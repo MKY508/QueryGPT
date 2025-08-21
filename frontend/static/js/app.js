@@ -360,7 +360,8 @@ class DataAnalysisPlatform {
         const message = messageInput.value.trim();
         
         if (!message) {
-            this.showNotification('请输入查询内容', 'error');
+            const i18n = window.i18nManager || { t: (key) => key };
+            this.showNotification(i18n.t('errors.enterQuery'), 'error');
             return;
         }
 
@@ -551,7 +552,8 @@ class DataAnalysisPlatform {
             window.HistoryManager.instance.loadRecentConversations();
         }
         
-        this.showNotification('已开始新对话', 'success');
+        const i18n = window.i18nManager || { t: (key) => key };
+        this.showNotification(i18n.t('errors.newConversationStarted'), 'success');
     }
     
     /**
@@ -2046,10 +2048,11 @@ class DataAnalysisPlatform {
      * 复制到剪贴板
      */
     copyToClipboard(text) {
+        const i18n = window.i18nManager || { t: (key) => key };
         navigator.clipboard.writeText(text).then(() => {
-            this.showNotification('已复制到剪贴板', 'success');
+            this.showNotification(i18n.t('errors.copiedToClipboard'), 'success');
         }).catch(() => {
-            this.showNotification('复制失败', 'error');
+            this.showNotification(i18n.t('errors.copyFailed'), 'error');
         });
     }
 
@@ -2122,8 +2125,9 @@ class DataAnalysisPlatform {
         this.updateLanguageToggleStyle(newLang);
         
         // 显示通知
+        const i18n = window.i18nManager || { t: (key) => key };
         this.showNotification(
-            newLang === 'zh' ? '语言已切换为中文' : 'Language switched to English', 
+            newLang === 'zh' ? i18n.t('errors.languageSwitchedZh') : i18n.t('errors.languageSwitchedEn'), 
             'success'
         );
     }

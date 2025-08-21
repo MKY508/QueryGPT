@@ -31,11 +31,19 @@ class SettingsManager {
     async loadConfig() {
         try {
             const response = await fetch('/api/config');
+            if (!response.ok) {
+                // 如果响应不成功，静默处理，不显示错误
+                console.warn('API配置端点不可用，使用默认配置');
+                this.config = {};
+                return;
+            }
             this.config = await response.json();
             console.log('SettingsManager加载配置:', this.config);
         } catch (error) {
-            console.error('SettingsManager加载配置失败:', error);
+            // 静默处理错误，避免页面加载时弹出错误
+            console.warn('无法连接到后端API，使用默认配置:', error.message);
             this.config = {};
+            // 不显示错误通知，避免打扰用户
         }
     }
 
