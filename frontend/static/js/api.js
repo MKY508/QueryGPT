@@ -25,6 +25,10 @@ class API {
             });
 
             if (!response.ok) {
+                // 对于配置端点的404，不要抛出错误
+                if (url === '/api/config' && response.status === 404) {
+                    return {};  // 返回空配置
+                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
@@ -35,6 +39,11 @@ class API {
             
             return await response.text();
         } catch (error) {
+            // 页面加载时的网络错误静默处理
+            if (url === '/api/config' || url === '/api/models') {
+                console.warn(`加载${url}失败，使用默认值:`, error.message);
+                return url === '/api/config' ? {} : { models: [] };
+            }
             console.error('API请求失败:', error);
             throw error;
         }

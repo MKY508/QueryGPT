@@ -43,11 +43,35 @@ class DataAnalysisPlatform {
      * 初始化应用
      */
     async init() {
-        await this.loadConfig();
-        await this.loadModels();  // 加载模型列表
-        await this.loadSettings();  // 加载并显示设置
+        // 延迟初始化，确保DOM完全加载
+        if (document.readyState !== 'complete') {
+            await new Promise(resolve => {
+                window.addEventListener('load', resolve);
+            });
+        }
+        
+        // 使用Promise.allSettled避免单个失败影响整体
+        const initTasks = await Promise.allSettled([
+            this.loadConfig(),
+            this.loadModels(),
+            this.loadSettings()
+        ]);
+        
+        // 记录初始化失败的任务（仅用于调试）
+        initTasks.forEach((result, index) => {
+            if (result.status === 'rejected') {
+                const taskNames = ['配置', '模型', '设置'];
+                console.warn(`${taskNames[index]}加载失败，使用默认值:`, result.reason?.message);
+            }
+        });
+        
+        // 设置事件监听器（不依赖后端）
         this.setupEventListeners();
-        this.checkConnection();
+        
+        // 异步检查连接（不阻塞初始化）
+        setTimeout(() => this.checkConnection(), 500);
+        
+        // 加载视图模式
         this.loadViewMode();
         
         // 初始化历史记录管理器
@@ -311,6 +335,19 @@ class DataAnalysisPlatform {
         if (activeLink) {
             activeLink.classList.add('active');
         }
+        
+        // 如果切换到历史记录页面，按需加载历史记录
+        if (tabName === 'history' && this.historyManager) {
+            // 如果有标记需要刷新，强制刷新
+            const forceReload = this.historyManager.needsRefresh;
+            if (forceReload) {
+                this.historyManager.needsRefresh = false;
+            }
+            // 延迟加载，避免切换动画时的卡顿
+            setTimeout(() => {
+                this.historyManager.loadRecentConversationsIfNeeded(forceReload);
+            }, 200);
+        }
 
         // 更新内容
         document.querySelectorAll('.tab-content').forEach(content => {
@@ -542,6 +579,11 @@ class DataAnalysisPlatform {
         const chatMessages = document.getElementById('chat-messages');
         if (chatMessages) {
             chatMessages.innerHTML = '';
+        }
+        
+        // 标记历史记录需要刷新
+        if (this.historyManager) {
+            this.historyManager.markNeedsRefresh();
         }
         
         // 显示欢迎消息
@@ -1655,14 +1697,30 @@ class DataAnalysisPlatform {
      */
     async loadConfig() {
         try {
-            this.config = await api.getConfig();
+            // 设置超时时间，避免长时间等待
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('配置加载超时')), 3000)
+            );
+            
+            this.config = await Promise.race([
+                api.getConfig(),
+                timeoutPromise
+            ]);
             
             // 更新UI
             if (this.config.current_model) {
-                document.getElementById('current-model').value = this.config.current_model;
+                const modelSelect = document.getElementById('current-model');
+                if (modelSelect) {
+                    modelSelect.value = this.config.current_model;
+                }
             }
         } catch (error) {
-            console.error('加载配置失败:', error);
+            // 静默处理错误，使用默认配置
+            console.warn('配置加载失败，使用默认值:', error.message);
+            this.config = {
+                current_model: 'gpt-4.1',
+                api_base: 'http://localhost:11434/v1'
+            };
         }
     }
 
@@ -1840,9 +1898,11 @@ class DataAnalysisPlatform {
         const messagesContainer = document.getElementById('chat-messages');
         if (!messagesContainer) return;
         
-        // 检查是否已有欢迎消息
+        // 移除现有的欢迎消息（为了支持语言切换重新生成）
         const existingWelcome = messagesContainer.querySelector('.welcome-message');
-        if (existingWelcome) return;
+        if (existingWelcome) {
+            existingWelcome.remove();
+        }
         
         // 获取翻译
         const i18n = window.i18nManager || { 
@@ -2123,6 +2183,12 @@ class DataAnalysisPlatform {
         
         // 更新切换开关样式
         this.updateLanguageToggleStyle(newLang);
+        
+        // 刷新欢迎消息（如果当前没有对话）
+        const messagesContainer = document.getElementById('chat-messages');
+        if (messagesContainer && messagesContainer.querySelector('.welcome-message')) {
+            this.showWelcomeMessage();
+        }
         
         // 显示通知
         const i18n = window.i18nManager || { t: (key) => key };
@@ -2512,7 +2578,25 @@ class DataAnalysisPlatform {
     }
 }
 
-// 初始化应用
-document.addEventListener('DOMContentLoaded', () => {
+// 初始化应用 - 使用多重检查确保完全加载
+function initializeApp() {
+    // 检查依赖是否都已加载
+    if (typeof API === 'undefined' || 
+        typeof LanguageManager === 'undefined' || 
+        typeof ErrorHandler === 'undefined') {
+        // 如果依赖未加载，延迟重试
+        setTimeout(initializeApp, 100);
+        return;
+    }
+    
+    // 创建应用实例
     window.app = new DataAnalysisPlatform();
-});
+}
+
+// 使用多重事件确保页面完全加载
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    // 如果DOMContentLoaded已经触发，延迟执行确保其他脚本已加载
+    setTimeout(initializeApp, 100);
+}
