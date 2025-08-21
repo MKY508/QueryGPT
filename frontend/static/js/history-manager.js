@@ -30,6 +30,8 @@ class HistoryManager {
         };
         
         this.initialized = false;  // 标记是否已初始化
+        this.lastLoadTime = 0;  // 上次加载时间
+        this.loadInterval = 60000;  // 最小加载间隔（60秒）
         // 不再自动初始化，等待首次访问时初始化
     }
     
@@ -65,30 +67,46 @@ class HistoryManager {
         this.setupVirtualScroll();
         this.setupIntersectionObserver();
         
-        // 首次加载数据
-        await this.loadRecentConversations();
+        // 延迟首次加载，避免页面加载时的闪烁
+        setTimeout(() => {
+            this.loadRecentConversationsIfNeeded();
+        }, 500);
         
-        // 定期刷新历史记录（每30秒）
-        this.startAutoRefresh();
+        // 不再自动刷新，改为按需加载
     }
     
     /**
-     * 启动自动刷新
+     * 按需加载历史记录
      */
-    startAutoRefresh() {
-        // 清除旧的定时器
-        if (this.autoRefreshTimer) {
-            clearInterval(this.autoRefreshTimer);
+    async loadRecentConversationsIfNeeded(forceReload = false) {
+        const now = Date.now();
+        
+        // 如果不是强制刷新，检查时间间隔
+        if (!forceReload && (now - this.lastLoadTime) < this.loadInterval) {
+            console.log('历史记录加载间隔未到，跳过加载');
+            return;
         }
         
-        // 每30秒自动刷新一次
-        this.autoRefreshTimer = setInterval(() => {
-            // 如果正在删除或加载中，不刷新
-            if (!this.isLoading && !this.isDeleting && document.getElementById('history-tab').classList.contains('active')) {
-                // 自动刷新历史记录（静默）
-                this.loadRecentConversations(0, true);  // 静默刷新
-            }
-        }, 30000);
+        // 如果历史记录标签页不活动，不加载
+        const historyTab = document.getElementById('history-tab');
+        if (!historyTab || !historyTab.classList.contains('active')) {
+            return;
+        }
+        
+        this.lastLoadTime = now;
+        await this.loadRecentConversations();
+    }
+    
+    /**
+     * 标记需要刷新（用于新对话创建后）
+     */
+    markNeedsRefresh() {
+        this.needsRefresh = true;
+        // 如果历史记录页面当前可见，立即刷新
+        const historyTab = document.getElementById('history-tab');
+        if (historyTab && historyTab.classList.contains('active')) {
+            this.loadRecentConversationsIfNeeded(true);
+        }
     }
     
     /**

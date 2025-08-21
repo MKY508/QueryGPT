@@ -9,10 +9,11 @@ class ErrorHandler {
         this.maxLogSize = 100;
         this.pageLoadComplete = false;
         
-        // 延迟启动错误处理，避免页面加载时的误报
+        // 增加延迟时间，确保页面完全初始化
         setTimeout(() => {
             this.pageLoadComplete = true;
-        }, 3000);
+            console.log('错误处理器已激活');
+        }, 5000);  // 增加到5秒
         
         this.setupGlobalHandlers();
     }
@@ -62,7 +63,12 @@ class ErrorHandler {
             'ResizeObserver loop limit exceeded',
             'Non-Error promise rejection captured',
             '/api/config',  // 忽略配置加载失败
-            'Failed to fetch'  // 忽略初始fetch失败
+            '/api/models',  // 忽略模型加载失败
+            'Failed to fetch',  // 忽略初始fetch失败
+            'NetworkError',  // 忽略网络错误
+            '404',  // 忽略404错误
+            'HTTP error! status: 404',  // 忽略404 HTTP错误
+            '配置加载超时'  // 忽略配置超时
         ];
         
         if (ignoredErrors.some(ignored => errorString.includes(ignored))) {
