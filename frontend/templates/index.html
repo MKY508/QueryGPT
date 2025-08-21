@@ -45,18 +45,18 @@
                     <li class="menu-item has-submenu expanded">
                         <a href="#" class="menu-header">
                             <i class="fas fa-search"></i>
-                            <span>查询</span>
+                            <span data-i18n="nav.query">查询</span>
                             <i class="fas fa-chevron-down submenu-arrow"></i>
                         </a>
                         <ul class="submenu">
                             <li>
                                 <a href="#" class="nav-link active" data-tab="chat">
-                                    <i class="fas fa-plus-circle"></i> 数据查询
+                                    <i class="fas fa-plus-circle"></i> <span data-i18n="nav.newQuery">数据查询</span>
                                 </a>
                             </li>
                             <li>
                                 <a href="#" class="nav-link" data-tab="history">
-                                    <i class="fas fa-history"></i> 历史记录
+                                    <i class="fas fa-history"></i> <span data-i18n="nav.history">历史记录</span>
                                 </a>
                             </li>
                         </ul>
@@ -66,23 +66,23 @@
                     <li class="menu-item has-submenu">
                         <a href="#" class="menu-header">
                             <i class="fas fa-cog"></i>
-                            <span>设置</span>
+                            <span data-i18n="nav.settings">设置</span>
                             <i class="fas fa-chevron-down submenu-arrow"></i>
                         </a>
                         <ul class="submenu" style="display: none;">
                             <li>
                                 <a href="#" class="nav-link" data-tab="settings" data-settings-tab="basic">
-                                    <i class="fas fa-cog"></i> 基础设置
+                                    <i class="fas fa-cog"></i> <span data-i18n="nav.basicSettings">基础设置</span>
                                 </a>
                             </li>
                             <li>
                                 <a href="#" class="nav-link" data-tab="settings" data-settings-tab="models">
-                                    <i class="fas fa-brain"></i> 模型管理
+                                    <i class="fas fa-brain"></i> <span data-i18n="nav.modelManagement">模型管理</span>
                                 </a>
                             </li>
                             <li>
                                 <a href="#" class="nav-link" data-tab="settings" data-settings-tab="database">
-                                    <i class="fas fa-database"></i> 数据库配置
+                                    <i class="fas fa-database"></i> <span data-i18n="nav.databaseConfig">数据库配置</span>
                                 </a>
                             </li>
                         </ul>
@@ -92,7 +92,7 @@
                     <li class="menu-item">
                         <a href="#" class="nav-link" data-tab="about">
                             <i class="fas fa-info-circle"></i>
-                            <span>关于</span>
+                            <span data-i18n="nav.about">关于</span>
                         </a>
                     </li>
                 </ul>
@@ -112,7 +112,7 @@
             <div class="tab-content active" id="chat-tab">
                 <div class="chat-header">
                     <div class="header-left">
-                        <h1>数据查询与分析</h1>
+                        <h1 data-i18n="chat.title">数据查询与分析</h1>
                     </div>
                     <div class="header-controls">
                         <div class="model-selector">
@@ -124,7 +124,7 @@
                             </select>
                         </div>
                         <button class="btn-new-conversation" id="new-conversation">
-                            <i class="fas fa-plus"></i> 新对话
+                            <i class="fas fa-plus"></i> <span data-i18n="chat.newConversation">新对话</span>
                         </button>
                     </div>
                 </div>
@@ -138,6 +138,7 @@
                         <div class="chat-input">
                             <textarea id="message-input" 
                                       placeholder="输入查询内容..." 
+                                      data-i18n="chat.inputPlaceholder"
                                       rows="3"></textarea>
                             <button id="send-button" class="send-button">
                                 <i class="fas fa-paper-plane"></i>
@@ -197,9 +198,17 @@
                     <!-- 基础设置标签页 -->
                     <div class="settings-panel active" id="basic-settings">
                         <div class="settings-card">
-                            <h3><i class="fas fa-cog"></i> 基础设置</h3>
+                            <h3><i class="fas fa-cog"></i> <span data-i18n="settings.title">基础设置</span></h3>
                             <div class="form-group">
-                                <label>默认视图模式</label>
+                                <label data-i18n="settings.language">语言</label>
+                                <select id="language-select">
+                                    <option value="zh">中文</option>
+                                    <option value="en">English</option>
+                                </select>
+                                <small data-i18n="settings.languageDesc">选择系统界面语言</small>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="settings.viewMode">默认视图模式</label>
                                 <select id="default-view-mode">
                                     <option value="user">用户模式（简洁）</option>
                                     <option value="developer">开发者模式（详细）</option>
@@ -642,6 +651,7 @@
     </div>
     
     <!-- JavaScript -->
+    <script src="/static/js/i18n.js"></script>
     <script src="/static/js/performance.js"></script>
     <script src="/static/js/error-handler.js"></script>
     <script src="/static/js/api.js"></script>
