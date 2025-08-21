@@ -15,7 +15,7 @@
     <!-- 内部样式 -->
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/main.css">
-    <link rel="stylesheet" href="/static/css/about-settings.css">
+    <link rel="stylesheet" href="/static/css/about-settings.css?v=20250821">
     <link rel="stylesheet" href="/static/css/dual-view-system.css">
     <link rel="stylesheet" href="/static/css/thinking-progress-enhanced.css">
     <link rel="stylesheet" href="/static/css/responsive.css">
@@ -37,9 +37,6 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h2><i class="fas fa-chart-line"></i> QueryGPT</h2>
-                <div class="system-info">
-                    <small>智能数据查询与可视化系统</small>
-                </div>
             </div>
             
             <nav class="sidebar-nav">
@@ -349,11 +346,10 @@
                 <div class="about-hero">
                     <div class="hero-content">
                         <div class="logo-section">
-                            <i class="fas fa-chart-line hero-icon"></i>
+                            <img src="/static/images/logo.png" alt="QueryGPT Logo" style="width: 320px; height: auto; margin: 0 auto; display: block;">
                         </div>
                         <div class="hero-info">
-                            <h1 class="system-title">QueryGPT</h1>
-                            <p class="system-version">版本 v1.0.0 Beta | 2025年8月发布</p>
+                            <p class="system-version" style="color: #6c757d;">版本 v1.0.0 Beta | 2025年8月发布</p>
                             <div class="hero-badges">
                                 <span class="badge-item">
                                     <i class="fas fa-robot"></i> 智能数据分析
@@ -602,20 +598,6 @@
                         <div id="history-list"></div>
                     </div>
                     
-                    <div class="history-stats" id="history-stats">
-                        <div class="history-stat">
-                            <div class="history-stat-value" id="stat-total">0</div>
-                            <div class="history-stat-label">总对话</div>
-                        </div>
-                        <div class="history-stat">
-                            <div class="history-stat-value" id="stat-today">0</div>
-                            <div class="history-stat-label">今日查询</div>
-                        </div>
-                        <div class="history-stat">
-                            <div class="history-stat-value" id="stat-messages">0</div>
-                            <div class="history-stat-label">总消息</div>
-                        </div>
-                    </div>
                 </div>
             </div>
             
