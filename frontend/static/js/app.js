@@ -169,6 +169,23 @@ class DataAnalysisPlatform {
      * 设置设置页面事件
      */
     setupSettingsEvents() {
+        // 语言切换事件
+        const languageSelect = document.getElementById('language-select');
+        if (languageSelect) {
+            // 设置当前语言
+            languageSelect.value = window.i18nManager.getCurrentLanguage();
+            
+            // 监听语言切换
+            languageSelect.addEventListener('change', (e) => {
+                const newLang = e.target.value;
+                window.i18nManager.setLanguage(newLang);
+                this.showNotification(
+                    newLang === 'zh' ? '语言已切换为中文' : 'Language switched to English', 
+                    'success'
+                );
+            });
+        }
+        
         // 测试API连接
         document.getElementById('test-api')?.addEventListener('click', async () => {
             const config = {
