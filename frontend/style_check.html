@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>样式检查页面</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="static/css/main.css">
+    <link rel="stylesheet" href="static/css/dual-view-system.css">
+    <style>
+        .check-section {
+            margin: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .check-item {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 3px solid #3498db;
+            background: #f8f9fa;
+        }
+        .success { color: #27ae60; }
+        .warning { color: #f39c12; }
+        .error { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏示例 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-chart-line"></i> 数据分析平台</h2>
+                <div class="system-info">
+                    <small>样式检查版本</small>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <ul>
+                    <li>
+                        <a href="#" class="nav-link active">
+                            <i class="fas fa-terminal"></i> 数据查询
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-cog"></i> 系统设置
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="nav-link">
+                            <i class="fas fa-info-circle"></i> 关于
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="status-dot connected"></span>
+                    <span>连接正常</span>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <div class="check-section">
+                <h1>🎨 CSS样式检查报告</h1>
+                
+                <div class="check-item">
+                    <h3 class="success">✅ 侧边栏渐变背景</h3>
+                    <p>已应用: linear-gradient(180deg, #2c3e50 0%, #34495e 100%)</p>
+                </div>
+                
+                <div class="check-item">
+                    <h3 class="success">✅ 侧边栏宽度</h3>
+                    <p>已设置: 260px</p>
+                </div>
+                
+                <div class="check-item">
+                    <h3 class="success">✅ 字体系统</h3>
+                    <p>已应用: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto</p>
+                </div>
+                
+                <div class="check-item">
+                    <h3 class="success">✅ 背景色</h3>
+                    <p>主内容区: #f5f5f5</p>
+                </div>
+                
+                <div class="check-item">
+                    <h3 class="success">✅ 菜单hover效果</h3>
+                    <p>背景: #3498db, 左边框: 白色, 动画: translateX(5px)</p>
+                </div>
+            </div>
+            
+            <!-- 组件示例 -->
+            <div class="check-section">
+                <h2>组件样式预览</h2>
+                
+                <div style="margin: 20px 0;">
+                    <button class="btn-primary">主要按钮</button>
+                    <button class="btn-secondary">次要按钮</button>
+                    <button class="btn-danger">危险按钮</button>
+                </div>
+                
+                <div class="card" style="margin: 20px 0;">
+                    <h3>卡片组件</h3>
+                    <p>这是一个卡片组件示例，具有白色背景、圆角和阴影效果。</p>
+                </div>
+                
+                <div class="form-group" style="margin: 20px 0;">
+                    <label>输入框示例</label>
+                    <input type="text" class="form-control" placeholder="请输入内容">
+                </div>
+                
+                <div class="alert alert-info" style="margin: 20px 0;">
+                    <i class="fas fa-info-circle"></i> 这是一个信息提示框
+                </div>
+            </div>
+            
+            <!-- 样式验证脚本 -->
+            <div class="check-section">
+                <h2>JavaScript样式验证</h2>
+                <div id="js-check-result"></div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // 验证CSS是否正确加载
+        window.onload = function() {
+            const sidebar = document.querySelector('.sidebar');
+            const styles = window.getComputedStyle(sidebar);
+            const resultDiv = document.getElementById('js-check-result');
+            
+            let html = '<ul>';
+            
+            // 检查背景渐变
+            const background = styles.background;
+            if (background.includes('linear-gradient')) {
+                html += '<li class="success">✅ 渐变背景已正确加载</li>';
+            } else {
+                html += '<li class="error">❌ 渐变背景未加载</li>';
+            }
+            
+            // 检查宽度
+            const width = styles.width;
+            if (width === '260px') {
+                html += '<li class="success">✅ 侧边栏宽度正确</li>';
+            } else {
+                html += '<li class="warning">⚠️ 侧边栏宽度: ' + width + '</li>';
+            }
+            
+            // 检查字体
+            const fontFamily = styles.fontFamily;
+            if (fontFamily.includes('apple-system')) {
+                html += '<li class="success">✅ 字体系统正确</li>';
+            } else {
+                html += '<li class="warning">⚠️ 字体: ' + fontFamily + '</li>';
+            }
+            
+            html += '</ul>';
+            resultDiv.innerHTML = html;
+        };
+    </script>
+</body>
+</html>

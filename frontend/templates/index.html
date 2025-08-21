@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryGPT - AI数据库查询</title>
+    
+    <!-- 外部资源 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    
+    <!-- 设计系统核心样式 -->
+    <link rel="stylesheet" href="/static/css/design-system.css">
+    <link rel="stylesheet" href="/static/css/modern-style.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/animations.css">
+    
+    <!-- 功能模块样式 -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/about-settings.css">
+    <link rel="stylesheet" href="/static/css/dual-view-system.css">
+    <link rel="stylesheet" href="/static/css/thinking-progress-enhanced.css">
+    <link rel="stylesheet" href="/static/css/query-summary.css">
+    <link rel="stylesheet" href="/static/css/history.css">
+    
+    <!-- 响应式和修复样式 -->
+    <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/ui-fixes.css">
+</head>
+<body data-theme="auto">
+    <div class="container modern-layout">
+        <!-- 遮罩层 -->
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+        
+        <!-- 移动端菜单按钮 -->
+        <button class="mobile-menu-btn" id="menu-toggle-btn">
+            <i class="fas fa-bars"></i>
+        </button>
+        
+        <!-- 主题切换按钮 -->
+        <div class="theme-toggle" id="theme-toggle">
+            <button class="theme-btn" data-theme="light" title="明亮模式">
+                <i class="fas fa-sun"></i>
+            </button>
+            <button class="theme-btn" data-theme="auto" title="自动模式">
+                <i class="fas fa-adjust"></i>
+            </button>
+            <button class="theme-btn" data-theme="dark" title="深色模式">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+        
+        <!-- 侧边栏 -->
+        <aside class="sidebar modern-sidebar animated">
+            <div class="sidebar-header modern-sidebar-header">
+                <h2 class="brand-title"><i class="fas fa-chart-line brand-icon"></i> QueryGPT</h2>
+                <div class="system-info">
+                    <small class="brand-subtitle">智能数据查询与可视化系统</small>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav modern-nav">
+                <ul class="menu-list">
+                    <!-- 查询菜单 -->
+                    <li class="menu-item has-submenu expanded">
+                        <a href="#" class="menu-header">
+                            <i class="fas fa-search"></i>
+                            <span>查询</span>
+                            <i class="fas fa-chevron-down submenu-arrow"></i>
+                        </a>
+                        <ul class="submenu">
+                            <li>
+                                <a href="#" class="nav-link active" data-tab="chat">
+                                    <i class="fas fa-plus-circle"></i> 数据查询
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link" data-tab="history">
+                                    <i class="fas fa-history"></i> 历史记录
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 设置菜单 -->
+                    <li class="menu-item has-submenu">
+                        <a href="#" class="menu-header">
+                            <i class="fas fa-cog"></i>
+                            <span>设置</span>
+                            <i class="fas fa-chevron-down submenu-arrow"></i>
+                        </a>
+                        <ul class="submenu" style="display: none;">
+                            <li>
+                                <a href="#" class="nav-link" data-tab="settings" data-settings-tab="basic">
+                                    <i class="fas fa-cog"></i> 基础设置
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link" data-tab="settings" data-settings-tab="models">
+                                    <i class="fas fa-brain"></i> 模型管理
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="nav-link" data-tab="settings" data-settings-tab="database">
+                                    <i class="fas fa-database"></i> 数据库配置
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    
+                    <!-- 关于菜单 -->
+                    <li class="menu-item">
+                        <a href="#" class="nav-link" data-tab="about">
+                            <i class="fas fa-info-circle"></i>
+                            <span>关于</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer modern-sidebar-footer">
+                <div class="status-indicator glass-effect">
+                    <span class="status-dot pulse" id="connection-status"></span>
+                    <span class="status-text" id="connection-text">检查连接中...</span>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 主内容区 -->
+        <main class="main-content modern-content animated">
+            <!-- 数据查询页面 -->
+            <div class="tab-content active fade-in" id="chat-tab">
+                <div class="chat-header modern-header glass-effect">
+                    <div class="header-left">
+                        <h1>数据查询与分析</h1>
+                    </div>
+                    <div class="header-controls">
+                        <div class="model-selector modern-select">
+                            <select id="current-model">
+                                <option value="gpt-4.1">GPT-4.1</option>
+                                <option value="claude-sonnet-4">Claude Sonnet 4</option>
+                                <option value="deepseek-r1">DeepSeek R1</option>
+                                <option value="qwen-flagship">Qwen 旗舰模型</option>
+                            </select>
+                        </div>
+                        <button class="btn-new-conversation btn-modern btn-secondary" id="new-conversation">
+                            <i class="fas fa-plus"></i> 新对话
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="chat-container modern-chat">
+                    <div class="chat-messages modern-messages custom-scrollbar" id="chat-messages">
+                        <!-- 欢迎消息将由JavaScript动态生成 -->
+                    </div>
+                    
+                    <div class="chat-input-container modern-input-container">
+                        <div class="chat-input modern-input glass-effect">
+                            <textarea id="message-input" 
+                                      class="modern-textarea"
+                                      placeholder="输入查询内容..." 
+                                      rows="3"></textarea>
+                            <button id="send-button" class="send-button btn-modern btn-primary-gradient">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button id="stop-button" class="stop-button btn-modern btn-danger" style="display: none;">
+                                <i class="fas fa-stop"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 导出结果页面 -->
+            <div class="tab-content" id="export-tab">
+                <div class="page-header">
+                    <h1>导出结果</h1>
+                </div>
+                <div class="export-container">
+                    <div class="settings-card">
+                        <h3><i class="fas fa-file-export"></i> 导出选项</h3>
+                        <div class="form-group">
+                            <label>导出格式</label>
+                            <select id="export-format">
+                                <option value="excel">Excel (.xlsx)</option>
+                                <option value="csv">CSV (.csv)</option>
+                                <option value="json">JSON (.json)</option>
+                                <option value="html">HTML报表</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>包含内容</label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" checked> 查询结果数据
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" checked> 可视化图表
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox"> 执行的SQL语句
+                            </label>
+                        </div>
+                        <button class="btn-primary btn-modern btn-primary-gradient" id="export-data">
+                            <i class="fas fa-download"></i> 导出数据
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 系统设置页面 -->
+            <div class="tab-content" id="settings-tab">
+                <div class="page-header">
+                    <h1>系统设置</h1>
+                </div>
+                
+                <div class="settings-container">
+                    
+                    <!-- 基础设置标签页 -->
+                    <div class="settings-panel active" id="basic-settings">
+                        <div class="settings-card">
+                            <h3><i class="fas fa-cog"></i> 基础设置</h3>
+                            <div class="form-group">
+                                <label>默认视图模式</label>
+                                <select id="default-view-mode">
+                                    <option value="user">用户模式（简洁）</option>
+                                    <option value="developer">开发者模式（详细）</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>上下文保留轮数</label>
+                                <select id="context-rounds">
+                                    <option value="0">不保留历史（单轮对话）</option>
+                                    <option value="1">保留1轮历史</option>
+                                    <option value="2">保留2轮历史</option>
+                                    <option value="3" selected>保留3轮历史（推荐）</option>
+                                    <option value="5">保留5轮历史</option>
+                                    <option value="10">保留10轮历史（可能影响性能）</option>
+                                </select>
+                                <small>设置AI记住之前几轮对话的内容，用于错误修正和上下文理解</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 模型管理标签页 -->
+                    <div class="settings-panel" id="models-settings">
+                        <div class="settings-card">
+                            <div class="card-header">
+                                <h3><i class="fas fa-brain"></i> 模型管理</h3>
+                                <button class="btn-primary btn-sm" id="add-model-btn">
+                                    <i class="fas fa-plus"></i> 添加模型
+                                </button>
+                            </div>
+                            
+                            <!-- 模型列表表格 -->
+                            <div class="table-container">
+                                <table class="models-table">
+                                    <thead>
+                                        <tr>
+                                            <th>模型名称</th>
+                                            <th>类型</th>
+                                            <th>API地址</th>
+                                            <th>状态</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="models-list">
+                                        <tr>
+                                            <td>GPT-4.1</td>
+                                            <td>OpenAI</td>
+                                            <td>http://localhost:11434/v1</td>
+                                            <td><span class="status-badge active">可用</span></td>
+                                            <td>
+                                                <button class="btn-icon" title="编辑" onclick="app.editModel('gpt-4.1')">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn-icon" title="测试" onclick="app.testModel('gpt-4.1')">
+                                                    <i class="fas fa-plug"></i>
+                                                </button>
+                                                <button class="btn-icon danger" title="删除" onclick="app.deleteModel('gpt-4.1')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>Claude Sonnet 4</td>
+                                            <td>Anthropic</td>
+                                            <td>http://localhost:11434/v1</td>
+                                            <td><span class="status-badge active">可用</span></td>
+                                            <td>
+                                                <button class="btn-icon" title="编辑" onclick="app.editModel('claude-sonnet-4')">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn-icon" title="测试" onclick="app.testModel('claude-sonnet-4')">
+                                                    <i class="fas fa-plug"></i>
+                                                </button>
+                                                <button class="btn-icon danger" title="删除" onclick="app.deleteModel('claude-sonnet-4')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 数据库配置标签页 -->
+                    <div class="settings-panel" id="database-settings">
+                        <div class="settings-card">
+                            <h3><i class="fas fa-database"></i> Doris数据库配置</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>主机地址</label>
+                                    <input type="text" id="db-host" placeholder="例如: localhost 或 192.168.1.100">
+                                </div>
+                                <div class="form-group">
+                                    <label>端口</label>
+                                    <input type="number" id="db-port" placeholder="3306" value="3306">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>用户名</label>
+                                    <input type="text" id="db-user" placeholder="数据库用户名">
+                                </div>
+                                <div class="form-group">
+                                    <label>密码</label>
+                                    <input type="password" id="db-password" placeholder="数据库密码">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>数据库名</label>
+                                <input type="text" id="db-name" placeholder="留空使用所有数据库">
+                                <small>提示：留空可访问所有可用数据库</small>
+                            </div>
+                            <div class="button-group">
+                                <button class="btn-primary" id="test-db">
+                                    <i class="fas fa-plug"></i> 测试连接
+                                </button>
+                                <button class="btn-secondary" id="save-db-config">
+                                    <i class="fas fa-save"></i> 保存配置
+                                </button>
+                            </div>
+                            
+                            <!-- 连接状态显示 -->
+                            <div class="connection-status-box" id="db-connection-status" style="display: none;">
+                                <div class="status-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <div class="status-info">
+                                    <h4>连接成功</h4>
+                                    <p>数据库连接正常，共发现 <span id="table-count">0</span> 个表</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+            
+            <!-- 关于页面 -->
+            <div class="tab-content" id="about-tab">
+                <div class="about-header">
+                    <h1>关于系统</h1>
+                </div>
+                
+                <div class="about-hero">
+                    <div class="hero-content">
+                        <div class="logo-section">
+                            <i class="fas fa-chart-line hero-icon"></i>
+                        </div>
+                        <div class="hero-info">
+                            <h1 class="system-title">QueryGPT</h1>
+                            <p class="system-version">版本 v1.0.0 Beta | 2025年8月发布</p>
+                            <div class="hero-badges">
+                                <span class="badge-item">
+                                    <i class="fas fa-robot"></i> 智能数据分析
+                                </span>
+                                <span class="badge-item">
+                                    <i class="fas fa-database"></i> 数据库查询
+                                </span>
+                                <span class="badge-item">
+                                    <i class="fas fa-chart-pie"></i> 可视化生成
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="about-cards">
+                    <div class="about-card">
+                        <div class="card-icon">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3>开发者</h3>
+                            <p class="card-main">MKY</p>
+                            <p class="card-sub">独立开发者</p>
+                        </div>
+                    </div>
+                    
+                    <div class="about-card">
+                        <div class="card-icon">
+                            <i class="fas fa-building"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3>所属单位</h3>
+                            <p class="card-main">开源项目</p>
+                            <p class="card-sub">MIT License</p>
+                        </div>
+                    </div>
+                    
+                    <div class="about-card">
+                        <div class="card-icon">
+                            <i class="fas fa-code-branch"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3>版本信息</h3>
+                            <p class="card-main">v1.0.0 Beta</p>
+                            <p class="card-sub">测试版本</p>
+                        </div>
+                    </div>
+                    
+                    <div class="about-card">
+                        <div class="card-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3>更新时间</h3>
+                            <p class="card-main">2025年8月</p>
+                            <p class="card-sub">持续维护中</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="license-section">
+                    <h2><i class="fas fa-file-contract"></i> 许可证说明</h2>
+                    <div class="license-content">
+                        <div class="license-item">
+                            <strong>OpenInterpreter 核心引擎：</strong> MIT许可证 
+                            <span class="license-info">
+                                <i class="fas fa-info-circle"></i> 
+                                开源自然语言代码执行引擎，允许商业使用
+                            </span>
+                            <div class="license-details">
+                                <small>• 本项目使用pip安装的0.4.3版本，遵循MIT许可证</small>
+                                <small>• 允许自由使用、修改和部署</small>
+                                <small>• 提供自然语言转代码的核心AI能力</small>
+                            </div>
+                        </div>
+                        <div class="license-item">
+                            <strong>Flask/PyMySQL/Plotly等：</strong> MIT/BSD许可证 
+                            <span class="license-info">
+                                <i class="fas fa-info-circle"></i> 
+                                允许商业使用、修改和分发
+                            </span>
+                            <div class="license-details">
+                                <small>• Flask 3.1.1 - 轻量级Web框架，BSD许可证</small>
+                                <small>• PyMySQL 1.1.1 - MySQL数据库连接库，MIT许可证</small>
+                                <small>• Plotly 6.3.0 - 数据可视化库，MIT许可证</small>
+                                <small>• 所有依赖均为开源许可证</small>
+                            </div>
+                        </div>
+                        <div class="license-item">
+                            <div class="license-notice">
+                                <i class="fas fa-exclamation-triangle"></i> 
+                                <strong>免责声明：</strong> 本系统为大模型驱动的工具，开发者对使用过程中可能出现的数据损失或其他问题不承担责任。请在使用前做好数据备份和权限管理。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 技术栈部分 -->
+                <div class="tech-stack-section">
+                    <h2><i class="fas fa-layer-group"></i> 技术栈</h2>
+                    <div class="tech-grid">
+                        <div class="tech-group">
+                            <h3><i class="fas fa-server"></i> 后端技术</h3>
+                            <div class="tech-badges">
+                                <span class="tech-badge">Python 3.10</span>
+                                <span class="tech-badge">Flask 3.1.1</span>
+                                <span class="tech-badge">OpenInterpreter 0.4.3</span>
+                                <span class="tech-badge">PyMySQL 1.1.1</span>
+                                <span class="tech-badge">Pandas 2.3.1</span>
+                                <span class="tech-badge">Plotly 6.3.0</span>
+                            </div>
+                        </div>
+                        <div class="tech-group">
+                            <h3><i class="fas fa-palette"></i> 前端技术</h3>
+                            <div class="tech-badges">
+                                <span class="tech-badge">HTML5</span>
+                                <span class="tech-badge">CSS3</span>
+                                <span class="tech-badge">JavaScript ES6</span>
+                                <span class="tech-badge">Plotly.js</span>
+                                <span class="tech-badge">Marked.js</span>
+                                <span class="tech-badge">Highlight.js</span>
+                            </div>
+                        </div>
+                        <div class="tech-group">
+                            <h3><i class="fas fa-database"></i> 数据库</h3>
+                            <div class="tech-badges">
+                                <span class="tech-badge">Apache Doris</span>
+                                <span class="tech-badge">MySQL Protocol</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="system-usage">
+                    <h2><i class="fas fa-info-circle"></i> 本系统使用声明</h2>
+                    <p>本系统基于开源组件开发，采用 MIT 许可证：</p>
+                    <ul>
+                        <li>自由使用、修改和分发</li>
+                        <li>支持商业和非商业用途</li>
+                        <li>请保留版权声明</li>
+                    </ul>
+                    <div class="developer-contact">
+                        <p><i class="fas fa-envelope"></i> <strong>开发者联系邮箱：</strong> mky369258@gmail.com</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 模型配置弹窗 -->
+            <div class="modal" id="model-modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="model-modal-title">添加模型</h3>
+                        <button class="modal-close" onclick="app.closeModelModal()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>模型名称 <span class="required">*</span></label>
+                            <input type="text" id="model-name" placeholder="例如: GPT-4 Turbo">
+                        </div>
+                        <div class="form-group">
+                            <label>模型ID <span class="required">*</span></label>
+                            <input type="text" id="model-id" placeholder="例如: gpt-4-turbo">
+                        </div>
+                        <div class="form-group">
+                            <label>模型类型 <span class="required">*</span></label>
+                            <select id="model-type">
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="qwen">Qwen</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>API地址 <span class="required">*</span></label>
+                            <input type="text" id="model-api-base" placeholder="https://api.example.com/v1">
+                        </div>
+                        <div class="form-group">
+                            <label>API密钥 <span class="required">*</span></label>
+                            <input type="password" id="model-api-key" placeholder="输入API密钥">
+                        </div>
+                        <div class="form-group">
+                            <label>最大Token数</label>
+                            <input type="number" id="model-max-tokens" placeholder="4096" value="4096">
+                        </div>
+                        <div class="form-group">
+                            <label>温度参数</label>
+                            <input type="number" id="model-temperature" placeholder="0.7" value="0.7" step="0.1" min="0" max="2">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" onclick="app.closeModelModal()">取消</button>
+                        <button class="btn-primary" id="save-model-btn">
+                            <i class="fas fa-save"></i> 保存模型
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 历史记录页面 -->
+            <div class="tab-content" id="history-tab">
+                <div class="history-container">
+                    <div class="history-header">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h2 class="history-title" style="margin: 0;">
+                                <i class="fas fa-history"></i>
+                                历史记录
+                            </h2>
+                            <button id="refresh-history-btn" class="btn-icon" title="刷新历史记录" 
+                                    style="background: white; border: 1px solid #dee2e6; color: #6c757d; 
+                                           padding: 8px 12px; border-radius: 6px; cursor: pointer; 
+                                           transition: all 0.3s ease;"
+                                    onmouseover="this.style.background='#f8f9fa'; this.style.transform='rotate(180deg)'"
+                                    onmouseout="this.style.background='white'; this.style.transform='rotate(0deg)'"
+                                    onclick="if(window.HistoryManager.instance) { window.HistoryManager.instance.loadRecentConversations(); this.style.transform='rotate(360deg)'; }">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="history-search-container">
+                            <input type="text" id="history-search" placeholder="搜索历史记录...">
+                            <i class="fas fa-search history-search-icon"></i>
+                        </div>
+                        
+                        <div class="history-filters">
+                            <button class="history-filter-btn active" data-filter="recent">
+                                <i class="fas fa-clock"></i> 最近
+                            </button>
+                            <button class="history-filter-btn" data-filter="today">
+                                <i class="fas fa-calendar-day"></i> 今天
+                            </button>
+                            <button class="history-filter-btn" data-filter="week">
+                                <i class="fas fa-calendar-week"></i> 本周
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="history-list-container" id="history-list-container">
+                        <div id="history-loading" class="history-loading">
+                            <div class="history-loading-spinner"></div>
+                            <p>加载中...</p>
+                        </div>
+                        <div id="history-list"></div>
+                    </div>
+                    
+                    <div class="history-stats" id="history-stats">
+                        <div class="history-stat">
+                            <div class="history-stat-value" id="stat-total">0</div>
+                            <div class="history-stat-label">总对话</div>
+                        </div>
+                        <div class="history-stat">
+                            <div class="history-stat-value" id="stat-today">0</div>
+                            <div class="history-stat-label">今日查询</div>
+                        </div>
+                        <div class="history-stat">
+                            <div class="history-stat-value" id="stat-messages">0</div>
+                            <div class="history-stat-label">总消息</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </main>
+    </div>
+    
+    <!-- 全局通知 -->
+    <div class="notification modern-notification slide-in" id="notification">
+        <div class="notification-content">
+            <i class="notification-icon"></i>
+            <span class="notification-text"></span>
+        </div>
+    </div>
+    
+    <!-- 加载提示 -->
+    <div class="loading-overlay modern-loading" id="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner modern-spinner"></div>
+            <p class="loading-text">处理中...</p>
+        </div>
+    </div>
+    
+    <!-- 删除确认弹窗 -->
+    <div class="delete-modal" id="delete-modal">
+        <div class="delete-modal-content">
+            <div class="delete-modal-header">
+                <i class="fas fa-exclamation-triangle delete-modal-icon"></i>
+                <h3 class="delete-modal-title">确认删除</h3>
+            </div>
+            <div class="delete-modal-body">
+                确定要删除这个对话吗？此操作无法撤销。
+            </div>
+            <div class="delete-modal-footer">
+                <button class="delete-modal-btn delete-modal-btn-cancel" onclick="window.HistoryManager.instance.closeDeleteModal()">
+                    取消
+                </button>
+                <button class="delete-modal-btn delete-modal-btn-delete" id="confirm-delete-btn">
+                    <i class="fas fa-trash"></i> 删除
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="/static/js/theme-manager.js"></script>
+    <script src="/static/js/performance.js"></script>
+    <script src="/static/js/error-handler.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/settings.js"></script>
+    <script src="/static/js/history-manager.js"></script>
+    <script src="/static/js/app.js"></script>
+    
+    <!-- 初始化主题管理器 -->
+    <script>
+        // 初始化主题管理器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 创建全局主题管理器实例
+            window.themeManager = new ThemeManager();
+            
+            // 添加页面加载动画
+            document.body.classList.add('page-loaded');
+            
+            // 初始化完成后移除加载状态
+            setTimeout(() => {
+                document.querySelector('.container').classList.add('loaded');
+            }, 100);
+        });
+    </script>
+</body>
+</html>
