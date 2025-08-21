@@ -1,6 +1,6 @@
 open-interpreter==0.4.3
 flask==2.3.3
-flask-cors==4.0.0
+flask-cors==6.0.1
 pymysql==1.1.0
 pandas==2.0.3
 plotly==5.17.0
