@@ -197,9 +197,7 @@ body {
 }
 
 /* 3. 统一关于系统页面配色 - 使用纯蓝色主题 */
-.about-hero {
-    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%) !important;
-}
+/* .about-hero样式已移到about-settings.css中定义 */
 
 .card-icon {
     background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%) !important;

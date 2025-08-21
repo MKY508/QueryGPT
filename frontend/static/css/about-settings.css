@@ -6,18 +6,26 @@
 }
 
 .about-hero {
-    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
+    background: white;
     border-radius: 16px;
     padding: 50px 60px;
     margin: 30px 40px 50px 40px;
-    color: white;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    color: #333;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border: 1px solid #e8eaec;
 }
 
 .hero-content {
     display: flex;
     align-items: center;
     gap: 40px;
+}
+
+.logo-section {
+    flex-shrink: 0;
+    padding: 15px;
+    background: white;
+    border-radius: 12px;
 }
 
 .hero-icon {
@@ -44,13 +52,15 @@
 }
 
 .badge-item {
-    background: rgba(255,255,255,0.2);
+    background: #f0f2f5;
     padding: 8px 16px;
     border-radius: 20px;
     font-size: 14px;
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    color: #4a90e2;
+    border: 1px solid #d9dce0;
 }
 
 .about-cards {
