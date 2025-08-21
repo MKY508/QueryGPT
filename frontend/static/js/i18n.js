@@ -140,6 +140,31 @@ const i18n = {
             success: '操作成功',
             error: '操作失败',
             checkingConnection: '检查连接中...'
+        },
+        
+        // 错误消息
+        errors: {
+            networkError: '网络连接失败',
+            loadConfigFailed: '加载配置失败',
+            saveConfigFailed: '保存配置失败',
+            connectionFailed: '连接失败',
+            testConnectionFailed: '连接测试失败',
+            saveModelFailed: '保存模型失败',
+            deleteModelFailed: '删除模型失败',
+            fillRequiredFields: '请填写所有必填字段',
+            enterQuery: '请输入查询内容',
+            sendFailed: '发送失败，请重试',
+            loadConversationFailed: '加载对话失败',
+            copyFailed: '复制失败',
+            clearCacheFailed: '清空缓存失败',
+            apiConnectionSuccess: 'API连接成功！',
+            dbConnectionSuccess: '数据库连接成功！',
+            configSaved: '配置已保存',
+            cacheCleared: '缓存已清空',
+            copiedToClipboard: '已复制到剪贴板',
+            newConversationStarted: '已开始新对话',
+            languageSwitchedZh: '语言已切换为中文',
+            languageSwitchedEn: 'Language switched to English'
         }
     },
     
@@ -283,6 +308,31 @@ const i18n = {
             success: 'Success',
             error: 'Failed',
             checkingConnection: 'Checking connection...'
+        },
+        
+        // Error messages
+        errors: {
+            networkError: 'Network connection failed',
+            loadConfigFailed: 'Failed to load configuration',
+            saveConfigFailed: 'Failed to save configuration',
+            connectionFailed: 'Connection failed',
+            testConnectionFailed: 'Connection test failed',
+            saveModelFailed: 'Failed to save model',
+            deleteModelFailed: 'Failed to delete model',
+            fillRequiredFields: 'Please fill in all required fields',
+            enterQuery: 'Please enter a query',
+            sendFailed: 'Send failed, please try again',
+            loadConversationFailed: 'Failed to load conversation',
+            copyFailed: 'Copy failed',
+            clearCacheFailed: 'Failed to clear cache',
+            apiConnectionSuccess: 'API connection successful!',
+            dbConnectionSuccess: 'Database connection successful!',
+            configSaved: 'Configuration saved',
+            cacheCleared: 'Cache cleared',
+            copiedToClipboard: 'Copied to clipboard',
+            newConversationStarted: 'New conversation started',
+            languageSwitchedZh: '语言已切换为中文',
+            languageSwitchedEn: 'Language switched to English'
         }
     }
 };
