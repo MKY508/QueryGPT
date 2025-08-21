@@ -12,27 +12,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
     
-    <!-- 设计系统核心样式 -->
-    <link rel="stylesheet" href="/static/css/design-system.css">
-    <link rel="stylesheet" href="/static/css/modern-style.css">
-    <link rel="stylesheet" href="/static/css/components.css">
-    <link rel="stylesheet" href="/static/css/animations.css">
-    
-    <!-- 功能模块样式 -->
+    <!-- 内部样式 -->
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/main.css">
     <link rel="stylesheet" href="/static/css/about-settings.css">
     <link rel="stylesheet" href="/static/css/dual-view-system.css">
     <link rel="stylesheet" href="/static/css/thinking-progress-enhanced.css">
-    <link rel="stylesheet" href="/static/css/query-summary.css">
-    <link rel="stylesheet" href="/static/css/history.css">
-    
-    <!-- 响应式和修复样式 -->
     <link rel="stylesheet" href="/static/css/responsive.css">
+    <link rel="stylesheet" href="/static/css/query-summary.css">
     <link rel="stylesheet" href="/static/css/ui-fixes.css">
+    <link rel="stylesheet" href="/static/css/history.css">
 </head>
-<body data-theme="auto">
-    <div class="container modern-layout">
+<body>
+    <div class="container">
         <!-- 遮罩层 -->
         <div class="sidebar-overlay" id="sidebar-overlay"></div>
         
@@ -41,29 +33,16 @@
             <i class="fas fa-bars"></i>
         </button>
         
-        <!-- 主题切换按钮 -->
-        <div class="theme-toggle" id="theme-toggle">
-            <button class="theme-btn" data-theme="light" title="明亮模式">
-                <i class="fas fa-sun"></i>
-            </button>
-            <button class="theme-btn" data-theme="auto" title="自动模式">
-                <i class="fas fa-adjust"></i>
-            </button>
-            <button class="theme-btn" data-theme="dark" title="深色模式">
-                <i class="fas fa-moon"></i>
-            </button>
-        </div>
-        
         <!-- 侧边栏 -->
-        <aside class="sidebar modern-sidebar animated">
-            <div class="sidebar-header modern-sidebar-header">
-                <h2 class="brand-title"><i class="fas fa-chart-line brand-icon"></i> QueryGPT</h2>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-chart-line"></i> QueryGPT</h2>
                 <div class="system-info">
-                    <small class="brand-subtitle">智能数据查询与可视化系统</small>
+                    <small>智能数据查询与可视化系统</small>
                 </div>
             </div>
             
-            <nav class="sidebar-nav modern-nav">
+            <nav class="sidebar-nav">
                 <ul class="menu-list">
                     <!-- 查询菜单 -->
                     <li class="menu-item has-submenu expanded">
@@ -122,24 +101,24 @@
                 </ul>
             </nav>
             
-            <div class="sidebar-footer modern-sidebar-footer">
-                <div class="status-indicator glass-effect">
-                    <span class="status-dot pulse" id="connection-status"></span>
-                    <span class="status-text" id="connection-text">检查连接中...</span>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="status-dot" id="connection-status"></span>
+                    <span id="connection-text">检查连接中...</span>
                 </div>
             </div>
         </aside>
         
         <!-- 主内容区 -->
-        <main class="main-content modern-content animated">
+        <main class="main-content">
             <!-- 数据查询页面 -->
-            <div class="tab-content active fade-in" id="chat-tab">
-                <div class="chat-header modern-header glass-effect">
+            <div class="tab-content active" id="chat-tab">
+                <div class="chat-header">
                     <div class="header-left">
                         <h1>数据查询与分析</h1>
                     </div>
                     <div class="header-controls">
-                        <div class="model-selector modern-select">
+                        <div class="model-selector">
                             <select id="current-model">
                                 <option value="gpt-4.1">GPT-4.1</option>
                                 <option value="claude-sonnet-4">Claude Sonnet 4</option>
@@ -147,27 +126,26 @@
                                 <option value="qwen-flagship">Qwen 旗舰模型</option>
                             </select>
                         </div>
-                        <button class="btn-new-conversation btn-modern btn-secondary" id="new-conversation">
+                        <button class="btn-new-conversation" id="new-conversation">
                             <i class="fas fa-plus"></i> 新对话
                         </button>
                     </div>
                 </div>
                 
-                <div class="chat-container modern-chat">
-                    <div class="chat-messages modern-messages custom-scrollbar" id="chat-messages">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
                         <!-- 欢迎消息将由JavaScript动态生成 -->
                     </div>
                     
-                    <div class="chat-input-container modern-input-container">
-                        <div class="chat-input modern-input glass-effect">
+                    <div class="chat-input-container">
+                        <div class="chat-input">
                             <textarea id="message-input" 
-                                      class="modern-textarea"
                                       placeholder="输入查询内容..." 
                                       rows="3"></textarea>
-                            <button id="send-button" class="send-button btn-modern btn-primary-gradient">
+                            <button id="send-button" class="send-button">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
-                            <button id="stop-button" class="stop-button btn-modern btn-danger" style="display: none;">
+                            <button id="stop-button" class="stop-button" style="display: none;">
                                 <i class="fas fa-stop"></i>
                             </button>
                         </div>
@@ -204,7 +182,7 @@
                                 <input type="checkbox"> 执行的SQL语句
                             </label>
                         </div>
-                        <button class="btn-primary btn-modern btn-primary-gradient" id="export-data">
+                        <button class="btn-primary" id="export-data">
                             <i class="fas fa-download"></i> 导出数据
                         </button>
                     </div>
@@ -645,7 +623,7 @@
     </div>
     
     <!-- 全局通知 -->
-    <div class="notification modern-notification slide-in" id="notification">
+    <div class="notification" id="notification">
         <div class="notification-content">
             <i class="notification-icon"></i>
             <span class="notification-text"></span>
@@ -653,10 +631,10 @@
     </div>
     
     <!-- 加载提示 -->
-    <div class="loading-overlay modern-loading" id="loading-overlay">
+    <div class="loading-overlay" id="loading-overlay">
         <div class="loading-spinner">
-            <div class="spinner modern-spinner"></div>
-            <p class="loading-text">处理中...</p>
+            <div class="spinner"></div>
+            <p>处理中...</p>
         </div>
     </div>
     
@@ -682,29 +660,11 @@
     </div>
     
     <!-- JavaScript -->
-    <script src="/static/js/theme-manager.js"></script>
     <script src="/static/js/performance.js"></script>
     <script src="/static/js/error-handler.js"></script>
     <script src="/static/js/api.js"></script>
     <script src="/static/js/settings.js"></script>
     <script src="/static/js/history-manager.js"></script>
     <script src="/static/js/app.js"></script>
-    
-    <!-- 初始化主题管理器 -->
-    <script>
-        // 初始化主题管理器
-        document.addEventListener('DOMContentLoaded', function() {
-            // 创建全局主题管理器实例
-            window.themeManager = new ThemeManager();
-            
-            // 添加页面加载动画
-            document.body.classList.add('page-loaded');
-            
-            // 初始化完成后移除加载状态
-            setTimeout(() => {
-                document.querySelector('.container').classList.add('loaded');
-            }, 100);
-        });
-    </script>
 </body>
 </html>
