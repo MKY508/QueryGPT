@@ -335,24 +335,67 @@ class LanguageManager {
             const translation = this.t(key);
             
             if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                // 对于输入框，更新placeholder
                 element.placeholder = translation;
+            } else if (element.tagName === 'SPAN' || !element.querySelector('i')) {
+                // 对于span标签或没有图标的元素，直接更新文本
+                element.textContent = translation;
             } else {
-                // 保留图标，只更新文本
-                const icon = element.querySelector('i');
-                if (icon) {
-                    element.innerHTML = '';
-                    element.appendChild(icon);
-                    element.appendChild(document.createTextNode(' ' + translation));
+                // 对于包含图标的元素，保留图标和其他子元素
+                const icons = element.querySelectorAll('i');
+                const spans = element.querySelectorAll('span[data-i18n]');
+                
+                if (spans.length > 0) {
+                    // 如果有子span带data-i18n，递归处理
+                    // 父元素不做处理
+                } else if (icons.length > 0) {
+                    // 保留所有图标，更新文本节点
+                    const childNodes = Array.from(element.childNodes);
+                    childNodes.forEach(node => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            node.textContent = ' ' + translation;
+                        }
+                    });
+                    
+                    // 如果没有文本节点，添加一个
+                    const hasTextNode = childNodes.some(node => node.nodeType === Node.TEXT_NODE);
+                    if (!hasTextNode) {
+                        element.appendChild(document.createTextNode(' ' + translation));
+                    }
                 } else {
                     element.textContent = translation;
                 }
             }
         });
         
+        // 更新select选项中的固定文本
+        this.updateSelectOptions();
+        
         // 触发自定义事件，通知其他组件语言已更改
         window.dispatchEvent(new CustomEvent('languageChanged', { 
             detail: { language: this.currentLang } 
         }));
+    }
+    
+    // 更新select选项的文本
+    updateSelectOptions() {
+        // 更新视图模式选项
+        const viewModeSelect = document.getElementById('default-view-mode');
+        if (viewModeSelect) {
+            viewModeSelect.options[0].textContent = this.t('settings.userMode');
+            viewModeSelect.options[1].textContent = this.t('settings.developerMode');
+        }
+        
+        // 更新上下文轮数选项
+        const contextSelect = document.getElementById('context-rounds');
+        if (contextSelect) {
+            contextSelect.options[0].textContent = this.t('settings.noHistory');
+            contextSelect.options[1].textContent = this.format('settings.roundHistory', {n: 1});
+            contextSelect.options[2].textContent = this.format('settings.roundHistory', {n: 2});
+            contextSelect.options[3].textContent = this.format('settings.roundHistory', {n: 3}) + ' ' + this.t('settings.recommended');
+            contextSelect.options[4].textContent = this.format('settings.roundHistory', {n: 5});
+            contextSelect.options[5].textContent = this.format('settings.roundHistory', {n: 10}) + ' ' + this.t('settings.mayAffectPerformance');
+        }
     }
     
     // 格式化带参数的文本

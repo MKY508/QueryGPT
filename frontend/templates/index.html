@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="/static/css/query-summary.css">
     <link rel="stylesheet" href="/static/css/ui-fixes.css">
     <link rel="stylesheet" href="/static/css/history.css">
+    <link rel="stylesheet" href="/static/css/language-toggle.css">
 </head>
 <body>
     <div class="container">
@@ -99,10 +100,6 @@
             </nav>
             
             <div class="sidebar-footer">
-                <div class="status-indicator">
-                    <span class="status-dot" id="connection-status"></span>
-                    <span id="connection-text">检查连接中...</span>
-                </div>
             </div>
         </aside>
         
@@ -115,6 +112,14 @@
                         <h1 data-i18n="chat.title">数据查询与分析</h1>
                     </div>
                     <div class="header-controls">
+                        <div class="language-toggle">
+                            <span class="lang-label">中文</span>
+                            <label class="switch">
+                                <input type="checkbox" id="header-lang-toggle">
+                                <span class="slider round"></span>
+                            </label>
+                            <span class="lang-label">English</span>
+                        </div>
                         <div class="model-selector">
                             <select id="current-model">
                                 <option value="gpt-4.1">GPT-4.1</option>
@@ -190,7 +195,7 @@
             <!-- 系统设置页面 -->
             <div class="tab-content" id="settings-tab">
                 <div class="page-header">
-                    <h1>系统设置</h1>
+                    <h1 data-i18n="settings.title">系统设置</h1>
                 </div>
                 
                 <div class="settings-container">
@@ -215,7 +220,7 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>上下文保留轮数</label>
+                                <label data-i18n="settings.contextRounds">上下文保留轮数</label>
                                 <select id="context-rounds">
                                     <option value="0">不保留历史（单轮对话）</option>
                                     <option value="1">保留1轮历史</option>
@@ -224,7 +229,7 @@
                                     <option value="5">保留5轮历史</option>
                                     <option value="10">保留10轮历史（可能影响性能）</option>
                                 </select>
-                                <small>设置AI记住之前几轮对话的内容，用于错误修正和上下文理解</small>
+                                <small data-i18n="settings.contextDesc">设置AI记住之前几轮对话的内容，用于错误修正和上下文理解</small>
                             </div>
                         </div>
                     </div>
@@ -233,10 +238,7 @@
                     <div class="settings-panel" id="models-settings">
                         <div class="settings-card">
                             <div class="card-header">
-                                <h3><i class="fas fa-brain"></i> 模型管理</h3>
-                                <button class="btn-primary btn-sm" id="add-model-btn">
-                                    <i class="fas fa-plus"></i> 添加模型
-                                </button>
+                                <h3><i class="fas fa-brain"></i> <span data-i18n="models.title">模型管理</span></h3>
                             </div>
                             
                             <!-- 模型列表表格 -->
@@ -244,11 +246,11 @@
                                 <table class="models-table">
                                     <thead>
                                         <tr>
-                                            <th>模型名称</th>
-                                            <th>类型</th>
-                                            <th>API地址</th>
-                                            <th>状态</th>
-                                            <th>操作</th>
+                                            <th data-i18n="models.name">模型名称</th>
+                                            <th data-i18n="models.type">类型</th>
+                                            <th data-i18n="models.apiAddress">API地址</th>
+                                            <th data-i18n="models.status">状态</th>
+                                            <th data-i18n="models.actions">操作</th>
                                         </tr>
                                     </thead>
                                     <tbody id="models-list">
@@ -295,38 +297,38 @@
                     <!-- 数据库配置标签页 -->
                     <div class="settings-panel" id="database-settings">
                         <div class="settings-card">
-                            <h3><i class="fas fa-database"></i> Doris数据库配置</h3>
+                            <h3><i class="fas fa-database"></i> <span data-i18n="database.title">Doris数据库配置</span></h3>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>主机地址</label>
-                                    <input type="text" id="db-host" placeholder="例如: localhost 或 192.168.1.100">
+                                    <label data-i18n="database.host">主机地址</label>
+                                    <input type="text" id="db-host" placeholder="例如: localhost 或 192.168.1.100" data-i18n="database.hostPlaceholder">
                                 </div>
                                 <div class="form-group">
-                                    <label>端口</label>
+                                    <label data-i18n="database.port">端口</label>
                                     <input type="number" id="db-port" placeholder="3306" value="3306">
                                 </div>
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>用户名</label>
-                                    <input type="text" id="db-user" placeholder="数据库用户名">
+                                    <label data-i18n="database.username">用户名</label>
+                                    <input type="text" id="db-user" placeholder="数据库用户名" data-i18n="database.usernamePlaceholder">
                                 </div>
                                 <div class="form-group">
-                                    <label>密码</label>
-                                    <input type="password" id="db-password" placeholder="数据库密码">
+                                    <label data-i18n="database.password">密码</label>
+                                    <input type="password" id="db-password" placeholder="数据库密码" data-i18n="database.passwordPlaceholder">
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label>数据库名</label>
-                                <input type="text" id="db-name" placeholder="留空使用所有数据库">
-                                <small>提示：留空可访问所有可用数据库</small>
+                                <label data-i18n="database.dbName">数据库名</label>
+                                <input type="text" id="db-name" placeholder="留空使用所有数据库" data-i18n="database.dbNamePlaceholder">
+                                <small data-i18n="database.hint">提示：留空可访问所有可用数据库</small>
                             </div>
                             <div class="button-group">
                                 <button class="btn-primary" id="test-db">
-                                    <i class="fas fa-plug"></i> 测试连接
+                                    <i class="fas fa-plug"></i> <span data-i18n="database.testConnection">测试连接</span>
                                 </button>
                                 <button class="btn-secondary" id="save-db-config">
-                                    <i class="fas fa-save"></i> 保存配置
+                                    <i class="fas fa-save"></i> <span data-i18n="database.saveConfig">保存配置</span>
                                 </button>
                             </div>
                             
@@ -336,8 +338,8 @@
                                     <i class="fas fa-check-circle"></i>
                                 </div>
                                 <div class="status-info">
-                                    <h4>连接成功</h4>
-                                    <p>数据库连接正常，共发现 <span id="table-count">0</span> 个表</p>
+                                    <h4 data-i18n="database.connectionSuccess">连接成功</h4>
+                                    <p><span data-i18n="database.connectionInfo">数据库连接正常，共发现</span> <span id="table-count">0</span> <span>个表</span></p>
                                 </div>
                             </div>
                         </div>
@@ -349,7 +351,7 @@
             <!-- 关于页面 -->
             <div class="tab-content" id="about-tab">
                 <div class="about-header">
-                    <h1>关于系统</h1>
+                    <h1 data-i18n="about.title">关于系统</h1>
                 </div>
                 
                 <div class="about-hero">
@@ -358,16 +360,16 @@
                             <img src="/static/images/logo.png" alt="QueryGPT Logo" style="width: 320px; height: auto; margin: 0 auto; display: block;">
                         </div>
                         <div class="hero-info">
-                            <p class="system-version" style="color: #6c757d;">版本 v1.0.0 Beta | 2025年8月发布</p>
+                            <p class="system-version" style="color: #6c757d;"><span data-i18n="about.version">版本</span> v1.0.0 Beta | 2025年8月</p>
                             <div class="hero-badges">
                                 <span class="badge-item">
-                                    <i class="fas fa-robot"></i> 智能数据分析
+                                    <i class="fas fa-robot"></i> <span data-i18n="about.features.ai">智能数据分析</span>
                                 </span>
                                 <span class="badge-item">
-                                    <i class="fas fa-database"></i> 数据库查询
+                                    <i class="fas fa-database"></i> <span data-i18n="about.features.database">数据库查询</span>
                                 </span>
                                 <span class="badge-item">
-                                    <i class="fas fa-chart-pie"></i> 可视化生成
+                                    <i class="fas fa-chart-pie"></i> <span data-i18n="about.features.visualization">可视化生成</span>
                                 </span>
                             </div>
                         </div>
@@ -380,9 +382,9 @@
                             <i class="fas fa-user"></i>
                         </div>
                         <div class="card-content">
-                            <h3>开发者</h3>
+                            <h3 data-i18n="about.developer">开发者</h3>
                             <p class="card-main">MKY</p>
-                            <p class="card-sub">独立开发者</p>
+                            <p class="card-sub" data-i18n="about.independentDev">独立开发者</p>
                         </div>
                     </div>
                     
@@ -391,8 +393,8 @@
                             <i class="fas fa-building"></i>
                         </div>
                         <div class="card-content">
-                            <h3>所属单位</h3>
-                            <p class="card-main">开源项目</p>
+                            <h3 data-i18n="about.organization">所属单位</h3>
+                            <p class="card-main" data-i18n="about.openSource">开源项目</p>
                             <p class="card-sub">MIT License</p>
                         </div>
                     </div>
@@ -402,9 +404,9 @@
                             <i class="fas fa-code-branch"></i>
                         </div>
                         <div class="card-content">
-                            <h3>版本信息</h3>
+                            <h3 data-i18n="about.versionInfo">版本信息</h3>
                             <p class="card-main">v1.0.0 Beta</p>
-                            <p class="card-sub">测试版本</p>
+                            <p class="card-sub" data-i18n="about.betaVersion">测试版本</p>
                         </div>
                     </div>
                     
@@ -413,15 +415,15 @@
                             <i class="fas fa-clock"></i>
                         </div>
                         <div class="card-content">
-                            <h3>更新时间</h3>
+                            <h3 data-i18n="about.updateTime">更新时间</h3>
                             <p class="card-main">2025年8月</p>
-                            <p class="card-sub">持续维护中</p>
+                            <p class="card-sub" data-i18n="about.maintaining">持续维护中</p>
                         </div>
                     </div>
                 </div>
                 
                 <div class="license-section">
-                    <h2><i class="fas fa-file-contract"></i> 许可证说明</h2>
+                    <h2><i class="fas fa-file-contract"></i> <span data-i18n="about.license">许可证说明</span></h2>
                     <div class="license-content">
                         <div class="license-item">
                             <strong>OpenInterpreter 核心引擎：</strong> MIT许可证 
@@ -459,10 +461,10 @@
                 
                 <!-- 技术栈部分 -->
                 <div class="tech-stack-section">
-                    <h2><i class="fas fa-layer-group"></i> 技术栈</h2>
+                    <h2><i class="fas fa-layer-group"></i> <span data-i18n="about.techStack">技术栈</span></h2>
                     <div class="tech-grid">
                         <div class="tech-group">
-                            <h3><i class="fas fa-server"></i> 后端技术</h3>
+                            <h3><i class="fas fa-server"></i> <span data-i18n="about.backend">后端技术</span></h3>
                             <div class="tech-badges">
                                 <span class="tech-badge">Python 3.10</span>
                                 <span class="tech-badge">Flask 3.1.1</span>
@@ -473,7 +475,7 @@
                             </div>
                         </div>
                         <div class="tech-group">
-                            <h3><i class="fas fa-palette"></i> 前端技术</h3>
+                            <h3><i class="fas fa-palette"></i> <span data-i18n="about.frontend">前端技术</span></h3>
                             <div class="tech-badges">
                                 <span class="tech-badge">HTML5</span>
                                 <span class="tech-badge">CSS3</span>
@@ -484,7 +486,7 @@
                             </div>
                         </div>
                         <div class="tech-group">
-                            <h3><i class="fas fa-database"></i> 数据库</h3>
+                            <h3><i class="fas fa-database"></i> <span data-i18n="nav.databaseConfig">数据库</span></h3>
                             <div class="tech-badges">
                                 <span class="tech-badge">Apache Doris</span>
                                 <span class="tech-badge">MySQL Protocol</span>
@@ -494,69 +496,15 @@
                 </div>
                 
                 <div class="system-usage">
-                    <h2><i class="fas fa-info-circle"></i> 本系统使用声明</h2>
+                    <h2><i class="fas fa-info-circle"></i> <span data-i18n="about.usageStatement">本系统使用声明</span></h2>
                     <p>本系统基于开源组件开发，采用 MIT 许可证：</p>
                     <ul>
-                        <li>自由使用、修改和分发</li>
-                        <li>支持商业和非商业用途</li>
-                        <li>请保留版权声明</li>
+                        <li data-i18n="about.freeUse">自由使用、修改和分发</li>
+                        <li data-i18n="about.commercial">支持商业和非商业用途</li>
+                        <li data-i18n="about.copyright">请保留版权声明</li>
                     </ul>
                     <div class="developer-contact">
-                        <p><i class="fas fa-envelope"></i> <strong>开发者联系邮箱：</strong> mky369258@gmail.com</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 模型配置弹窗 -->
-            <div class="modal" id="model-modal" style="display: none;">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3 id="model-modal-title">添加模型</h3>
-                        <button class="modal-close" onclick="app.closeModelModal()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label>模型名称 <span class="required">*</span></label>
-                            <input type="text" id="model-name" placeholder="例如: GPT-4 Turbo">
-                        </div>
-                        <div class="form-group">
-                            <label>模型ID <span class="required">*</span></label>
-                            <input type="text" id="model-id" placeholder="例如: gpt-4-turbo">
-                        </div>
-                        <div class="form-group">
-                            <label>模型类型 <span class="required">*</span></label>
-                            <select id="model-type">
-                                <option value="openai">OpenAI</option>
-                                <option value="anthropic">Anthropic</option>
-                                <option value="deepseek">DeepSeek</option>
-                                <option value="qwen">Qwen</option>
-                                <option value="custom">自定义</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>API地址 <span class="required">*</span></label>
-                            <input type="text" id="model-api-base" placeholder="https://api.example.com/v1">
-                        </div>
-                        <div class="form-group">
-                            <label>API密钥 <span class="required">*</span></label>
-                            <input type="password" id="model-api-key" placeholder="输入API密钥">
-                        </div>
-                        <div class="form-group">
-                            <label>最大Token数</label>
-                            <input type="number" id="model-max-tokens" placeholder="4096" value="4096">
-                        </div>
-                        <div class="form-group">
-                            <label>温度参数</label>
-                            <input type="number" id="model-temperature" placeholder="0.7" value="0.7" step="0.1" min="0" max="2">
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn-secondary" onclick="app.closeModelModal()">取消</button>
-                        <button class="btn-primary" id="save-model-btn">
-                            <i class="fas fa-save"></i> 保存模型
-                        </button>
+                        <p><i class="fas fa-envelope"></i> <strong data-i18n="about.contactEmail">开发者联系邮箱：</strong> mky369258@gmail.com</p>
                     </div>
                 </div>
             </div>
@@ -568,7 +516,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h2 class="history-title" style="margin: 0;">
                                 <i class="fas fa-history"></i>
-                                历史记录
+                                <span data-i18n="history.title">历史记录</span>
                             </h2>
                             <button id="refresh-history-btn" class="btn-icon" title="刷新历史记录" 
                                     style="background: white; border: 1px solid #dee2e6; color: #6c757d; 
@@ -582,19 +530,19 @@
                         </div>
                         
                         <div class="history-search-container">
-                            <input type="text" id="history-search" placeholder="搜索历史记录...">
+                            <input type="text" id="history-search" placeholder="搜索历史记录..." data-i18n="history.search">
                             <i class="fas fa-search history-search-icon"></i>
                         </div>
                         
                         <div class="history-filters">
                             <button class="history-filter-btn active" data-filter="recent">
-                                <i class="fas fa-clock"></i> 最近
+                                <i class="fas fa-clock"></i> <span data-i18n="history.recent">最近</span>
                             </button>
                             <button class="history-filter-btn" data-filter="today">
-                                <i class="fas fa-calendar-day"></i> 今天
+                                <i class="fas fa-calendar-day"></i> <span data-i18n="history.today">今天</span>
                             </button>
                             <button class="history-filter-btn" data-filter="week">
-                                <i class="fas fa-calendar-week"></i> 本周
+                                <i class="fas fa-calendar-week"></i> <span data-i18n="history.thisWeek">本周</span>
                             </button>
                         </div>
                     </div>
@@ -602,7 +550,7 @@
                     <div class="history-list-container" id="history-list-container">
                         <div id="history-loading" class="history-loading">
                             <div class="history-loading-spinner"></div>
-                            <p>加载中...</p>
+                            <p data-i18n="history.loading">加载中...</p>
                         </div>
                         <div id="history-list"></div>
                     </div>
@@ -625,7 +573,7 @@
     <div class="loading-overlay" id="loading-overlay">
         <div class="loading-spinner">
             <div class="spinner"></div>
-            <p>处理中...</p>
+            <p data-i18n="common.loading">处理中...</p>
         </div>
     </div>
     
@@ -637,14 +585,14 @@
                 <h3 class="delete-modal-title">确认删除</h3>
             </div>
             <div class="delete-modal-body">
-                确定要删除这个对话吗？此操作无法撤销。
+                <span data-i18n="history.deleteConfirm">确定要删除这个对话吗？此操作无法撤销。</span>
             </div>
             <div class="delete-modal-footer">
                 <button class="delete-modal-btn delete-modal-btn-cancel" onclick="window.HistoryManager.instance.closeDeleteModal()">
-                    取消
+                    <span data-i18n="history.cancel">取消</span>
                 </button>
                 <button class="delete-modal-btn delete-modal-btn-delete" id="confirm-delete-btn">
-                    <i class="fas fa-trash"></i> 删除
+                    <i class="fas fa-trash"></i> <span data-i18n="history.delete">删除</span>
                 </button>
             </div>
         </div>

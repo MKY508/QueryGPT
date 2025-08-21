@@ -169,7 +169,7 @@ class DataAnalysisPlatform {
      * 设置设置页面事件
      */
     setupSettingsEvents() {
-        // 语言切换事件
+        // 语言切换事件 - 设置页面的下拉框
         const languageSelect = document.getElementById('language-select');
         if (languageSelect) {
             // 设置当前语言
@@ -178,11 +178,22 @@ class DataAnalysisPlatform {
             // 监听语言切换
             languageSelect.addEventListener('change', (e) => {
                 const newLang = e.target.value;
-                window.i18nManager.setLanguage(newLang);
-                this.showNotification(
-                    newLang === 'zh' ? '语言已切换为中文' : 'Language switched to English', 
-                    'success'
-                );
+                this.changeLanguage(newLang);
+            });
+        }
+        
+        // 语言切换事件 - 头部的开关
+        const headerLangToggle = document.getElementById('header-lang-toggle');
+        if (headerLangToggle) {
+            // 设置初始状态
+            const currentLang = window.i18nManager.getCurrentLanguage();
+            headerLangToggle.checked = currentLang === 'en';
+            this.updateLanguageToggleStyle(currentLang);
+            
+            // 监听切换
+            headerLangToggle.addEventListener('change', (e) => {
+                const newLang = e.target.checked ? 'en' : 'zh';
+                this.changeLanguage(newLang);
             });
         }
         
@@ -1831,6 +1842,24 @@ class DataAnalysisPlatform {
         const existingWelcome = messagesContainer.querySelector('.welcome-message');
         if (existingWelcome) return;
         
+        // 获取翻译
+        const i18n = window.i18nManager || { 
+            t: (key) => {
+                const fallbacks = {
+                    'chat.welcome': '欢迎使用 QueryGPT 智能数据分析系统',
+                    'chat.welcomeDesc': '我可以帮助您：',
+                    'chat.feature1': '使用自然语言查询数据库',
+                    'chat.feature2': '自动生成数据可视化图表',
+                    'chat.feature3': '智能分析数据并提供洞察',
+                    'chat.tryExample': '试试这些示例：',
+                    'chat.example1': '显示最近一个月的销售数据',
+                    'chat.example2': '分析产品类别的销售占比',
+                    'chat.example3': '查找销售额最高的前10个客户'
+                };
+                return fallbacks[key] || key;
+            }
+        };
+        
         // 创建欢迎消息
         const welcomeDiv = document.createElement('div');
         welcomeDiv.className = 'welcome-message';
@@ -1838,37 +1867,37 @@ class DataAnalysisPlatform {
             <div class="welcome-content">
                 <div class="welcome-header">
                     <i class="fas fa-chart-bar welcome-icon"></i>
-                    <h2>欢迎使用数据分析平台</h2>
+                    <h2>${i18n.t('chat.welcome')}</h2>
                 </div>
-                <p class="welcome-subtitle">我可以帮助您进行数据分析、生成可视化图表和导出报表</p>
+                <p class="welcome-subtitle">${i18n.t('chat.welcomeDesc')}</p>
                 
                 <div class="welcome-features">
                     <div class="feature-item">
                         <i class="fas fa-database"></i>
-                        <span>查询Doris数据库</span>
+                        <span>${i18n.t('chat.feature1')}</span>
                     </div>
                     <div class="feature-item">
                         <i class="fas fa-chart-pie"></i>
-                        <span>生成可视化图表</span>
+                        <span>${i18n.t('chat.feature2')}</span>
                     </div>
                     <div class="feature-item">
                         <i class="fas fa-file-export"></i>
-                        <span>导出分析结果</span>
+                        <span>${i18n.t('chat.feature3')}</span>
                     </div>
                 </div>
                 
                 <div class="example-section">
-                    <p class="section-title">快速开始：</p>
+                    <p class="section-title">${i18n.t('chat.tryExample')}</p>
                     <div class="example-queries">
-                        <button class="example-btn" data-example="显示所有可用的数据库">
+                        <button class="example-btn" data-example="${i18n.t('chat.example1')}">
                             <i class="fas fa-database"></i>
                             <span>查看数据库</span>
                         </button>
-                        <button class="example-btn" data-example="分析最近一个月的销售数据并生成趋势图">
+                        <button class="example-btn" data-example="${i18n.t('chat.example2')}">
                             <i class="fas fa-chart-line"></i>
                             <span>销售分析</span>
                         </button>
-                        <button class="example-btn" data-example="统计各产品类别的销售占比">
+                        <button class="example-btn" data-example="${i18n.t('chat.example3')}">
                             <i class="fas fa-chart-pie"></i>
                             <span>产品占比</span>
                         </button>
@@ -2072,6 +2101,47 @@ class DataAnalysisPlatform {
         }
     }
 
+    /**
+     * 切换语言
+     */
+    changeLanguage(newLang) {
+        window.i18nManager.setLanguage(newLang);
+        
+        // 同步更新两个语言切换控件
+        const languageSelect = document.getElementById('language-select');
+        if (languageSelect) {
+            languageSelect.value = newLang;
+        }
+        
+        const headerLangToggle = document.getElementById('header-lang-toggle');
+        if (headerLangToggle) {
+            headerLangToggle.checked = newLang === 'en';
+        }
+        
+        // 更新切换开关样式
+        this.updateLanguageToggleStyle(newLang);
+        
+        // 显示通知
+        this.showNotification(
+            newLang === 'zh' ? '语言已切换为中文' : 'Language switched to English', 
+            'success'
+        );
+    }
+    
+    /**
+     * 更新语言切换开关样式
+     */
+    updateLanguageToggleStyle(lang) {
+        const toggleContainer = document.querySelector('.language-toggle');
+        if (toggleContainer) {
+            if (lang === 'en') {
+                toggleContainer.classList.add('english');
+            } else {
+                toggleContainer.classList.remove('english');
+            }
+        }
+    }
+    
     /**
      * 更新执行状态
      */
