@@ -1,0 +1,35 @@
+{
+  "models": [
+    {
+      "api_base": "http://localhost:11434/v1",
+      "id": "gpt-4.1",
+      "name": "GPT-4.1",
+      "status": "active",
+      "type": "OpenAI"
+    },
+    {
+      "api_base": "http://localhost:11434/v1",
+      "id": "claude-sonnet-4",
+      "name": "Claude Sonnet 4",
+      "status": "active",
+      "type": "Anthropic"
+    },
+    {
+      "api_base": "http://localhost:11434/v1",
+      "id": "deepseek-r1",
+      "name": "DeepSeek R1",
+      "status": "active",
+      "type": "DeepSeek"
+    },
+    {
+      "api_base": "http://localhost:11434/v1",
+      "id": "qwen-3-coder",
+      "name": "Qwen",
+      "status": "active",
+      "type": "qwen",
+      "api_key": "not_needed_for_local",
+      "max_tokens": 4096,
+      "temperature": 0.7
+    }
+  ]
+}

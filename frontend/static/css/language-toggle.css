@@ -1,0 +1,112 @@
+/* 语言切换开关样式 */
+.language-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: 20px;
+}
+
+.lang-label {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
+/* 开关样式 */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #4a90e2;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #4a90e2;
+}
+
+input:checked + .slider:before {
+    transform: translateX(26px);
+}
+
+/* 激活状态的标签 */
+.language-toggle .lang-label:first-child {
+    transition: color 0.3s;
+}
+
+.language-toggle .lang-label:last-child {
+    transition: color 0.3s;
+}
+
+/* 根据切换状态改变标签颜色 */
+.language-toggle.english .lang-label:first-child {
+    color: #ccc;
+}
+
+.language-toggle.english .lang-label:last-child {
+    color: #4a90e2;
+    font-weight: 600;
+}
+
+.language-toggle:not(.english) .lang-label:first-child {
+    color: #4a90e2;
+    font-weight: 600;
+}
+
+.language-toggle:not(.english) .lang-label:last-child {
+    color: #ccc;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .language-toggle {
+        margin-right: 10px;
+    }
+    
+    .lang-label {
+        font-size: 12px;
+    }
+    
+    .switch {
+        width: 40px;
+        height: 20px;
+    }
+    
+    .slider:before {
+        height: 14px;
+        width: 14px;
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(20px);
+    }
+}
