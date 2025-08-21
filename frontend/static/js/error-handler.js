@@ -7,6 +7,13 @@ class ErrorHandler {
     constructor() {
         this.errorLog = [];
         this.maxLogSize = 100;
+        this.pageLoadComplete = false;
+        
+        // 延迟启动错误处理，避免页面加载时的误报
+        setTimeout(() => {
+            this.pageLoadComplete = true;
+        }, 3000);
+        
         this.setupGlobalHandlers();
     }
     
@@ -42,6 +49,25 @@ class ErrorHandler {
     handleError(errorInfo) {
         // 记录错误
         this.logError(errorInfo);
+        
+        // 页面加载期间不显示错误通知
+        if (!this.pageLoadComplete) {
+            console.warn('页面加载期间的错误（已忽略）:', errorInfo);
+            return;
+        }
+        
+        // 忽略某些无关紧要的错误
+        const errorString = errorInfo.error?.toString() || '';
+        const ignoredErrors = [
+            'ResizeObserver loop limit exceeded',
+            'Non-Error promise rejection captured',
+            '/api/config',  // 忽略配置加载失败
+            'Failed to fetch'  // 忽略初始fetch失败
+        ];
+        
+        if (ignoredErrors.some(ignored => errorString.includes(ignored))) {
+            return;
+        }
         
         // 根据错误类型显示不同提示
         const errorType = this.classifyError(errorInfo);
@@ -87,28 +113,42 @@ class ErrorHandler {
      * 显示用户友好的错误提示
      */
     showUserNotification(errorType, errorInfo) {
+        // 获取i18n管理器
+        const i18n = window.i18nManager || { 
+            t: (key) => {
+                const fallbacks = {
+                    'errors.networkError': '网络连接问题，检查网络设置',
+                    'errors.serverError': '服务器响应异常，稍后重试',
+                    'errors.permissionError': '无权限执行此操作',
+                    'errors.validationError': '数据格式错误，检查后重试',
+                    'errors.generalError': '发生错误，请重试'
+                };
+                return fallbacks[key] || key;
+            }
+        };
+        
         let message = '';
         let icon = 'fas fa-exclamation-triangle';
         
         switch (errorType) {
             case 'network':
-                message = '网络连接问题，检查网络设置';
+                message = i18n.t('errors.networkError');
                 icon = 'fas fa-wifi';
                 break;
             case 'api':
-                message = '服务器响应异常，稍后重试';
+                message = i18n.t('errors.serverError');
                 icon = 'fas fa-server';
                 break;
             case 'permission':
-                message = '无权限执行此操作';
+                message = i18n.t('errors.permissionError');
                 icon = 'fas fa-lock';
                 break;
             case 'validation':
-                message = '数据格式错误，检查后重试';
+                message = i18n.t('errors.validationError');
                 icon = 'fas fa-check-circle';
                 break;
             default:
-                message = '发生错误，刷新页面重试';
+                message = i18n.t('errors.generalError');
                 icon = 'fas fa-exclamation-circle';
         }
         

@@ -164,7 +164,11 @@ const i18n = {
             copiedToClipboard: '已复制到剪贴板',
             newConversationStarted: '已开始新对话',
             languageSwitchedZh: '语言已切换为中文',
-            languageSwitchedEn: 'Language switched to English'
+            languageSwitchedEn: 'Language switched to English',
+            serverError: '服务器响应异常，稍后重试',
+            permissionError: '无权限执行此操作',
+            validationError: '数据格式错误，检查后重试',
+            generalError: '发生错误，请重试'
         }
     },
     
@@ -332,7 +336,11 @@ const i18n = {
             copiedToClipboard: 'Copied to clipboard',
             newConversationStarted: 'New conversation started',
             languageSwitchedZh: '语言已切换为中文',
-            languageSwitchedEn: 'Language switched to English'
+            languageSwitchedEn: 'Language switched to English',
+            serverError: 'Server error, please try again later',
+            permissionError: 'Permission denied',
+            validationError: 'Invalid data format',
+            generalError: 'An error occurred, please try again'
         }
     }
 };
@@ -463,7 +471,17 @@ class LanguageManager {
 // 创建全局实例
 window.i18nManager = new LanguageManager();
 
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    window.i18nManager.updatePageLanguage();
-});
+// 页面加载完成后初始化，增加延迟确保所有元素都已渲染
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        // 延迟执行，确保其他脚本已初始化
+        setTimeout(() => {
+            window.i18nManager.updatePageLanguage();
+        }, 100);
+    });
+} else {
+    // 如果DOM已加载，直接执行
+    setTimeout(() => {
+        window.i18nManager.updatePageLanguage();
+    }, 100);
+}
