@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>QueryGPT - 错误</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #333;
+    }
+    .container {
+      text-align: center;
+      padding: 40px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+    }
+    .icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      color: #e74c3c;
+    }
+    p {
+      margin: 10px 0;
+      color: #666;
+      line-height: 1.6;
+    }
+    .actions {
+      margin-top: 30px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 0 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #5a67d8;
+    }
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+    .btn-secondary:hover {
+      background: #d0d0d0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">⚠️</div>
+    <h1>无法连接到后端服务</h1>
+    <p>QueryGPT 后端服务未能正常启动。</p>
+    <p>可能的原因：</p>
+    <ul style="text-align: left; display: inline-block;">
+      <li>Python 环境未正确安装</li>
+      <li>依赖包安装不完整</li>
+      <li>端口被占用</li>
+      <li>数据库连接失败</li>
+    </ul>
+    
+    <div class="actions">
+      <button class="btn-primary" onclick="retry()">重试</button>
+      <button class="btn-secondary" onclick="openLogs()">查看日志</button>
+    </div>
+  </div>
+
+  <script>
+    const { shell } = require('electron').remote || require('@electron/remote');
+    
+    function retry() {
+      window.location.reload();
+    }
+    
+    function openLogs() {
+      // 打开日志文件夹
+      const logPath = require('electron').remote.app.getPath('logs');
+      shell.showItemInFolder(logPath);
+    }
+  </script>
+</body>
+</html>

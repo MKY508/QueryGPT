@@ -1,0 +1,281 @@
+/**
+ * QueryGPT Design System
+ * 统一的设计变量和规范
+ * Version: 2.0
+ */
+
+:root {
+  /* ===========================
+     品牌颜色系统 
+     =========================== */
+  
+  /* 主品牌色 - 专业蓝色调 */
+  --primary-50: #eff6ff;
+  --primary-100: #dbeafe;
+  --primary-200: #bfdbfe;
+  --primary-300: #93c5fd;
+  --primary-400: #60a5fa;
+  --primary-500: #3b82f6;  /* 主色 */
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --primary-800: #1e40af;
+  --primary-900: #1e3a8a;
+
+  /* 辅助色 - 智能科技感 */
+  --accent-50: #f0f9ff;
+  --accent-100: #e0f2fe;
+  --accent-200: #bae6fd;
+  --accent-300: #7dd3fc;
+  --accent-400: #38bdf8;
+  --accent-500: #0ea5e9;  /* 辅助色 */
+  --accent-600: #0284c7;
+  --accent-700: #0369a1;
+  --accent-800: #075985;
+  --accent-900: #0c4a6e;
+
+  /* 语义颜色 */
+  --success-50: #f0fdf4;
+  --success-500: #22c55e;
+  --success-600: #16a34a;
+  
+  --warning-50: #fffbeb;
+  --warning-500: #f59e0b;
+  --warning-600: #d97706;
+  
+  --error-50: #fef2f2;
+  --error-500: #ef4444;
+  --error-600: #dc2626;
+
+  /* 中性色系 - 更现代的灰色调 */
+  --neutral-50: #fafafa;
+  --neutral-100: #f5f5f5;
+  --neutral-200: #e5e5e5;
+  --neutral-300: #d4d4d4;
+  --neutral-400: #a3a3a3;
+  --neutral-500: #737373;
+  --neutral-600: #525252;
+  --neutral-700: #404040;
+  --neutral-800: #262626;
+  --neutral-900: #171717;
+
+  /* ===========================
+     光明模式颜色 
+     =========================== */
+  --color-bg-primary: var(--neutral-50);
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: var(--neutral-100);
+  --color-bg-elevated: #ffffff;
+  
+  --color-text-primary: var(--neutral-900);
+  --color-text-secondary: var(--neutral-700);
+  --color-text-tertiary: var(--neutral-500);
+  --color-text-inverse: #ffffff;
+  
+  --color-border-primary: var(--neutral-200);
+  --color-border-secondary: var(--neutral-300);
+  --color-border-focus: var(--primary-500);
+
+  /* ===========================
+     字体系统 
+     =========================== */
+  --font-family-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-family-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  --font-family-display: 'Inter', var(--font-family-primary);
+
+  /* 字体大小 - 基于模块化比例 (1.250 - 大三度) */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+  --text-3xl: 1.875rem;  /* 30px */
+  --text-4xl: 2.25rem;   /* 36px */
+  --text-5xl: 3rem;      /* 48px */
+
+  /* 字重 */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* 行高 */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* ===========================
+     间距系统 - 8px 基础网格
+     =========================== */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;   /* 4px */
+  --spacing-2: 0.5rem;    /* 8px */
+  --spacing-3: 0.75rem;   /* 12px */
+  --spacing-4: 1rem;      /* 16px */
+  --spacing-5: 1.25rem;   /* 20px */
+  --spacing-6: 1.5rem;    /* 24px */
+  --spacing-8: 2rem;      /* 32px */
+  --spacing-10: 2.5rem;   /* 40px */
+  --spacing-12: 3rem;     /* 48px */
+  --spacing-16: 4rem;     /* 64px */
+  --spacing-20: 5rem;     /* 80px */
+  --spacing-24: 6rem;     /* 96px */
+
+  /* ===========================
+     圆角系统 
+     =========================== */
+  --radius-none: 0;
+  --radius-sm: 0.25rem;   /* 4px */
+  --radius-md: 0.375rem;  /* 6px */
+  --radius-lg: 0.5rem;    /* 8px */
+  --radius-xl: 0.75rem;   /* 12px */
+  --radius-2xl: 1rem;     /* 16px */
+  --radius-full: 9999px;
+
+  /* ===========================
+     阴影系统 
+     =========================== */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  
+  /* 特殊阴影 */
+  --shadow-glow: 0 0 0 1px var(--primary-500), 0 0 0 4px var(--primary-100);
+  --shadow-focus: 0 0 0 3px var(--primary-100);
+
+  /* ===========================
+     动画系统 
+     =========================== */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+  
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* ===========================
+     布局系统 
+     =========================== */
+  --sidebar-width: 280px;
+  --sidebar-width-collapsed: 64px;
+  --header-height: 64px;
+  --footer-height: 48px;
+  
+  --container-max-width: 1400px;
+  --content-max-width: 800px;
+  
+  /* Z-index 系统 */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
+
+  /* ===========================
+     组件特定变量 
+     =========================== */
+  
+  /* 按钮 */
+  --button-height-sm: 2rem;
+  --button-height-md: 2.5rem;
+  --button-height-lg: 3rem;
+  
+  --button-padding-sm: var(--spacing-2) var(--spacing-3);
+  --button-padding-md: var(--spacing-3) var(--spacing-4);
+  --button-padding-lg: var(--spacing-4) var(--spacing-6);
+
+  /* 输入框 */
+  --input-height-sm: 2rem;
+  --input-height-md: 2.5rem;
+  --input-height-lg: 3rem;
+  
+  /* 卡片 */
+  --card-padding: var(--spacing-6);
+  --card-border-radius: var(--radius-xl);
+  
+  /* 导航 */
+  --nav-item-height: 2.75rem;
+  --nav-item-padding: var(--spacing-3) var(--spacing-4);
+}
+
+/* ===========================
+   深色模式变量 
+   =========================== */
+[data-theme="dark"] {
+  /* 深色模式颜色重定义 */
+  --color-bg-primary: var(--neutral-900);
+  --color-bg-secondary: var(--neutral-800);
+  --color-bg-tertiary: var(--neutral-700);
+  --color-bg-elevated: var(--neutral-800);
+  
+  --color-text-primary: var(--neutral-50);
+  --color-text-secondary: var(--neutral-300);
+  --color-text-tertiary: var(--neutral-400);
+  --color-text-inverse: var(--neutral-900);
+  
+  --color-border-primary: var(--neutral-700);
+  --color-border-secondary: var(--neutral-600);
+  
+  /* 深色模式下的阴影调整 */
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+}
+
+/* ===========================
+   自动深色模式检测 
+   =========================== */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg-primary: var(--neutral-900);
+    --color-bg-secondary: var(--neutral-800);
+    --color-bg-tertiary: var(--neutral-700);
+    --color-bg-elevated: var(--neutral-800);
+    
+    --color-text-primary: var(--neutral-50);
+    --color-text-secondary: var(--neutral-300);
+    --color-text-tertiary: var(--neutral-400);
+    --color-text-inverse: var(--neutral-900);
+    
+    --color-border-primary: var(--neutral-700);
+    --color-border-secondary: var(--neutral-600);
+  }
+}
+
+/* ===========================
+   基础工具类 
+   =========================== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.focus-visible {
+  outline: 2px solid var(--primary-500);
+  outline-offset: 2px;
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

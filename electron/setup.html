@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>QueryGPT 安装</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: white;
+      user-select: none;
+    }
+    .container {
+      text-align: center;
+      padding: 40px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+    }
+    .subtitle {
+      margin: 0 0 30px;
+      opacity: 0.9;
+      font-size: 16px;
+    }
+    .progress-container {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      overflow: hidden;
+      height: 10px;
+      margin: 30px 0;
+    }
+    .progress-bar {
+      background: white;
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .status {
+      font-size: 14px;
+      opacity: 0.9;
+      min-height: 20px;
+    }
+    .log-area {
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      text-align: left;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+    }
+    .log-area.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>QueryGPT 正在安装</h1>
+    <p class="subtitle">首次运行需要配置环境，请稍候...</p>
+    
+    <div class="progress-container">
+      <div class="progress-bar" id="progress"></div>
+    </div>
+    
+    <div class="status" id="status">正在检查 Python 环境...</div>
+    
+    <div class="log-area" id="logs"></div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    let progress = 0;
+    const progressBar = document.getElementById('progress');
+    const statusText = document.getElementById('status');
+    const logArea = document.getElementById('logs');
+    
+    // 监听安装进度
+    ipcRenderer.on('setup-progress', (event, data) => {
+      // 更新日志
+      logArea.classList.add('show');
+      logArea.innerHTML += data.replace(/\n/g, '<br>');
+      logArea.scrollTop = logArea.scrollHeight;
+      
+      // 更新进度
+      if (data.includes('Python') || data.includes('python')) {
+        progress = 20;
+        statusText.textContent = '配置 Python 环境...';
+      } else if (data.includes('虚拟环境') || data.includes('venv')) {
+        progress = 40;
+        statusText.textContent = '创建虚拟环境...';
+      } else if (data.includes('依赖') || data.includes('pip')) {
+        progress = 60;
+        statusText.textContent = '安装依赖包...';
+      } else if (data.includes('目录') || data.includes('mkdir')) {
+        progress = 80;
+        statusText.textContent = '创建必要目录...';
+      } else if (data.includes('完成') || data.includes('Success')) {
+        progress = 100;
+        statusText.textContent = '安装完成！';
+      }
+      
+      progressBar.style.width = progress + '%';
+    });
+  </script>
+</body>
+</html>

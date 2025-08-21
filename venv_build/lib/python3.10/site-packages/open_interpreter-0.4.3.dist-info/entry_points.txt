@@ -1,0 +1,6 @@
+[console_scripts]
+i=interpreter.terminal_interface.start_terminal_interface:main
+interpreter=interpreter.terminal_interface.start_terminal_interface:main
+interpreter-classic=interpreter.terminal_interface.start_terminal_interface:main
+wtf=scripts.wtf:main
+

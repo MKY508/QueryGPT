@@ -1,0 +1,87 @@
+# 环境变量和敏感信息
+.env
+.env.*
+!.env.example
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# 虚拟环境
+venv/
+venv_py310/
+env/
+ENV/
+.venv/
+.python-version
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 项目特定
+cache/
+output/*.html
+output/*.png
+output/*.jpg
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 备份文件
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+
+# 测试覆盖率
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# 配置文件（可选，根据需要调整）
+# config/config.json  # 如果包含敏感信息，取消注释这行
+
+# 临时文件
+temp/
+tmp/
+*.temp
+*.tmp
+
+# 旧版本目录（已经被跟踪，这里仅作为提醒）
+# 旧版data-analysis-platform/

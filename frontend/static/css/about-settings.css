@@ -1,0 +1,411 @@
+/* ===========================
+   关于系统页面样式
+   =========================== */
+.about-header {
+    margin-bottom: 30px;
+}
+
+.about-hero {
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
+    border-radius: 16px;
+    padding: 50px 60px;
+    margin: 30px 40px 50px 40px;
+    color: white;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+}
+
+.hero-content {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+}
+
+.hero-icon {
+    font-size: 48px;
+    color: rgba(255,255,255,0.9);
+}
+
+.system-title {
+    font-size: 36px;
+    margin: 0 0 10px 0;
+    font-weight: 600;
+}
+
+.system-version {
+    font-size: 18px;
+    opacity: 0.9;
+    margin-bottom: 20px;
+}
+
+.hero-badges {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.badge-item {
+    background: rgba(255,255,255,0.2);
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.about-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin: 0 40px 50px 40px;
+}
+
+.about-card {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    transition: transform 0.3s;
+}
+
+.about-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+}
+
+.card-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.card-icon i {
+    font-size: 28px;
+    color: white;
+}
+
+.card-content h3 {
+    font-size: 14px;
+    color: #6c757d;
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.card-main {
+    font-size: 20px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0 0 4px 0;
+}
+
+.card-sub {
+    font-size: 14px;
+    color: #95a5a6;
+    margin: 0;
+}
+
+.license-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.license-section h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-size: 24px;
+}
+
+.license-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.license-item {
+    padding: 16px;
+    background: white;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.license-details {
+    margin-top: 12px;
+    padding-left: 20px;
+    border-left: 2px solid #e8eaec;
+}
+
+.license-details small {
+    display: block;
+    color: #666;
+    line-height: 1.8;
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+.license-info {
+    color: #6c757d;
+    font-size: 14px;
+    margin-left: 10px;
+}
+
+.license-notice {
+    background: #fff3cd;
+    color: #856404;
+    padding: 16px;
+    border-radius: 8px;
+    border-left: 4px solid #ffc107;
+}
+
+.system-usage {
+    background: white;
+    border-radius: 12px;
+    padding: 30px 35px;
+    margin: 30px 40px 40px 40px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border: 1px solid #e8eaec;
+}
+
+.system-usage h2 {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.system-usage h2 i {
+    color: #4a90e2;
+}
+
+.system-usage ul {
+    list-style: none;
+    padding: 0;
+}
+
+.system-usage li {
+    padding: 10px 0;
+    padding-left: 30px;
+    position: relative;
+}
+
+.system-usage li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: #28a745;
+    font-weight: bold;
+}
+
+/* 开发者联系信息 */
+.developer-contact {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #e8eaec;
+}
+
+.developer-contact p {
+    color: #495057;
+    font-size: 15px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.developer-contact i {
+    color: #4a90e2;
+}
+
+/* ===========================
+   调整设置页面比例
+   =========================== */
+.settings-panel {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.settings-card {
+    padding: 30px;
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    font-size: 16px;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    font-size: 15px;
+    padding: 12px 15px;
+    width: 100%;
+}
+
+.settings-section {
+    margin-bottom: 35px;
+}
+
+.settings-section h4 {
+    font-size: 20px;
+    margin-bottom: 20px;
+}
+
+/* 调整模型管理表格 */
+.models-table {
+    width: 100%;
+    font-size: 15px;
+}
+
+.models-table th,
+.models-table td {
+    padding: 12px 15px;
+}
+
+/* 调整信息卡片间距 */
+.info-card {
+    padding: 25px;
+    margin-bottom: 20px;
+}
+
+.help-section {
+    padding: 25px;
+    margin-bottom: 20px;
+}
+
+.version-card {
+    padding: 30px;
+}
+
+/* 技术栈部分样式 */
+.tech-stack-section {
+    margin: 40px 40px 30px 40px;
+    padding-bottom: 30px;
+    border-bottom: 1px solid #e8eaec;
+}
+
+.tech-stack-section h2 {
+    font-size: 24px;
+    margin-bottom: 25px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tech-stack-section h2 i {
+    color: #4a90e2;
+}
+
+.tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 25px;
+}
+
+.tech-group {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    border: 1px solid #e8eaec;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+.tech-group:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+    border-color: #4a90e2;
+}
+
+.tech-group h3 {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tech-group h3 i {
+    color: #4a90e2;
+    font-size: 20px;
+}
+
+.tech-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* 给每个badge添加动画延迟 */
+.tech-badge:nth-child(1) { animation-delay: 0.05s; }
+.tech-badge:nth-child(2) { animation-delay: 0.1s; }
+.tech-badge:nth-child(3) { animation-delay: 0.15s; }
+.tech-badge:nth-child(4) { animation-delay: 0.2s; }
+.tech-badge:nth-child(5) { animation-delay: 0.25s; }
+.tech-badge:nth-child(6) { animation-delay: 0.3s; }
+
+@keyframes badgeFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+.tech-group:hover .tech-badge {
+    animation: badgeFloat 2s ease-in-out infinite;
+}
+
+.tech-badge {
+    background: #f0f2f5;
+    color: #4a90e2;
+    padding: 5px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid #d9dce0;
+    transition: all 0.3s ease;
+    cursor: default;
+    position: relative;
+}
+
+.tech-badge:hover {
+    background: #4a90e2;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+    border-color: #4a90e2;
+}
+
+/* 支持部分样式 - 已移除 */
+
+/* 大屏幕优化 */
+@media (min-width: 1920px) {
+    .support-card {
+        font-size: 18px;
+        padding: 35px;
+    }
+    
+    .support-card h3 {
+        font-size: 24px;
+    }
+    
+    .support-card ul {
+        font-size: 17px;
+    }
+}

@@ -1,0 +1,36 @@
+{
+	"name": "electron-is-dev",
+	"version": "2.0.0",
+	"description": "Check if Electron is running in development",
+	"license": "MIT",
+	"repository": "sindresorhus/electron-is-dev",
+	"funding": "https://github.com/sponsors/sindresorhus",
+	"author": {
+		"name": "Sindre Sorhus",
+		"email": "sindresorhus@gmail.com",
+		"url": "https://sindresorhus.com"
+	},
+	"scripts": {
+		"test": "xo && tsd"
+	},
+	"files": [
+		"index.js",
+		"index.d.ts"
+	],
+	"keywords": [
+		"electron",
+		"dev",
+		"development",
+		"mode",
+		"prod",
+		"production",
+		"detect",
+		"check",
+		"debug",
+		"app"
+	],
+	"devDependencies": {
+		"tsd": "^0.14.0",
+		"xo": "^0.38.1"
+	}
+}

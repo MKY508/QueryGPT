@@ -1,0 +1,1142 @@
+/* ===========================
+   UI修复和改进样式
+   =========================== */
+
+/* 1. 修复页面高度问题 - 完全禁用大滚动条 */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden !important;
+}
+
+.container {
+    height: 100vh;
+    overflow: hidden !important;
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.main-content {
+    flex: 1;
+    height: 100vh;
+    overflow: hidden !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.tab-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden !important;
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+}
+
+/* 禁止水平滚动 */
+body {
+    overflow-x: hidden !important;
+    max-width: 100vw;
+}
+
+.sidebar {
+    flex-shrink: 0;
+    width: 260px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.chat-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    max-height: calc(100vh - 280px);
+}
+
+.page-header {
+    flex-shrink: 0;
+    padding: 20px 30px;
+    background: white;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/* 侧边栏主题 - 保持原来的深灰色 */
+.sidebar {
+    background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
+}
+
+/* 修复所有页面上方的黑色覆盖问题 */
+.page-header {
+    background: white !important;
+    z-index: 1;
+    position: relative;
+    border-bottom: none !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+#history-tab .page-header,
+#settings-tab .page-header,
+#system-info-tab .page-header {
+    background: white !important;
+}
+
+.history-container {
+    background: transparent !important;
+    padding-top: 0;
+}
+
+/* 修复新建查询对话框留白过大 */
+.modal-dialog {
+    max-height: 90vh;
+}
+
+.modal-body {
+    padding: 20px 25px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* 2. 修复侧边栏字体居中问题 */
+.sidebar-nav .menu-header,
+.sidebar-nav .nav-link {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+}
+
+.sidebar-nav .menu-header span,
+.sidebar-nav .nav-link span {
+    margin-left: 10px;
+}
+
+.sidebar-nav .submenu-arrow {
+    margin-left: auto;
+}
+
+.sidebar-nav .submenu {
+    padding-left: 0;
+}
+
+.sidebar-nav .submenu li a {
+    padding-left: 50px;
+    display: flex;
+    align-items: center;
+}
+
+/* 特别增强关于菜单下所有子项的显示 */
+.sidebar-nav .nav-link[data-tab="system-info"],
+.sidebar-nav .nav-link[data-tab="version"],
+.sidebar-nav .nav-link[data-tab="support"] {
+    padding: 14px 20px;
+    margin: 5px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.sidebar-nav .nav-link[data-tab="system-info"]:before,
+.sidebar-nav .nav-link[data-tab="version"]:before,
+.sidebar-nav .nav-link[data-tab="support"]:before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: #4a90e2;
+    transition: width 0.3s;
+}
+
+.sidebar-nav .nav-link[data-tab="system-info"]:hover,
+.sidebar-nav .nav-link[data-tab="version"]:hover,
+.sidebar-nav .nav-link[data-tab="support"]:hover {
+    background: rgba(74, 144, 226, 0.2) !important;
+    padding-left: 25px;
+}
+
+.sidebar-nav .nav-link[data-tab="system-info"]:hover:before,
+.sidebar-nav .nav-link[data-tab="version"]:hover:before,
+.sidebar-nav .nav-link[data-tab="support"]:hover:before {
+    width: 5px;
+}
+
+.sidebar-nav .nav-link[data-tab="system-info"] i,
+.sidebar-nav .nav-link[data-tab="version"] i,
+.sidebar-nav .nav-link[data-tab="support"] i {
+    font-size: 16px;
+    color: #5ca0e9;
+}
+
+.sidebar-nav .nav-link[data-tab="system-info"].active,
+.sidebar-nav .nav-link[data-tab="version"].active,
+.sidebar-nav .nav-link[data-tab="support"].active {
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%) !important;
+    font-weight: 600;
+}
+
+.sidebar-nav .nav-link[data-tab="system-info"].active i,
+.sidebar-nav .nav-link[data-tab="version"].active i,
+.sidebar-nav .nav-link[data-tab="support"].active i {
+    color: white;
+}
+
+/* 3. 统一关于系统页面配色 - 使用纯蓝色主题 */
+.about-hero {
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%) !important;
+}
+
+.card-icon {
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%) !important;
+}
+
+.about-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(74, 144, 226, 0.15);
+}
+
+.license-item {
+    border-left-color: #4a90e2 !important;
+}
+
+/* 4. 为其他关于页面添加统一样式 */
+.help-container,
+.version-container,
+.support-container {
+    padding: 30px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.help-section,
+.support-card {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.help-section h3,
+.support-card h3 {
+    color: #4a90e2;
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
+.version-card {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.version-card h2 {
+    color: #4a90e2;
+    margin-bottom: 10px;
+}
+
+.version-desc {
+    color: #7f8c8d;
+    margin-bottom: 30px;
+}
+
+.version-details h3 {
+    color: #5ca0e9;
+    margin-top: 25px;
+    margin-bottom: 15px;
+    font-size: 18px;
+}
+
+.version-details ul {
+    list-style: none;
+    padding: 0;
+}
+
+.version-details li {
+    padding: 8px 0;
+    color: #555;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.version-details li:last-child {
+    border-bottom: none;
+}
+
+/* 5. 修复设置页面高亮逻辑 */
+.settings-tabs {
+    display: none !important;  /* 隐藏内部的标签，只使用侧边栏导航 */
+}
+
+/* 默认状态下所有导航链接的样式 */
+.sidebar-nav .nav-link {
+    background: transparent !important;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sidebar-nav .nav-link:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: white;
+}
+
+/* 只有当链接真正激活时才显示高亮 */
+.sidebar-nav .nav-link.active {
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%) !important;
+    color: white !important;
+}
+
+/* 6. 美化基础设置页面布局 */
+.settings-panel {
+    padding: 40px 60px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+}
+
+.settings-container {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+}
+
+.settings-card {
+    background: white;
+    border-radius: 12px;
+    padding: 40px 50px;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+    margin-bottom: 25px;
+    max-width: 100%;
+}
+
+/* 两列布局的表单组 */
+#basic-settings .settings-card {
+    display: flex;
+    flex-direction: column;
+}
+
+#basic-settings .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-bottom: 0;
+}
+
+#basic-settings .form-group {
+    margin-bottom: 25px;
+}
+
+.settings-card h3 {
+    color: #4a90e2;
+    font-size: 22px;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #ecf0f1;
+}
+
+.form-group {
+    margin-bottom: 30px;
+}
+
+.form-group label {
+    display: block;
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 12px;
+    font-size: 16px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    max-width: 100%;
+    padding: 14px 18px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 15px;
+    transition: all 0.3s;
+    background: #f8f9fa;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    border-color: #4a90e2;
+    background: white;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.checkbox-label:hover {
+    background: #f8f9fa;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin-right: 10px;
+}
+
+.checkbox-label span {
+    color: #555;
+    font-size: 15px;
+}
+
+/* 7. 修复模型管理表格显示 */
+.models-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.models-table th {
+    background: #f8f9fa;
+    color: #495057;
+    font-weight: 600;
+    text-align: left;
+    padding: 15px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.models-table td {
+    padding: 15px;
+    border-top: 1px solid #e9ecef;
+    color: #495057;
+    font-size: 15px;
+}
+
+.models-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-badge.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* 8. 按钮样式改进 */
+.btn-primary {
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(74, 144, 226, 0.3);
+}
+
+.btn-secondary {
+    background: white;
+    color: #4a90e2;
+    border: 2px solid #e9ecef;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+.btn-secondary:hover {
+    border-color: #4a90e2;
+    background: #f8f9fa;
+}
+
+.btn-icon {
+    background: transparent !important;
+    border: none !important;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.btn-icon:hover {
+    background: #f8f9fa;
+    color: #4a90e2;
+}
+
+.btn-icon.danger:hover {
+    background: #fff5f5;
+    color: #dc3545;
+}
+
+/* 9. 表单行布局 */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-row .form-group {
+    margin-bottom: 0;
+}
+
+/* 10. 连接状态框美化 */
+.connection-status-box {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 25px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.connection-status-box .status-icon {
+    font-size: 32px;
+    color: #155724;
+}
+
+.connection-status-box h4 {
+    margin: 0;
+    color: #155724;
+    font-size: 18px;
+}
+
+.connection-status-box p {
+    margin: 5px 0 0 0;
+    color: #155724;
+}
+
+/* 11. 修复下拉框高度问题 */
+select {
+    max-height: 45px;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 20px;
+    padding-right: 40px;
+}
+
+/* 12. 响应式调整 */
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .about-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .settings-panel {
+        padding: 20px;
+    }
+    
+    .settings-card {
+        padding: 20px;
+    }
+}
+
+/* 13. 滚动条美化 - 隐藏水平滚动条 */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 0px;  /* 隐藏水平滚动条 */
+}
+
+::-webkit-scrollbar:horizontal {
+    display: none;  /* 完全隐藏水平滚动条 */
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* 防止水平溢出 */
+* {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+html, body {
+    overflow-x: hidden !important;
+    width: 100%;
+}
+
+/* 14. 确保内容不会被遮挡 */
+.tab-content:not(.active) {
+    display: none;
+}
+
+.tab-content.active {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 60px);
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* 限制内容宽度以避免横向滚动 */
+.page-header,
+.chat-header,
+.about-header {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.settings-container,
+.history-container,
+.support-container,
+.version-container {
+    max-width: 100%;
+    overflow-x: hidden;
+    padding-right: 20px;
+}
+
+/* 15. 修复模态框样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 50px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+/* 统一所有页面背景样式 - 浅灰色背景 */
+#history-tab, #settings-tab, #chat-tab, #system-info-tab, #about-tab {
+    background: #f8f9fa;
+    min-height: 100vh;
+}
+
+/* 统一页面标题样式 - 类似关于页面 */
+.page-header {
+    padding: 30px 40px;
+    background: white !important;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 30px;
+}
+
+.page-header h1 {
+    font-size: 32px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+}
+
+/* 设置页面采用关于页面的卡片布局 */
+.settings-container {
+    padding: 0 40px 40px 40px;
+}
+
+.settings-section {
+    background: white;
+    border-radius: 16px;
+    padding: 35px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    transition: transform 0.3s;
+}
+
+.settings-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+}
+
+.settings-section h2 {
+    color: #2c3e50;
+    font-size: 20px;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+/* 查询历史页面采用卡片布局 */
+.history-container {
+    padding: 0 40px 40px 40px;
+}
+
+.history-item {
+    background: white;
+    border-radius: 16px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    transition: all 0.3s;
+}
+
+.history-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+}
+
+/* 查询页面的输入区域卡片化 - 最大化内容区域 */
+.chat-container {
+    padding: 0 25px 10px 25px;
+}
+
+.chat-messages {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    min-height: 550px;
+    max-height: calc(100vh - 180px);
+}
+
+.chat-input-container {
+    background: white;
+    border-radius: 16px;
+    padding: 12px 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+/* 确保所有页面标题样式一致 */
+.page-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+}
+
+/* 页面操作按钮样式 */
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* 修复所有tab内容的高度和滚动 */
+.tab-content {
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+    position: relative;
+}
+
+/* ===========================
+   通知系统 - 渐入渐出效果
+   =========================== */
+.notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    z-index: 10000;
+    min-width: 300px;
+    max-width: 400px;
+    opacity: 0;
+    pointer-events: none;
+    transition: none;
+}
+
+.notification.show {
+    animation: slideInNotification 0.4s ease-out forwards;
+    pointer-events: auto;
+}
+
+.notification.hide {
+    animation: slideOutNotification 0.4s ease-in forwards;
+}
+
+@keyframes slideInNotification {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-100px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes slideOutNotification {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-100px);
+    }
+}
+
+.notification-content {
+    background: white !important;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-left: 4px solid #4a90e2;
+    color: #2c3e50 !important;
+    border: none !important;
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.notification-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.notification-text {
+    color: #2c3e50;
+    font-size: 14px;
+    line-height: 1.4;
+    flex: 1;
+    white-space: normal;
+    word-break: break-word;
+    max-width: 400px;
+}
+
+/* 不同类型的通知样式 */
+.notification.success .notification-content {
+    border-left-color: #27ae60;
+    background: linear-gradient(to right, rgba(39, 174, 96, 0.05), white);
+}
+
+.notification.success .notification-icon {
+    color: #27ae60;
+}
+
+.notification.error .notification-content {
+    border-left-color: #e74c3c;
+    background: linear-gradient(to right, rgba(231, 76, 60, 0.05), white);
+}
+
+.notification.error .notification-icon {
+    color: #e74c3c;
+}
+
+.notification.warning .notification-content {
+    border-left-color: #f39c12;
+    background: linear-gradient(to right, rgba(243, 156, 18, 0.05), white);
+}
+
+.notification.warning .notification-icon {
+    color: #f39c12;
+}
+
+.notification.info .notification-content {
+    border-left-color: #3498db;
+    background: linear-gradient(to right, rgba(52, 152, 219, 0.05), white);
+}
+
+.notification.info .notification-icon {
+    color: #3498db;
+}
+
+/* ===========================
+   新对话按钮样式 - 统一主题色
+   =========================== */
+.btn-new-conversation {
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-new-conversation:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(74, 144, 226, 0.35);
+}
+
+.btn-new-conversation:active {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.25);
+}
+
+.btn-new-conversation i {
+    font-size: 13px;
+}
+
+/* ===========================
+   欢迎消息样式统一
+   =========================== */
+.welcome-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    min-height: 500px;
+}
+
+.welcome-content {
+    max-width: 700px;
+    width: 100%;
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+}
+
+.welcome-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.welcome-icon {
+    font-size: 48px;
+    color: #4a90e2;
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.welcome-content h2 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.welcome-subtitle {
+    font-size: 16px;
+    color: #6c757d;
+    margin-bottom: 35px;
+    line-height: 1.6;
+}
+
+.welcome-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+    margin-bottom: 35px;
+    padding: 25px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.feature-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+}
+
+.feature-item i {
+    font-size: 28px;
+    color: #4a90e2;
+}
+
+.feature-item span {
+    font-size: 14px;
+    color: #495057;
+    font-weight: 500;
+}
+
+.example-section {
+    margin-bottom: 25px;
+}
+
+.section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.welcome-content .example-queries {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.welcome-content .example-btn {
+    background: white;
+    border: 2px solid #e9ecef;
+    color: #495057;
+    padding: 15px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+}
+
+.welcome-content .example-btn:hover {
+    background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
+    color: white;
+    border-color: transparent;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(74, 144, 226, 0.3);
+}
+
+.welcome-content .example-btn i {
+    font-size: 20px;
+}
+
+.welcome-content .example-btn span {
+    font-weight: 500;
+}
+
+.welcome-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px;
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.1) 0%, rgba(92, 160, 233, 0.1) 100%);
+    border-radius: 10px;
+    font-size: 14px;
+    color: #495057;
+    margin: 0;
+}
+
+.welcome-hint i {
+    color: #f39c12;
+    font-size: 16px;
+}
+
+/* 新对话的欢迎消息保持一致的样式 */
+.chat-messages .welcome-message {
+    background: transparent;
+    margin: 0;
+    padding: 20px;
+    min-height: calc(100vh - 300px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    .notification {
+        left: 10px;
+        right: 10px;
+        max-width: calc(100% - 20px);
+        min-width: auto;
+    }
+    
+    .notification.show {
+        animation: slideInNotificationMobile 0.4s ease-out forwards;
+    }
+    
+    .notification.hide {
+        animation: slideOutNotificationMobile 0.4s ease-in forwards;
+    }
+    
+    @keyframes slideInNotificationMobile {
+        0% {
+            opacity: 0;
+            transform: translateY(-100px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes slideOutNotificationMobile {
+        0% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        100% {
+            opacity: 0;
+            transform: translateY(-100px);
+        }
+    }
+}
+

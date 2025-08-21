@@ -1,0 +1,46 @@
+═══════════════════════════════════════════════════════════════════
+                         COPYRIGHT NOTICE
+═══════════════════════════════════════════════════════════════════
+
+QueryGPT - AI驱动的自然语言数据库查询系统
+Version: 1.0.0-beta
+
+Copyright (c) 2025 Mao Kaiyue (MKY508)
+All rights reserved.
+
+作者信息 / Author Information
+-----------------------------
+姓名/Name: Mao Kaiyue
+笔名/Alias: MKY508
+邮箱/Email: mky369258@gmail.com
+GitHub: https://github.com/MKY508
+创建日期/Created: 2025年8月
+
+项目标识 / Project Identity
+---------------------------
+项目名称: QueryGPT
+项目类型: AI数据库查询系统
+核心技术: OpenInterpreter 0.4.3 + Flask + PyMySQL
+独特标识: MKY508_QUERYGPT_2025
+
+知识产权声明 / Intellectual Property
+------------------------------------
+1. 本软件的所有源代码、文档、设计和相关材料均为作者原创
+2. 未经授权，禁止声称对本软件的所有权
+3. 任何基于本软件的衍生作品必须明确标注原作者
+4. 商业使用需要获得作者的书面授权
+
+作者签名 / Author Signature
+---------------------------
+本人 Mao Kaiyue (MKY508) 声明对 QueryGPT 项目拥有完整的知识产权。
+
+数字指纹 / Digital Fingerprint
+------------------------------
+Project Hash: SHA256:QueryGPT_MKY508_2025
+Timestamp: 2025-08-01T12:00:00Z
+Signature: MKY508_QUERYGPT_ORIGINAL
+
+═══════════════════════════════════════════════════════════════════
+        This is an original work by MKY508
+        此作品为 MKY508 原创
+═══════════════════════════════════════════════════════════════════

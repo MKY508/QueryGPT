@@ -1,0 +1,378 @@
+/* ===========================
+   main.css - 补充样式
+   仅包含style.css中没有的特定功能样式
+   =========================== */
+
+/* ===========================
+   多级菜单样式（补充）
+   =========================== */
+.menu-list {
+    list-style: none;
+}
+
+.menu-item {
+    position: relative;
+}
+
+.menu-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    color: #ecf0f1;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.menu-header:hover {
+    background-color: rgba(52, 152, 219, 0.1);
+}
+
+.menu-header span {
+    flex: 1;
+}
+
+.submenu-arrow {
+    transition: transform 0.3s ease;
+    font-size: 12px;
+}
+
+.menu-item.expanded .submenu-arrow {
+    transform: rotate(180deg);
+}
+
+.submenu {
+    list-style: none;
+    background-color: rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+}
+
+.menu-item.expanded .submenu {
+    max-height: 500px;
+}
+
+.submenu li {
+    margin: 0;
+}
+
+.submenu .nav-link {
+    padding-left: 45px;
+    font-size: 13px;
+}
+
+/* ===========================
+   设置页面标签样式
+   =========================== */
+.settings-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    padding: 20px 30px 0;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.settings-tab {
+    padding: 12px 24px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: -2px;
+}
+
+.settings-tab:hover {
+    color: #495057;
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.settings-tab.active {
+    color: #3498db;
+    border-bottom-color: #3498db;
+    background-color: white;
+}
+
+.settings-tab i {
+    font-size: 16px;
+}
+
+.settings-panel {
+    display: none;
+    padding: 30px;
+    animation: fadeIn 0.3s ease;
+}
+
+.settings-panel.active {
+    display: block;
+}
+
+.settings-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.settings-section:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.settings-section h4 {
+    margin-bottom: 20px;
+    color: #2c3e50;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* ===========================
+   模态框样式（新增）
+   =========================== */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #f8f9fa;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 20px;
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+.modal-body {
+    padding: 25px;
+    max-height: calc(90vh - 140px);
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 15px 25px;
+    border-top: 1px solid #e0e0e0;
+    background-color: #f8f9fa;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.required {
+    color: #e74c3c;
+    font-weight: normal;
+}
+
+
+
+/* ===========================
+   页面特定的滚动控制（补充）
+   =========================== */
+#database-tab,
+#semantic-tab,
+#models-tab,
+#history-tab,
+#about-tab,
+#export-tab {
+    overflow-y: auto;
+    padding: 20px;
+    height: 100%;
+}
+
+/* 聊天页面特殊处理 */
+#chat-tab {
+    overflow: hidden;
+}
+
+/* ===========================
+   导出页面样式（补充）
+   =========================== */
+.export-container {
+    padding: 30px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* ===========================
+   连接状态框（补充）
+   =========================== */
+.connection-status-box {
+    margin-top: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-radius: 8px;
+    border: 1px solid #b1dfbb;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.connection-status-box.error {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    border-color: #f5c6cb;
+}
+
+.connection-status-box .status-icon {
+    font-size: 32px;
+    color: #155724;
+}
+
+.connection-status-box.error .status-icon {
+    color: #721c24;
+}
+
+.connection-status-box .status-info h4 {
+    margin: 0 0 5px 0;
+    color: #155724;
+}
+
+.connection-status-box.error .status-info h4 {
+    color: #721c24;
+}
+
+.connection-status-box .status-info p {
+    margin: 0;
+    color: #155724;
+    font-size: 14px;
+}
+
+/* ===========================
+   表格操作按钮（补充）
+   =========================== */
+.btn-icon {
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin: 0 2px;
+    color: #495057;
+}
+
+.btn-icon:hover {
+    background-color: #f8f9fa;
+    border-color: #adb5bd;
+    transform: translateY(-1px);
+}
+
+.btn-icon.danger:hover {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+/* ===========================
+   状态标记（补充）
+   =========================== */
+.status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-badge.active {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-badge.inactive {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge.testing {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* ===========================
+   空状态样式（补充）
+   =========================== */
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6c757d;
+}
+
+.empty-state i {
+    margin-bottom: 20px;
+    opacity: 0.3;
+}
+
+.empty-state p {
+    margin: 10px 0;
+    font-size: 16px;
+}
+
+.empty-state small {
+    font-size: 14px;
+    opacity: 0.8;
+}

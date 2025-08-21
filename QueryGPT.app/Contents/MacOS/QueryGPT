@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# 获取应用资源目录
+APP_RESOURCES="$(dirname "$0")/../Resources"
+cd "$APP_RESOURCES"
+
+# 在新的终端窗口中运行
+osascript <<END
+tell application "Terminal"
+    do script "cd '$APP_RESOURCES' && ./QueryGPT.command"
+    activate
+end tell
+END
