@@ -1,0 +1,131 @@
+# 环境变量和敏感信息
+.env
+.env.*
+!.env.example
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# 虚拟环境
+venv/
+venv_py310/
+venv_build/
+env/
+ENV/
+.venv/
+.python-version
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# 系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 项目特定
+cache/
+output/*.html
+output/*.png
+output/*.jpg
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
+
+# 备份文件
+*.bak
+*.backup
+*.old
+*.orig
+*.tmp
+
+# 测试覆盖率
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# 配置文件（可选，根据需要调整）
+# config/config.json  # 如果包含敏感信息，取消注释这行
+
+# 临时文件
+temp/
+tmp/
+*.temp
+*.tmp
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Electron
+electron/
+electron_start.sh
+*.app/
+*.dmg
+
+# 构建和打包文件
+*.spec
+build_*.sh
+build_*.bat
+prepare_pr.sh
+push_to_github.sh
+submit_*.sh
+quick_submit.sh
+create_*.sh
+create_*.py
+
+# 测试文件
+test_*.py
+test_*.js
+backend_standalone.py
+
+# 临时文档
+AWESOME_*.md
+SUBMISSION_*.md
+CHECKLIST.md
+PR_TEMPLATES.md
+DEPLOYMENT_GUIDE.md
+badge_update.md
+pr_*.md
+CHINESE_*.md
+
+# 命令文件
+*.command
+
+# 旧版本目录（已经被跟踪，这里仅作为提醒）
+# 旧版data-analysis-platform/

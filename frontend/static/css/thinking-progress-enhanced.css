@@ -1,0 +1,708 @@
+/**
+ * 增强版思考过程组件样式
+ * 支持智能状态反馈、流畅动画和圆圈到圆圈的进度展示
+ * 包含思考完成后的平滑过渡效果
+ */
+
+/* 主容器 */
+.thinking-process-enhanced {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 16px;
+    padding: 24px;
+    margin: 16px 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+}
+
+.thinking-process-enhanced::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 3s infinite;
+}
+
+/* 头部区域 */
+.thinking-header-enhanced {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+    gap: 16px;
+}
+
+.thinking-icon-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.thinking-main-icon {
+    font-size: 32px;
+    animation: pulse 2s infinite;
+    z-index: 2;
+    position: relative;
+}
+
+.thinking-pulse-ring {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border: 2px solid #3498db;
+    border-radius: 50%;
+    opacity: 0;
+    animation: pulseRing 2s infinite;
+}
+
+.thinking-title-section {
+    flex: 1;
+}
+
+.thinking-title-enhanced {
+    font-size: 20px;
+    font-weight: 600;
+    color: #2c3e50;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.thinking-subtitle {
+    font-size: 14px;
+    color: #7f8c8d;
+    margin-bottom: 8px;
+}
+
+.thinking-flow-indicator {
+    margin-top: 8px;
+}
+
+.flow-arrow {
+    font-size: 16px;
+    color: #5a6c7d;
+    letter-spacing: 2px;
+    animation: flowPulse 3s infinite;
+}
+
+/* 阶段容器 */
+.thinking-stages-enhanced {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+    position: relative;
+}
+
+/* 单个阶段 */
+.thinking-stage-enhanced {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    transition: all 0.3s ease;
+    opacity: 0.6;
+}
+
+.thinking-stage-enhanced.active {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.8);
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.thinking-stage-enhanced.completed {
+    opacity: 0.8;
+    background: rgba(46, 204, 113, 0.1);
+}
+
+/* 阶段圆圈 */
+.stage-circle-enhanced {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 3px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stage-circle-enhanced.active-stage {
+    animation: activeCircle 2s infinite alternate;
+}
+
+.stage-emoji {
+    font-size: 28px;
+    z-index: 2;
+    position: relative;
+}
+
+.stage-emoji.bounce-animation {
+    animation: bounceEmoji 0.6s ease;
+}
+
+.stage-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    opacity: 0;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    transition: opacity 0.3s ease;
+}
+
+.stage-shimmer.active-shimmer {
+    opacity: 1;
+    animation: shimmerRotate 2s infinite;
+}
+
+/* 进度环 */
+.circle-progress-ring {
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+}
+
+.progress-ring-svg {
+    transform: rotate(-90deg);
+}
+
+.progress-ring-background {
+    fill: none;
+    stroke: #e0e0e0;
+    stroke-width: 2;
+}
+
+.progress-ring-fill {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.5s ease-in-out;
+}
+
+/* 阶段信息 */
+.stage-info-enhanced {
+    flex: 1;
+    padding-left: 8px;
+}
+
+.stage-title-enhanced {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 4px;
+}
+
+.stage-description-enhanced {
+    font-size: 13px;
+    color: #7f8c8d;
+    line-height: 1.4;
+    transition: opacity 0.3s ease;
+}
+
+.stage-time-estimate {
+    font-size: 11px;
+    color: #95a5a6;
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.stage-time-estimate.fade-in {
+    opacity: 1;
+}
+
+/* 状态指示器 */
+.stage-status-enhanced {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.status-dot-enhanced {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.thinking-stage-enhanced.active .status-dot-enhanced {
+    animation: dotPulse 1.5s infinite;
+}
+
+.thinking-stage-enhanced.completed .status-dot-enhanced {
+    background: #27ae60;
+    box-shadow: 0 0 8px rgba(39, 174, 96, 0.4);
+}
+
+.status-trail {
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(to bottom, transparent, #e0e0e0, transparent);
+    opacity: 0.3;
+}
+
+/* 连接线 */
+.stage-connection-line {
+    position: absolute;
+    right: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 2px;
+    border-top: 2px dashed #e0e0e0;
+    opacity: 0.5;
+}
+
+.thinking-stage-enhanced:last-child .stage-connection-line {
+    display: none;
+}
+
+/* 进度条区域 */
+.thinking-progress-enhanced {
+    margin-bottom: 20px;
+}
+
+.progress-container-enhanced {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.progress-bar-enhanced {
+    flex: 1;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-fill-enhanced {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    position: relative;
+}
+
+.progress-glow {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    width: 8px;
+    height: 100%;
+    background: radial-gradient(circle, rgba(52, 152, 219, 0.8) 0%, transparent 70%);
+    border-radius: 50%;
+    animation: progressGlow 2s infinite alternate;
+}
+
+.progress-particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.3) 1px, transparent 1px),
+        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
+    background-size: 20px 20px;
+    animation: particleMove 3s infinite linear;
+}
+
+.progress-text-enhanced {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2c3e50;
+    min-width: 40px;
+    text-align: right;
+}
+
+/* 状态区域 */
+.thinking-status-enhanced {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.status-indicator-enhanced {
+    position: relative;
+    width: 24px;
+    height: 24px;
+}
+
+.status-pulse {
+    width: 12px;
+    height: 12px;
+    background: #3498db;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: statusPulse 2s infinite;
+}
+
+.status-wave {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 24px;
+    border: 2px solid #3498db;
+    border-radius: 50%;
+    opacity: 0;
+    animation: statusWave 2s infinite;
+}
+
+.status-content {
+    flex: 1;
+}
+
+.status-text-enhanced {
+    font-size: 14px;
+    color: #2c3e50;
+    font-weight: 500;
+    transition: opacity 0.3s ease;
+}
+
+.status-time-estimate {
+    font-size: 12px;
+    color: #7f8c8d;
+    margin-top: 2px;
+}
+
+/* 洞察预览 */
+.thinking-insights-enhanced {
+    margin-top: 16px;
+    padding: 12px;
+    background: rgba(241, 196, 15, 0.1);
+    border-radius: 8px;
+    border-left: 4px solid #f1c40f;
+}
+
+.insight-preview {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.insight-icon {
+    color: #f39c12;
+    animation: insightPulse 2s infinite;
+}
+
+.insight-text {
+    font-size: 13px;
+    color: #d68910;
+    font-style: italic;
+}
+
+/* 动画定义 */
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+@keyframes pulseRing {
+    0% { opacity: 0; transform: scale(0.8); }
+    50% { opacity: 0.6; transform: scale(1.2); }
+    100% { opacity: 0; transform: scale(1.4); }
+}
+
+@keyframes flowPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+@keyframes shimmer {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+@keyframes activeCircle {
+    0% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+    100% { box-shadow: 0 8px 24px rgba(52, 152, 219, 0.3); }
+}
+
+@keyframes bounceEmoji {
+    0%, 100% { transform: scale(1) translateY(0); }
+    50% { transform: scale(1.2) translateY(-4px); }
+}
+
+@keyframes shimmerRotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes dotPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+@keyframes progressGlow {
+    0% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+@keyframes particleMove {
+    0% { background-position: 0 0; }
+    100% { background-position: 20px 20px; }
+}
+
+@keyframes statusPulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.7; }
+}
+
+@keyframes statusWave {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+    50% { opacity: 0.6; }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+
+@keyframes insightPulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+/* 完成状态 */
+.thinking-process-enhanced.completed {
+    background: linear-gradient(135deg, #e8f5e8 0%, #d5f4d5 100%);
+    border-color: rgba(39, 174, 96, 0.3);
+}
+
+.thinking-process-enhanced.completed .thinking-main-icon {
+    animation: none;
+}
+
+.thinking-process-enhanced.completed .flow-arrow {
+    color: #27ae60;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .thinking-process-enhanced {
+        padding: 16px;
+        margin: 12px 0;
+    }
+    
+    .thinking-header-enhanced {
+        flex-direction: column;
+        text-align: center;
+        gap: 12px;
+    }
+    
+    .thinking-stages-enhanced {
+        gap: 12px;
+    }
+    
+    .thinking-stage-enhanced {
+        flex-direction: column;
+        text-align: center;
+        padding: 16px;
+    }
+    
+    .stage-circle-enhanced {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .stage-emoji {
+        font-size: 24px;
+    }
+    
+    .stage-connection-line {
+        display: none;
+    }
+    
+    .progress-container-enhanced {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .progress-text-enhanced {
+        text-align: center;
+    }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .thinking-process-enhanced {
+        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .thinking-title-enhanced,
+    .stage-title-enhanced,
+    .status-text-enhanced,
+    .progress-text-enhanced {
+        color: #ecf0f1;
+    }
+    
+    .thinking-subtitle,
+    .stage-description-enhanced,
+    .status-time-estimate {
+        color: #bdc3c7;
+    }
+    
+    .thinking-stage-enhanced {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .thinking-stage-enhanced.active {
+        background: rgba(255, 255, 255, 0.2);
+    }
+    
+    .stage-circle-enhanced {
+        background: #34495e;
+        border-color: #4a6278;
+    }
+}
+
+/* ======================================
+   思考完成过渡动画
+   ====================================== */
+
+/* 思考完成状态 */
+.thinking-complete {
+    animation: thinkingComplete 0.6s ease-out forwards;
+}
+
+.thinking-complete .thinking-header {
+    animation: headerGlow 0.8s ease-out;
+}
+
+.thinking-complete .thinking-icon {
+    color: #27ae60;
+    animation: iconSuccess 0.6s ease-out;
+}
+
+.thinking-complete .thinking-title {
+    color: #27ae60;
+    font-weight: 600;
+}
+
+/* 思考完成的主动画 */
+@keyframes thinkingComplete {
+    0% {
+        transform: scale(1);
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    }
+    50% {
+        transform: scale(1.02);
+        background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+        box-shadow: 0 12px 40px rgba(46, 204, 113, 0.2);
+    }
+    100% {
+        transform: scale(1);
+        background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+        box-shadow: 0 8px 32px rgba(46, 204, 113, 0.15);
+    }
+}
+
+/* 图标成功动画 */
+@keyframes iconSuccess {
+    0% {
+        transform: rotate(0deg) scale(1);
+    }
+    50% {
+        transform: rotate(360deg) scale(1.2);
+    }
+    100% {
+        transform: rotate(360deg) scale(1);
+    }
+}
+
+/* 头部发光效果 */
+@keyframes headerGlow {
+    0% {
+        text-shadow: none;
+    }
+    50% {
+        text-shadow: 0 0 20px rgba(46, 204, 113, 0.5);
+    }
+    100% {
+        text-shadow: none;
+    }
+}
+
+/* 阶段完成动画 */
+.thinking-stage.completed {
+    animation: stageComplete 0.4s ease-out forwards;
+}
+
+@keyframes stageComplete {
+    0% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+        background: linear-gradient(135deg, #a8e6cf 0%, #7fcdbb 100%);
+    }
+}
+
+/* 平滑过渡到结果内容 */
+.thinking-to-result-transition {
+    animation: fadeToResult 0.5s ease-out forwards;
+}
+
+@keyframes fadeToResult {
+    0% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    50% {
+        opacity: 0.5;
+        transform: translateY(-5px);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+}
+
+/* 结果内容淡入 */
+.result-fade-in {
+    animation: resultFadeIn 0.5s ease-out forwards;
+}
+
+@keyframes resultFadeIn {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

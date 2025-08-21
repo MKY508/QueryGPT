@@ -1,0 +1,701 @@
+{
+  "数据库映射": {
+    "center_dws": {
+      "中文名": "数据汇总层",
+      "描述": "汇总级别的业务数据，适合统计分析和报表",
+      "使用场景": [
+        "月度统计",
+        "事业部分析",
+        "销售汇总",
+        "财务汇总"
+      ],
+      "优先级": 5
+    },
+    "center_dwd": {
+      "中文名": "数据明细层",
+      "描述": "交易级别的明细数据，包含所有业务细节",
+      "使用场景": [
+        "订单查询",
+        "明细分析",
+        "客户追踪"
+      ],
+      "优先级": 4
+    },
+    "center_dim": {
+      "中文名": "维度数据",
+      "描述": "基础维度表，如产品、客户、组织等主数据",
+      "使用场景": [
+        "基础信息查询",
+        "维度关联"
+      ],
+      "优先级": 3
+    },
+    "center_ods": {
+      "中文名": "原始数据层",
+      "描述": "从业务系统同步的原始数据",
+      "使用场景": [
+        "数据核对",
+        "源数据查询"
+      ],
+      "优先级": 2
+    },
+    "ads": {
+      "中文名": "应用数据层",
+      "描述": "为特定应用准备的数据集市",
+      "使用场景": [
+        "应用报表",
+        "BI分析"
+      ],
+      "优先级": 3
+    },
+    "wms_dws": {
+      "中文名": "仓储汇总层",
+      "描述": "仓储物流的汇总数据",
+      "使用场景": [
+        "库存分析",
+        "物流统计"
+      ],
+      "优先级": 3
+    }
+  },
+  "核心业务表": {
+    "销售分析": {
+      "表路径": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "中文名": "销售交易SKU日明细",
+      "描述": "最详细的销售数据，包含每个SKU每天的销售情况",
+      "关键词": [
+        "销售",
+        "销量",
+        "七折",
+        "折扣",
+        "事业部",
+        "订单",
+        "金额"
+      ],
+      "必需字段": {
+        "v_month": "月份",
+        "sale_num": "销量",
+        "sale_num_discount": "七折销量",
+        "cpsyb_name": "事业部",
+        "knead_pay_amount": "订单金额",
+        "qy": "区域",
+        "dq": "大区",
+        "cust_name": "客户",
+        "sku_name": "SKU名称"
+      },
+      "可选字段": {
+        "d_date": "日期",
+        "order_no": "订单号",
+        "shop_name": "店铺",
+        "province": "省份",
+        "city": "城市"
+      }
+    },
+    "财务核算": {
+      "表路径": "center_dws.dws_fin_accounting",
+      "中文名": "财务记账明细",
+      "描述": "财务维度的记账数据，用于财务分析和核算",
+      "关键词": [
+        "财务",
+        "记账",
+        "税务",
+        "结算",
+        "净收入"
+      ],
+      "必需字段": {
+        "accounting_date": "记账日期",
+        "n_sl": "数量",
+        "total_amt": "总金额",
+        "settlement_amount": "结算金额",
+        "tax_amt": "税额",
+        "jsr_amt": "净收入",
+        "cpsyb_name": "事业部"
+      }
+    },
+    "库存分析": {
+      "表路径": "center_dws.dws_inv_logic_inv_age",
+      "中文名": "库存账龄分析",
+      "描述": "库存的账龄分布，用于库存管理和优化",
+      "关键词": [
+        "库存",
+        "账龄",
+        "仓库",
+        "滞销"
+      ],
+      "必需字段": {
+        "sku_code": "SKU代码",
+        "warehouse_name": "仓库",
+        "inv_qty": "库存数量",
+        "inv_age": "账龄天数"
+      }
+    },
+    "销售出库": {
+      "表路径": "center_dws.dws_sale_trd_out",
+      "中文名": "销售出库明细",
+      "描述": "实际出库的销售订单数据",
+      "关键词": [
+        "出库",
+        "发货",
+        "履约"
+      ],
+      "必需字段": {
+        "done_quantity": "出库数量",
+        "collection_time": "采集时间",
+        "organization_name": "组织",
+        "knead_pay_price": "实付单价"
+      }
+    },
+    "销售_销售退货汇总": {
+      "表路径": "center_dws.dws_sale_trd_ret_total",
+      "中文名": "销售退货汇总",
+      "描述": "销售退货汇总数据",
+      "关键词": [
+        "退货汇总"
+      ],
+      "必需字段": {
+        "d_date": "日期",
+        "order_no": "订单号",
+        "sku_name": "SKU名称",
+        "cust_name": "客户",
+        "sale_num": "salenum数量",
+        "knead_settlement_amount": "kneadsettlementamount金额",
+        "cpsyb_name": "事业部"
+      }
+    },
+    "销售_售后服务明细": {
+      "表路径": "center_dws.dws_sale_trd_after_sale",
+      "中文名": "售后服务明细",
+      "描述": "售后服务明细数据",
+      "关键词": [
+        "售后服务"
+      ],
+      "必需字段": {
+        "actual_return_num": "actualreturnnum数量"
+      }
+    },
+    "销售_销售退货调整": {
+      "表路径": "center_dws.dws_sale_trd_rtn_ad",
+      "中文名": "销售退货调整",
+      "描述": "销售退货调整数据",
+      "关键词": [
+        "退货调整"
+      ],
+      "必需字段": {
+        "cust_name": "客户",
+        "cpsyb_name": "事业部",
+        "rtn_num": "rtnnum数量",
+        "sale_num": "salenum数量",
+        "sale_knead_settlement_amount": "salekneadsettlementamount金额",
+        "rtn_knead_settlement_amount": "rtnkneadsettlementamount金额"
+      }
+    },
+    "销售_海外销售明细": {
+      "表路径": "center_dws.dws_sale_overseas_sale_detail",
+      "中文名": "海外销售明细",
+      "描述": "海外销售明细数据",
+      "关键词": [
+        "海外"
+      ],
+      "必需字段": {
+        "cust_name": "客户",
+        "sku_name": "SKU名称"
+      }
+    },
+    "销售_每日商品交付": {
+      "表路径": "center_dws.dws_daily_goods_delivery",
+      "中文名": "每日商品交付",
+      "描述": "每日商品交付数据",
+      "关键词": [
+        "每日商品交付"
+      ],
+      "必需字段": {
+        "d_date": "日期",
+        "sku_name": "SKU名称",
+        "cpsyb_name": "事业部",
+        "original_request_num": "originalrequestnum数量",
+        "actual_request_num": "actualrequestnum数量",
+        "done_num": "donenum数量",
+        "pending_num": "pendingnum数量"
+      }
+    },
+    "8月_财务记账": {
+      "表路径": "center_dws.dws_fin_accounting_202508",
+      "中文名": "2025年8月财务记账",
+      "描述": "2025年8月的财务记账数据，包含当月所有财务交易明细",
+      "关键词": [
+        "2025年8月财务记账",
+        "财务",
+        "记账",
+        "结算"
+      ],
+      "必需字段": {
+        "accounting_line_id": "记账行ID",
+        "accounting_no": "记账单号",
+        "accounting_date": "记账日期",
+        "accounting_type_code": "记账类型代码",
+        "accounting_type": "记账类型",
+        "accounting_business_order_number": "记账业务订单号",
+        "accounting_status": "记账状态",
+        "accounting_num": "记账数量",
+        "total_amt": "总金额",
+        "channel_order_number": "渠道订单号"
+      },
+      "可选字段": {
+        "entity_code": "实体代码",
+        "erp_order_id": "ERP订单ID",
+        "erp_order_name": "ERP订单名称"
+      }
+    },
+    "财务AB销售计划": {
+      "表路径": "center_dws.dws_fin_ab_sale_plan_new_ct",
+      "中文名": "财务AB销售计划",
+      "描述": "财务维度的AB销售计划数据，用于销售计划跟踪",
+      "关键词": [
+        "财务AB销售计划",
+        "财务",
+        "记账",
+        "结算",
+        "销售",
+        "计划"
+      ],
+      "必需字段": {
+        "d_date": "日期",
+        "d_month": "月份",
+        "dq": "大区",
+        "cust_code": "客户代码",
+        "cust_name": "客户名称",
+        "cpsyb": "产品事业部",
+        "sale_num": "销售数量",
+        "sale_amt": "销售金额",
+        "cj_sale_amt": "成交销售金额"
+      },
+      "可选字段": {
+        "qd": "渠道",
+        "ywlxr": "业务联系人",
+        "use_rebate": "使用返利"
+      }
+    },
+    "库存账龄调整": {
+      "表路径": "center_dws.dws_inv_logic_inv_age_ad",
+      "中文名": "库存账龄调整",
+      "描述": "库存账龄的调整数据，用于库存优化分析",
+      "关键词": [
+        "库存账龄调整",
+        "库存",
+        "账龄",
+        "仓库"
+      ],
+      "必需字段": {
+        "d_date": "日期",
+        "sku_code": "SKU代码",
+        "sku_name": "SKU名称",
+        "cpsyb_name": "事业部名称",
+        "cpsyb_jc": "事业部简称",
+        "manage_department_name": "管理部门名称",
+        "logic_warehouse_code": "逻辑仓库代码",
+        "logic_warehouse_name": "逻辑仓库名称",
+        "warehouse_property_code": "仓库属性代码",
+        "warehouse_property": "仓库属性",
+        "physics_warehouse_code": "物理仓库代码",
+        "physics_warehouse_name": "物理仓库名称"
+      },
+      "可选字段": {
+        "factory_price": "出厂价",
+        "organization_code": "组织代码",
+        "organization_name": "组织名称"
+      }
+    },
+    "财务库存账龄": {
+      "表路径": "center_dws.dws_inv_age_cw",
+      "中文名": "财务库存账龄",
+      "描述": "财务视角的库存账龄分析，用于财务核算",
+      "关键词": [
+        "财务库存账龄",
+        "财务",
+        "记账",
+        "结算",
+        "库存",
+        "账龄",
+        "仓库"
+      ],
+      "必需字段": {
+        "d_date": "日期",
+        "sku_code": "SKU代码",
+        "sku_name": "SKU名称",
+        "inv_num": "库存数量",
+        "inv_amt": "库存金额",
+        "normal_num": "正常库存数量",
+        "normal_amt": "正常库存金额",
+        "long_num": "长库龄数量",
+        "long_amt": "长库龄金额",
+        "num_1_to_30": "1-30天数量",
+        "num_31_to_90": "31-90天数量",
+        "num_91_to_150": "91-150天数量"
+      },
+      "可选字段": {
+        "factory_price": "出厂价",
+        "ip_code": "IP代码",
+        "ip_name": "IP名称"
+      }
+    },
+    "采购计划数量快照": {
+      "表路径": "center_dws.dws_pur_plan_quantity_snapshot",
+      "中文名": "采购计划数量快照",
+      "描述": "采购计划的数量快照，记录各时点的采购计划",
+      "关键词": [
+        "采购计划数量快照",
+        "采购",
+        "计划",
+        "完成"
+      ],
+      "必需字段": {
+        "snapshot_date": "快照日期",
+        "cw_month": "财务月份",
+        "sku_code": "SKU代码",
+        "sku_name": "SKU名称",
+        "original_request_num": "原始需求数量",
+        "actual_request_num": "实际需求数量",
+        "done_num": "完成数量",
+        "pending_num": "待处理数量"
+      },
+      "可选字段": {
+        "order_no": "订单号",
+        "order_type": "订单类型",
+        "order_source": "订单来源"
+      }
+    },
+    "采购完成数量": {
+      "表路径": "center_dws.dws_done_quantity_purchase",
+      "中文名": "采购完成数量",
+      "描述": "已完成的采购数量统计，用于采购执行跟踪",
+      "关键词": [
+        "采购完成数量",
+        "采购",
+        "计划",
+        "完成"
+      ],
+      "必需字段": {
+        "month": "月份",
+        "sku_code": "SKU代码",
+        "sku_name": "SKU名称",
+        "done_quantity": "完成数量",
+        "cumulative_done_quantity": "累计完成数量"
+      },
+      "可选字段": {
+        "order_no": "订单号"
+      }
+    },
+    "待采购数量": {
+      "表路径": "center_dws.dws_wait_quantity",
+      "中文名": "待采购数量",
+      "描述": "待处理的采购数量，用于采购需求分析",
+      "关键词": [
+        "待采购数量",
+        "采购",
+        "计划",
+        "完成"
+      ],
+      "必需字段": {
+        "month": "月份",
+        "sku_code": "SKU代码",
+        "sku_name": "SKU名称",
+        "done_quantity": "完成数量",
+        "cumulative_done_quantity": "累计完成数量"
+      },
+      "可选字段": {
+        "order_no": "订单号"
+      }
+    },
+    "渠道预测明细": {
+      "表路径": "center_dws.dws_channel_forecast_detail",
+      "中文名": "渠道预测明细",
+      "描述": "各渠道的销售预测明细数据",
+      "关键词": [
+        "渠道预测明细",
+        "预测",
+        "渠道",
+        "事业部"
+      ],
+      "必需字段": {
+        "forecast_fill_sku_id": "预测填报SKU ID",
+        "forecast_fill_no": "预测填报编号",
+        "sku_code": "SKU代码",
+        "sku_name": "SKU名称",
+        "cpsyb_code": "事业部代码",
+        "cpsyb_name": "事业部名称",
+        "is_sku_core": "是否核心SKU",
+        "forecast_range": "预测范围",
+        "forecast_version": "预测版本",
+        "current_forecast_qty": "当期预测数量"
+      },
+      "可选字段": {
+        "business_unit_code": "业务单元代码",
+        "business_unit_name": "业务单元名称",
+        "qd_code": "渠道代码"
+      }
+    },
+    "事业部预测明细": {
+      "表路径": "center_dws.dws_syb_forecast_detail",
+      "中文名": "事业部预测明细",
+      "描述": "各事业部的销售预测明细数据",
+      "关键词": [
+        "事业部预测明细",
+        "预测",
+        "渠道",
+        "事业部"
+      ],
+      "必需字段": {
+        "sku_code": "SKU代码",
+        "sku_name": "SKU名称",
+        "cpsyb_code": "事业部代码",
+        "cpsyb_name": "事业部名称",
+        "is_sku_core": "是否核心SKU",
+        "forecast_range": "预测范围",
+        "forecast_version": "预测版本",
+        "current_forecast_qty": "当期预测数量",
+        "current_forecast_amt": "当期预测金额",
+        "next_forecast_qty": "下期预测数量",
+        "next_forecast_amt": "下期预测金额",
+        "customized_tag": "定制标签"
+      },
+      "可选字段": {
+        "ip1_name": "一级IP名称",
+        "ip2_name": "二级IP名称",
+        "ip3_name": "三级IP名称"
+      }
+    }
+  },
+  "快速搜索索引": {
+    "七折": {
+      "字段": "sale_num_discount",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "七折销量，用于促销分析"
+    },
+    "折扣": {
+      "字段": "sale_num_discount",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "折扣销量"
+    },
+    "事业部": {
+      "字段": "cpsyb_name",
+      "表": [
+        "center_dws.dws_sale_trd_sku_sale_day_datail",
+        "center_dws.dws_fin_accounting"
+      ],
+      "描述": "产品事业部名称"
+    },
+    "月份": {
+      "字段": "v_month",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "数据月份，格式YYYY-MM"
+    },
+    "日期": {
+      "字段": "d_date",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "具体日期"
+    },
+    "销量": {
+      "字段": "sale_num",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "销售数量"
+    },
+    "销售数量": {
+      "字段": "sale_num",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "销售数量"
+    },
+    "订单金额": {
+      "字段": "knead_pay_amount",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "客户实付的订单金额"
+    },
+    "实付金额": {
+      "字段": "knead_pay_amount",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "客户实际支付金额"
+    },
+    "结算金额": {
+      "字段": "knead_settlement_amount",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "结算金额"
+    },
+    "总金额": {
+      "字段": "total_amt",
+      "表": "center_dws.dws_fin_accounting",
+      "描述": "财务总金额"
+    },
+    "税额": {
+      "字段": "tax_amt",
+      "表": "center_dws.dws_fin_accounting",
+      "描述": "税务金额"
+    },
+    "净收入": {
+      "字段": "jsr_amt",
+      "表": "center_dws.dws_fin_accounting",
+      "描述": "净收入金额"
+    },
+    "区域": {
+      "字段": "qy",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "销售区域"
+    },
+    "大区": {
+      "字段": "dq",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "销售大区"
+    },
+    "省份": {
+      "字段": "province",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "省份"
+    },
+    "城市": {
+      "字段": "city",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "城市"
+    },
+    "客户": {
+      "字段": "cust_name",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "客户名称"
+    },
+    "客户名称": {
+      "字段": "cust_name",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "客户名称"
+    },
+    "SKU": {
+      "字段": "sku_name",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "商品名称"
+    },
+    "商品": {
+      "字段": "sku_name",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "商品名称"
+    },
+    "产品": {
+      "字段": "sku_name",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "产品名称"
+    },
+    "产品线": {
+      "字段": "product_line_name",
+      "表": "center_dws.dws_sale_trd_sku_sale_day_datail",
+      "描述": "产品线名称"
+    },
+    "退货": {
+      "字段": "*",
+      "表": "center_dws.dws_sale_trd_ret_total",
+      "描述": "退货相关数据"
+    },
+    "退货数量": {
+      "字段": "rtn_num",
+      "表": "center_dws.dws_sale_trd_rtn_ad",
+      "描述": "退货数量"
+    },
+    "售后": {
+      "字段": "*",
+      "表": "center_dws.dws_sale_trd_after_sale",
+      "描述": "售后服务相关数据"
+    },
+    "财务": {
+      "字段": "*",
+      "表": "center_dws.dws_fin_accounting",
+      "描述": "财务相关数据"
+    },
+    "记账": {
+      "字段": "*",
+      "表": "center_dws.dws_fin_accounting",
+      "描述": "财务记账数据"
+    },
+    "记账日期": {
+      "字段": "accounting_date",
+      "表": "center_dws.dws_fin_accounting",
+      "描述": "记账日期"
+    },
+    "库存": {
+      "字段": "*",
+      "表": "center_dws.dws_inv_logic_inv_age",
+      "描述": "库存相关数据"
+    },
+    "库存数量": {
+      "字段": "inv_qty",
+      "表": "center_dws.dws_inv_logic_inv_age_ad",
+      "描述": "库存数量"
+    },
+    "账龄": {
+      "字段": "inv_age",
+      "表": "center_dws.dws_inv_logic_inv_age",
+      "描述": "库存账龄天数"
+    },
+    "仓库": {
+      "字段": "warehouse_name",
+      "表": "center_dws.dws_inv_logic_inv_age",
+      "描述": "仓库名称"
+    },
+    "采购": {
+      "字段": "*",
+      "表": "center_dws.dws_pur_plan_quantity_snapshot",
+      "描述": "采购相关数据"
+    },
+    "采购计划": {
+      "字段": "*",
+      "表": "center_dws.dws_pur_plan_quantity_snapshot",
+      "描述": "采购计划数据"
+    },
+    "采购完成": {
+      "字段": "done_quantity",
+      "表": "center_dws.dws_done_quantity_purchase",
+      "描述": "采购完成数量"
+    },
+    "待采购": {
+      "字段": "wait_quantity",
+      "表": "center_dws.dws_wait_quantity",
+      "描述": "待采购数量"
+    },
+    "预测": {
+      "字段": "*",
+      "表": [
+        "center_dws.dws_channel_forecast_detail",
+        "center_dws.dws_syb_forecast_detail"
+      ],
+      "描述": "销售预测数据"
+    },
+    "渠道预测": {
+      "字段": "*",
+      "表": "center_dws.dws_channel_forecast_detail",
+      "描述": "渠道销售预测"
+    },
+    "事业部预测": {
+      "字段": "*",
+      "表": "center_dws.dws_syb_forecast_detail",
+      "描述": "事业部销售预测"
+    },
+    "出库": {
+      "字段": "done_quantity",
+      "表": "center_dws.dws_sale_trd_out",
+      "描述": "出库数量"
+    },
+    "发货": {
+      "字段": "*",
+      "表": "center_dws.dws_sale_trd_out",
+      "描述": "发货相关数据"
+    },
+    "交付": {
+      "字段": "*",
+      "表": "center_dws.dws_daily_goods_delivery",
+      "描述": "商品交付数据"
+    },
+    "海外": {
+      "字段": "*",
+      "表": "center_dws.dws_sale_overseas_sale_detail",
+      "描述": "海外销售数据"
+    },
+    "海外销售": {
+      "字段": "*",
+      "表": "center_dws.dws_sale_overseas_sale_detail",
+      "描述": "海外销售明细"
+    }
+  }
+}
