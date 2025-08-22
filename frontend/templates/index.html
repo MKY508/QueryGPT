@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="/static/css/ui-fixes.css">
     <link rel="stylesheet" href="/static/css/history.css">
     <link rel="stylesheet" href="/static/css/language-toggle.css">
+    <link rel="stylesheet" href="/static/css/model-modal.css">
 </head>
 <body>
     <div class="container">
@@ -574,6 +575,58 @@
         <div class="loading-spinner">
             <div class="spinner"></div>
             <p data-i18n="common.loading">处理中...</p>
+        </div>
+    </div>
+    
+    <!-- 模型配置弹窗 -->
+    <div class="modal" id="model-modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="model-modal-title">编辑模型</h2>
+                <button class="modal-close" onclick="window.settingsManager.closeModelModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>模型名称</label>
+                    <input type="text" id="model-name" placeholder="例如: GPT-4">
+                </div>
+                <div class="form-group">
+                    <label>模型ID</label>
+                    <input type="text" id="model-id" placeholder="例如: gpt-4">
+                </div>
+                <div class="form-group">
+                    <label>类型</label>
+                    <select id="model-type">
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="deepseek">DeepSeek</option>
+                        <option value="qwen">Qwen</option>
+                        <option value="custom">自定义</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>API地址</label>
+                    <input type="text" id="model-api-base" placeholder="例如: http://localhost:11434/v1">
+                </div>
+                <div class="form-group">
+                    <label>API密钥</label>
+                    <input type="password" id="model-api-key" placeholder="输入API密钥">
+                </div>
+                <div class="form-group">
+                    <label>最大Token数</label>
+                    <input type="number" id="model-max-tokens" value="4096">
+                </div>
+                <div class="form-group">
+                    <label>温度参数</label>
+                    <input type="number" id="model-temperature" value="0.7" step="0.1" min="0" max="2">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="window.settingsManager.closeModelModal()">取消</button>
+                <button class="btn-primary" id="save-model-btn">保存</button>
+            </div>
         </div>
     </div>
     
