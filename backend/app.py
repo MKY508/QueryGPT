@@ -653,16 +653,34 @@ def test_database():
                 cursorclass=pymysql.cursors.DictCursor
             )
             
-            # 获取表数量
+            # 获取表数量或数据库列表
             with connection.cursor() as cursor:
                 if config.get('database'):
+                    # 指定了数据库，显示该数据库的表
                     cursor.execute("SHOW TABLES")
-                    table_count = len(cursor.fetchall())
+                    tables = cursor.fetchall()
+                    table_count = len(tables)
+                    message = f"连接成功，发现 {table_count} 个表"
                 else:
+                    # 未指定数据库，统计所有数据库的表
                     cursor.execute("SHOW DATABASES")
-                    db_count = len(cursor.fetchall())
-                    table_count = 0
-                    message = f"连接成功，发现 {db_count} 个数据库"
+                    databases = cursor.fetchall()
+                    db_list = [db[list(db.keys())[0]] for db in databases]
+                    # 过滤系统数据库
+                    user_databases = [db for db in db_list if db not in ['information_schema', 'mysql', 'performance_schema', 'sys', '__internal_schema']]
+                    
+                    # 统计所有用户数据库的表总数
+                    total_table_count = 0
+                    for db_name in user_databases:
+                        try:
+                            cursor.execute(f"SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = '{db_name}'")
+                            result = cursor.fetchone()
+                            total_table_count += result.get('cnt', 0)
+                        except:
+                            pass
+                    
+                    table_count = total_table_count
+                    message = f"连接成功！可访问 {len(user_databases)} 个数据库，共 {total_table_count} 个表"
             
             connection.close()
             
