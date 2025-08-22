@@ -6,7 +6,15 @@
   
   <p>
     <a href="#">English</a> •
-    <a href="docs/README_CN.md">简体中文</a>
+    <a href="docs/README_CN.md">简体中文</a> •
+    <a href="README_ZH-TW.md">繁體中文</a> •
+    <a href="README_JA.md">日本語</a> •
+    <a href="README_ES.md">Español</a> •
+    <a href="README_FR.md">Français</a> •
+    <a href="docs/README_DE.md">Deutsch</a> •
+    <a href="README_RU.md">Русский</a> •
+    <a href="README_PT.md">Português</a> •
+    <a href="README_KO.md">한국어</a>
   </p>
   
   <br/>
