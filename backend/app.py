@@ -633,24 +633,151 @@ def test_database():
     """测试数据库连接"""
     try:
         config = request.json
-        # 测试连接逻辑
-        from backend.database import DatabaseManager
-        test_manager = DatabaseManager()  # 修复: Database类不存在
-        test_result = test_manager.test_connection()
         
-        # 构建响应
-        success = test_result.get("connected", False)
-        message = "连接成功" if success else f"连接失败: {test_result.get('error', '未知错误')}"
+        # 处理localhost到127.0.0.1的转换（macOS兼容性）
+        if config.get('host') == 'localhost':
+            config['host'] = '127.0.0.1'
         
-        return jsonify({
-            "success": success,
-            "message": message,
-            "table_count": test_result.get("table_count", 0),  # 添加table_count到顶层
-            "details": test_result
-        })
+        # 创建临时的数据库管理器进行测试
+        import pymysql
+        
+        try:
+            # 直接测试连接
+            connection = pymysql.connect(
+                host=config.get('host', '127.0.0.1'),
+                port=int(config.get('port', 3306)),
+                user=config.get('user'),
+                password=config.get('password'),
+                database=config.get('database', ''),
+                charset='utf8mb4',
+                cursorclass=pymysql.cursors.DictCursor
+            )
+            
+            # 获取表数量
+            with connection.cursor() as cursor:
+                if config.get('database'):
+                    cursor.execute("SHOW TABLES")
+                    table_count = len(cursor.fetchall())
+                else:
+                    cursor.execute("SHOW DATABASES")
+                    db_count = len(cursor.fetchall())
+                    table_count = 0
+                    message = f"连接成功，发现 {db_count} 个数据库"
+            
+            connection.close()
+            
+            return jsonify({
+                "success": True,
+                "message": "连接成功" if config.get('database') else message,
+                "table_count": table_count
+            })
+            
+        except Exception as conn_error:
+            error_msg = str(conn_error)
+            # 提供更友好的错误消息
+            if "Can't connect" in error_msg:
+                if "nodename nor servname provided" in error_msg:
+                    error_msg = "无法解析主机名，请尝试使用 127.0.0.1 代替 localhost"
+                elif "Connection refused" in error_msg:
+                    error_msg = "连接被拒绝，请检查数据库服务是否运行以及端口是否正确"
+            elif "Access denied" in error_msg:
+                error_msg = "用户名或密码错误"
+                
+            return jsonify({
+                "success": False,
+                "message": f"连接失败: {error_msg}",
+                "table_count": 0
+            })
+            
     except Exception as e:
         logger.error(f"数据库测试连接失败: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route('/api/database/config', methods=['POST'])
+def save_database_config():
+    """保存数据库配置到.env文件"""
+    try:
+        config = request.json
+        
+        # 处理localhost到127.0.0.1的转换
+        if config.get('host') == 'localhost':
+            config['host'] = '127.0.0.1'
+        
+        # 读取现有的.env文件
+        from pathlib import Path
+        env_path = Path(__file__).parent.parent / '.env'
+        env_lines = []
+        
+        if env_path.exists():
+            with open(env_path, 'r') as f:
+                env_lines = f.readlines()
+        
+        # 更新数据库配置行
+        config_map = {
+            'DB_HOST': config.get('host', '127.0.0.1'),
+            'DB_PORT': str(config.get('port', 3306)),
+            'DB_USER': config.get('user', ''),
+            'DB_PASSWORD': config.get('password', ''),
+            'DB_DATABASE': config.get('database', '')
+        }
+        
+        # 创建新的配置行
+        new_lines = []
+        db_section_found = False
+        
+        for line in env_lines:
+            # 跳过旧的数据库配置行
+            if any(line.startswith(f"{key}=") for key in config_map.keys()):
+                db_section_found = True
+                continue
+            # 在数据库配置注释后插入新配置
+            if line.startswith("# 数据库配置") and not db_section_found:
+                new_lines.append(line)
+                new_lines.append(f"DB_HOST={config_map['DB_HOST']}\n")
+                new_lines.append(f"DB_PORT={config_map['DB_PORT']}\n")
+                new_lines.append(f"DB_USER={config_map['DB_USER']}\n")
+                new_lines.append(f"DB_PASSWORD={config_map['DB_PASSWORD']}\n")
+                new_lines.append(f"DB_DATABASE={config_map['DB_DATABASE']}\n")
+                db_section_found = True
+            else:
+                new_lines.append(line)
+        
+        # 如果没有找到数据库配置部分，在文件开头添加
+        if not db_section_found:
+            db_config_lines = [
+                "# 数据库配置\n",
+                f"DB_HOST={config_map['DB_HOST']}\n",
+                f"DB_PORT={config_map['DB_PORT']}\n",
+                f"DB_USER={config_map['DB_USER']}\n",
+                f"DB_PASSWORD={config_map['DB_PASSWORD']}\n",
+                f"DB_DATABASE={config_map['DB_DATABASE']}\n",
+                "\n"
+            ]
+            new_lines = db_config_lines + new_lines
+        
+        # 备份现有文件
+        if env_path.exists():
+            backup_path = env_path.with_suffix('.env.backup')
+            import shutil
+            shutil.copy(env_path, backup_path)
+        
+        # 写入新配置
+        with open(env_path, 'w') as f:
+            f.writelines(new_lines)
+        
+        # 重新加载配置
+        global database_manager
+        from backend.database import DatabaseManager
+        database_manager = DatabaseManager()
+        
+        return jsonify({
+            "success": True,
+            "message": "数据库配置已保存"
+        })
+        
+    except Exception as e:
+        logger.error(f"保存数据库配置失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/api/stop_query', methods=['POST'])
 def stop_query():
