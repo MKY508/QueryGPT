@@ -147,3 +147,90 @@ CHINESE_*.md
 
 # 旧版本目录（已经被跟踪，这里仅作为提醒）
 # 旧版data-analysis-platform/
+
+# ============================================
+# 防止不需要的文件被再次创建和上传
+# ============================================
+
+# 不需要的构建和配置文件
+Makefile
+makefile
+GNUmakefile
+*.mk
+pytest.ini
+.coveragerc
+.editorconfig
+.version
+tox.ini
+.flake8
+.pylintrc
+pyproject.toml
+poetry.lock
+
+# 不需要的 Node.js/前端配置
+package.json
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bower.json
+.bowerrc
+webpack.config.js
+rollup.config.js
+vite.config.js
+tsconfig.json
+jsconfig.json
+.prettierrc*
+.eslintrc*
+.stylelintrc*
+
+# 不需要的文档文件
+CONTRIBUTING.md
+CONTRIBUTORS.md
+AUTHORS
+AUTHORS.md
+COPYRIGHT
+COPYRIGHT.md
+SECURITY.md
+CODE_OF_CONDUCT.md
+GOVERNANCE.md
+FUNDING.yml
+.github/FUNDING.yml
+SUPPORT.md
+
+# 不需要的开发环境配置
+docker-compose.dev.yml
+docker-compose.override.yml
+docker-start.sh
+setup.sh
+install.sh
+bootstrap.sh
+requirements-dev.txt
+requirements-test.txt
+dev-requirements.txt
+test-requirements.txt
+
+# 不需要的 CI/CD 配置
+.travis.yml
+.circleci/
+.gitlab-ci.yml
+.jenkins/
+appveyor.yml
+azure-pipelines.yml
+bitbucket-pipelines.yml
+.drone.yml
+
+# 不需要的测试和质量检查配置
+.pre-commit-config.yaml
+.commitlintrc*
+.huskyrc*
+.lintstagedrc*
+sonar-project.properties
+.sonarcloud.properties
+
+# 临时和备份文件
+cleanup-report.md
+*-report.md
+*-report.json
+*.report
+TODO.md
+NOTES.md
