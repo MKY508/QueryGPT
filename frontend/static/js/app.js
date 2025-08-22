@@ -1916,7 +1916,13 @@ class DataAnalysisPlatform {
                     'chat.tryExample': '试试这些示例：',
                     'chat.example1': '显示最近一个月的销售数据',
                     'chat.example2': '分析产品类别的销售占比',
-                    'chat.example3': '查找销售额最高的前10个客户'
+                    'chat.example3': '查找销售额最高的前10个客户',
+                    'chat.example4': '生成用户增长趋势图',
+                    'chat.exampleBtn1': '查看数据库',
+                    'chat.exampleBtn2': '销售分析',
+                    'chat.exampleBtn3': '产品占比',
+                    'chat.exampleBtn4': '用户趋势',
+                    'chat.hint': '提示：直接输入自然语言查询，系统会自动转换为SQL并生成图表'
                 };
                 return fallbacks[key] || key;
             }
@@ -1953,26 +1959,26 @@ class DataAnalysisPlatform {
                     <div class="example-queries">
                         <button class="example-btn" data-example="${i18n.t('chat.example1')}">
                             <i class="fas fa-database"></i>
-                            <span>查看数据库</span>
+                            <span>${i18n.t('chat.exampleBtn1')}</span>
                         </button>
                         <button class="example-btn" data-example="${i18n.t('chat.example2')}">
                             <i class="fas fa-chart-line"></i>
-                            <span>销售分析</span>
+                            <span>${i18n.t('chat.exampleBtn2')}</span>
                         </button>
                         <button class="example-btn" data-example="${i18n.t('chat.example3')}">
                             <i class="fas fa-chart-pie"></i>
-                            <span>产品占比</span>
+                            <span>${i18n.t('chat.exampleBtn3')}</span>
                         </button>
-                        <button class="example-btn" data-example="生成用户增长趋势图">
+                        <button class="example-btn" data-example="${i18n.t('chat.example4')}">
                             <i class="fas fa-users"></i>
-                            <span>用户趋势</span>
+                            <span>${i18n.t('chat.exampleBtn4')}</span>
                         </button>
                     </div>
                 </div>
                 
                 <p class="welcome-hint">
                     <i class="fas fa-lightbulb"></i>
-                    提示：直接输入自然语言查询，系统会自动转换为SQL并生成图表
+                    ${i18n.t('chat.hint')}
                 </p>
             </div>
         `;
