@@ -73,7 +73,11 @@ const i18n = {
             delete: '删除',
             apiKey: 'API密钥',
             maxTokens: '最大Token数',
-            temperature: '温度参数'
+            temperature: '温度参数',
+            modelNamePlaceholder: '例如: GPT-4',
+            modelIdPlaceholder: '例如: gpt-4',
+            apiBasePlaceholder: '例如: http://localhost:11434/v1',
+            apiKeyPlaceholder: '输入API密钥'
         },
         
         // 数据库配置
@@ -323,7 +327,11 @@ const i18n = {
             delete: 'Delete',
             apiKey: 'API Key',
             maxTokens: 'Max Tokens',
-            temperature: 'Temperature'
+            temperature: 'Temperature',
+            modelNamePlaceholder: 'e.g. GPT-4',
+            modelIdPlaceholder: 'e.g. gpt-4',
+            apiBasePlaceholder: 'e.g. http://localhost:11434/v1',
+            apiKeyPlaceholder: 'Enter API key'
         },
         
         // Database configuration

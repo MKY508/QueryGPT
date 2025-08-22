@@ -163,6 +163,7 @@
                             <textarea id="message-input" 
                                       class="modern-textarea"
                                       placeholder="输入查询内容..." 
+                                      data-i18n="chat.inputPlaceholder"
                                       rows="3"></textarea>
                             <button id="send-button" class="send-button btn-modern btn-primary-gradient">
                                 <i class="fas fa-paper-plane"></i>
@@ -315,7 +316,7 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>主机地址</label>
-                                    <input type="text" id="db-host" placeholder="例如: localhost 或 192.168.1.100">
+                                    <input type="text" id="db-host" placeholder="例如: localhost 或 192.168.1.100" data-i18n="database.hostPlaceholder">
                                 </div>
                                 <div class="form-group">
                                     <label>端口</label>
@@ -325,16 +326,16 @@
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>用户名</label>
-                                    <input type="text" id="db-user" placeholder="数据库用户名">
+                                    <input type="text" id="db-user" placeholder="数据库用户名" data-i18n="database.usernamePlaceholder">
                                 </div>
                                 <div class="form-group">
                                     <label>密码</label>
-                                    <input type="password" id="db-password" placeholder="数据库密码">
+                                    <input type="password" id="db-password" placeholder="数据库密码" data-i18n="database.passwordPlaceholder">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>数据库名</label>
-                                <input type="text" id="db-name" placeholder="留空使用所有数据库">
+                                <input type="text" id="db-name" placeholder="留空使用所有数据库" data-i18n="database.dbNamePlaceholder">
                                 <small>提示：留空可访问所有可用数据库</small>
                             </div>
                             <div class="button-group">
@@ -536,11 +537,11 @@
                     <div class="modal-body">
                         <div class="form-group">
                             <label>模型名称 <span class="required">*</span></label>
-                            <input type="text" id="model-name" placeholder="例如: GPT-4 Turbo">
+                            <input type="text" id="model-name" placeholder="例如: GPT-4 Turbo" data-i18n="models.modelNamePlaceholder">
                         </div>
                         <div class="form-group">
                             <label>模型ID <span class="required">*</span></label>
-                            <input type="text" id="model-id" placeholder="例如: gpt-4-turbo">
+                            <input type="text" id="model-id" placeholder="例如: gpt-4-turbo" data-i18n="models.modelIdPlaceholder">
                         </div>
                         <div class="form-group">
                             <label>模型类型 <span class="required">*</span></label>
@@ -554,11 +555,11 @@
                         </div>
                         <div class="form-group">
                             <label>API地址 <span class="required">*</span></label>
-                            <input type="text" id="model-api-base" placeholder="https://api.example.com/v1">
+                            <input type="text" id="model-api-base" placeholder="https://api.example.com/v1" data-i18n="models.apiBasePlaceholder">
                         </div>
                         <div class="form-group">
                             <label>API密钥 <span class="required">*</span></label>
-                            <input type="password" id="model-api-key" placeholder="输入API密钥">
+                            <input type="password" id="model-api-key" placeholder="输入API密钥" data-i18n="models.apiKeyPlaceholder">
                         </div>
                         <div class="form-group">
                             <label>最大Token数</label>
@@ -599,7 +600,7 @@
                         </div>
                         
                         <div class="history-search-container">
-                            <input type="text" id="history-search" placeholder="搜索历史记录...">
+                            <input type="text" id="history-search" placeholder="搜索历史记录..." data-i18n="history.search">
                             <i class="fas fa-search history-search-icon"></i>
                         </div>
                         
