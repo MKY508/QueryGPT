@@ -151,6 +151,7 @@ def chat():
         use_database = data.get('use_database', True)
         conversation_id = data.get('conversation_id')  # 获取会话ID
         context_rounds = data.get('context_rounds', 3)  # 获取上下文轮数，默认3
+        user_language = data.get('language', 'zh')  # 获取用户语言，默认中文
         
         # 如果没有提供会话ID，生成一个新的并在历史记录中创建
         is_new_conversation = not conversation_id
@@ -311,7 +312,8 @@ def chat():
                 context=context,
                 model_name=model_name,
                 conversation_id=conversation_id,  # 传递会话ID
-                stop_checker=lambda: active_queries.get(conversation_id, {}).get('should_stop', False)
+                stop_checker=lambda: active_queries.get(conversation_id, {}).get('should_stop', False),
+                language=user_language  # 传递语言设置
             )
         finally:
             # 清理活跃查询记录

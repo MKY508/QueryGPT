@@ -74,7 +74,7 @@ class InterpreterManager:
         interpreter.auto_run = True  # 自动执行代码
         interpreter.safe_mode = "off"  # 关闭安全模式以执行所有代码
         
-        # 设置系统消息
+        # 设置系统消息（默认中文，将在execute_query中根据语言更新）
         interpreter.system_message = """
         你是一个数据分析助手。请帮助用户查询数据库并生成可视化。
         使用pandas处理数据，使用plotly创建图表。
@@ -86,7 +86,7 @@ class InterpreterManager:
     
     def execute_query(self, query: str, context: Dict[str, Any] = None, 
                      model_name: Optional[str] = None, conversation_id: Optional[str] = None,
-                     stop_checker: Optional[callable] = None) -> Dict[str, Any]:
+                     stop_checker: Optional[callable] = None, language: str = 'zh') -> Dict[str, Any]:
         """
         执行查询并返回结果，支持会话上下文和中断
         """
@@ -118,13 +118,29 @@ class InterpreterManager:
             # 创建新的interpreter实例
             interpreter = self.create_interpreter(model_name)
             
+            # 根据语言设置系统消息
+            if language == 'en':
+                interpreter.system_message = """
+                You are a data analysis assistant. Help users query databases and generate visualizations.
+                Use pandas for data processing and plotly for creating charts.
+                Save results as HTML files to the output directory.
+                IMPORTANT: Please respond in English.
+                """
+            else:
+                interpreter.system_message = """
+                你是一个数据分析助手。请帮助用户查询数据库并生成可视化。
+                使用pandas处理数据，使用plotly创建图表。
+                将结果保存为HTML文件到output目录。
+                重要：请用中文回复。
+                """
+            
             # 获取会话历史（如果有）
             conversation_history = None
             if conversation_id:
                 conversation_history = self._get_conversation_history(conversation_id)
             
             # 构建包含历史的提示词（使用增强后的查询）
-            full_prompt = self._build_prompt_with_context(enhanced_query, context, conversation_history)
+            full_prompt = self._build_prompt_with_context(enhanced_query, context, conversation_history, language)
             
             # 存储当前的interpreter以便停止
             if conversation_id:
@@ -183,8 +199,8 @@ class InterpreterManager:
                     if conversation_id in self._session_cache:
                         del self._session_cache[conversation_id]
     
-    def _build_prompt(self, query: str, context: Dict[str, Any] = None) -> str:
-        """构建简洁的提示词，让 OpenInterpreter 自主工作"""
+    def _build_prompt(self, query: str, context: Dict[str, Any] = None, language: str = 'zh') -> str:
+        """构建简洁的提示词，让 OpenInterpreter 自主工作，支持多语言"""
         
         import os
         
@@ -196,8 +212,64 @@ class InterpreterManager:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             output_dir = os.path.join(project_root, 'backend', 'output')
             
-            # 构建简洁的提示词
-            prompt = f"""数据库连接信息（Apache Doris，MySQL协议）：
+            # 根据语言构建提示词
+            if language == 'en':
+                # 英文版prompt
+                prompt = f"""Database Connection (Apache Doris, MySQL Protocol):
+host = '{conn['host']}'
+port = {conn['port']}
+user = '{conn['user']}'
+password = '{conn['password']}'
+database = '{conn.get('database', '')}'  # Initial database, can be switched
+
+User Request: {query}
+
+Important Requirements:
+1. Use pymysql to connect to database (not sqlalchemy)
+
+2. **Smart Exploration Strategy**:
+   - Understand business semantics in user requirements:
+     * "Sales" usually means actual sales quantity (sale_num/sale_qty/quantity), not production plans
+     * "70% sales" or "0.7x sales": Calculate as sales_field * 0.7
+     * "Order amount" refers to actual transaction amount (pay_amount/order_amount/total_amount)
+   - Database selection priority:
+     * Prioritize data warehouse: center_dws > dws > dwh > dw
+     * Then consider: ods (raw data) > ads (aggregated data)
+   - Table selection strategy:
+     * Prefer tables containing: trd/trade/order/sale + detail/day
+     * Avoid: production/forecast/plan/budget tables
+     * Check data volume and date range
+   - Field identification:
+     * Month fields: v_month > month > year_month
+     * Sales fields: sale_num > sale_qty > quantity > qty
+     * Amount fields: pay_amount > order_amount > total_amount
+
+3. **Data Processing Notes**:
+   - Convert Decimal type to float for calculations
+   - Standardize date format (e.g., '2025-01' format)
+   - Detect data anomalies and explain if found
+   - Filter negative or abnormal values in SQL WHERE clause
+   - When multiple tables exist:
+     * Check total count: SELECT COUNT(*)
+     * Check date range: SELECT MIN(date_field), MAX(date_field)
+     * View sample data: SELECT * LIMIT 5
+     * Choose table with most complete data
+
+4. Use plotly for data visualization
+5. Save HTML files to: {output_dir}
+6. Create output directory: os.makedirs('{output_dir}', exist_ok=True)
+7. Keep database connection open until all operations complete
+
+Please provide a concise summary including:
+- What task was completed
+- Full path of generated files
+- Key findings from the data (if any)
+- **IMPORTANT: Please respond in English**
+"""
+            
+            else:
+                # 中文版prompt
+                prompt = f"""数据库连接信息（Apache Doris，MySQL协议）：
 host = '{conn['host']}'
 port = {conn['port']}
 user = '{conn['user']}'
@@ -206,78 +278,39 @@ database = '{conn.get('database', '')}'  # 初始数据库，可以切换
 
 用户需求：{query}
 
-特别说明：
-- 如果用户提到"七折销量"，通常是指：销量 * 0.7（即70%的销量）
-- 如果用户要求按月统计，需要GROUP BY月份字段
-- 如果要求绘制柱状图，使用plotly.graph_objects或plotly.express
-
 重要要求：
 1. 使用 pymysql 连接数据库（不要用 sqlalchemy）
 
 2. **智能探索策略**：
-   - 先理解用户需求中的业务语义：
-     * "销量"通常指实际销售数量（sale_num/sale_qty/quantity），不是生产计划或预测
-     * "七折销量"理解方式：
-       - 如果表中有sale_num_discount或类似字段，直接使用
-       - 否则计算：销量字段 * 0.7
-     * "订单金额"指实际成交金额（knead_pay_amount/pay_amount/order_amount/total_amount）
-   - 数据库选择优先级：
-     * 优先探索数据仓库：center_dws > dws > dwh > dw（数据仓库更全面）
-     * 其次考虑：ods（原始数据）> ads（汇总数据）
-   - 表选择策略：
-     * 优先选择包含：trd/trade/order/sale + detail/day 的表（交易明细表）
-     * 避免：production/forecast/plan/budget（计划类表）
-     * 检查表数据量和日期范围，确保包含所需时间段
-   - 字段识别：
-     * 月份字段：v_month > month > year_month > year_of_month
-     * 销量字段：sale_num > sale_qty > quantity > qty
-     * 金额字段：pay_amount > order_amount > total_amount
-   - 验证数据：查看样例数据确认是否符合需求
+   - 先理解用户需求中的业务语义
+   - 数据库选择优先级：center_dws > dws > dwh > dw > ods > ads
+   - 表选择：优先选择包含 trd/trade/order/sale 的表
+   - 字段识别：月份字段、销量字段、金额字段等
 
 3. **数据处理注意事项**：
    - Decimal类型需转换为float进行计算
-   - 日期格式统一处理（如 '2025-01' 格式）
-   - 数据异常检测（如某月数据异常低，需要说明）
-   - **重要**：如果发现负销量或异常值，在SQL中用WHERE条件过滤，不要在Python中过滤
-   - **多表选择策略**：
-     * 遇到多个候选表时，执行以下检查：
-     * 检查数据总量：SELECT COUNT(*) 
-     * 检查日期范围：SELECT MIN(日期字段), MAX(日期字段)
-     * 查看样例数据：SELECT * LIMIT 5
-     * 选择数据最完整、日期范围包含需求时间段的表
-   - **探索顺序**：
-     * 第一步：SHOW DATABASES 查看所有数据库
-     * 第二步：优先进入 center_dws/dws 类数据库
-     * 第三步：SHOW TABLES 并用关键词过滤
-     * 第四步：对候选表进行数据质量检查
+   - 日期格式统一处理
+   - 数据异常检测并说明
+   - 在SQL中过滤异常值
 
 4. 使用 plotly 生成可视化图表
 5. 将 HTML 文件保存到：{output_dir}
 6. 确保创建输出目录：os.makedirs('{output_dir}', exist_ok=True)
-7. **连接管理**：保持连接直到所有操作完成，不要过早关闭
-
-8. **SQL查询示例模板**（按月统计）：
-   ```sql
-   SELECT 月份字段,
-          SUM(销量字段) as total_sales,
-          SUM(销量字段) * 0.7 as sales_70pct,  -- 七折销量
-          SUM(金额字段) as total_amount
-   FROM 数据库.表名
-   WHERE 月份字段 LIKE '2025%' 
-     AND 销量字段 > 0  -- 过滤异常数据
-   GROUP BY 月份字段
-   ORDER BY 月份字段
-   ```
+7. 保持连接直到所有操作完成
 
 最后请提供简洁的总结，包括：
 - 完成了什么任务
 - 生成的文件完整路径
 - 数据的关键发现（如有）
+- **重要：请用中文回复**
 """
             
             # 如果有可用数据库列表，添加参考信息
             if context.get('available_databases'):
-                prompt += f"\n可用数据库参考：{', '.join(context['available_databases'])}"
+                if language == 'en':
+                    prompt += f"\nAvailable databases: {', '.join(context['available_databases'])}"
+                else:
+                    prompt += f"\n可用数据库参考：{', '.join(context['available_databases'])}"
             
             return prompt
         
@@ -483,11 +516,11 @@ database = '{conn.get('database', '')}'  # 初始数据库，可以切换
         return str(result)[:500]
     
     def _build_prompt_with_context(self, query: str, context: Dict[str, Any] = None, 
-                                   conversation_history: list = None) -> str:
+                                   conversation_history: list = None, language: str = 'zh') -> str:
         """构建包含历史上下文的提示词"""
         
         # 基础提示词
-        base_prompt = self._build_prompt(query, context)
+        base_prompt = self._build_prompt(query, context, language)
         
         # 如果没有历史，直接返回基础提示词
         if not conversation_history:

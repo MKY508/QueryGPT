@@ -82,7 +82,8 @@ class API {
                     model: localStorage.getItem('default_model') || 'gpt-4.1',
                     use_database: true,
                     conversation_id: conversationId,  // 传递会话ID
-                    context_rounds: window.app?.contextRounds || 3  // 传递上下文轮数
+                    context_rounds: window.app?.contextRounds || 3,  // 传递上下文轮数
+                    language: localStorage.getItem('language') || 'zh'  // 传递当前界面语言
                 })
             });
 
