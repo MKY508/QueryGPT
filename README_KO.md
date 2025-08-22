@@ -36,28 +36,6 @@
 - **복잡한 분석**: SQL뿐만 아니라 통계 분석과 머신러닝을 위한 Python 실행 가능
 - **가시적 사고**: 에이전트의 추론 과정을 실시간으로 표시 (Chain-of-Thought)
 
-## 📸 시스템 스크린샷
-
-<table>
-  <tr>
-    <td align="center">
-      <img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT 인터페이스"/>
-      <b>실시간 AI 사고 프로세스</b>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/images/data-visualization-en.png" width="100%" alt="데이터 시각화"/>
-      <b>인터랙티브 데이터 시각화</b>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/images/developer-view-en.png" width="100%" alt="개발자 뷰"/>
-      <b>투명한 코드 실행</b>
-    </td>
-  </tr>
-</table>
 
 ## 🌟 주요 기능
 
@@ -123,6 +101,35 @@ QueryGPT는 글로벌 사용을 위해 10개 언어를 지원합니다:
 - **에이전트 자율 탐색**: 문제 발생 시 능동적으로 조사, 단순한 일회성 쿼리가 아님
 - **투명한 사고 과정**: AI가 무엇을 생각하는지 실시간으로 확인, 언제든 개입하여 안내 가능
 - **진정한 무료 오픈소스**: MIT 라이선스, 유료 장벽 없음
+
+## 📸 시스템 스크린샷
+
+<table>
+  <tr>
+    <td width="50%">
+      <strong>🤖 지능형 에이전트 사고 프로세스</strong><br/>
+      <img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT 인터페이스"/>
+      <p align="center">투명한 사고 체인 시각화</p>
+    </td>
+    <td width="50%">
+      <strong>📊 데이터 시각화</strong><br/>
+      <img src="docs/images/data-visualization-en.png" width="100%" alt="데이터 시각화"/>
+      <p align="center">자동 선택을 통한 스마트 차트 생성</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>👨‍💻 개발자 뷰</strong><br/>
+      <img src="docs/images/developer-view-en.png" width="100%" alt="개발자 뷰"/>
+      <p align="center">완전한 실행 세부 정보, 투명한 SQL 및 코드</p>
+    </td>
+    <td width="50%">
+      <strong>🌐 다국어 지원</strong><br/>
+      <img src="docs/images/main-interface.png" width="100%" alt="메인 인터페이스"/>
+      <p align="center">10개 언어 지원, 전 세계 접근 가능</p>
+    </td>
+  </tr>
+</table>
 
 ## 🚀 빠른 시작
 
