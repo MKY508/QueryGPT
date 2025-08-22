@@ -36,7 +36,13 @@ const i18n = {
             exampleBtn2: '销售分析',
             exampleBtn3: '产品占比',
             exampleBtn4: '用户趋势',
-            hint: '提示：直接输入自然语言查询，系统会自动转换为SQL并生成图表'
+            hint: '提示：直接输入自然语言查询，系统会自动转换为SQL并生成图表',
+            userView: '用户视图',
+            developerView: '开发者视图',
+            analysisComplete: '分析完成',
+            executionComplete: '执行完成',
+            finalOutput: '最终输出',
+            needChart: '需要图表？尝试在查询中明确要求"生成图表"或"可视化展示"'
         },
         
         // 设置页面
@@ -194,6 +200,8 @@ const i18n = {
             parsingDataStructure: '解析数据结构中...',
             step: '步骤',
             codeExecution: '代码执行',
+            summary: '总结',
+            system: '系统',
             noDetailedSteps: '无详细执行步骤信息',
             
             // Tips系统
@@ -290,7 +298,13 @@ const i18n = {
             exampleBtn2: 'Sales Analysis',
             exampleBtn3: 'Product Mix',
             exampleBtn4: 'User Trends',
-            hint: 'Tip: Enter natural language queries, and the system will automatically convert them to SQL and generate charts'
+            hint: 'Tip: Enter natural language queries, and the system will automatically convert them to SQL and generate charts',
+            userView: 'User View',
+            developerView: 'Developer View',
+            analysisComplete: 'Analysis Complete',
+            executionComplete: 'Execution Complete',
+            finalOutput: 'Final Output',
+            needChart: 'Need a chart? Try explicitly requesting "generate chart" or "visualize data" in your query'
         },
         
         // Settings page
@@ -448,6 +462,8 @@ const i18n = {
             parsingDataStructure: 'Parsing data structure...',
             step: 'Step',
             codeExecution: 'Code Execution',
+            summary: 'Summary',
+            system: 'System',
             noDetailedSteps: 'No detailed execution steps available',
             
             // Tips system

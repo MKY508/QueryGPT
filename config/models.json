@@ -43,16 +43,6 @@
       "status": "inactive",
       "temperature": 0.7,
       "type": "custom"
-    },
-    {
-      "api_base": "https://api.vveai.com/v1/",
-      "api_key": "sk-It6GYaJHoajzLt1i7f3463Ae8223491cA81bF258B55a4529",
-      "id": "1",
-      "max_tokens": 4096,
-      "name": "1",
-      "status": "inactive",
-      "temperature": 0.7,
-      "type": "openai"
     }
   ]
 }

@@ -805,7 +805,7 @@ class DataAnalysisPlatform {
             summaryHtml = `
                 <div class="user-summary-content">
                     <div class="summary-header">
-                        <i class="fas fa-check-circle"></i> 分析完成
+                        <i class="fas fa-check-circle"></i> ${window.i18nManager.t('chat.analysisComplete')}
                     </div>
                     
                     <div class="ai-summary">
@@ -993,7 +993,7 @@ class DataAnalysisPlatform {
             tipMessage = '遇到错误？尝试简化查询条件或检查表名是否正确';
             tipIcon = 'fa-exclamation-circle';
         } else if (!htmlGenerated) {
-            tipMessage = '需要图表？尝试在查询中明确要求"生成图表"或"可视化展示"';
+            tipMessage = window.i18nManager.t('chat.needChart');
             tipIcon = 'fa-chart-line';
         } else if (sqlCommands.length === 0) {
             tipMessage = '查询不够精准？尝试指定具体的时间范围或数据维度';
@@ -1112,7 +1112,7 @@ class DataAnalysisPlatform {
                 <div class="dev-step summary">
                     <div class="step-header">
                         <span class="step-number">总结</span>
-                        <span class="step-type">最终输出</span>
+                        <span class="step-type">${window.i18nManager.t('chat.finalOutput')}</span>
                     </div>
                     <div class="summary-content">
                         ${this.renderMarkdown(finalSummary)}
@@ -1138,15 +1138,15 @@ class DataAnalysisPlatform {
             <div class="view-tabs">
                 <button class="view-tab ${this.currentViewMode === 'user' ? 'active' : ''}" 
                         data-view="user">
-                    <i class="fas fa-user"></i> 用户视图
+                    <i class="fas fa-user"></i> ${window.i18nManager.t('chat.userView')}
                 </button>
                 <button class="view-tab ${this.currentViewMode === 'developer' ? 'active' : ''}" 
                         data-view="developer">
-                    <i class="fas fa-code"></i> 开发者视图
+                    <i class="fas fa-code"></i> ${window.i18nManager.t('chat.developerView')}
                 </button>
             </div>
             <div class="execution-status success">
-                <i class="fas fa-check-circle"></i> 执行完成
+                <i class="fas fa-check-circle"></i> ${window.i18nManager.t('chat.executionComplete')}
             </div>
         `;
         
@@ -1500,7 +1500,7 @@ class DataAnalysisPlatform {
                 currentActive.querySelector('.stage-icon').innerHTML = '<i class="fas fa-check"></i>';
             }
             
-            thinking.querySelector('.thinking-title').textContent = '分析完成';
+            thinking.querySelector('.thinking-title').textContent = window.i18nManager.t('chat.analysisComplete');
             
             // 渐隐后移除
             setTimeout(() => {
@@ -1536,7 +1536,7 @@ class DataAnalysisPlatform {
 
         // 更新标题显示"思考完成"
         setTimeout(() => {
-            thinking.querySelector('.thinking-title').textContent = '✨ 分析完成';
+            thinking.querySelector('.thinking-title').textContent = `✨ ${window.i18nManager.t('chat.analysisComplete')}`;
             thinking.querySelector('.thinking-icon').className = 'fas fa-check-circle thinking-icon';
             
             // 添加完成动画效果
@@ -1593,10 +1593,10 @@ class DataAnalysisPlatform {
         viewSwitcher.className = 'view-switcher';
         viewSwitcher.innerHTML = `
             <button class="view-btn ${this.currentViewMode === 'user' ? 'active' : ''}" data-view="user">
-                <i class="fas fa-user"></i> 用户视图
+                <i class="fas fa-user"></i> ${window.i18nManager.t('chat.userView')}
             </button>
             <button class="view-btn ${this.currentViewMode === 'developer' ? 'active' : ''}" data-view="developer">
-                <i class="fas fa-code"></i> 开发者视图
+                <i class="fas fa-code"></i> ${window.i18nManager.t('chat.developerView')}
             </button>
         `;
         
