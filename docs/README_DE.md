@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="images/logo.png" width="400" alt="QueryGPT">
+  <img src="../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -82,24 +82,24 @@ Das System denkt wie ein erfahrener Datenanalyst: Es erkundet autonom Datenstruk
   <tr>
     <td width="50%">
       <strong>🤖 Intelligenter Agent-Denkprozess</strong><br/>
-      <img src="images/agent-thinking-en.png" width="100%" alt="QueryGPT Oberfläche"/>
+      <img src="../images/agent-thinking-en.png" width="100%" alt="QueryGPT Oberfläche"/>
       <p align="center">Transparente Gedankenketten-Visualisierung</p>
     </td>
     <td width="50%">
       <strong>📊 Datenvisualisierung</strong><br/>
-      <img src="images/data-visualization-en.png" width="100%" alt="Datenvisualisierung"/>
+      <img src="../images/data-visualization-en.png" width="100%" alt="Datenvisualisierung"/>
       <p align="center">Intelligente Diagrammerstellung mit automatischer Auswahl</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <strong>👨‍💻 Entwickleransicht</strong><br/>
-      <img src="images/developer-view-en.png" width="100%" alt="Entwickleransicht"/>
+      <img src="../images/developer-view-en.png" width="100%" alt="Entwickleransicht"/>
       <p align="center">Vollständige Ausführungsdetails, SQL und Code transparent</p>
     </td>
     <td width="50%">
       <strong>🌐 Mehrsprachige Unterstützung</strong><br/>
-      <img src="images/main-interface.png" width="100%" alt="Hauptoberfläche"/>
+      <img src="../images/main-interface.png" width="100%" alt="Hauptoberfläche"/>
       <p align="center">Unterstützung für 10 Sprachen, weltweit zugänglich</p>
     </td>
   </tr>

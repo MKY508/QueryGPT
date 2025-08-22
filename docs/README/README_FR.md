@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="../images/logo.png" width="400" alt="QueryGPT">
+  <img src="../../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -73,24 +73,24 @@ QueryGPT est un système intelligent de requête et d'analyse de données qui r�
   <tr>
     <td width="50%">
       <strong>🤖 Processus de Pensée de l'Agent Intelligent</strong><br/>
-      <img src="../images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
+      <img src="../../images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
       <p align="center">Visualisation transparente de la chaîne de pensée</p>
     </td>
     <td width="50%">
       <strong>📊 Visualisation des Données</strong><br/>
-      <img src="../images/data-visualization-en.png" width="100%" alt="Visualisation des Données"/>
+      <img src="../../images/data-visualization-en.png" width="100%" alt="Visualisation des Données"/>
       <p align="center">Génération intelligente de graphiques avec sélection automatique</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <strong>👨‍💻 Vue Développeur</strong><br/>
-      <img src="../images/developer-view-en.png" width="100%" alt="Vue Développeur"/>
+      <img src="../../images/developer-view-en.png" width="100%" alt="Vue Développeur"/>
       <p align="center">Détails d'exécution complets, SQL et code transparents</p>
     </td>
     <td width="50%">
       <strong>🌐 Support Multilingue</strong><br/>
-      <img src="../images/main-interface.png" width="100%" alt="Interface Principale"/>
+      <img src="../../images/main-interface.png" width="100%" alt="Interface Principale"/>
       <p align="center">Support de 10 langues, accessible mondialement</p>
     </td>
   </tr>

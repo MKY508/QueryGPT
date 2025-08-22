@@ -48,6 +48,17 @@ backend/output/
 output/*.html
 output/*.png
 output/*.jpg
+
+# 配置文件（包含隐私信息）
+config/
+config.json
+config/*.json
+!config/*.example.json
+backend/config/
+backend/config.json
+backend/semantic_layer.json
+backend/table_classification.json
+!backend/semantic_layer.json.example
 *.log
 *.pid
 *.seed
