@@ -67,6 +67,35 @@ QueryGPT est un système intelligent de requête et d'analyse de données qui r�
 - **Visualisation** : Plotly, Chart.js
 - **IA/LLM** : OpenAI API, Claude, Gemini, Ollama
 
+## 📸 Captures d'écran du Système
+
+<table>
+  <tr>
+    <td width="50%">
+      <strong>🤖 Processus de Pensée de l'Agent Intelligent</strong><br/>
+      <img src="docs/images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
+      <p align="center">Visualisation transparente de la chaîne de pensée</p>
+    </td>
+    <td width="50%">
+      <strong>📊 Visualisation des Données</strong><br/>
+      <img src="docs/images/data-visualization-en.png" width="100%" alt="Visualisation des Données"/>
+      <p align="center">Génération intelligente de graphiques avec sélection automatique</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>👨‍💻 Vue Développeur</strong><br/>
+      <img src="docs/images/developer-view-en.png" width="100%" alt="Vue Développeur"/>
+      <p align="center">Détails d'exécution complets, SQL et code transparents</p>
+    </td>
+    <td width="50%">
+      <strong>🌐 Support Multilingue</strong><br/>
+      <img src="docs/images/main-interface.png" width="100%" alt="Interface Principale"/>
+      <p align="center">Support de 10 langues, accessible mondialement</p>
+    </td>
+  </tr>
+</table>
+
 ## 🚀 Démarrage rapide
 
 ### Installation initiale
