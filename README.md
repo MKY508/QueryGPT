@@ -90,7 +90,7 @@
 ## 📦 Technical Requirements
 
 - Python 3.10.x (Required, OpenInterpreter 0.4.3 dependency)
-- MySQL or compatible database
+- doris database
 
 <br/>
 
