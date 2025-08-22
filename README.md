@@ -1,23 +1,30 @@
 <div align="center">
+  
   <img src="docs/images/logo.png" width="400" alt="QueryGPT">
   
-  <p>
-    <a href="docs/README_CN.md">🇨🇳 中文文档</a> | 
-    <strong>🇬🇧 English</strong>
-  </p>
+  <br/><br/>
   
-  [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square&labelColor=black)](LICENSE)
-  [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=flat-square&labelColor=black)](https://www.python.org/)
-  [![OpenInterpreter](https://img.shields.io/badge/OpenInterpreter-0.4.3-green.svg?style=flat-square&labelColor=black)](https://github.com/OpenInterpreter/open-interpreter)
-  [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/MKY508/QueryGPT/stargazers)
+  **[Documentation](docs/README_CN.md)** : [🇨🇳](docs/README_CN.md) | 🇬🇧
   
-  <p>
-    <strong>An intelligent data analysis Agent based on OpenInterpreter</strong><br/>
-    Chat with your database in natural language
-  </p>
+  <br/>
+  
+  [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+  [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+  [![OpenInterpreter](https://img.shields.io/badge/OpenInterpreter-0.4.3-green.svg?style=for-the-badge)](https://github.com/OpenInterpreter/open-interpreter)
+  [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=for-the-badge&color=yellow)](https://github.com/MKY508/QueryGPT/stargazers)
+  
+  <br/>
+  
+  <h3>An intelligent data analysis Agent based on OpenInterpreter</h3>
+  <p><i>Chat with your database in natural language</i></p>
+  
 </div>
 
-## Core Advantages
+<br/>
+
+---
+
+## ✨ Core Advantages
 
 **Think Like a Data Analyst**
 - **Autonomous Exploration**: Proactively examines table structures and sample data when encountering issues
@@ -25,25 +32,30 @@
 - **Complex Analysis**: Not just SQL, can execute Python for statistical analysis and machine learning
 - **Visible Thinking**: Real-time display of Agent's reasoning process (Chain-of-Thought)
 
-## System Screenshots
+## 📸 System Screenshots
 
-<img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT Interface"/>
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT Interface"/>
+      <b>Real-time AI Thinking Process</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/data-visualization-en.png" width="100%" alt="Data Visualization"/>
+      <b>Interactive Data Visualization</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/developer-view-en.png" width="100%" alt="Developer View"/>
+      <b>Transparent Code Execution</b>
+    </td>
+  </tr>
+</table>
 
-**Real-time display of AI thinking process, complete complex data analysis through natural language dialogue.**
-
----
-
-<img src="docs/images/data-visualization-en.png" width="100%" alt="Data Visualization"/>
-
-**Automatically generate interactive charts with clear data insights.**
-
----
-
-<img src="docs/images/developer-view-en.png" width="100%" alt="Developer View"/>
-
-**Completely transparent code execution, supporting both SQL and Python engines.**
-
-## Key Features
+## 🌟 Key Features
 
 ### Agent Core Capabilities
 - **Autonomous Data Exploration**: Agent proactively understands data structure and explores relationships
@@ -64,12 +76,14 @@
 - **Data Security**: Read-only permissions, SQL injection protection, sensitive data masking
 - **Flexible Export**: Supports Excel, PDF, HTML and other formats
 
-## Technical Requirements
+## 📦 Technical Requirements
 
 - Python 3.10.x (Required, OpenInterpreter 0.4.3 dependency)
 - MySQL or compatible database
 
-## Product Comparison
+<br/>
+
+## 📊 Product Comparison
 
 | Comparison | **QueryGPT** | Vanna AI | DB-GPT | TableGPT | Text2SQL.AI |
 |------------|:------------:|:--------:|:------:|:--------:|:-----------:|
@@ -84,13 +98,16 @@
 | **Extensibility** | **✅ Unlimited** | ❌ | ❌ | ❌ | ❌ |
 
 ### Our Core Differences
-- **Complete Python Environment**: Not preset features, but a real Python execution environment, can write any code
-- **Unlimited Extensibility**: Need new features? Just install new libraries, no waiting for product updates
-- **Agent Autonomous Exploration**: Proactively investigates when encountering issues, not simple single queries
-- **Transparent Thinking Process**: See what AI is thinking in real-time, can intervene and guide anytime
-- **Truly Free and Open Source**: MIT license, no paywalls
 
-## Quick Start (Easy Mode)
+> - **Complete Python Environment**: Not preset features, but a real Python execution environment, can write any code
+> - **Unlimited Extensibility**: Need new features? Just install new libraries, no waiting for product updates
+> - **Agent Autonomous Exploration**: Proactively investigates when encountering issues, not simple single queries
+> - **Transparent Thinking Process**: See what AI is thinking in real-time, can intervene and guide anytime
+> - **Truly Free and Open Source**: MIT license, no paywalls
+
+<br/>
+
+## 🚀 Quick Start
 
 ### First Time Use
 
@@ -117,7 +134,7 @@ Service runs on http://localhost:5000 by default
 
 > **Note**: If port 5000 is occupied (e.g., macOS AirPlay), the system will automatically select the next available port (5001-5010) and display the actual port used at startup.
 
-## Configuration
+## ⚙️ Configuration
 
 ### Basic Configuration
 
@@ -168,7 +185,7 @@ The semantic layer enhances Chinese business term understanding, helping the sys
 > - System uses default configuration when semantic layer is not configured, normal data queries still work
 > - For detailed configuration instructions, see [backend/SEMANTIC_LAYER_SETUP.md](backend/SEMANTIC_LAYER_SETUP.md)
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 QueryGPT/
@@ -190,7 +207,7 @@ QueryGPT/
 └── .env.example        # Configuration example
 ```
 
-## API Interface
+## 🔌 API Interface
 
 ### Query Interface
 
@@ -239,7 +256,7 @@ DELETE /api/history/conversation/:id # Delete record
 GET /api/health
 ```
 
-## Advanced Features
+## 🎯 Advanced Features
 
 ### Custom Models
 
@@ -269,13 +286,13 @@ ollama pull qwen2.5
 # Set api_base to http://localhost:11434/v1 in config
 ```
 
-## Security Notes
+## 🔒 Security Notes
 
 - Only supports read-only queries (SELECT, SHOW, DESCRIBE)
 - Automatically filters dangerous SQL statements
 - Database user should be configured with read-only permissions
 
-## Frequently Asked Questions
+## ❓ FAQ
 
 **Q: How to handle database connection failures?**
 A: Check database service status, verify connection parameters in .env file are correct.
@@ -286,7 +303,7 @@ A: Ensure output directory has write permissions, check if browser blocks local 
 **Q: How to improve query accuracy?**
 A: Configure semantic layer to help system understand business terms; provide more detailed query descriptions.
 
-## Contributing
+## 🤝 Contributing
 
 Welcome to submit Issues and Pull Requests.
 
@@ -296,21 +313,21 @@ Welcome to submit Issues and Pull Requests.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details
 
-## Author
+## 👨‍💻 Author
 
 - **Author**: Mao Kaiyue
 - **GitHub**: [@MKY508](https://github.com/MKY508)
 - **Created**: August 2025
 
-## Star History
+## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&t=202508)](https://star-history.com/#MKY508/QueryGPT&Date)
 
-## Project Stats
+## 📊 Project Stats
 
 ![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/MKY508/QueryGPT?style=social)
@@ -320,11 +337,17 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ---
 
-## ⭐ Support the Project
+<br/>
+
+<div align="center">
+  <h2>⭐ Support the Project</h2>
 
 If QueryGPT helps you, please consider giving this project a **Star** ⭐
 
 Your support is my motivation to keep improving 💪
+</div>
+
+<br/>
 
 ---
 

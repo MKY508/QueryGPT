@@ -1,23 +1,26 @@
 <div align="center">
+  
   <img src="images/logo.png" width="400" alt="QueryGPT">
   
-  <p>
-    <strong>🇨🇳 中文</strong> | 
-    <a href="../README.md">🇬🇧 English Documentation</a>
-  </p>
+  <br/><br/>
   
-  [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square&labelColor=black)](LICENSE)
-  [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=flat-square&labelColor=black)](https://www.python.org/)
-  [![OpenInterpreter](https://img.shields.io/badge/OpenInterpreter-0.4.3-green.svg?style=flat-square&labelColor=black)](https://github.com/OpenInterpreter/open-interpreter)
-  [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/MKY508/QueryGPT/stargazers)
+  **[文档](../README.md)** : 🇨🇳 | [🇬🇧](../README.md)
   
-  <p>
-    <strong>基于 OpenInterpreter 的智能数据分析 Agent</strong><br/>
-    用自然语言与数据库对话
-  </p>
+  <br/>
+  
+  [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+  [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+  [![OpenInterpreter](https://img.shields.io/badge/OpenInterpreter-0.4.3-green.svg?style=for-the-badge)](https://github.com/OpenInterpreter/open-interpreter)
+  [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=for-the-badge&color=yellow)](https://github.com/MKY508/QueryGPT/stargazers)
+  
+  <br/>
+  
+  <h3>基于 OpenInterpreter 的智能数据分析 Agent</h3>
+  <p><i>用自然语言与数据库对话</i></p>
+  
 </div>
 
-## 核心优势
+## ✨ 核心优势
 
 **像数据分析师一样思考**
 - **自主探索**：遇到问题会主动查看表结构、样本数据
@@ -25,7 +28,7 @@
 - **复杂分析**：不只是 SQL，能执行 Python 做统计分析、机器学习
 - **思考可见**：实时显示 Agent 的推理过程（Chain-of-Thought）
 
-## 系统截图
+## 📸 系统截图
 
 <img src="images/agent-thinking.png" width="100%" alt="QueryGPT Interface"/>
 
@@ -43,7 +46,7 @@
 
 **完全透明的代码执行，支持 SQL 和 Python 双引擎。**
 
-## 功能特性
+## 🌟 功能特性
 
 ### Agent 核心能力
 - **自主数据探索**: Agent 会主动了解数据结构、探索数据关系
@@ -64,12 +67,12 @@
 - **数据安全**: 只读权限、SQL 注入防护、敏感数据脱敏
 - **灵活导出**: 支持 Excel、PDF、HTML 等多种格式
 
-## 技术要求
+## 📦 技术要求
 
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
 - MySQL 或兼容数据库
 
-## 产品对比
+## 📊 产品对比
 
 | 对比维度 | **QueryGPT** | Vanna AI | DB-GPT | TableGPT | Text2SQL.AI |
 |---------|:------------:|:--------:|:------:|:--------:|:-----------:|
@@ -90,7 +93,7 @@
 - **思考过程透明**：实时看到 AI 在想什么，可以随时介入指导
 - **真正免费开源**：MIT 协议，没有任何付费墙
 
-## 快速开始（懒人模式）
+## 🚀 快速开始
 
 ### 首次使用
 
@@ -117,7 +120,7 @@ cd QueryGPT
 
 > **注意**: 如果端口 5000 被占用（如 macOS 的 AirPlay），系统会自动选择下一个可用端口（5001-5010），并在启动时显示实际使用的端口。
 
-## 配置说明
+## ⚙️ 配置说明
 
 ### 基础配置
 
@@ -168,7 +171,7 @@ cd QueryGPT
 > - 不配置语义层时，系统使用默认配置，仍可正常进行数据查询
 > - 详细配置说明请参考 [backend/SEMANTIC_LAYER_SETUP.md](backend/SEMANTIC_LAYER_SETUP.md)
 
-## 项目结构
+## 📁 项目结构
 
 ```
 QueryGPT/
@@ -190,7 +193,7 @@ QueryGPT/
 └── .env.example        # 配置示例
 ```
 
-## API 接口
+## 🔌 API 接口
 
 ### 查询接口
 
@@ -218,27 +221,27 @@ DELETE /api/history/conversation/:id # 删除记录
 GET /api/health
 ```
 
-## 安全说明
+## 🔒 安全说明
 
 - 仅支持只读查询（SELECT, SHOW, DESCRIBE）
 - 自动过滤危险 SQL 语句
 - 数据库用户应配置为只读权限
 
-## 许可证
+## 📄 许可证
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
 
-## 作者
+## 👨‍💻 作者
 
 - **作者**: Mao Kaiyue
 - **GitHub**: [@MKY508](https://github.com/MKY508)
 - **创建时间**: 2025年8月
 
-## Star History
+## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&t=202508)](https://star-history.com/#MKY508/QueryGPT&Date)
 
-## 项目统计
+## 📊 项目统计
 
 ![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/MKY508/QueryGPT?style=social)
@@ -246,7 +249,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 ![GitHub contributors](https://img.shields.io/github/contributors/MKY508/QueryGPT)
 ![GitHub last commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT)
 
-## 贡献
+## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request。
 
