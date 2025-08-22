@@ -325,15 +325,30 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&t=202508)](https://star-history.com/#MKY508/QueryGPT&Date)
+<div align="center">
+  <a href="https://star-history.com/#MKY508/QueryGPT&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+    </picture>
+  </a>
+</div>
 
 ## 📊 Project Stats
 
-![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=social)
-![GitHub forks](https://img.shields.io/github/forks/MKY508/QueryGPT?style=social)
-![GitHub watchers](https://img.shields.io/github/watchers/MKY508/QueryGPT?style=social)
-![GitHub contributors](https://img.shields.io/github/contributors/MKY508/QueryGPT)
-![GitHub last commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT)
+<div align="center">
+  
+  ![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=social)
+  ![GitHub forks](https://img.shields.io/github/forks/MKY508/QueryGPT?style=social)
+  ![GitHub watchers](https://img.shields.io/github/watchers/MKY508/QueryGPT?style=social)
+  
+  ![GitHub contributors](https://img.shields.io/github/contributors/MKY508/QueryGPT)
+  ![GitHub last commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT)
+  ![GitHub issues](https://img.shields.io/github/issues/MKY508/QueryGPT)
+  ![GitHub pull requests](https://img.shields.io/github/issues-pr/MKY508/QueryGPT)
+  
+</div>
 
 ---
 
