@@ -63,7 +63,7 @@ class DataAnalysisPlatform {
         // 记录初始化失败的任务（仅用于调试）
         initTasks.forEach((result, index) => {
             if (result.status === 'rejected') {
-                const taskNames = ['配置', '模型', '设置'];
+                const taskNames = [window.i18nManager?.t('config.configuration') || '配置', window.i18nManager?.t('config.model') || '模型', window.i18nManager?.t('config.settings') || '设置'];
                 console.warn(`${taskNames[index]}加载失败，使用默认值:`, result.reason?.message);
             }
         });
@@ -244,7 +244,7 @@ class DataAnalysisPlatform {
             try {
                 const result = await api.testModel(config);
                 if (result.success) {
-                    this.showNotification('API连接成功！', 'success');
+                    this.showNotification(window.i18nManager?.t('notifications.apiConnected') || 'API连接成功！', 'success');
                 } else {
                     this.showNotification(`连接失败: ${result.message}`, 'error');
                 }
@@ -263,10 +263,10 @@ class DataAnalysisPlatform {
             
             try {
                 await api.saveConfig(config);
-                this.showNotification('模型配置已保存', 'success');
+                this.showNotification(window.i18nManager?.t('notifications.modelSaved') || '模型配置已保存', 'success');
                 this.config = { ...this.config, ...config };
             } catch (error) {
-                this.showNotification('保存失败', 'error');
+                this.showNotification(window.i18nManager?.t('notifications.saveFailed') || '保存失败', 'error');
             }
         });
 
@@ -285,7 +285,7 @@ class DataAnalysisPlatform {
             try {
                 const result = await api.testDatabase(config);
                 if (result.success) {
-                    this.showNotification('数据库连接成功！', 'success');
+                    this.showNotification(window.i18nManager?.t('notifications.dbConnected') || '数据库连接成功！', 'success');
                 } else {
                     this.showNotification(`连接失败: ${result.message}`, 'error');
                 }
@@ -306,9 +306,9 @@ class DataAnalysisPlatform {
             
             try {
                 await api.saveDatabaseConfig(config);
-                this.showNotification('数据库配置已保存', 'success');
+                this.showNotification(window.i18nManager?.t('notifications.dbConfigSaved') || '数据库配置已保存', 'success');
             } catch (error) {
-                this.showNotification('保存失败', 'error');
+                this.showNotification(window.i18nManager?.t('notifications.saveFailed') || '保存失败', 'error');
             }
         });
 
@@ -320,7 +320,7 @@ class DataAnalysisPlatform {
             };
             
             localStorage.setItem('ui_config', JSON.stringify(config));
-            this.showNotification('界面设置已保存', 'success');
+            this.showNotification(window.i18nManager?.t('notifications.uiSettingsSaved') || '界面设置已保存', 'success');
         });
     }
 
@@ -478,9 +478,9 @@ class DataAnalysisPlatform {
                 this.hideThinkingProcess(thinkingId);
             } else {
                 console.error('发送消息失败:', error);
-                this.showNotification('发送失败，请重试', 'error');
+                this.showNotification(window.i18nManager?.t('notifications.sendFailed') || '发送失败，请重试', 'error');
                 this.hideThinkingProcess(thinkingId);
-                this.addMessage('bot', '处理请求失败。检查网络连接或稍后重试。');
+                this.addMessage('bot', window.i18nManager?.t('notifications.requestFailed') || '处理请求失败。检查网络连接或稍后重试。');
             }
         } finally {
             this.isProcessing = false;
