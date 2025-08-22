@@ -3,11 +3,6 @@
 </div>
 
 <p align="center">
-  <strong>🇨🇳 中文</strong> | 
-  <a href="../README.md">🇬🇧 English Documentation</a>
-</p>
-
-<p align="center">
   用中文对话，让数据分析像聊天一样简单<br/>
   实时展示 AI 思考过程，完全透明可控<br/>
   不只是 SQL，支持复杂 Python 数据分析
@@ -17,6 +12,11 @@
   基于 OpenInterpreter 的智能数据分析 Agent，<br/>
   像数据分析师一样自主探索、多轮验证、生成洞察，<br/>
   让非技术人员也能轻松完成专业数据分析。
+</p>
+
+<p align="center">
+  <strong>🇨🇳 中文</strong> | 
+  <a href="../README.md">🇬🇧 English Documentation</a>
 </p>
 
 <div align="center">
