@@ -24,7 +24,12 @@ class DatabaseManager:
         
         self.connection_pool = []
         self.max_connections = 5
-        logger.info(f"数据库配置: {self.config['host']}:{self.config['port']} - 用户: {self.config['user']}")
+        
+        # 如果没有指定数据库，说明允许跨库查询
+        if not self.config.get('database'):
+            logger.info(f"数据库配置: {self.config['host']}:{self.config['port']} - 用户: {self.config['user']} - 模式: 跨库查询")
+        else:
+            logger.info(f"数据库配置: {self.config['host']}:{self.config['port']} - 用户: {self.config['user']} - 数据库: {self.config['database']}")
         
     
     @contextmanager
