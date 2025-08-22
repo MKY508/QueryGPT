@@ -104,13 +104,12 @@ class SettingsManager {
             });
         }
 
-        // 保存模型按钮
-        const saveModelBtn = document.getElementById('save-model-btn');
-        if (saveModelBtn) {
-            saveModelBtn.addEventListener('click', () => {
+        // 保存模型按钮 - 使用事件委托确保按钮可用
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'save-model-btn') {
                 this.saveModel();
-            });
-        }
+            }
+        });
 
         // 自动保存基础设置 - 当设置改变时立即保存
         const defaultViewModel = document.getElementById('default-view-mode');
