@@ -30,7 +30,13 @@ const i18n = {
             tryExample: '试试这些示例：',
             example1: '显示最近一个月的销售数据',
             example2: '分析产品类别的销售占比',
-            example3: '查找销售额最高的前10个客户'
+            example3: '查找销售额最高的前10个客户',
+            example4: '生成用户增长趋势图',
+            exampleBtn1: '查看数据库',
+            exampleBtn2: '销售分析',
+            exampleBtn3: '产品占比',
+            exampleBtn4: '用户趋势',
+            hint: '提示：直接输入自然语言查询，系统会自动转换为SQL并生成图表'
         },
         
         // 设置页面
@@ -220,7 +226,13 @@ const i18n = {
             tryExample: 'Try these examples:',
             example1: 'Show sales data for the last month',
             example2: 'Analyze sales distribution by product category',
-            example3: 'Find top 10 customers by sales amount'
+            example3: 'Find top 10 customers by sales amount',
+            example4: 'Generate user growth trend chart',
+            exampleBtn1: 'View Database',
+            exampleBtn2: 'Sales Analysis',
+            exampleBtn3: 'Product Mix',
+            exampleBtn4: 'User Trends',
+            hint: 'Tip: Enter natural language queries, and the system will automatically convert them to SQL and generate charts'
         },
         
         // Settings page
