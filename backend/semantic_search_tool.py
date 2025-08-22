@@ -18,6 +18,23 @@ class SemanticSearchTool:
             current_dir = os.path.dirname(os.path.abspath(__file__))
             mapping_file = os.path.join(current_dir, 'semantic_layer.json')
         
+        # 检查文件是否存在
+        if not os.path.exists(mapping_file):
+            # 尝试使用示例文件
+            example_file = os.path.join(current_dir, 'semantic_layer.json.example')
+            if os.path.exists(example_file):
+                print(f"警告: 未找到 {mapping_file}，使用示例配置文件")
+                mapping_file = example_file
+            else:
+                # 创建一个空的默认配置
+                print(f"警告: 未找到语义层配置文件，使用默认空配置")
+                self.mappings = {
+                    "数据库映射": {},
+                    "核心业务表": {},
+                    "快速搜索索引": {}
+                }
+                return
+        
         with open(mapping_file, 'r', encoding='utf-8') as f:
             self.mappings = json.load(f)
     

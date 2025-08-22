@@ -44,6 +44,7 @@ Thumbs.db
 
 # 项目特定
 cache/
+backend/output/
 output/*.html
 output/*.png
 output/*.jpg
@@ -77,6 +78,12 @@ htmlcov/
 
 # 配置文件（可选，根据需要调整）
 # config/config.json  # 如果包含敏感信息，取消注释这行
+
+# 语义层敏感数据
+backend/semantic_layer.json
+**/semantic_layer.json
+semantic_*.json
+*semantic*.json
 
 # 临时文件
 temp/
