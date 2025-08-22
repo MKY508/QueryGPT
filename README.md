@@ -1,24 +1,20 @@
 <div align="center">
-  <img src="docs/images/logo.png" width="300" alt="QueryGPT">
-</div>
-
-<p align="center">
-  <strong>An intelligent data analysis Agent based on OpenInterpreter</strong><br/>
-  Chat with your database in natural language
-</p>
-
-<p align="center">
-  <a href="docs/README_CN.md">🇨🇳 中文文档</a> | 
-  <strong>🇬🇧 English</strong>
-</p>
-
-<div align="center">
-
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square&labelColor=black)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=flat-square&labelColor=black)](https://www.python.org/)
-[![OpenInterpreter](https://img.shields.io/badge/OpenInterpreter-0.4.3-green.svg?style=flat-square&labelColor=black)](https://github.com/OpenInterpreter/open-interpreter)
-[![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/MKY508/QueryGPT/stargazers)
-
+  <img src="docs/images/logo.png" width="400" alt="QueryGPT">
+  
+  <p>
+    <a href="docs/README_CN.md">🇨🇳 中文文档</a> | 
+    <strong>🇬🇧 English</strong>
+  </p>
+  
+  [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square&labelColor=black)](LICENSE)
+  [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=flat-square&labelColor=black)](https://www.python.org/)
+  [![OpenInterpreter](https://img.shields.io/badge/OpenInterpreter-0.4.3-green.svg?style=flat-square&labelColor=black)](https://github.com/OpenInterpreter/open-interpreter)
+  [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/MKY508/QueryGPT/stargazers)
+  
+  <p>
+    <strong>An intelligent data analysis Agent based on OpenInterpreter</strong><br/>
+    Chat with your database in natural language
+  </p>
 </div>
 
 ## Core Advantages
