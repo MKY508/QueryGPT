@@ -1,5 +1,35 @@
 {
-  "api_key": "sk-It6GYaJHoajzLt1i7f3463Ae8223491cA81bF258B55a4529",
   "api_base": "https://api.vveai.com/v1/",
-  "default_model": "gpt-4.1"
+  "api_key": "sk-It6GYaJHoajzLt1i7f3463Ae8223491cA81bF258B55a4529",
+  "database": {
+    "database": "",
+    "host": "10.91.11.27",
+    "password": "AlphatCh@2024",
+    "port": 19130,
+    "user": "dbquery"
+  },
+  "default_model": "gpt-4.1",
+  "models": [
+    {
+      "id": "gpt-4.1",
+      "name": "GPT-4.1",
+      "type": "openai"
+    },
+    {
+      "id": "claude-sonnet-4",
+      "name": "Claude Sonnet 4",
+      "type": "anthropic"
+    },
+    {
+      "id": "deepseek-r1",
+      "name": "DeepSeek R1",
+      "type": "deepseek"
+    },
+    {
+      "id": "qwen-flagship",
+      "name": "Qwen 旗舰模型",
+      "type": "qwen"
+    }
+  ],
+  "current_model": "gpt-4.1"
 }

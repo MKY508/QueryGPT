@@ -92,9 +92,10 @@
                     
                     <!-- 关于菜单 -->
                     <li class="menu-item">
-                        <a href="#" class="nav-link" data-tab="about">
+                        <a href="#" class="menu-header" data-tab="about">
                             <i class="fas fa-info-circle"></i>
                             <span data-i18n="nav.about">关于</span>
+                            <i class="submenu-arrow-placeholder"></i>
                         </a>
                     </li>
                 </ul>
@@ -240,6 +241,9 @@
                         <div class="settings-card">
                             <div class="card-header">
                                 <h3><i class="fas fa-brain"></i> <span data-i18n="models.title">模型管理</span></h3>
+                                <button class="btn-primary" id="add-model-btn" onclick="window.settingsManager && window.settingsManager.showAddModelDialog()">
+                                    <i class="fas fa-plus"></i> <span data-i18n="models.addModel">添加模型</span>
+                                </button>
                             </div>
                             
                             <!-- 模型列表表格 -->
@@ -361,7 +365,7 @@
                             <img src="/static/images/logo.png" alt="QueryGPT Logo" style="width: 320px; height: auto; margin: 0 auto; display: block;">
                         </div>
                         <div class="hero-info">
-                            <p class="system-version" style="color: #6c757d;"><span data-i18n="about.version">版本</span> v1.0.0 Beta | 2025年8月</p>
+                            <p class="system-version" style="color: #6c757d;"><span data-i18n="about.version">版本</span> v1.0.0 Beta | <span data-i18n="about.releaseDate">2025年8月</span></p>
                             <div class="hero-badges">
                                 <span class="badge-item">
                                     <i class="fas fa-robot"></i> <span data-i18n="about.features.ai">智能数据分析</span>
@@ -417,7 +421,7 @@
                         </div>
                         <div class="card-content">
                             <h3 data-i18n="about.updateTime">更新时间</h3>
-                            <p class="card-main">2025年8月</p>
+                            <p class="card-main" data-i18n="about.releaseDate">2025年8月</p>
                             <p class="card-sub" data-i18n="about.maintaining">持续维护中</p>
                         </div>
                     </div>
