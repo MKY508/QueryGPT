@@ -38,19 +38,19 @@
 
 ## System Screenshots
 
-<img src="docs/images/agent-thinking.png" width="100%" alt="QueryGPT Interface"/>
+<img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT Interface"/>
 
 **Real-time display of AI thinking process, complete complex data analysis through natural language dialogue.**
 
 ---
 
-<img src="docs/images/data-visualization.png" width="100%" alt="Data Visualization"/>
+<img src="docs/images/data-visualization-en.png" width="100%" alt="Data Visualization"/>
 
 **Automatically generate interactive charts with clear data insights.**
 
 ---
 
-<img src="docs/images/developer-view.png" width="100%" alt="Developer View"/>
+<img src="docs/images/developer-view-en.png" width="100%" alt="Developer View"/>
 
 **Completely transparent code execution, supporting both SQL and Python engines.**
 
