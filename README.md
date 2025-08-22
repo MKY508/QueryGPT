@@ -4,7 +4,10 @@
   
   <br/>
   
-  **[简体中文](docs/README_CN.md)** | **English**
+  <p>
+    <a href="#">English</a> •
+    <a href="docs/README_CN.md">简体中文</a>
+  </p>
   
   <br/>
   
