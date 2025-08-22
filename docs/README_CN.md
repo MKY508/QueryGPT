@@ -2,9 +2,9 @@
   
   <img src="images/logo.png" width="400" alt="QueryGPT">
   
-  <br/><br/>
+  <br/>
   
-  **[文档](../README.md)** : 🇨🇳 | [🇬🇧](../README.md)
+  **简体中文** | **[English](../README.md)**
   
   <br/>
   
