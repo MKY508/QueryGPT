@@ -7,6 +7,7 @@ class SettingsManager {
         this.models = [];
         this.currentEditingModel = null;
         this.config = null;  // 存储配置
+        this.hasTestedModels = false;  // 标记是否已经测试过模型
         // 不在构造函数中初始化，等待DOM准备好
     }
 
@@ -88,6 +89,11 @@ class SettingsManager {
             panel.classList.remove('active');
         });
         document.getElementById(`${tabName}-settings`).classList.add('active');
+        
+        // 如果切换到模型管理页面，执行首次批量测试
+        if (tabName === 'models' && !this.hasTestedModels) {
+            this.testAllModelsOnFirstVisit();
+        }
     }
 
     /**
@@ -326,8 +332,7 @@ class SettingsManager {
                     this.models[index] = { ...this.models[index], ...modelData };
                 }
             } else {
-                // 添加新模型
-                modelData.status = 'inactive';
+                // 添加新模型，不设置状态
                 this.models.push(modelData);
             }
 
@@ -335,7 +340,7 @@ class SettingsManager {
             await api.saveModels(this.models);
             
             // 如果是当前选中的模型，更新全局API配置
-            const currentModel = document.getElementById('current-model').value;
+            const currentModel = document.getElementById('current-model')?.value;
             if (modelData.id === currentModel || this.models.length === 1) {
                 // 保存API配置到.env文件
                 await api.saveConfig({
@@ -357,6 +362,13 @@ class SettingsManager {
     }
 
     /**
+     * 显示添加模型对话框
+     */
+    showAddModelDialog() {
+        this.openModelModal();
+    }
+
+    /**
      * 编辑模型
      */
     editModel(modelId) {
@@ -370,7 +382,7 @@ class SettingsManager {
         const model = this.models.find(m => m.id === modelId);
         if (!model) return;
 
-        app.showNotification('正在测试模型连接...', 'info');
+        app.showNotification(window.i18nManager.t('common.testingModel'), 'info');
         
         // 更新状态为测试中
         model.status = 'testing';
@@ -513,7 +525,7 @@ class SettingsManager {
             database: document.getElementById('db-name').value
         };
 
-        app.showNotification('正在测试数据库连接...', 'info');
+        app.showNotification(window.i18nManager.t('common.testingDatabase'), 'info');
 
         try {
             const result = await api.testDatabase(config);
@@ -637,6 +649,63 @@ class SettingsManager {
         } catch (error) {
             console.error('加载设置失败:', error);
         }
+    }
+
+    /**
+     * 首次访问时批量测试所有模型
+     */
+    async testAllModelsOnFirstVisit() {
+        this.hasTestedModels = true;  // 标记已测试，避免重复测试
+        
+        if (!this.models || this.models.length === 0) {
+            return;
+        }
+        
+        console.log('首次进入模型管理页面，开始批量测试所有模型...');
+        
+        // 先将所有模型设置为测试中状态
+        this.models.forEach(model => {
+            model.status = 'testing';
+        });
+        this.renderModelsList();
+        
+        // 并行测试所有模型，不显示通知避免干扰
+        const testPromises = this.models.map(async (model) => {
+            try {
+                const result = await api.testModel({
+                    model: model.id,
+                    api_key: model.api_key || 'not_needed',
+                    api_base: model.api_base
+                });
+                
+                // 更新模型状态
+                if (result.success) {
+                    model.status = 'active';
+                    console.log(`模型 ${model.name} 测试成功`);
+                } else {
+                    model.status = 'inactive';
+                    console.log(`模型 ${model.name} 测试失败: ${result.message}`);
+                }
+            } catch (error) {
+                model.status = 'inactive';
+                console.log(`模型 ${model.name} 测试出错:`, error);
+            }
+            
+            // 每个模型测试完立即更新界面
+            this.renderModelsList();
+        });
+        
+        // 等待所有测试完成
+        await Promise.allSettled(testPromises);
+        
+        // 保存状态到后端
+        try {
+            await api.saveModels(this.models);
+        } catch (error) {
+            console.error('保存模型状态失败:', error);
+        }
+        
+        console.log('批量测试完成');
     }
 }
 

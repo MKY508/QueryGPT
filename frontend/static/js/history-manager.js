@@ -898,16 +898,21 @@ class HistoryManager {
         const now = new Date();
         const diff = now - date;
         
+        const isZh = window.i18nManager && window.i18nManager.getCurrentLanguage() === 'zh';
+        
         if (diff < 60000) {
-            return '刚刚';
+            return isZh ? '刚刚' : 'Just now';
         } else if (diff < 3600000) {
-            return `${Math.floor(diff / 60000)}分钟前`;
+            const minutes = Math.floor(diff / 60000);
+            return isZh ? `${minutes}分钟前` : `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
         } else if (diff < 86400000) {
-            return `${Math.floor(diff / 3600000)}小时前`;
+            const hours = Math.floor(diff / 3600000);
+            return isZh ? `${hours}小时前` : `${hours} hour${hours > 1 ? 's' : ''} ago`;
         } else if (diff < 604800000) {
-            return `${Math.floor(diff / 86400000)}天前`;
+            const days = Math.floor(diff / 86400000);
+            return isZh ? `${days}天前` : `${days} day${days > 1 ? 's' : ''} ago`;
         } else {
-            return date.toLocaleDateString('zh-CN');
+            return date.toLocaleDateString(isZh ? 'zh-CN' : 'en-US');
         }
     }
     

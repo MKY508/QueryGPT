@@ -157,8 +157,17 @@ def chat():
         if not conversation_id:
             # 创建新的对话记录
             if history_manager:
+                # 检测用户查询语言，使用适当的前缀
+                import re
+                # 简单检测是否包含中文字符
+                has_chinese = bool(re.search(r'[\u4e00-\u9fff]', user_query))
+                query_prefix = "查询: " if has_chinese else "Query: "
+                
+                # 创建标题
+                title = f"{query_prefix}{user_query[:50]}..." if len(user_query) > 50 else user_query
+                
                 conversation_id = history_manager.create_conversation(
-                    title=f"查询: {user_query[:50]}..." if len(user_query) > 50 else user_query,
+                    title=title,
                     model=model_name or "default",
                     database_name=data.get('database')
                 )

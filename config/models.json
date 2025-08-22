@@ -14,14 +14,14 @@
       "api_base": "http://localhost:11434/v1",
       "id": "claude-sonnet-4",
       "name": "Claude Sonnet 4",
-      "status": "active",
+      "status": "inactive",
       "type": "Anthropic"
     },
     {
       "api_base": "http://localhost:11434/v1",
       "id": "deepseek-r1",
       "name": "DeepSeek R1",
-      "status": "active",
+      "status": "inactive",
       "type": "DeepSeek"
     },
     {
@@ -30,9 +30,29 @@
       "id": "qwen-3-coder",
       "max_tokens": 4096,
       "name": "Qwen",
-      "status": "active",
+      "status": "inactive",
       "temperature": 0.7,
       "type": "qwen"
+    },
+    {
+      "api_base": "http://localhost:8000/v1",
+      "api_key": "your-api-key-here",
+      "id": "custom-model",
+      "max_tokens": 4096,
+      "name": "custom",
+      "status": "inactive",
+      "temperature": 0.7,
+      "type": "custom"
+    },
+    {
+      "api_base": "https://api.vveai.com/v1/",
+      "api_key": "sk-It6GYaJHoajzLt1i7f3463Ae8223491cA81bF258B55a4529",
+      "id": "1",
+      "max_tokens": 4096,
+      "name": "1",
+      "status": "inactive",
+      "temperature": 0.7,
+      "type": "openai"
     }
   ]
 }

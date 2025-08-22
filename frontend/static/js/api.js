@@ -71,7 +71,7 @@ class API {
         try {
             // 显示思考状态
             if (onProgress) {
-                onProgress({ type: 'thinking', content: '正在思考中...' });
+                onProgress({ type: 'thinking', content: window.i18nManager.t('common.thinking') });
             }
             
             const response = await fetch('/api/chat', {
@@ -112,7 +112,7 @@ class API {
                 if (onProgress) {
                     onProgress({ 
                         type: 'interrupted', 
-                        message: data.error || '查询已被用户中断',
+                        message: data.error || window.i18nManager.t('common.interrupted'),
                         partial_result: data.partial_result
                     });
                 }

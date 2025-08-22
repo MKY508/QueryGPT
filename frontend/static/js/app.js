@@ -103,6 +103,14 @@ class DataAnalysisPlatform {
                 const menuItem = header.parentElement;
                 const submenu = menuItem.querySelector('.submenu');
                 
+                // 检查是否有data-tab属性（用于直接导航的菜单项，如"关于"）
+                const tabName = header.dataset.tab;
+                if (tabName && !submenu) {
+                    // 直接切换到对应标签页
+                    this.switchTab(tabName);
+                    return;
+                }
+                
                 if (submenu) {
                     const isExpanded = menuItem.classList.contains('expanded');
                     
@@ -243,7 +251,7 @@ class DataAnalysisPlatform {
                 api_base: document.getElementById('api-base').value
             };
             
-            this.showNotification('正在测试连接...', 'info');
+            this.showNotification(window.i18nManager.t('common.testingConnection'), 'info');
             
             try {
                 const result = await api.testModel(config);
@@ -284,7 +292,7 @@ class DataAnalysisPlatform {
                 database: document.getElementById('db-name').value
             };
             
-            this.showNotification('正在测试数据库连接...', 'info');
+            this.showNotification(window.i18nManager.t('common.testingDatabase'), 'info');
             
             try {
                 const result = await api.testDatabase(config);
@@ -379,6 +387,12 @@ class DataAnalysisPlatform {
             // 如果设置管理器存在，加载设置
             if (window.settingsManager) {
                 window.settingsManager.loadSettings();
+                // 如果指定了子标签，切换到对应的子标签
+                if (settingsTab) {
+                    setTimeout(() => {
+                        window.settingsManager.switchSettingsTab(settingsTab);
+                    }, 100);
+                }
             }
         } else if (tabName === 'history') {
             // 切换到历史记录页面时，确保已初始化
@@ -403,7 +417,7 @@ class DataAnalysisPlatform {
      */
     async sendMessage() {
         if (this.isProcessing) {
-            this.showNotification('正在处理上一个请求，请稍候...', 'info');
+            this.showNotification(window.i18nManager.t('common.processingRequest'), 'info');
             return;
         }
 
@@ -472,7 +486,7 @@ class DataAnalysisPlatform {
         } catch (error) {
             if (error.name === 'AbortError') {
                 console.log('查询已取消');
-                this.showNotification('查询已取消', 'info');
+                this.showNotification(window.i18nManager.t('common.stopped'), 'info');
                 this.hideThinkingProcess(thinkingId);
             } else {
                 console.error('发送消息失败:', error);
@@ -498,7 +512,7 @@ class DataAnalysisPlatform {
      * 停止查询
      */
     async stopQuery() {
-        this.showNotification('正在停止查询...', 'info');
+        this.showNotification(window.i18nManager.t('common.stopping'), 'info');
         
         // 发送停止请求到后端
         if (this.currentConversationId) {
@@ -540,8 +554,9 @@ class DataAnalysisPlatform {
         
         // 添加中断消息，保留已生成的部分内容
         const lastBotMessage = Array.from(document.querySelectorAll('.message.bot')).pop();
-        if (!lastBotMessage || !lastBotMessage.textContent.includes('查询已被用户中断')) {
-            this.addMessage('bot', '⚠️ 查询已被用户中断');
+        const interruptedText = window.i18nManager.t('common.interrupted');
+        if (!lastBotMessage || !lastBotMessage.textContent.includes(interruptedText)) {
+            this.addMessage('bot', window.i18nManager.t('common.interruptedMessage'));
         }
     }
     
@@ -1049,8 +1064,8 @@ class DataAnalysisPlatform {
                     detailsHtml += `
                         <div class="dev-step">
                             <div class="step-header">
-                                <span class="step-number">步骤 ${index + 1}</span>
-                                <span class="step-type">代码执行</span>
+                                <span class="step-number">${window.i18nManager.t('common.step')} ${index + 1}</span>
+                                <span class="step-type">${window.i18nManager.t('common.codeExecution')}</span>
                             </div>
                             <pre class="code-block"><code>${this.escapeHtml(item.content)}</code></pre>
                         </div>
@@ -1088,7 +1103,7 @@ class DataAnalysisPlatform {
                 }
             });
         } else {
-            detailsHtml += '<p>无详细执行步骤信息</p>';
+            detailsHtml += `<p>${window.i18nManager.t('common.noDetailedSteps')}</p>`;
         }
         
         // 在开发者视图末尾添加总结部分
@@ -1411,21 +1426,21 @@ class DataAnalysisPlatform {
         
         // 获取随机的Loading文案
         const loadingTexts = [
-            '分析需求...',
-            '数据挖掘中，请稍候...',
-            '理解需求中...', 
-            '连接数据库中...',
-            '正在生成最佳查询方案...',
-            '数据处理中，马上就好...',
-            '正在优化查询语句...',
-            '解析数据结构中...'
+            window.i18nManager.t('common.analyzingRequirements'),
+            window.i18nManager.t('common.dataMining'),
+            window.i18nManager.t('common.understandingRequest'), 
+            window.i18nManager.t('common.connectingDatabase'),
+            window.i18nManager.t('common.generatingQuery'),
+            window.i18nManager.t('common.processingData'),
+            window.i18nManager.t('common.optimizingQuery'),
+            window.i18nManager.t('common.parsingDataStructure')
         ];
         const randomLoadingText = loadingTexts[Math.floor(Math.random() * loadingTexts.length)];
         
         thinking.innerHTML = `
             <div class="thinking-header">
                 <i class="fas fa-brain thinking-icon"></i>
-                <span class="thinking-title">正在思考...</span>
+                <span class="thinking-title">${window.i18nManager.t('common.thinkingTitle')}</span>
             </div>
             <div class="thinking-stages">
                 <div class="thinking-stage active">
@@ -1657,7 +1672,7 @@ class DataAnalysisPlatform {
         // 在新窗口中打开HTML文件
         const url = `/output/${filename}`;
         window.open(url, '_blank');
-        this.showNotification('正在打开可视化结果...', 'info');
+        this.showNotification(window.i18nManager.t('common.openingVisualization'), 'info');
         console.log('打开HTML文件:', url);
     }
 
@@ -1759,19 +1774,14 @@ class DataAnalysisPlatform {
                 // 清空并重新构建选项
                 currentModelSelector.innerHTML = '';
                 
-                let activeModelsCount = 0;
                 models.forEach(model => {
-                    // 只显示激活的模型
-                    if (model.status === 'active' || model.status === undefined) {
-                        const option = document.createElement('option');
-                        option.value = model.id;
-                        option.textContent = model.name || model.id;
-                        currentModelSelector.appendChild(option);
-                        activeModelsCount++;
-                    }
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.name || model.id;
+                    currentModelSelector.appendChild(option);
                 });
                 
-                console.log('添加了', activeModelsCount, '个激活的模型到选择器');
+                console.log('添加了', models.length, '个模型到选择器');
                 
                 // 恢复之前的选择
                 if (currentValue && currentModelSelector.querySelector(`option[value="${currentValue}"]`)) {
@@ -2144,16 +2154,21 @@ class DataAnalysisPlatform {
         const now = new Date();
         const diff = now - date;
         
+        const isZh = window.i18nManager && window.i18nManager.getCurrentLanguage() === 'zh';
+        
         if (diff < 60000) {
-            return '刚刚';
+            return isZh ? '刚刚' : 'Just now';
         } else if (diff < 3600000) {
-            return `${Math.floor(diff / 60000)}分钟前`;
+            const minutes = Math.floor(diff / 60000);
+            return isZh ? `${minutes}分钟前` : `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
         } else if (diff < 86400000) {
-            return `${Math.floor(diff / 3600000)}小时前`;
+            const hours = Math.floor(diff / 3600000);
+            return isZh ? `${hours}小时前` : `${hours} hour${hours > 1 ? 's' : ''} ago`;
         } else if (diff < 604800000) {
-            return `${Math.floor(diff / 86400000)}天前`;
+            const days = Math.floor(diff / 86400000);
+            return isZh ? `${days}天前` : `${days} day${days > 1 ? 's' : ''} ago`;
         } else {
-            return date.toLocaleDateString();
+            return date.toLocaleDateString(isZh ? 'zh-CN' : 'en-US');
         }
     }
 
@@ -2189,6 +2204,9 @@ class DataAnalysisPlatform {
      */
     changeLanguage(newLang) {
         window.i18nManager.setLanguage(newLang);
+        
+        // 重新初始化Tips以使用新语言
+        this.initTipsManager();
         
         // 同步更新两个语言切换控件
         const languageSelect = document.getElementById('language-select');
@@ -2528,20 +2546,20 @@ class DataAnalysisPlatform {
     initTipsManager() {
         // 定义所有提示语 - 简洁版本
         this.queryTips = [
-            'Tips: 描述越详细，查询越精准',
-            'Tips: 支持自然语言查询，如"上个月的销售额"',
-            'Tips: 时间描述灵活：本周、上季度、2024年Q3都能识别',
-            'Tips: 查询结果会自动生成图表',
-            'Tips: 支持连续对话，可基于上次结果继续提问',
-            'Tips: 试试对比分析："对比今年和去年的数据"',
-            'Tips: 示例："本月销售TOP10" 或 "华东地区营收"',
-            'Tips: 支持排名查询："销售前5名"',
-            'Tips: 可分析趋势："最近6个月销售趋势"',
-            'Tips: 可以追问："按月份分组" 或 "加上同比"',
-            'Tips: 支持条件筛选："毛利率>30%的产品"',
-            'Tips: 双击图表可放大查看',
-            'Tips: 按Tab键快速切换输入框',
-            'Tips: 输入"帮助"查看更多功能'
+            'Tips: ' + window.i18nManager.t('common.tips.detailed'),
+            'Tips: ' + window.i18nManager.t('common.tips.naturalLanguage'),
+            'Tips: ' + window.i18nManager.t('common.tips.flexibleTime'),
+            'Tips: ' + window.i18nManager.t('common.tips.autoChart'),
+            'Tips: ' + window.i18nManager.t('common.tips.continuous'),
+            'Tips: ' + window.i18nManager.t('common.tips.comparison'),
+            'Tips: ' + window.i18nManager.t('common.tips.examples'),
+            'Tips: ' + window.i18nManager.t('common.tips.ranking'),
+            'Tips: ' + window.i18nManager.t('common.tips.trend'),
+            'Tips: ' + window.i18nManager.t('common.tips.followUp'),
+            'Tips: ' + window.i18nManager.t('common.tips.filter'),
+            'Tips: ' + window.i18nManager.t('common.tips.doubleClick'),
+            'Tips: ' + window.i18nManager.t('common.tips.tabKey'),
+            'Tips: ' + window.i18nManager.t('common.tips.help')
         ];
     }
     
@@ -2562,22 +2580,22 @@ class DataAnalysisPlatform {
         // 深夜关怀提醒
         if (hour >= 23 || hour < 5) {
             const lateNightTips = [
-                'Tips: 夜深了，查完这个就休息吧~',
-                'Tips: 凌晨时分，注意保护眼睛哦',
-                'Tips: 深夜工作辛苦了，记得适当休息',
-                'Tips: 这么晚还在努力，您真是太拼了！',
-                'Tips: 夜猫子模式已激活，但健康更重要哦'
+                'Tips: ' + window.i18nManager.t('common.tips.lateNight1'),
+                'Tips: ' + window.i18nManager.t('common.tips.lateNight2'),
+                'Tips: ' + window.i18nManager.t('common.tips.lateNight3'),
+                'Tips: ' + window.i18nManager.t('common.tips.lateNight4'),
+                'Tips: ' + window.i18nManager.t('common.tips.lateNight5')
             ];
             
             // 根据具体时间选择不同的关怀语
             if (hour >= 23 && hour < 24) {
-                return 'Tips: 夜深了，查完这个就休息吧~';
+                return 'Tips: ' + window.i18nManager.t('common.tips.lateNight1');
             } else if (hour >= 0 && hour < 1) {
-                return 'Tips: 已经过了午夜，早点休息对身体好哦';
+                return 'Tips: ' + window.i18nManager.t('common.tips.midnight');
             } else if (hour >= 1 && hour < 3) {
-                return 'Tips: 凌晨了，健康比数据更重要';
+                return 'Tips: ' + window.i18nManager.t('common.tips.earlyMorning');
             } else if (hour >= 3 && hour < 5) {
-                return 'Tips: 这么晚还在工作？您真是太拼了！记得休息';
+                return 'Tips: ' + window.i18nManager.t('common.tips.lateNight4');
             }
         }
         

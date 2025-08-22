@@ -128,6 +128,32 @@ body {
   margin-bottom: var(--spacing-1);
 }
 
+/* 单独菜单项的样式 - 保持与可展开菜单相同的间距 */
+.menu-item.single-item .menu-header-style {
+  display: flex;
+  align-items: center;
+  padding: var(--nav-item-padding);
+  color: var(--color-text-inverse);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  border-radius: var(--radius-lg);
+  margin: 0 var(--spacing-4);
+  position: relative;
+  overflow: hidden;
+}
+
+.menu-item.single-item .menu-header-style:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(var(--spacing-1));
+}
+
+.menu-item.single-item .menu-header-style span {
+  flex: 1;
+  font-weight: var(--font-weight-medium);
+  margin-left: var(--spacing-3);
+}
+
 .menu-header {
   display: flex;
   align-items: center;
