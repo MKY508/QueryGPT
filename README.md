@@ -26,78 +26,12 @@
   
   <br/>
   
-  [![Build Status](https://img.shields.io/github/actions/workflow/status/MKY508/QueryGPT/main.yml?style=for-the-badge&logo=github-actions&logoColor=white)](https://github.com/MKY508/QueryGPT/actions)
-  [![Test Coverage](https://img.shields.io/codecov/c/github/MKY508/QueryGPT?style=for-the-badge&logo=codecov&logoColor=white)](https://codecov.io/gh/MKY508/QueryGPT)
-  [![Code Quality](https://img.shields.io/codacy/grade/MKY508/QueryGPT?style=for-the-badge&logo=codacy)](https://www.codacy.com/gh/MKY508/QueryGPT)
-  [![Dependencies Status](https://img.shields.io/librariesio/github/MKY508/QueryGPT?style=for-the-badge)](https://libraries.io/github/MKY508/QueryGPT)
-  
-  <br/>
-  
-  [![Docker Pulls](https://img.shields.io/docker/pulls/mky508/querygpt?style=for-the-badge&logo=docker&logoColor=white)](https://hub.docker.com/r/mky508/querygpt)
-  [![Docker Image Size](https://img.shields.io/docker/image-size/mky508/querygpt?style=for-the-badge&logo=docker&logoColor=white)](https://hub.docker.com/r/mky508/querygpt)
-  [![Contributors](https://img.shields.io/github/contributors/MKY508/QueryGPT?style=for-the-badge&color=orange)](https://github.com/MKY508/QueryGPT/graphs/contributors)
-  [![Last Commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT?style=for-the-badge)](https://github.com/MKY508/QueryGPT/commits/main)
-  
-  <br/>
-  
-  [![Release Date](https://img.shields.io/github/release-date/MKY508/QueryGPT?style=for-the-badge)](https://github.com/MKY508/QueryGPT/releases)
-  [![Downloads](https://img.shields.io/github/downloads/MKY508/QueryGPT/total?style=for-the-badge)](https://github.com/MKY508/QueryGPT/releases)
-  [![Release Version](https://img.shields.io/github/v/release/MKY508/QueryGPT?style=for-the-badge&include_prereleases)](https://github.com/MKY508/QueryGPT/releases)
-  [![Issues](https://img.shields.io/github/issues/MKY508/QueryGPT?style=for-the-badge)](https://github.com/MKY508/QueryGPT/issues)
-  
-  <br/>
-  
   <h3>An intelligent data analysis Agent based on OpenInterpreter</h3>
   <p><i>Chat with your database in natural language</i></p>
   
 </div>
 
 <br/>
-
-## 🔗 Quick Links
-
-<div align="center">
-  
-| Documentation | Community | Resources |
-|:-------------:|:---------:|:---------:|
-| [📚 Documentation](https://github.com/MKY508/QueryGPT/wiki) | [💬 Discussions](https://github.com/MKY508/QueryGPT/discussions) | [📦 Releases](https://github.com/MKY508/QueryGPT/releases) |
-| [📖 API Docs](https://github.com/MKY508/QueryGPT/wiki/API-Documentation) | [🐛 Issue Tracker](https://github.com/MKY508/QueryGPT/issues) | [🗺️ Roadmap](https://github.com/MKY508/QueryGPT/projects) |
-| [🤝 Contributing](CONTRIBUTING.md) | [💡 Feature Requests](https://github.com/MKY508/QueryGPT/issues/new?template=feature_request.md) | [📋 Changelog](CHANGELOG.md) |
-| [⚡ Quick Start](#-quick-start) | [🎯 Examples](https://github.com/MKY508/QueryGPT/tree/main/examples) | [🔧 Configuration](#-configuration) |
-
-</div>
-
-## 💖 Sponsors
-
-<div align="center">
-  
-### 🌟 Gold Sponsors
-  
-<a href="#become-a-sponsor">
-  <img src="https://via.placeholder.com/150x50?text=Your+Logo+Here" alt="Become a Sponsor" />
-</a>
-
-### 🥈 Silver Sponsors
-
-<a href="#become-a-sponsor">
-  <img src="https://via.placeholder.com/100x40?text=Your+Logo" alt="Become a Sponsor" />
-</a>
-
-### Support This Project
-
-<a href="https://github.com/sponsors/MKY508">
-  <img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-red?style=for-the-badge&logo=github-sponsors" alt="Sponsor on GitHub" />
-</a>
-<a href="https://www.buymeacoffee.com/mky508">
-  <img src="https://img.shields.io/badge/Buy%20Me%20A%20Coffee-%23FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy Me A Coffee" />
-</a>
-<a href="https://ko-fi.com/mky508">
-  <img src="https://img.shields.io/badge/Ko--fi-%23FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Support on Ko-fi" />
-</a>
-
-<sub>Want to become a sponsor? [Contact us](mailto:sponsor@querygpt.ai) or [sponsor on GitHub](https://github.com/sponsors/MKY508)</sub>
-
-</div>
 
 ---
 
