@@ -228,21 +228,6 @@ class DataAnalysisPlatform {
             });
         }
         
-        // 语言切换事件 - 头部的开关
-        const headerLangToggle = document.getElementById('header-lang-toggle');
-        if (headerLangToggle) {
-            // 设置初始状态
-            const currentLang = window.i18nManager.getCurrentLanguage();
-            headerLangToggle.checked = currentLang === 'en';
-            this.updateLanguageToggleStyle(currentLang);
-            
-            // 监听切换
-            headerLangToggle.addEventListener('change', (e) => {
-                const newLang = e.target.checked ? 'en' : 'zh';
-                this.changeLanguage(newLang);
-            });
-        }
-        
         // 测试API连接
         document.getElementById('test-api')?.addEventListener('click', async () => {
             const config = {
@@ -2214,13 +2199,6 @@ class DataAnalysisPlatform {
             languageSelect.value = newLang;
         }
         
-        const headerLangToggle = document.getElementById('header-lang-toggle');
-        if (headerLangToggle) {
-            headerLangToggle.checked = newLang === 'en';
-        }
-        
-        // 更新切换开关样式
-        this.updateLanguageToggleStyle(newLang);
         
         // 刷新欢迎消息（如果当前没有对话）
         const messagesContainer = document.getElementById('chat-messages');
@@ -2236,19 +2214,6 @@ class DataAnalysisPlatform {
         );
     }
     
-    /**
-     * 更新语言切换开关样式
-     */
-    updateLanguageToggleStyle(lang) {
-        const toggleContainer = document.querySelector('.language-toggle');
-        if (toggleContainer) {
-            if (lang === 'en') {
-                toggleContainer.classList.add('english');
-            } else {
-                toggleContainer.classList.remove('english');
-            }
-        }
-    }
     
     /**
      * 更新执行状态

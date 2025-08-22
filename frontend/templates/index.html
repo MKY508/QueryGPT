@@ -22,7 +22,6 @@
     <link rel="stylesheet" href="/static/css/query-summary.css">
     <link rel="stylesheet" href="/static/css/ui-fixes.css">
     <link rel="stylesheet" href="/static/css/history.css">
-    <link rel="stylesheet" href="/static/css/language-toggle.css">
     <link rel="stylesheet" href="/static/css/model-modal.css">
 </head>
 <body>
@@ -114,14 +113,6 @@
                         <h1 data-i18n="chat.title">数据查询与分析</h1>
                     </div>
                     <div class="header-controls">
-                        <div class="language-toggle">
-                            <span class="lang-label">中文</span>
-                            <label class="switch">
-                                <input type="checkbox" id="header-lang-toggle">
-                                <span class="slider round"></span>
-                            </label>
-                            <span class="lang-label">English</span>
-                        </div>
                         <div class="model-selector">
                             <select id="current-model">
                                 <option value="gpt-4.1">GPT-4.1</option>
@@ -209,8 +200,16 @@
                             <div class="form-group">
                                 <label data-i18n="settings.language">语言</label>
                                 <select id="language-select">
-                                    <option value="zh">中文</option>
                                     <option value="en">English</option>
+                                    <option value="zh">简体中文</option>
+                                    <option value="zh-TW">繁體中文</option>
+                                    <option value="ja">日本語</option>
+                                    <option value="es">Español</option>
+                                    <option value="fr">Français</option>
+                                    <option value="de">Deutsch</option>
+                                    <option value="ru">Русский</option>
+                                    <option value="pt">Português</option>
+                                    <option value="ko">한국어</option>
                                 </select>
                                 <small data-i18n="settings.languageDesc">选择系统界面语言</small>
                             </div>
