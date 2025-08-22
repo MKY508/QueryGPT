@@ -3,11 +3,6 @@
 </div>
 
 <p align="center">
-  <a href="docs/README_CN.md">🇨🇳 中文文档</a> | 
-  <strong>🇬🇧 English</strong>
-</p>
-
-<p align="center">
   Chat in natural language, make data analysis as easy as conversation<br/>
   Real-time display of AI thinking process, completely transparent and controllable<br/>
   Not just SQL, supports complex Python data analysis
@@ -17,6 +12,11 @@
   An intelligent data analysis Agent based on OpenInterpreter,<br/>
   autonomously explores, multi-round validation, generates insights like a data analyst,<br/>
   enabling non-technical users to easily complete professional data analysis.
+</p>
+
+<p align="center">
+  <a href="docs/README_CN.md">🇨🇳 中文文档</a> | 
+  <strong>🇬🇧 English</strong>
 </p>
 
 <div align="center">
