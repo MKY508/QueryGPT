@@ -335,39 +335,4 @@ MIT License - see [LICENSE](LICENSE) file for details
   </a>
 </div>
 
-## 📊 Project Stats
 
-<div align="center">
-  
-  ![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=social)
-  ![GitHub forks](https://img.shields.io/github/forks/MKY508/QueryGPT?style=social)
-  ![GitHub watchers](https://img.shields.io/github/watchers/MKY508/QueryGPT?style=social)
-  
-  ![GitHub contributors](https://img.shields.io/github/contributors/MKY508/QueryGPT)
-  ![GitHub last commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT)
-  ![GitHub issues](https://img.shields.io/github/issues/MKY508/QueryGPT)
-  ![GitHub pull requests](https://img.shields.io/github/issues-pr/MKY508/QueryGPT)
-  
-</div>
-
----
-
-<br/>
-
-<div align="center">
-  <h2>⭐ Support the Project</h2>
-
-If QueryGPT helps you, please consider giving this project a **Star** ⭐
-
-Your support is my motivation to keep improving 💪
-</div>
-
-<br/>
-
----
-
-## Keywords
-
-`AI Agent` `Data Analysis Agent` `Chain-of-Thought` `Autonomous Data Exploration` `Multi-round Reasoning` `Natural Language Query` `Natural Language to SQL` `Text to SQL` `Data Analytics` `ChatGPT` `Code Interpreter` `OpenInterpreter` `Chinese Database Query` `AI Data Analysis` `Smart BI` `Data Visualization` `Business Intelligence` `MySQL` `PostgreSQL` `Python Execution` `Statistical Analysis` `Data Mining` `RFM Analysis` `User Profiling` `Sales Analysis` `YoY MoM` `Retention Analysis` `no-code` `low-code` `chat with database` `conversational AI` `Database Dialogue` `Autonomous Agent` `Vanna AI Alternative` `DB-GPT` `Text2SQL` `TableGPT` `ChatBI` `Conversational BI` `Chat2DB` `AI BI`
-
----

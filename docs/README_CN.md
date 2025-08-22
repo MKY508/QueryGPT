@@ -249,21 +249,6 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
   </a>
 </div>
 
-## 📊 项目统计
-
-<div align="center">
-  
-  ![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=social)
-  ![GitHub forks](https://img.shields.io/github/forks/MKY508/QueryGPT?style=social)
-  ![GitHub watchers](https://img.shields.io/github/watchers/MKY508/QueryGPT?style=social)
-  
-  ![GitHub contributors](https://img.shields.io/github/contributors/MKY508/QueryGPT)
-  ![GitHub last commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT)
-  ![GitHub issues](https://img.shields.io/github/issues/MKY508/QueryGPT)
-  ![GitHub pull requests](https://img.shields.io/github/issues-pr/MKY508/QueryGPT)
-  
-</div>
-
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request。
@@ -274,20 +259,3 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 提交 Pull Request
 
----
-
-## ⭐ 支持项目
-
-如果 QueryGPT 对你有帮助，请考虑给这个项目一个 **Star** ⭐
-
-你的支持是我持续改进的动力 💪
-
----
-
-## 关键词 / Keywords
-
-`AI Agent` `数据分析Agent` `Chain-of-Thought` `自主数据探索` `多轮推理` `自然语言查询` `Natural Language to SQL` `Text to SQL` `数据分析` `Data Analytics` `ChatGPT` `Code Interpreter` `OpenInterpreter` `中文数据库查询` `AI数据分析` `智能BI` `数据可视化` `Business Intelligence` `MySQL` `PostgreSQL` `Python执行` `统计分析` `数据挖掘` `RFM分析` `用户画像` `销售分析` `环比同比` `留存分析` `no-code` `low-code` `chat with database` `conversational AI` `数据库对话` `Autonomous Agent` `Vanna AI 替代` `DB-GPT` `Text2SQL` `TableGPT` `ChatBI` `对话式BI` `Chat2DB` `AI BI`
-
----
-
-**QueryGPT** © 2025 Mao Kaiyue. MIT License.
