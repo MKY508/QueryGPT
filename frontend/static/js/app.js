@@ -1074,8 +1074,8 @@ class DataAnalysisPlatform {
                     detailsHtml += `
                         <div class="dev-step">
                             <div class="step-header">
-                                <span class="step-number">输出</span>
-                                <span class="step-type">控制台</span>
+                                <span class="step-number">${window.i18nManager.t('common.output')}</span>
+                                <span class="step-type">${window.i18nManager.t('common.console')}</span>
                             </div>
                             <pre class="console-output">${this.escapeHtml(item.content)}</pre>
                         </div>
@@ -1084,8 +1084,8 @@ class DataAnalysisPlatform {
                     detailsHtml += `
                         <div class="dev-step error">
                             <div class="step-header">
-                                <span class="step-number">错误</span>
-                                <span class="step-type">异常</span>
+                                <span class="step-number">${window.i18nManager.t('common.error')}</span>
+                                <span class="step-type">${window.i18nManager.t('common.exception')}</span>
                             </div>
                             <pre class="error-output">${this.escapeHtml(item.content)}</pre>
                         </div>
@@ -1094,8 +1094,8 @@ class DataAnalysisPlatform {
                     detailsHtml += `
                         <div class="dev-step">
                             <div class="step-header">
-                                <span class="step-number">消息</span>
-                                <span class="step-type">系统</span>
+                                <span class="step-number">${window.i18nManager.t('common.message')}</span>
+                                <span class="step-type">${window.i18nManager.t('common.system')}</span>
                             </div>
                             <div class="message-content">${item.content}</div>
                         </div>
@@ -1111,7 +1111,7 @@ class DataAnalysisPlatform {
             detailsHtml += `
                 <div class="dev-step summary">
                     <div class="step-header">
-                        <span class="step-number">总结</span>
+                        <span class="step-number">${window.i18nManager.t('common.summary')}</span>
                         <span class="step-type">${window.i18nManager.t('chat.finalOutput')}</span>
                     </div>
                     <div class="summary-content">
