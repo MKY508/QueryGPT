@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="docs/images/logo.png" width="400" alt="QueryGPT">
+  <img src="../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -84,24 +84,24 @@
   <tr>
     <td width="50%">
       <strong>🤖 インテリジェントAgent思考プロセス</strong><br/>
-      <img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT インターフェース"/>
+      <img src="../images/agent-thinking-en.png" width="100%" alt="QueryGPT インターフェース"/>
       <p align="center">透明な思考チェーンの表示、AIがクエリをどのように分析するかを理解</p>
     </td>
     <td width="50%">
       <strong>📊 データ可視化</strong><br/>
-      <img src="docs/images/data-visualization-en.png" width="100%" alt="データ可視化"/>
+      <img src="../images/data-visualization-en.png" width="100%" alt="データ可視化"/>
       <p align="center">スマートチャート生成、最適な表示方法を自動選択</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <strong>👨‍💻 開発者ビュー</strong><br/>
-      <img src="docs/images/developer-view-en.png" width="100%" alt="開発者ビュー"/>
+      <img src="../images/developer-view-en.png" width="100%" alt="開発者ビュー"/>
       <p align="center">完全な実行詳細、SQLステートメントとコードが透明に表示</p>
     </td>
     <td width="50%">
       <strong>🌐 多言語サポート</strong><br/>
-      <img src="docs/images/main-interface.png" width="100%" alt="メインインターフェース"/>
+      <img src="../images/main-interface.png" width="100%" alt="メインインターフェース"/>
       <p align="center">10言語をサポート、世界中のユーザーが利用可能</p>
     </td>
   </tr>
