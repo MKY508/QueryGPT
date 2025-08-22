@@ -1,0 +1,93 @@
+# Coverage.py configuration file
+# https://coverage.readthedocs.io/en/latest/config.html
+
+[run]
+# Source code to measure
+source = backend
+
+# Files to omit from coverage
+omit = 
+    */tests/*
+    */test_*.py
+    */__pycache__/*
+    */venv/*
+    */venv_py310/*
+    */site-packages/*
+    */migrations/*
+    */__init__.py
+    */conftest.py
+    */setup.py
+    backend/swagger.py
+    backend/swagger_config.py
+
+# Enable branch coverage
+branch = True
+
+# Parallel execution support
+parallel = True
+
+# Data file naming
+data_file = .coverage
+
+[report]
+# Reporting settings
+precision = 2
+show_missing = True
+skip_covered = False
+skip_empty = True
+
+# Exclude lines from coverage report
+exclude_lines =
+    # Standard pragma
+    pragma: no cover
+    
+    # Don't complain about debug code
+    def __repr__
+    def __str__
+    
+    # Don't complain if tests don't hit defensive assertion code
+    raise AssertionError
+    raise NotImplementedError
+    
+    # Don't complain if non-runnable code isn't run
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+    
+    # Don't complain about debug-only code
+    if DEBUG:
+    if debug:
+    
+    # Skip type checking blocks
+    if typing.TYPE_CHECKING:
+    
+    # Skip pass statements
+    pass
+    
+    # Skip ellipsis
+    ...
+
+# Ignore errors about missing source files
+ignore_errors = False
+
+[html]
+# HTML report output directory
+directory = htmlcov
+title = QueryGPT Test Coverage Report
+show_contexts = True
+
+[xml]
+# XML report for CI/CD integration
+output = coverage.xml
+
+[json]
+# JSON report for further processing
+output = coverage.json
+pretty_print = True
+
+[paths]
+# Path mapping for combining coverage from different environments
+source =
+    backend/
+    */backend/

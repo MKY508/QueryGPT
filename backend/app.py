@@ -47,6 +47,17 @@ app = Flask(__name__,
             static_folder=STATIC_DIR,
             template_folder=TEMPLATE_DIR,
             static_url_path='/static')
+
+# 初始化Swagger文档（可选）
+try:
+    from swagger_config import init_swagger
+    swagger = init_swagger(app)
+    if swagger:
+        print("Swagger documentation initialized at /api/docs")
+except ImportError:
+    print("Flasgger not installed. Run: pip install flasgger")
+except Exception as e:
+    print(f"Failed to initialize Swagger: {e}")
 # 限制CORS来源以提高安全性
 CORS(app, resources={r"/api/*": {"origins": ["http://localhost:*", "http://127.0.0.1:*"]}})
 

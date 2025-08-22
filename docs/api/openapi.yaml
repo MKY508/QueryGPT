@@ -1,0 +1,1212 @@
+openapi: 3.0.3
+info:
+  title: QueryGPT API
+  description: |
+    QueryGPT 是一个企业级 NLP-to-SQL 数据分析平台，提供自然语言查询数据库、
+    数据可视化、历史记录管理等功能。
+    
+    ## 主要功能
+    - 自然语言转SQL查询
+    - 多模型支持（GPT-4, Claude, DeepSeek, Qwen）
+    - 数据可视化（柱状图、饼图、折线图）
+    - 对话历史管理
+    - 数据库连接管理
+    
+    ## 认证方式
+    API支持可选的Bearer Token认证。如果配置了`API_ACCESS_SECRET`环境变量，
+    则需要在请求头中提供认证令牌。
+    
+    ## 速率限制
+    - /api/chat: 每分钟30次
+    - 其他端点: 无限制
+  version: 0.4.3
+  contact:
+    name: QueryGPT Support
+    email: support@querygpt.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5001
+    description: 本地开发服务器
+  - url: http://127.0.0.1:5001
+    description: 本地备用地址
+  - url: https://api.querygpt.com
+    description: 生产环境服务器
+
+security:
+  - BearerAuth: []
+  - {}  # 允许无认证访问
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 在Authorization头中提供Bearer令牌
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 错误信息
+        code:
+          type: integer
+          description: 错误代码
+      required:
+        - error
+
+    ChatRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          description: 用户的自然语言查询
+          example: "查询上个月的销售总额"
+        model:
+          type: string
+          description: 指定使用的AI模型
+          enum: ["gpt-4.1", "claude-sonnet-4", "deepseek-r1", "qwen-flagship"]
+          example: "gpt-4.1"
+        use_database:
+          type: boolean
+          description: 是否使用数据库执行查询
+          default: true
+        conversation_id:
+          type: string
+          format: uuid
+          description: 会话ID，用于保持上下文
+        context_rounds:
+          type: integer
+          description: 包含的历史对话轮数
+          default: 3
+          minimum: 0
+          maximum: 10
+        language:
+          type: string
+          description: 响应语言
+          enum: ["zh", "en"]
+          default: "zh"
+        stream:
+          type: boolean
+          description: 是否使用流式响应
+          default: false
+      required:
+        - query
+
+    ChatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: 请求是否成功
+        result:
+          type: object
+          description: 查询结果
+          properties:
+            content:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                    enum: ["text", "code", "html", "image"]
+                  content:
+                    type: string
+                  format:
+                    type: string
+                  language:
+                    type: string
+        model:
+          type: string
+          description: 使用的模型名称
+        conversation_id:
+          type: string
+          format: uuid
+          description: 会话ID
+        timestamp:
+          type: string
+          format: date-time
+          description: 响应时间戳
+        sql:
+          type: string
+          description: 生成的SQL查询（如果有）
+        visualization:
+          type: object
+          description: 可视化数据（如果有）
+        execution_time:
+          type: number
+          description: 执行时间（秒）
+        interrupted:
+          type: boolean
+          description: 查询是否被中断
+
+    ConfigResponse:
+      type: object
+      properties:
+        api_key:
+          type: string
+          description: API密钥（部分隐藏）
+        api_base:
+          type: string
+          description: API基础URL
+        default_model:
+          type: string
+          description: 默认模型
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/Model'
+        database:
+          $ref: '#/components/schemas/DatabaseConfig'
+        interface_language:
+          type: string
+          enum: ["zh", "en"]
+        interface_theme:
+          type: string
+          enum: ["light", "dark", "auto"]
+        auto_run_code:
+          type: boolean
+        show_thinking:
+          type: boolean
+
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+          description: 模型ID
+        name:
+          type: string
+          description: 模型显示名称
+        type:
+          type: string
+          description: 模型类型
+          enum: ["openai", "anthropic", "deepseek", "qwen"]
+        api_base:
+          type: string
+          description: 模型API地址
+        status:
+          type: string
+          enum: ["active", "inactive", "error"]
+          description: 模型状态
+
+    DatabaseConfig:
+      type: object
+      properties:
+        host:
+          type: string
+          description: 数据库主机地址
+        port:
+          type: integer
+          description: 数据库端口
+        user:
+          type: string
+          description: 数据库用户名
+        password:
+          type: string
+          description: 数据库密码（加密存储）
+        database:
+          type: string
+          description: 默认数据库名
+
+    SqlExecuteRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          description: SQL查询语句（仅支持SELECT/SHOW/DESCRIBE/EXPLAIN）
+          example: "SELECT * FROM sales LIMIT 10"
+      required:
+        - query
+
+    SqlExecuteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        count:
+          type: integer
+          description: 结果行数
+        timestamp:
+          type: string
+          format: date-time
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        model:
+          type: string
+        database_name:
+          type: string
+        is_favorite:
+          type: boolean
+        message_count:
+          type: integer
+        session_state:
+          type: object
+
+    ConversationDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              message_type:
+                type: string
+                enum: ["user", "assistant", "system"]
+              content:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              context:
+                type: object
+              execution_details:
+                type: object
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: ["healthy", "degraded", "unhealthy"]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        services:
+          type: object
+          properties:
+            database:
+              type: boolean
+            llm:
+              type: boolean
+            cache:
+              type: boolean
+
+    TestConnectionRequest:
+      type: object
+      properties:
+        host:
+          type: string
+        port:
+          type: integer
+        user:
+          type: string
+        password:
+          type: string
+        database:
+          type: string
+
+    TestConnectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        table_count:
+          type: integer
+        connected:
+          type: boolean
+
+paths:
+  /:
+    get:
+      summary: 获取Web界面
+      description: 返回QueryGPT的Web用户界面
+      tags:
+        - UI
+      responses:
+        '200':
+          description: HTML页面
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /api/health:
+    get:
+      summary: 健康检查
+      description: 检查服务健康状态
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: 服务健康
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/chat:
+    post:
+      summary: 执行自然语言查询
+      description: |
+        将自然语言查询转换为SQL并执行，返回结果和可视化数据。
+        支持流式响应和会话上下文。
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              simple_query:
+                summary: 简单查询
+                value:
+                  query: "查询销售总额"
+              with_context:
+                summary: 带上下文的查询
+                value:
+                  query: "按月份分组"
+                  conversation_id: "550e8400-e29b-41d4-a716-446655440000"
+                  context_rounds: 3
+              with_model:
+                summary: 指定模型
+                value:
+                  query: "生成销售趋势图"
+                  model: "gpt-4.1"
+                  use_database: true
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 认证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 超过速率限制
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/config:
+    get:
+      summary: 获取系统配置
+      description: 获取当前系统配置，包括API设置、数据库连接等
+      tags:
+        - Configuration
+      responses:
+        '200':
+          description: 配置信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      summary: 更新系统配置
+      description: 更新系统配置，包括API密钥、数据库连接等
+      tags:
+        - Configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigResponse'
+      responses:
+        '200':
+          description: 配置已更新
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: 更新失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/models:
+    get:
+      summary: 获取可用模型列表
+      description: 获取所有配置的AI模型列表
+      tags:
+        - Models
+      responses:
+        '200':
+          description: 模型列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Model'
+                  current:
+                    type: string
+                    description: 当前默认模型
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    post:
+      summary: 保存模型配置
+      description: 保存模型配置列表
+      tags:
+        - Models
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Model'
+      responses:
+        '200':
+          description: 配置已保存
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '500':
+          description: 保存失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/test_model:
+    post:
+      summary: 测试模型连接
+      description: 测试指定模型的连接状态
+      tags:
+        - Models
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model:
+                  type: string
+                  description: 模型ID
+                api_key:
+                  type: string
+                  description: API密钥（可选）
+                api_base:
+                  type: string
+                  description: API基础URL（可选）
+              required:
+                - model
+      responses:
+        '200':
+          description: 测试结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  response:
+                    type: string
+        '500':
+          description: 测试失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/query:
+    post:
+      summary: 直接SQL查询（开发者模式）
+      description: |
+        直接执行SQL查询，仅在开发者模式下可用。
+        此端点是 /api/execute_sql 的别名，提供向后兼容性。
+        仅支持只读操作：SELECT, SHOW, DESCRIBE, EXPLAIN
+      tags:
+        - Database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SqlExecuteRequest'
+            examples:
+              select_query:
+                summary: SELECT查询
+                value:
+                  query: "SELECT * FROM sales ORDER BY sale_date DESC LIMIT 10"
+              show_tables:
+                summary: 显示表
+                value:
+                  query: "SHOW TABLES"
+              describe_table:
+                summary: 描述表结构
+                value:
+                  query: "DESCRIBE products"
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SqlExecuteResponse'
+        '400':
+          description: 查询为空或格式错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 不允许的SQL操作或未启用开发者模式
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 执行失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/execute_sql:
+    post:
+      summary: 执行SQL查询
+      description: |
+        直接执行SQL查询（仅支持只读操作）。
+        允许的操作：SELECT, SHOW, DESCRIBE, EXPLAIN
+      tags:
+        - Database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SqlExecuteRequest'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SqlExecuteResponse'
+        '400':
+          description: 查询为空
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 不允许的SQL操作
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 执行失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/schema:
+    get:
+      summary: 获取数据库结构
+      description: 获取当前连接数据库的表结构信息
+      tags:
+        - Database
+      responses:
+        '200':
+          description: 数据库结构
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          type:
+                            type: string
+                          nullable:
+                            type: boolean
+                          key:
+                            type: string
+                          default:
+                            type: string
+                          extra:
+                            type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+        '400':
+          description: 数据库未配置
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 获取失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/test_connection:
+    get:
+      summary: 测试数据库连接
+      description: 测试当前配置的数据库连接状态
+      tags:
+        - Database
+      responses:
+        '200':
+          description: 连接状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected:
+                    type: boolean
+                  host:
+                    type: string
+                  port:
+                    type: integer
+                  database:
+                    type: string
+                  error:
+                    type: string
+                  test_queries:
+                    type: array
+                    items:
+                      type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/database/test:
+    post:
+      summary: 测试数据库连接（带参数）
+      description: 使用提供的参数测试数据库连接
+      tags:
+        - Database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestConnectionRequest'
+      responses:
+        '200':
+          description: 测试结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestConnectionResponse'
+        '500':
+          description: 测试失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/database/config:
+    post:
+      summary: 保存数据库配置
+      description: 保存数据库连接配置到.env文件
+      tags:
+        - Database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatabaseConfig'
+      responses:
+        '200':
+          description: 配置已保存
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: 保存失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/stop_query:
+    post:
+      summary: 停止正在执行的查询
+      description: 中断指定会话的正在执行的查询
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                conversation_id:
+                  type: string
+                  format: uuid
+                  description: 要停止的会话ID
+              required:
+                - conversation_id
+      responses:
+        '200':
+          description: 停止请求已发送
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  conversation_id:
+                    type: string
+        '400':
+          description: 缺少会话ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 停止失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/history:
+    get:
+      summary: 获取历史记录概览
+      description: 获取历史记录的概览信息，包括最近的对话和统计数据
+      tags:
+        - History
+      parameters:
+        - name: limit
+          in: query
+          description: 返回的最近对话数量
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: 历史概览
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  recent_conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+                  statistics:
+                    type: object
+                    properties:
+                      total_conversations:
+                        type: integer
+                      total_messages:
+                        type: integer
+                      active_today:
+                        type: integer
+        '500':
+          description: 获取失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/history/conversations:
+    get:
+      summary: 获取对话历史列表
+      description: 获取对话历史记录，支持搜索和过滤
+      tags:
+        - History
+      parameters:
+        - name: q
+          in: query
+          description: 搜索关键词
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: 返回数量限制
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: favorites
+          in: query
+          description: 仅返回收藏的对话
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 对话列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+        '500':
+          description: 获取失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/history/conversation/{conversation_id}:
+    get:
+      summary: 获取对话详情
+      description: 获取指定对话的完整消息历史
+      tags:
+        - History
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          description: 对话ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 对话详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  conversation:
+                    $ref: '#/components/schemas/ConversationDetail'
+        '404':
+          description: 对话不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 获取失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    delete:
+      summary: 删除对话
+      description: 删除指定的对话记录
+      tags:
+        - History
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          description: 对话ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          description: 对话不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 删除失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/history/conversation/{conversation_id}/favorite:
+    post:
+      summary: 切换收藏状态
+      description: 切换对话的收藏状态
+      tags:
+        - History
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          description: 对话ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 状态已切换
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  is_favorite:
+                    type: boolean
+        '500':
+          description: 操作失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/history/statistics:
+    get:
+      summary: 获取历史统计信息
+      description: 获取对话历史的统计数据
+      tags:
+        - History
+      responses:
+        '200':
+          description: 统计信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  statistics:
+                    type: object
+                    properties:
+                      total_conversations:
+                        type: integer
+                      total_messages:
+                        type: integer
+                      favorite_count:
+                        type: integer
+                      models_usage:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      daily_stats:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              format: date
+                            count:
+                              type: integer
+        '500':
+          description: 获取失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/history/cleanup:
+    post:
+      summary: 清理历史记录
+      description: 清理指定天数之前的历史记录
+      tags:
+        - History
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days:
+                  type: integer
+                  description: 保留最近N天的记录
+                  default: 90
+                  minimum: 1
+      responses:
+        '200':
+          description: 清理完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '500':
+          description: 清理失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/history/replay/{conversation_id}:
+    post:
+      summary: 复现对话
+      description: 加载历史对话以继续交互
+      tags:
+        - History
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          description: 对话ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 对话已加载
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  conversation:
+                    $ref: '#/components/schemas/ConversationDetail'
+                  message:
+                    type: string
+        '404':
+          description: 对话不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 加载失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+tags:
+  - name: UI
+    description: Web用户界面
+  - name: System
+    description: 系统状态和健康检查
+  - name: Chat
+    description: 自然语言查询和对话管理
+  - name: Configuration
+    description: 系统配置管理
+  - name: Models
+    description: AI模型管理
+  - name: Database
+    description: 数据库连接和查询
+  - name: History
+    description: 对话历史管理

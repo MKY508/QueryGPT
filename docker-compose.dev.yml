@@ -1,0 +1,68 @@
+version: '3.8'
+
+# 开发环境配置 - 不包含数据库服务，连接外部数据库
+services:
+  querygpt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: querygpt-app-dev
+    restart: unless-stopped
+    ports:
+      - "5007:5007"
+    environment:
+      # 开发环境配置
+      - ENV=development
+      - DEBUG=true
+      - PORT=5007
+      - LOG_LEVEL=${LOG_LEVEL:-DEBUG}
+      
+      # API 配置 (从 .env 文件读取)
+      - API_KEY=${API_KEY}
+      - API_BASE_URL=${API_BASE_URL:-https://api.openai.com/v1/}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4.1}
+      
+      # 连接到外部数据库
+      - DB_HOST=${DB_HOST:-host.docker.internal}  # 使用 host.docker.internal 访问宿主机
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DATABASE=${DB_DATABASE:-test_db}
+      
+      # 缓存配置
+      - CACHE_TTL=${CACHE_TTL:-3600}
+      - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-104857600}
+      
+      # 目录配置
+      - OUTPUT_DIR=/app/output
+      - CACHE_DIR=/app/cache
+      - LOG_FILE=/app/logs/app.log
+    volumes:
+      # 开发模式：挂载源代码以支持热重载
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      - ./config:/app/config
+      - ./.env:/app/.env:ro
+      
+      # 挂载数据目录
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./output:/app/output
+      
+      # 挂载语义层配置
+      - ./backend/semantic_layer.json:/app/backend/semantic_layer.json
+      - ./backend/table_classification.json:/app/backend/table_classification.json
+    networks:
+      - querygpt-dev-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # 允许容器访问宿主机服务
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5007/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  querygpt-dev-network:
+    driver: bridge
