@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="../images/logo.png" width="400" alt="QueryGPT">
+  <img src="../../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -42,24 +42,24 @@
   <tr>
     <td width="50%">
       <strong>🤖 Processo de Pensamento do Agente Inteligente</strong><br/>
-      <img src="../images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
+      <img src="../../images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
       <p align="center">Visualização transparente da cadeia de pensamento</p>
     </td>
     <td width="50%">
       <strong>📊 Visualização de Dados</strong><br/>
-      <img src="../images/data-visualization-en.png" width="100%" alt="Visualização de Dados"/>
+      <img src="../../images/data-visualization-en.png" width="100%" alt="Visualização de Dados"/>
       <p align="center">Geração inteligente de gráficos com seleção automática</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <strong>👨‍💻 Visão do Desenvolvedor</strong><br/>
-      <img src="../images/developer-view-en.png" width="100%" alt="Visão do Desenvolvedor"/>
+      <img src="../../images/developer-view-en.png" width="100%" alt="Visão do Desenvolvedor"/>
       <p align="center">Detalhes completos de execução, SQL e código transparentes</p>
     </td>
     <td width="50%">
       <strong>🌐 Suporte Multilíngue</strong><br/>
-      <img src="../images/main-interface.png" width="100%" alt="Interface Principal"/>
+      <img src="../../images/main-interface.png" width="100%" alt="Interface Principal"/>
       <p align="center">Suporte para 10 idiomas, acessível globalmente</p>
     </td>
   </tr>

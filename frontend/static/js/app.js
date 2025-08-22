@@ -24,19 +24,22 @@ class DataAnalysisPlatform {
      * 获取存储的视图模式
      */
     getStoredViewMode() {
-        // 首先尝试从基础设置中获取
+        // 首先尝试从基础设置中获取默认视图模式
         const basicSettings = JSON.parse(localStorage.getItem('basic_settings') || '{}');
         if (basicSettings.default_view_mode) {
+            // 使用基础设置中的默认视图模式
             return basicSettings.default_view_mode;
         }
         
-        // 其次尝试从view_mode中获取
+        // 其次尝试从view_mode中获取（这个已弃用，但保留兼容性）
         const savedMode = localStorage.getItem('view_mode');
         if (savedMode) {
+            // 使用旧的视图模式设置
             return savedMode;
         }
         
-        return null;
+        // 默认返回用户视图
+        return 'user';
     }
 
     /**
@@ -687,13 +690,12 @@ class DataAnalysisPlatform {
     }
     
     /**
-     * 创建用户视图总结
+     * 创建用户视图总结 - 改进版
      */
     createUserSummary(data) {
         const summaryDiv = document.createElement('div');
         
-        // 调试：打印数据结构
-        console.log('用户视图数据:', data);
+        // 分析用户视图数据
         
         // 分析执行结果
         let queryData = [];
@@ -716,7 +718,7 @@ class DataAnalysisPlatform {
                 data.content.includes('关键') ||
                 data.content.includes('生成文件')) {
                 finalSummary = data.content;
-                console.log('找到字符串格式的总结');
+                // 找到字符串格式的总结
             }
         }
         
@@ -743,7 +745,7 @@ class DataAnalysisPlatform {
                         item.content.includes('任务') ||
                         item.content.includes('完成')) {
                         finalSummary = item.content;
-                        console.log('找到包含关键词的总结！');
+                        // 找到包含关键词的总结
                         break;
                     }
                     // 如果没有找到带关键词的，保存最后一个有实质内容的文本
@@ -1031,7 +1033,7 @@ class DataAnalysisPlatform {
                         item.content.includes('任务') ||
                         item.content.includes('完成')) {
                         finalSummary = item.content;
-                        console.log('找到包含关键词的总结！');
+                        // 找到包含关键词的总结
                         break;
                     }
                     // 如果没有找到带关键词的，保存最后一个有实质内容的文本
@@ -1087,6 +1089,14 @@ class DataAnalysisPlatform {
                     `;
                 }
             });
+        } else if (data.content) {
+            // 尝试显示原始内容作为后备方案
+            detailsHtml += `<div class="dev-step">
+                <div class="step-header">
+                    <span class="step-number">原始数据</span>
+                </div>
+                <pre class="console-output">${this.escapeHtml(JSON.stringify(data.content, null, 2))}</pre>
+            </div>`;
         } else {
             detailsHtml += `<p>${window.i18nManager.t('common.noDetailedSteps')}</p>`;
         }
@@ -1570,8 +1580,15 @@ class DataAnalysisPlatform {
         // 存储原始数据供两个视图使用
         this.lastQueryData = data;
         
-        // 确保使用最新的视图模式设置
-        this.currentViewMode = this.getStoredViewMode() || 'user';
+        // 每次创建视图时都重新获取最新的设置，确保使用正确的默认视图
+        const defaultMode = this.getStoredViewMode();
+        // 只有在没有设置当前视图模式时才使用默认值
+        if (!this.currentViewMode || this.currentViewMode === '') {
+            this.currentViewMode = defaultMode;
+        }
+        // 确保始终使用用户设置的默认视图
+        this.currentViewMode = defaultMode;
+        // 使用当前视图模式创建容器
         
         // 创建视图切换按钮
         const viewSwitcher = document.createElement('div');
@@ -1616,9 +1633,10 @@ class DataAnalysisPlatform {
     switchView(viewType, container) {
         // 更新当前视图模式
         this.currentViewMode = viewType;
+        // 切换到指定视图
         
-        // 保存到本地存储
-        localStorage.setItem('view_mode', viewType);
+        // 不保存临时的视图切换，只使用用户在设置中配置的默认值
+        // localStorage.setItem('view_mode', viewType);  // 注释掉，避免覆盖默认设置
         
         // 如果提供了容器，更新该容器中的视图
         if (container) {
