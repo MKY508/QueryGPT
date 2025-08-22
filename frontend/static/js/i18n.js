@@ -202,6 +202,11 @@ const i18n = {
             codeExecution: '代码执行',
             summary: '总结',
             system: '系统',
+            output: '输出',
+            console: '控制台',
+            message: '消息',
+            error: '错误',
+            exception: '异常',
             noDetailedSteps: '无详细执行步骤信息',
             
             // Tips系统
@@ -464,6 +469,11 @@ const i18n = {
             codeExecution: 'Code Execution',
             summary: 'Summary',
             system: 'System',
+            output: 'Output',
+            console: 'Console',
+            message: 'Message',
+            error: 'Error',
+            exception: 'Exception',
             noDetailedSteps: 'No detailed execution steps available',
             
             // Tips system
