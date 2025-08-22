@@ -1,0 +1,99 @@
+# Python 相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv*/
+env/
+ENV/
+.venv
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# 虚拟环境
+venv_py310/
+
+# IDE 相关
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git 相关
+.git/
+.gitignore
+.github/
+
+# 文档
+*.md
+docs/
+README*
+LICENSE
+COPYRIGHT
+
+# 日志和临时文件 (运行时会创建)
+logs/
+*.log
+tmp/
+temp/
+
+# 缓存文件 (运行时会创建)
+cache/
+.cache/
+
+# 输出文件 (运行时会创建)
+output/
+
+# 测试相关
+tests/
+test_*.py
+*_test.py
+pytest.ini
+.pytest_cache/
+coverage.xml
+*.cover
+
+# 配置文件 (通过 volume 挂载)
+.env
+.env.*
+!.env.example
+
+# Docker 相关
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# 数据文件 (通过 volume 挂载)
+backend/data/*.db
+backend/data/*.sqlite
+*.db
+*.sqlite
+
+# 其他不需要的文件
+*.bak
+*.backup
+*.old
+*.orig
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# 脚本文件 (不需要在容器中)
+*.sh
+!entrypoint.sh
+
+# 掩码脚本
+mask_*.py
+
+# 前端源文件 (已经打包)
+frontend/UI_UX_IMPLEMENTATION_GUIDE.md
+frontend/style_check.html
+frontend/test.html
+frontend/test_ui.html

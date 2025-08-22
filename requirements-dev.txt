@@ -1,0 +1,139 @@
+# Development dependencies for QueryGPT
+# Install with: pip install -r requirements-dev.txt
+
+# Include base requirements
+-r requirements.txt
+
+# ============= Testing =============
+# Core testing framework
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-asyncio==0.21.1
+pytest-timeout==2.2.0
+pytest-xdist==3.5.0  # Parallel test execution
+pytest-watch==4.2.0  # Auto-rerun tests on file changes
+pytest-benchmark==4.0.0  # Performance benchmarking
+pytest-flask==1.3.0  # Flask testing utilities
+
+# Test utilities
+faker==20.1.0  # Generate fake data for tests
+factory-boy==3.3.0  # Test fixtures factory
+hypothesis==6.92.1  # Property-based testing
+responses==0.24.1  # Mock HTTP responses
+freezegun==1.4.0  # Mock datetime
+
+# Coverage
+coverage[toml]==7.3.3
+coverage-badge==1.1.0  # Generate coverage badges
+
+# ============= Code Quality =============
+# Linting
+ruff==0.1.9  # Fast Python linter
+flake8==6.1.0  # Alternative linter
+flake8-docstrings==1.7.0
+flake8-import-order==0.18.2
+flake8-bugbear==23.12.2
+pylint==3.0.3  # Comprehensive linter
+
+# Formatting
+black==23.12.1  # Code formatter
+isort==5.13.2  # Import sorting
+autopep8==2.0.4  # Alternative formatter
+
+# Type checking
+mypy==1.8.0
+types-requests==2.31.0.10
+types-PyYAML==6.0.12.12
+types-python-dateutil==2.8.19.14
+
+# Security
+bandit==1.7.6  # Security linter
+safety==3.0.1  # Check for known vulnerabilities
+
+# Documentation
+pydocstyle==6.3.0  # Docstring style checker
+
+# ============= Development Tools =============
+# Debugging
+ipython==8.19.0
+ipdb==0.13.13  # IPython debugger
+pdbpp==0.10.3  # Enhanced pdb
+
+# Profiling
+memory-profiler==0.61.0
+line-profiler==4.1.2
+py-spy==0.3.14  # Sampling profiler
+
+# Database tools
+sqlalchemy==2.0.25  # ORM for testing
+alembic==1.13.1  # Database migrations
+sqlite-utils==3.36  # SQLite utilities
+
+# API testing
+httpx==0.26.0  # HTTP client for testing
+requests-mock==1.11.0  # Mock requests
+
+# Documentation
+sphinx==7.2.6  # Documentation generator
+sphinx-rtd-theme==2.0.0
+sphinx-autodoc-typehints==1.25.2
+mkdocs==1.5.3  # Alternative docs generator
+mkdocs-material==9.5.3
+
+# ============= Utilities =============
+# Environment management
+python-dotenv==1.0.0  # Load .env files
+environs==11.0.0  # Environment variable parsing
+
+# Task automation
+invoke==2.2.0  # Task execution
+watchdog==3.0.0  # File system events
+
+# Git hooks
+pre-commit==3.6.0  # Git pre-commit hooks
+
+# Release management
+bump2version==1.0.1  # Version bumping
+twine==4.0.2  # Package publishing
+
+# ============= Optional Tools =============
+# Performance monitoring
+locust==2.20.0  # Load testing
+django-silk==5.0.4  # Profiling middleware (if using Django)
+
+# Code complexity
+radon==6.0.1  # Code metrics
+mccabe==0.7.0  # Cyclomatic complexity
+
+# Visualization
+matplotlib==3.8.2  # For test result visualization
+seaborn==0.13.0  # Statistical plots
+
+# Mock data generation
+mimesis==12.1.0  # Alternative to faker
+
+# ============= CI/CD =============
+# Build tools
+wheel==0.42.0
+setuptools==69.0.3
+build==1.0.3
+
+# Container testing
+testcontainers==3.7.1  # Test with Docker containers
+
+# ============= IDE Support =============
+# Language server
+python-lsp-server==1.9.0
+pylsp-mypy==0.6.8
+pylsp-black==2.0.0
+pylsp-ruff==2.0.0
+
+# Jupyter support (if needed)
+jupyter==1.0.0
+notebook==7.0.6
+jupyterlab==4.0.10
+
+# ============= Version Constraints =============
+# Ensure compatibility with Python 3.10 for OpenInterpreter
+# All packages should be compatible with Python 3.10.x

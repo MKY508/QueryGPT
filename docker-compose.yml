@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  querygpt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: querygpt-app
+    restart: unless-stopped
+    ports:
+      - "5007:5007"
+    environment:
+      # 基础配置
+      - PORT=5007
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      
+      # API 配置 (从 .env 文件读取)
+      - API_KEY=${API_KEY}
+      - API_BASE_URL=${API_BASE_URL:-https://api.openai.com/v1/}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-gpt-4.1}
+      
+      # 数据库配置 (使用内部数据库服务或外部连接)
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DATABASE=${DB_DATABASE:-test_db}
+      
+      # 缓存配置
+      - CACHE_TTL=${CACHE_TTL:-3600}
+      - CACHE_MAX_SIZE=${CACHE_MAX_SIZE:-104857600}
+      
+      # 目录配置
+      - OUTPUT_DIR=/app/output
+      - CACHE_DIR=/app/cache
+      - LOG_FILE=/app/logs/app.log
+    volumes:
+      # 挂载配置文件 (只读)
+      - ./config:/app/config:ro
+      - ./.env:/app/.env:ro
+      
+      # 挂载数据目录 (可写)
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+      - ./output:/app/output
+      - ./backend/data:/app/backend/data
+      
+      # 挂载语义层配置 (如果存在)
+      - ./backend/semantic_layer.json:/app/backend/semantic_layer.json:ro
+      - ./backend/table_classification.json:/app/backend/table_classification.json:ro
+    networks:
+      - querygpt-network
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5007/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 可选的 MySQL 数据库服务 (用于测试)
+  db:
+    image: mysql:8.0
+    container_name: querygpt-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-querygpt_password}
+      - MYSQL_DATABASE=${DB_DATABASE:-test_db}
+      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
+      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
+    ports:
+      - "3307:3306"  # 映射到 3307 避免与本地 MySQL 冲突
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro  # 可选的初始化脚本
+    networks:
+      - querygpt-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # 可选的 Doris 数据库服务 (用于生产环境)
+  # 注意: Doris 需要更复杂的配置，这里提供基础示例
+  # doris-fe:
+  #   image: apache/doris:1.2-fe
+  #   container_name: querygpt-doris-fe
+  #   restart: unless-stopped
+  #   environment:
+  #     - FE_SERVERS=doris-fe:9010
+  #     - FE_ID=1
+  #   ports:
+  #     - "8030:8030"  # HTTP 端口
+  #     - "9030:9030"  # MySQL 协议端口
+  #   volumes:
+  #     - doris_fe_data:/opt/apache-doris/fe/doris-meta
+  #   networks:
+  #     - querygpt-network
+  
+  # doris-be:
+  #   image: apache/doris:1.2-be
+  #   container_name: querygpt-doris-be
+  #   restart: unless-stopped
+  #   environment:
+  #     - FE_SERVERS=doris-fe:9010
+  #     - BE_ADDR=doris-be:9060
+  #   ports:
+  #     - "8040:8040"  # HTTP 端口
+  #     - "9060:9060"  # BE 端口
+  #   volumes:
+  #     - doris_be_data:/opt/apache-doris/be/storage
+  #   networks:
+  #     - querygpt-network
+  #   depends_on:
+  #     - doris-fe
+
+networks:
+  querygpt-network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
+  # doris_fe_data:
+  #   driver: local
+  # doris_be_data:
+  #   driver: local

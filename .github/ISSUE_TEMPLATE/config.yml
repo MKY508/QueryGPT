@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📚 项目文档
+    url: https://github.com/maokaiyue/QueryGPT/wiki
+    about: 查看项目的详细文档和使用指南
+  - name: 💬 讨论区
+    url: https://github.com/maokaiyue/QueryGPT/discussions
+    about: 与社区讨论想法、提问或分享经验
+  - name: 🔒 安全问题
+    url: https://github.com/maokaiyue/QueryGPT/security/policy
+    about: 请私下报告安全漏洞
+  - name: 📖 贡献指南
+    url: https://github.com/maokaiyue/QueryGPT/blob/main/CONTRIBUTING.md
+    about: 了解如何为项目做出贡献
