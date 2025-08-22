@@ -38,19 +38,19 @@
 
 ## System Screenshots
 
-<img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT Interface"/>
+<img src="docs/images/agent-thinking.png" width="100%" alt="QueryGPT Interface"/>
 
 **Real-time display of AI thinking process, complete complex data analysis through natural language dialogue.**
 
 ---
 
-<img src="docs/images/data-visualization-en.png" width="100%" alt="Data Visualization"/>
+<img src="docs/images/data-visualization.png" width="100%" alt="Data Visualization"/>
 
 **Automatically generate interactive charts with clear data insights.**
 
 ---
 
-<img src="docs/images/developer-view-en.png" width="100%" alt="Developer View"/>
+<img src="docs/images/developer-view.png" width="100%" alt="Developer View"/>
 
 **Completely transparent code execution, supporting both SQL and Python engines.**
 
@@ -236,6 +236,20 @@ Content-Type: application/json
 }
 ```
 
+### History Records
+
+```http
+GET /api/history/conversations    # Get history list
+GET /api/history/conversation/:id # Get details
+DELETE /api/history/conversation/:id # Delete record
+```
+
+### Health Check
+
+```http
+GET /api/health
+```
+
 ## Advanced Features
 
 ### Custom Models
@@ -266,6 +280,12 @@ ollama pull qwen2.5
 # Set api_base to http://localhost:11434/v1 in config
 ```
 
+## Security Notes
+
+- Only supports read-only queries (SELECT, SHOW, DESCRIBE)
+- Automatically filters dangerous SQL statements
+- Database user should be configured with read-only permissions
+
 ## Frequently Asked Questions
 
 **Q: How to handle database connection failures?**
@@ -279,29 +299,48 @@ A: Configure semantic layer to help system understand business terms; provide mo
 
 ## Contributing
 
-We welcome all forms of contributions:
+Welcome to submit Issues and Pull Requests.
 
-1. Submit Issues: Report bugs or suggest new features
-2. Submit PR: Fix bugs or add new features
-3. Improve Documentation: Help us improve documentation
-4. Share Use Cases: Tell us your usage scenarios
+1. Fork this project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details
 
-## Acknowledgments
+## Author
 
-- Thanks to [OpenInterpreter](https://github.com/OpenInterpreter/open-interpreter) project for Agent capabilities
-- Thanks to all contributors and users
+- **Author**: Mao Kaiyue
+- **GitHub**: [@MKY508](https://github.com/MKY508)
+- **Created**: August 2025
 
-## Contact
+## Star History
 
-- GitHub Issues: [github.com/MKY508/QueryGPT/issues](https://github.com/MKY508/QueryGPT/issues)
-- Email: [your-email@example.com](mailto:your-email@example.com)
+[![Star History Chart](https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&t=202508)](https://star-history.com/#MKY508/QueryGPT&Date)
+
+## Project Stats
+
+![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=social)
+![GitHub forks](https://img.shields.io/github/forks/MKY508/QueryGPT?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/MKY508/QueryGPT?style=social)
+![GitHub contributors](https://img.shields.io/github/contributors/MKY508/QueryGPT)
+![GitHub last commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT)
 
 ---
 
-<p align="center">
-  Made with ❤️ by the QueryGPT Team
-</p>
+## ⭐ Support the Project
+
+If QueryGPT helps you, please consider giving this project a **Star** ⭐
+
+Your support is my motivation to keep improving 💪
+
+---
+
+## Keywords
+
+`AI Agent` `Data Analysis Agent` `Chain-of-Thought` `Autonomous Data Exploration` `Multi-round Reasoning` `Natural Language Query` `Natural Language to SQL` `Text to SQL` `Data Analytics` `ChatGPT` `Code Interpreter` `OpenInterpreter` `Chinese Database Query` `AI Data Analysis` `Smart BI` `Data Visualization` `Business Intelligence` `MySQL` `PostgreSQL` `Python Execution` `Statistical Analysis` `Data Mining` `RFM Analysis` `User Profiling` `Sales Analysis` `YoY MoM` `Retention Analysis` `no-code` `low-code` `chat with database` `conversational AI` `Database Dialogue` `Autonomous Agent` `Vanna AI Alternative` `DB-GPT` `Text2SQL` `TableGPT` `ChatBI` `Conversational BI` `Chat2DB` `AI BI`
+
+---
