@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 语义搜索工具 - 供OpenInterpreter调用
 根据中文查询找到对应的数据库表和字段
