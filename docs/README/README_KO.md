@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="docs/images/logo.png" width="400" alt="QueryGPT">
+  <img src="../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -108,24 +108,24 @@ QueryGPT는 글로벌 사용을 위해 10개 언어를 지원합니다:
   <tr>
     <td width="50%">
       <strong>🤖 지능형 에이전트 사고 프로세스</strong><br/>
-      <img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT 인터페이스"/>
+      <img src="../images/agent-thinking-en.png" width="100%" alt="QueryGPT 인터페이스"/>
       <p align="center">투명한 사고 체인 시각화</p>
     </td>
     <td width="50%">
       <strong>📊 데이터 시각화</strong><br/>
-      <img src="docs/images/data-visualization-en.png" width="100%" alt="데이터 시각화"/>
+      <img src="../images/data-visualization-en.png" width="100%" alt="데이터 시각화"/>
       <p align="center">자동 선택을 통한 스마트 차트 생성</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <strong>👨‍💻 개발자 뷰</strong><br/>
-      <img src="docs/images/developer-view-en.png" width="100%" alt="개발자 뷰"/>
+      <img src="../images/developer-view-en.png" width="100%" alt="개발자 뷰"/>
       <p align="center">완전한 실행 세부 정보, 투명한 SQL 및 코드</p>
     </td>
     <td width="50%">
       <strong>🌐 다국어 지원</strong><br/>
-      <img src="docs/images/main-interface.png" width="100%" alt="메인 인터페이스"/>
+      <img src="../images/main-interface.png" width="100%" alt="메인 인터페이스"/>
       <p align="center">10개 언어 지원, 전 세계 접근 가능</p>
     </td>
   </tr>

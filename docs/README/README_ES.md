@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="docs/images/logo.png" width="400" alt="QueryGPT">
+  <img src="../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -138,24 +138,24 @@ QueryGPT soporta **10 idiomas** principales para una experiencia global:
   <tr>
     <td width="50%">
       <strong>🤖 Proceso de Pensamiento del Agente Inteligente</strong><br/>
-      <img src="docs/images/agent-thinking-en.png" width="100%" alt="Interfaz QueryGPT"/>
+      <img src="../images/agent-thinking-en.png" width="100%" alt="Interfaz QueryGPT"/>
       <p align="center">Visualización transparente de la cadena de pensamiento</p>
     </td>
     <td width="50%">
       <strong>📊 Visualización de Datos</strong><br/>
-      <img src="docs/images/data-visualization-en.png" width="100%" alt="Visualización de Datos"/>
+      <img src="../images/data-visualization-en.png" width="100%" alt="Visualización de Datos"/>
       <p align="center">Generación inteligente de gráficos con selección automática</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <strong>👨‍💻 Vista de Desarrollador</strong><br/>
-      <img src="docs/images/developer-view-en.png" width="100%" alt="Vista de Desarrollador"/>
+      <img src="../images/developer-view-en.png" width="100%" alt="Vista de Desarrollador"/>
       <p align="center">Detalles completos de ejecución, SQL y código transparente</p>
     </td>
     <td width="50%">
       <strong>🌐 Soporte Multiidioma</strong><br/>
-      <img src="docs/images/main-interface.png" width="100%" alt="Interfaz Principal"/>
+      <img src="../images/main-interface.png" width="100%" alt="Interfaz Principal"/>
       <p align="center">Soporte para 10 idiomas, accesible globalmente</p>
     </td>
   </tr>

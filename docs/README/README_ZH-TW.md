@@ -85,24 +85,24 @@ QueryGPT 不僅僅是一個 SQL 生成工具，而是一個能夠自主思考和
   <tr>
     <td width="50%">
       <strong>🤖 智慧Agent思考過程</strong><br/>
-      <img src="docs/images/agent-thinking-en.png" width="100%" alt="QueryGPT 介面"/>
+      <img src="../images/agent-thinking-en.png" width="100%" alt="QueryGPT 介面"/>
       <p align="center">透明的思考鏈展示，理解AI如何分析您的查詢</p>
     </td>
     <td width="50%">
       <strong>📊 數據視覺化</strong><br/>
-      <img src="docs/images/data-visualization-en.png" width="100%" alt="數據視覺化"/>
+      <img src="../images/data-visualization-en.png" width="100%" alt="數據視覺化"/>
       <p align="center">智慧圖表生成，自動選擇最佳展示方式</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <strong>👨‍💻 開發者視圖</strong><br/>
-      <img src="docs/images/developer-view-en.png" width="100%" alt="開發者視圖"/>
+      <img src="../images/developer-view-en.png" width="100%" alt="開發者視圖"/>
       <p align="center">完整的執行細節，SQL語句和程式碼透明可見</p>
     </td>
     <td width="50%">
       <strong>🌐 多語言支援</strong><br/>
-      <img src="docs/images/main-interface.png" width="100%" alt="主介面"/>
+      <img src="../images/main-interface.png" width="100%" alt="主介面"/>
       <p align="center">支援10種語言，全球用戶無障礙使用</p>
     </td>
   </tr>

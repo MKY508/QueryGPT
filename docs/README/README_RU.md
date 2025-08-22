@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="docs/images/logo.png" width="400" alt="QueryGPT">
+  <img src="../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -102,24 +102,24 @@
   <tr>
     <td width="50%">
       <strong>🤖 Процесс мышления интеллектуального агента</strong><br/>
-      <img src="docs/images/agent-thinking-en.png" width="100%" alt="Интерфейс QueryGPT"/>
+      <img src="../images/agent-thinking-en.png" width="100%" alt="Интерфейс QueryGPT"/>
       <p align="center">Прозрачная визуализация цепочки рассуждений</p>
     </td>
     <td width="50%">
       <strong>📊 Визуализация данных</strong><br/>
-      <img src="docs/images/data-visualization-en.png" width="100%" alt="Визуализация данных"/>
+      <img src="../images/data-visualization-en.png" width="100%" alt="Визуализация данных"/>
       <p align="center">Интеллектуальная генерация графиков с автоматическим выбором</p>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <strong>👨‍💻 Режим разработчика</strong><br/>
-      <img src="docs/images/developer-view-en.png" width="100%" alt="Режим разработчика"/>
+      <img src="../images/developer-view-en.png" width="100%" alt="Режим разработчика"/>
       <p align="center">Полные детали выполнения, прозрачный SQL и код</p>
     </td>
     <td width="50%">
       <strong>🌐 Многоязычная поддержка</strong><br/>
-      <img src="docs/images/main-interface.png" width="100%" alt="Главный интерфейс"/>
+      <img src="../images/main-interface.png" width="100%" alt="Главный интерфейс"/>
       <p align="center">Поддержка 10 языков, доступно по всему миру</p>
     </td>
   </tr>
