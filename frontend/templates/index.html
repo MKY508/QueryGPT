@@ -152,13 +152,13 @@
             <!-- 导出结果页面 -->
             <div class="tab-content" id="export-tab">
                 <div class="page-header">
-                    <h1>导出结果</h1>
+                    <h1 data-i18n="export.title">导出结果</h1>
                 </div>
                 <div class="export-container">
                     <div class="settings-card">
-                        <h3><i class="fas fa-file-export"></i> 导出选项</h3>
+                        <h3><i class="fas fa-file-export"></i> <span data-i18n="export.options">导出选项</span></h3>
                         <div class="form-group">
-                            <label>导出格式</label>
+                            <label data-i18n="export.format">导出格式</label>
                             <select id="export-format">
                                 <option value="excel">Excel (.xlsx)</option>
                                 <option value="csv">CSV (.csv)</option>
@@ -167,7 +167,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>包含内容</label>
+                            <label data-i18n="export.content">包含内容</label>
                             <label class="checkbox-label">
                                 <input type="checkbox" checked> 查询结果数据
                             </label>

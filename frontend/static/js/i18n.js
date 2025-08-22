@@ -264,6 +264,64 @@ const i18n = {
             permissionError: '无权限执行此操作',
             validationError: '数据格式错误，检查后重试',
             generalError: '发生错误，请重试'
+        },
+        
+        // 新增通知消息
+        notifications: {
+            apiConnected: 'API连接成功！',
+            modelSaved: '模型配置已保存',
+            saveFailed: '保存失败',
+            dbConnected: '数据库连接成功！',
+            dbConfigSaved: '数据库配置已保存',
+            uiSettingsSaved: '界面设置已保存',
+            sendFailed: '发送失败，请重试',
+            requestFailed: '处理请求失败。检查网络连接或稍后重试。'
+        },
+        
+        // 查询相关
+        query: {
+            executeComplete: '查询执行完成',
+            loadingChart: '加载图表中...',
+            chartLoadFailed: '图表加载失败',
+            dataFound: '成功查询到数据',
+            queryFailed: '查询失败',
+            noDataDetected: '未检测到数据查询结果',
+            sqlExecuted: '执行了 {count} 条SQL查询',
+            noSqlDetected: '未检测到SQL查询命令',
+            chartGenerated: '成功生成可视化图表',
+            noChartGenerated: '本次查询未生成可视化图表',
+            generatedCharts: '生成的图表：',
+            processing: '正在处理您的查询，请稍候...',
+            rawData: '原始数据',
+            step: '步骤',
+            codeExecution: '代码执行',
+            consoleOutput: '控制台输出',
+            error: '错误',
+            systemMessage: '系统消息',
+            summary: '总结',
+            finalOutput: '最终输出'
+        },
+        
+        // 提示消息
+        tips: {
+            notSatisfied: '不满意？尝试补充细节重新反馈给AI',
+            errorOccurred: '遇到错误？尝试简化查询条件或检查表名是否正确',
+            notPrecise: '查询不够精准？尝试指定具体的时间范围或数据维度'
+        },
+        
+        // 导出功能
+        export: {
+            title: '导出结果',
+            options: '导出选项',
+            format: '导出格式',
+            content: '包含内容'
+        },
+        
+        // 系统配置项
+        config: {
+            configuration: '配置',
+            model: '模型',
+            settings: '设置'
         }
     },
     
@@ -531,6 +589,64 @@ const i18n = {
             permissionError: 'Permission denied',
             validationError: 'Invalid data format',
             generalError: 'An error occurred, please try again'
+        },
+        
+        // Notification messages
+        notifications: {
+            apiConnected: 'API connection successful!',
+            modelSaved: 'Model configuration saved',
+            saveFailed: 'Save failed',
+            dbConnected: 'Database connection successful!',
+            dbConfigSaved: 'Database configuration saved',
+            uiSettingsSaved: 'Interface settings saved',
+            sendFailed: 'Send failed, please try again',
+            requestFailed: 'Request processing failed. Check network connection or try again later.'
+        },
+        
+        // Query related
+        query: {
+            executeComplete: 'Query execution completed',
+            loadingChart: 'Loading chart...',
+            chartLoadFailed: 'Chart loading failed',
+            dataFound: 'Data successfully retrieved',
+            queryFailed: 'Query failed',
+            noDataDetected: 'No data query results detected',
+            sqlExecuted: 'Executed {count} SQL queries',
+            noSqlDetected: 'No SQL query commands detected',
+            chartGenerated: 'Visualization chart generated successfully',
+            noChartGenerated: 'No visualization chart generated for this query',
+            generatedCharts: 'Generated charts:',
+            processing: 'Processing your query, please wait...',
+            rawData: 'Raw data',
+            step: 'Step',
+            codeExecution: 'Code execution',
+            consoleOutput: 'Console output',
+            error: 'Error',
+            systemMessage: 'System message',
+            summary: 'Summary',
+            finalOutput: 'Final output'
+        },
+        
+        // Tip messages
+        tips: {
+            notSatisfied: 'Not satisfied? Try adding details and providing feedback to AI again',
+            errorOccurred: 'Encountered an error? Try simplifying query conditions or check if table names are correct',
+            notPrecise: 'Query not precise enough? Try specifying specific time ranges or data dimensions'
+        },
+        
+        // Export functionality
+        export: {
+            title: 'Export Results',
+            options: 'Export Options',
+            format: 'Export Format',
+            content: 'Include Content'
+        },
+        
+        // System configuration
+        config: {
+            configuration: 'Configuration',
+            model: 'Model',
+            settings: 'Settings'
         }
     },
     
@@ -807,6 +923,64 @@ const i18n = {
             permissionError: 'Нет прав для выполнения этой операции',
             validationError: 'Неверный формат данных, проверьте и попробуйте снова',
             generalError: 'Произошла ошибка, попробуйте снова'
+        },
+        
+        // Уведомления
+        notifications: {
+            apiConnected: 'Соединение с API успешно!',
+            modelSaved: 'Конфигурация модели сохранена',
+            saveFailed: 'Сохранение не удалось',
+            dbConnected: 'Соединение с базой данных успешно!',
+            dbConfigSaved: 'Конфигурация базы данных сохранена',
+            uiSettingsSaved: 'Настройки интерфейса сохранены',
+            sendFailed: 'Отправка не удалась, попробуйте снова',
+            requestFailed: 'Обработка запроса не удалась. Проверьте сетевое соединение или попробуйте позже.'
+        },
+        
+        // Запросы
+        query: {
+            executeComplete: 'Выполнение запроса завершено',
+            loadingChart: 'Загрузка графика...',
+            chartLoadFailed: 'Загрузка графика не удалась',
+            dataFound: 'Данные успешно получены',
+            queryFailed: 'Запрос не удался',
+            noDataDetected: 'Результаты запроса данных не обнаружены',
+            sqlExecuted: 'Выполнено {count} SQL запросов',
+            noSqlDetected: 'Команды SQL запросов не обнаружены',
+            chartGenerated: 'График визуализации успешно создан',
+            noChartGenerated: 'График визуализации для этого запроса не создан',
+            generatedCharts: 'Созданные графики:',
+            processing: 'Обработка вашего запроса, пожалуйста подождите...',
+            rawData: 'Исходные данные',
+            step: 'Шаг',
+            codeExecution: 'Выполнение кода',
+            consoleOutput: 'Вывод консоли',
+            error: 'Ошибка',
+            systemMessage: 'Системное сообщение',
+            summary: 'Сводка',
+            finalOutput: 'Окончательный результат'
+        },
+        
+        // Подсказки
+        tips: {
+            notSatisfied: 'Не удовлетворены? Попробуйте добавить детали и предоставить обратную связь ИИ снова',
+            errorOccurred: 'Возникла ошибка? Попробуйте упростить условия запроса или проверить правильность имён таблиц',
+            notPrecise: 'Запрос недостаточно точен? Попробуйте указать конкретные временные диапазоны или измерения данных'
+        },
+        
+        // Экспорт
+        export: {
+            title: 'Экспорт результатов',
+            options: 'Параметры экспорта',
+            format: 'Формат экспорта',
+            content: 'Включить содержимое'
+        },
+        
+        // Конфигурация системы
+        config: {
+            configuration: 'Конфигурация',
+            model: 'Модель',
+            settings: 'Настройки'
         }
     },
     
@@ -1070,6 +1244,64 @@ const i18n = {
             permissionError: '無權限執行此操作',
             validationError: '資料格式錯誤，檢查後重試',
             generalError: '發生錯誤，請重試'
+        },
+        
+        // 通知訊息
+        notifications: {
+            apiConnected: 'API連線成功！',
+            modelSaved: '模型配置已儲存',
+            saveFailed: '儲存失敗',
+            dbConnected: '資料庫連線成功！',
+            dbConfigSaved: '資料庫配置已儲存',
+            uiSettingsSaved: '介面設定已儲存',
+            sendFailed: '傳送失敗，請重試',
+            requestFailed: '處理請求失敗。檢查網路連線或稍後重試。'
+        },
+        
+        // 查詢相關
+        query: {
+            executeComplete: '查詢執行完成',
+            loadingChart: '載入圖表中...',
+            chartLoadFailed: '圖表載入失敗',
+            dataFound: '成功查詢到資料',
+            queryFailed: '查詢失敗',
+            noDataDetected: '未檢測到資料查詢結果',
+            sqlExecuted: '執行了 {count} 條SQL查詢',
+            noSqlDetected: '未檢測到SQL查詢指令',
+            chartGenerated: '成功生成視覺化圖表',
+            noChartGenerated: '本次查詢未生成視覺化圖表',
+            generatedCharts: '生成的圖表：',
+            processing: '正在處理您的查詢，請稍候...',
+            rawData: '原始資料',
+            step: '步驟',
+            codeExecution: '程式碼執行',
+            consoleOutput: '控制台輸出',
+            error: '錯誤',
+            systemMessage: '系統訊息',
+            summary: '總結',
+            finalOutput: '最終輸出'
+        },
+        
+        // 提示訊息
+        tips: {
+            notSatisfied: '不滿意？嘗試補充細節重新反饋給AI',
+            errorOccurred: '遇到錯誤？嘗試簡化查詢條件或檢查表名是否正確',
+            notPrecise: '查詢不夠精準？嘗試指定具體的時間範圍或資料維度'
+        },
+        
+        // 匯出功能
+        export: {
+            title: '匯出結果',
+            options: '匯出選項',
+            format: '匯出格式',
+            content: '包含內容'
+        },
+        
+        // 系統配置項
+        config: {
+            configuration: '配置',
+            model: '模型',
+            settings: '設定'
         }
     },
     
@@ -1347,6 +1579,64 @@ const i18n = {
             permissionError: 'Permissão negada',
             validationError: 'Formato de dados inválido',
             generalError: 'Ocorreu um erro, por favor tente novamente'
+        },
+        
+        // Mensagens de notificação
+        notifications: {
+            apiConnected: 'Conexão API bem-sucedida!',
+            modelSaved: 'Configuração do modelo salva',
+            saveFailed: 'Falha ao salvar',
+            dbConnected: 'Conexão de banco de dados bem-sucedida!',
+            dbConfigSaved: 'Configuração do banco de dados salva',
+            uiSettingsSaved: 'Configurações da interface salvas',
+            sendFailed: 'Falha no envio, tente novamente',
+            requestFailed: 'Falha no processamento da solicitação. Verifique a conexão de rede ou tente novamente mais tarde.'
+        },
+        
+        // Relacionado a consultas
+        query: {
+            executeComplete: 'Execução da consulta concluída',
+            loadingChart: 'Carregando gráfico...',
+            chartLoadFailed: 'Falha ao carregar gráfico',
+            dataFound: 'Dados recuperados com sucesso',
+            queryFailed: 'Consulta falhou',
+            noDataDetected: 'Nenhum resultado de consulta de dados detectado',
+            sqlExecuted: 'Executadas {count} consultas SQL',
+            noSqlDetected: 'Nenhum comando de consulta SQL detectado',
+            chartGenerated: 'Gráfico de visualização gerado com sucesso',
+            noChartGenerated: 'Nenhum gráfico de visualização gerado para esta consulta',
+            generatedCharts: 'Gráficos gerados:',
+            processing: 'Processando sua consulta, aguarde...',
+            rawData: 'Dados brutos',
+            step: 'Passo',
+            codeExecution: 'Execução de código',
+            consoleOutput: 'Saída do console',
+            error: 'Erro',
+            systemMessage: 'Mensagem do sistema',
+            summary: 'Resumo',
+            finalOutput: 'Saída final'
+        },
+        
+        // Mensagens de dica
+        tips: {
+            notSatisfied: 'Não satisfeito? Tente adicionar detalhes e fornecer feedback ao AI novamente',
+            errorOccurred: 'Encontrou um erro? Tente simplificar as condições da consulta ou verificar se os nomes das tabelas estão corretos',
+            notPrecise: 'Consulta não precisa o suficiente? Tente especificar intervalos de tempo específicos ou dimensões de dados'
+        },
+        
+        // Funcionalidade de exportação
+        export: {
+            title: 'Exportar Resultados',
+            options: 'Opções de Exportação',
+            format: 'Formato de Exportação',
+            content: 'Incluir Conteúdo'
+        },
+        
+        // Configuração do sistema
+        config: {
+            configuration: 'Configuração',
+            model: 'Modelo',
+            settings: 'Configurações'
         }
     },
     
@@ -1617,6 +1907,64 @@ const i18n = {
             permissionError: 'Permiso denegado',
             validationError: 'Formato de datos inválido',
             generalError: 'Ocurrió un error, por favor intente de nuevo'
+        },
+        
+        // Mensajes de notificación
+        notifications: {
+            apiConnected: '¡Conexión API exitosa!',
+            modelSaved: 'Configuración del modelo guardada',
+            saveFailed: 'Error al guardar',
+            dbConnected: '¡Conexión de base de datos exitosa!',
+            dbConfigSaved: 'Configuración de base de datos guardada',
+            uiSettingsSaved: 'Configuraciones de interfaz guardadas',
+            sendFailed: 'Error de envío, intente de nuevo',
+            requestFailed: 'Error en el procesamiento de la solicitud. Verifique la conexión de red o intente más tarde.'
+        },
+        
+        // Relacionado con consultas
+        query: {
+            executeComplete: 'Ejecución de consulta completada',
+            loadingChart: 'Cargando gráfico...',
+            chartLoadFailed: 'Error al cargar gráfico',
+            dataFound: 'Datos recuperados exitosamente',
+            queryFailed: 'Consulta falló',
+            noDataDetected: 'No se detectaron resultados de consulta de datos',
+            sqlExecuted: 'Ejecutadas {count} consultas SQL',
+            noSqlDetected: 'No se detectaron comandos de consulta SQL',
+            chartGenerated: 'Gráfico de visualización generado exitosamente',
+            noChartGenerated: 'No se generó gráfico de visualización para esta consulta',
+            generatedCharts: 'Gráficos generados:',
+            processing: 'Procesando su consulta, por favor espere...',
+            rawData: 'Datos sin procesar',
+            step: 'Paso',
+            codeExecution: 'Ejecución de código',
+            consoleOutput: 'Salida de consola',
+            error: 'Error',
+            systemMessage: 'Mensaje del sistema',
+            summary: 'Resumen',
+            finalOutput: 'Salida final'
+        },
+        
+        // Mensajes de consejo
+        tips: {
+            notSatisfied: '¿No satisfecho? Intente agregar detalles y proporcionar comentarios al AI nuevamente',
+            errorOccurred: '¿Encontró un error? Intente simplificar las condiciones de consulta o verificar si los nombres de tabla son correctos',
+            notPrecise: '¿Consulta no lo suficientemente precisa? Intente especificar rangos de tiempo específicos o dimensiones de datos'
+        },
+        
+        // Funcionalidad de exportación
+        export: {
+            title: 'Exportar Resultados',
+            options: 'Opciones de Exportación',
+            format: 'Formato de Exportación',
+            content: 'Incluir Contenido'
+        },
+        
+        // Configuración del sistema
+        config: {
+            configuration: 'Configuración',
+            model: 'Modelo',
+            settings: 'Configuraciones'
         }
     },
     
@@ -1894,6 +2242,64 @@ const i18n = {
             permissionError: 'Permission refusée',
             validationError: 'Format de données invalide',
             generalError: 'Une erreur s\'est produite, veuillez réessayer'
+        },
+        
+        // Messages de notification
+        notifications: {
+            apiConnected: 'Connexion API réussie !',
+            modelSaved: 'Configuration du modèle sauvegardée',
+            saveFailed: 'Échec de la sauvegarde',
+            dbConnected: 'Connexion de base de données réussie !',
+            dbConfigSaved: 'Configuration de base de données sauvegardée',
+            uiSettingsSaved: 'Paramètres d\'interface sauvegardés',
+            sendFailed: 'Échec de l\'envoi, veuillez réessayer',
+            requestFailed: 'Échec du traitement de la demande. Vérifiez la connexion réseau ou réessayez plus tard.'
+        },
+        
+        // Relatif aux requêtes
+        query: {
+            executeComplete: 'Exécution de requête terminée',
+            loadingChart: 'Chargement du graphique...',
+            chartLoadFailed: 'Échec du chargement du graphique',
+            dataFound: 'Données récupérées avec succès',
+            queryFailed: 'Requête échouée',
+            noDataDetected: 'Aucun résultat de requête de données détecté',
+            sqlExecuted: '{count} requêtes SQL exécutées',
+            noSqlDetected: 'Aucune commande de requête SQL détectée',
+            chartGenerated: 'Graphique de visualisation généré avec succès',
+            noChartGenerated: 'Aucun graphique de visualisation généré pour cette requête',
+            generatedCharts: 'Graphiques générés :',
+            processing: 'Traitement de votre requête, veuillez patienter...',
+            rawData: 'Données brutes',
+            step: 'Étape',
+            codeExecution: 'Exécution de code',
+            consoleOutput: 'Sortie console',
+            error: 'Erreur',
+            systemMessage: 'Message système',
+            summary: 'Résumé',
+            finalOutput: 'Sortie finale'
+        },
+        
+        // Messages de conseil
+        tips: {
+            notSatisfied: 'Pas satisfait ? Essayez d\'ajouter des détails et de donner un retour à l\'IA à nouveau',
+            errorOccurred: 'Rencontré une erreur ? Essayez de simplifier les conditions de requête ou vérifiez si les noms de table sont corrects',
+            notPrecise: 'Requête pas assez précise ? Essayez de spécifier des plages de temps spécifiques ou des dimensions de données'
+        },
+        
+        // Fonctionnalité d'exportation
+        export: {
+            title: 'Exporter les Résultats',
+            options: 'Options d\'Exportation',
+            format: 'Format d\'Exportation',
+            content: 'Inclure le Contenu'
+        },
+        
+        // Configuration du système
+        config: {
+            configuration: 'Configuration',
+            model: 'Modèle',
+            settings: 'Paramètres'
         }
     },
     
@@ -2164,6 +2570,64 @@ const i18n = {
             permissionError: '이 작업을 수행할 권한이 없습니다',
             validationError: '잘못된 데이터 형식입니다',
             generalError: '오류가 발생했습니다. 다시 시도해주세요'
+        },
+        
+        // 알림 메시지
+        notifications: {
+            apiConnected: 'API 연결 성공!',
+            modelSaved: '모델 구성이 저장되었습니다',
+            saveFailed: '저장 실패',
+            dbConnected: '데이터베이스 연결 성공!',
+            dbConfigSaved: '데이터베이스 구성이 저장되었습니다',
+            uiSettingsSaved: '인터페이스 설정이 저장되었습니다',
+            sendFailed: '전송 실패, 다시 시도해주세요',
+            requestFailed: '요청 처리 실패. 네트워크 연결을 확인하거나 나중에 다시 시도해주세요.'
+        },
+        
+        // 쿼리 관련
+        query: {
+            executeComplete: '쿼리 실행 완료',
+            loadingChart: '차트 로딩 중...',
+            chartLoadFailed: '차트 로딩 실패',
+            dataFound: '데이터를 성공적으로 검색했습니다',
+            queryFailed: '쿼리 실패',
+            noDataDetected: '데이터 쿼리 결과가 감지되지 않았습니다',
+            sqlExecuted: '{count}개의 SQL 쿼리를 실행했습니다',
+            noSqlDetected: 'SQL 쿼리 명령이 감지되지 않았습니다',
+            chartGenerated: '시각화 차트가 성공적으로 생성되었습니다',
+            noChartGenerated: '이 쿼리에 대한 시각화 차트가 생성되지 않았습니다',
+            generatedCharts: '생성된 차트:',
+            processing: '쿼리를 처리 중입니다. 잠시 기다려주세요...',
+            rawData: '원시 데이터',
+            step: '단계',
+            codeExecution: '코드 실행',
+            consoleOutput: '콘솔 출력',
+            error: '오류',
+            systemMessage: '시스템 메시지',
+            summary: '요약',
+            finalOutput: '최종 출력'
+        },
+        
+        // 팁 메시지
+        tips: {
+            notSatisfied: '만족스럽지 않나요? 세부 사항을 추가하고 AI에게 다시 피드백을 제공해보세요',
+            errorOccurred: '오류가 발생했나요? 쿼리 조건을 단순화하거나 테이블 이름이 올바른지 확인해보세요',
+            notPrecise: '쿼리가 충분히 정확하지 않나요? 구체적인 시간 범위나 데이터 차원을 지정해보세요'
+        },
+        
+        // 내보내기 기능
+        export: {
+            title: '결과 내보내기',
+            options: '내보내기 옵션',
+            format: '내보내기 형식',
+            content: '포함 내용'
+        },
+        
+        // 시스템 구성
+        config: {
+            configuration: '구성',
+            model: '모델',
+            settings: '설정'
         }
     },
     
@@ -2433,6 +2897,376 @@ const i18n = {
             permissionError: 'Keine Berechtigung',
             validationError: 'Ungültiges Datenformat',
             generalError: 'Ein Fehler ist aufgetreten, bitte erneut versuchen'
+        },
+        
+        // Benachrichtigungen
+        notifications: {
+            apiConnected: 'API-Verbindung erfolgreich!',
+            modelSaved: 'Modellkonfiguration gespeichert',
+            saveFailed: 'Speichern fehlgeschlagen',
+            dbConnected: 'Datenbankverbindung erfolgreich!',
+            dbConfigSaved: 'Datenbankkonfiguration gespeichert',
+            uiSettingsSaved: 'Benutzeroberflächen-Einstellungen gespeichert',
+            sendFailed: 'Senden fehlgeschlagen, bitte erneut versuchen',
+            requestFailed: 'Anfrageverarbeitung fehlgeschlagen. Überprüfen Sie die Netzwerkverbindung oder versuchen Sie es später erneut.'
+        },
+        
+        // Abfrage-bezogen
+        query: {
+            executeComplete: 'Abfrageausführung abgeschlossen',
+            loadingChart: 'Diagramm wird geladen...',
+            chartLoadFailed: 'Diagramm laden fehlgeschlagen',
+            dataFound: 'Daten erfolgreich abgerufen',
+            queryFailed: 'Abfrage fehlgeschlagen',
+            noDataDetected: 'Keine Datenabfrageergebnisse erkannt',
+            sqlExecuted: '{count} SQL-Abfragen ausgeführt',
+            noSqlDetected: 'Keine SQL-Abfragebefehle erkannt',
+            chartGenerated: 'Visualisierungsdiagramm erfolgreich erstellt',
+            noChartGenerated: 'Kein Visualisierungsdiagramm für diese Abfrage erstellt',
+            generatedCharts: 'Erstellte Diagramme:',
+            processing: 'Ihre Abfrage wird verarbeitet, bitte warten...',
+            rawData: 'Rohdaten',
+            step: 'Schritt',
+            codeExecution: 'Code-Ausführung',
+            consoleOutput: 'Konsolenausgabe',
+            error: 'Fehler',
+            systemMessage: 'Systemnachricht',
+            summary: 'Zusammenfassung',
+            finalOutput: 'Endausgabe'
+        },
+        
+        // Tipp-Nachrichten
+        tips: {
+            notSatisfied: 'Nicht zufrieden? Versuchen Sie, Details hinzuzufügen und der KI erneut Feedback zu geben',
+            errorOccurred: 'Fehler aufgetreten? Versuchen Sie, Abfragebedingungen zu vereinfachen oder zu prüfen, ob Tabellennamen korrekt sind',
+            notPrecise: 'Abfrage nicht präzise genug? Versuchen Sie, spezifische Zeitbereiche oder Datendimensionen anzugeben'
+        },
+        
+        // Export-Funktionalität
+        export: {
+            title: 'Ergebnisse exportieren',
+            options: 'Export-Optionen',
+            format: 'Export-Format',
+            content: 'Inhalt einschließen'
+        },
+        
+        // Systemkonfiguration
+        config: {
+            configuration: 'Konfiguration',
+            model: 'Modell',
+            settings: 'Einstellungen'
+        }
+    },
+    
+    // 日本語
+    ja: {
+        // システムタイトル
+        systemName: 'QueryGPT',
+        systemDesc: 'インテリジェントデータクエリと可視化システム',
+        
+        // ナビゲーションメニュー
+        nav: {
+            query: 'クエリ',
+            newQuery: 'データクエリ',
+            history: '履歴',
+            settings: '設定',
+            basicSettings: '基本設定',
+            modelManagement: 'モデル管理',
+            databaseConfig: 'データベース設定',
+            about: '概要'
+        },
+        
+        // チャットページ
+        chat: {
+            title: 'データクエリと分析',
+            newConversation: '新しい会話',
+            inputPlaceholder: 'クエリ内容を入力...',
+            welcome: 'QueryGPT インテリジェントデータ分析システムへようこそ',
+            welcomeDesc: '私ができること：',
+            feature1: '自然言語でデータベースをクエリ',
+            feature2: 'データ可視化チャートの自動生成',
+            feature3: 'データの知的分析と洞察の提供',
+            tryExample: 'これらの例を試してみてください：',
+            example1: '先月の売上データを表示',
+            example2: '製品カテゴリの売上比率を分析',
+            example3: '売上高上位10の顧客を検索',
+            example4: 'ユーザー成長トレンドチャートを生成',
+            exampleBtn1: 'データベースを表示',
+            exampleBtn2: '売上分析',
+            exampleBtn3: '製品比率',
+            exampleBtn4: 'ユーザートレンド',
+            hint: 'ヒント：自然言語でクエリを直接入力すると、システムが自動的にSQLに変換してチャートを生成します',
+            userView: 'ユーザービュー',
+            developerView: '開発者ビュー',
+            analysisComplete: '分析完了',
+            executionComplete: '実行完了',
+            finalOutput: '最終出力',
+            needChart: 'チャートが必要ですか？クエリで「チャート生成」または「可視化表示」を明確に要求してみてください'
+        },
+        
+        // 設定ページ
+        settings: {
+            title: 'システム設定',
+            language: '言語',
+            languageDesc: 'システムインターフェース言語を選択',
+            chinese: '中国語',
+            english: 'English',
+            viewMode: 'デフォルトビューモード',
+            userMode: 'ユーザーモード（簡潔）',
+            developerMode: '開発者モード（詳細）',
+            contextRounds: 'コンテキスト保持ラウンド数',
+            contextDesc: 'AIが前の会話内容を記憶するラウンド数を設定し、エラー修正とコンテキスト理解に使用',
+            noHistory: '履歴を保持しない（単一ラウンド会話）',
+            roundHistory: '{n}ラウンドの履歴を保持',
+            recommended: '（推奨）',
+            mayAffectPerformance: '（パフォーマンスに影響する可能性があります）'
+        },
+        
+        // モデル管理
+        models: {
+            title: 'モデル管理',
+            addModel: 'モデルを追加',
+            name: 'モデル名',
+            type: 'タイプ',
+            apiAddress: 'APIアドレス',
+            status: 'ステータス',
+            actions: 'アクション',
+            available: '利用可能',
+            unavailable: '未設定',
+            edit: '編集',
+            test: 'テスト',
+            delete: '削除',
+            apiKey: 'APIキー',
+            maxTokens: '最大トークン数',
+            temperature: '温度パラメータ',
+            modelNamePlaceholder: '例: GPT-4',
+            modelIdPlaceholder: '例: gpt-4',
+            apiBasePlaceholder: '例: http://localhost:11434/v1',
+            apiKeyPlaceholder: 'APIキーを入力'
+        },
+        
+        // データベース設定
+        database: {
+            title: 'Dorisデータベース設定',
+            host: 'ホストアドレス',
+            hostPlaceholder: '例: localhost または 192.168.1.100',
+            port: 'ポート',
+            username: 'ユーザー名',
+            usernamePlaceholder: 'データベースユーザー名',
+            password: 'パスワード',
+            passwordPlaceholder: 'データベースパスワード',
+            dbName: 'データベース名',
+            dbNamePlaceholder: '空欄の場合はクロスデータベースクエリ（推奨）',
+            testConnection: '接続テスト',
+            saveConfig: '設定を保存',
+            connectionSuccess: '接続成功',
+            connectionInfo: 'データベース接続正常、{count}個のテーブルを発見'
+        },
+        
+        // 概要ページ
+        about: {
+            title: 'QueryGPT について',
+            subtitle: 'インテリジェントデータクエリと可視化プラットフォーム',
+            description: 'QueryGPTは先進的な大規模言語モデルと自然言語処理技術に基づき、ユーザーが自然言語でデータベースをクエリし、インテリジェントな分析と可視化を実現することを可能にします。',
+            
+            features: {
+                title: '主な機能',
+                nlp: '自然言語処理',
+                nlpDesc: '日常言語でデータベースに質問し、システムが自動的にSQLクエリに変換',
+                ai: 'AI分析',
+                aiDesc: '大規模言語モデルがデータを知的に分析し、洞察と提案を提供',
+                visualization: 'インテリジェント可視化',
+                visualizationDesc: 'データ特性に基づいて最適なチャートタイプを自動選択',
+                multidb: 'マルチデータベースサポート',
+                multidbDesc: 'Doris、MySQL、PostgreSQLなどの主流データベースをサポート',
+                realtime: 'リアルタイム対話',
+                realtimeDesc: '対話式クエリ体験、継続的な最適化と調整',
+                export: 'データエクスポート',
+                exportDesc: '複数の形式でのクエリ結果とチャートのエクスポートをサポート',
+                
+                capabilities: {
+                    title: '技術能力',
+                    database: 'データベースクエリ',
+                    visualization: '可視化生成'
+                }
+            },
+            
+            license: 'ライセンス説明',
+            licenseDetails: {
+                title: 'オープンソースライセンス',
+                description: 'このプロジェクトはMITライセンスの下でリリースされており、自由に使用、変更、配布することができます。',
+                mit: 'MITライセンス条項',
+                mitText: '著作権の表示とライセンス声明を保持する限り、商用および非商用目的での使用が許可されています。',
+                notice: '注意事項：',
+                noticeText: '本システムを使用または配布する際は、著作権表示とライセンス情報を保持してください。',
+                disclaimer: '免責事項：',
+                disclaimerText: '本システムは大規模言語モデル駆動のツールです。開発者は使用過程で発生する可能性のあるデータ損失やその他の問題について責任を負いません。使用前にデータバックアップと権限管理を行ってください。'
+            },
+            
+            techStack: '技術スタック',
+            backend: 'バックエンド技術',
+            frontend: 'フロントエンド技術',
+            database: 'データベース',
+            ai: 'AIモデル',
+            
+            contact: 'お問い合わせ',
+            github: 'GitHubリポジトリ',
+            copyright: '著作権表示を保持してください',
+            contactEmail: '開発者連絡先メール'
+        },
+        
+        // 履歴
+        history: {
+            title: 'クエリ履歴',
+            empty: '履歴なし',
+            loadMore: 'さらに読み込む',
+            confirmDelete: '削除を確認',
+            confirmDeleteMsg: 'この会話を削除してもよろしいですか？',
+            confirm: '確認',
+            cancel: 'キャンセル',
+            delete: '削除'
+        },
+        
+        // 共通
+        common: {
+            save: '保存',
+            cancel: 'キャンセル',
+            confirm: '確認',
+            delete: '削除',
+            edit: '編集',
+            add: '追加',
+            close: '閉じる',
+            loading: '読み込み中...',
+            success: '成功',
+            error: 'エラー',
+            warning: '警告',
+            info: '情報',
+            send: '送信',
+            clear: 'クリア',
+            export: 'エクスポート',
+            import: 'インポート',
+            refresh: '更新',
+            search: '検索',
+            filter: 'フィルター',
+            sort: 'ソート',
+            copy: 'コピー',
+            paste: '貼り付け',
+            cut: '切り取り',
+            download: 'ダウンロード',
+            upload: 'アップロード',
+            print: '印刷',
+            preview: 'プレビュー',
+            settings: '設定',
+            help: 'ヘルプ',
+            about: '概要',
+            version: 'バージョン',
+            update: '更新',
+            install: 'インストール',
+            uninstall: 'アンインストール',
+            enable: '有効',
+            disable: '無効',
+            start: '開始',
+            stop: '停止',
+            pause: '一時停止',
+            resume: '再開',
+            retry: '再試行',
+            reset: 'リセット',
+            backup: 'バックアップ',
+            restore: '復元',
+            
+            timeGreeting: {
+                morning: 'おはようございます！',
+                morning2: '今日も素敵な一日を',
+                morning3: '朝の時間、データで新しい発見を',
+                morning4: 'フレッシュな朝、新鮮な洞察を',
+                morning5: '朝の光、データの世界を照らします',
+                afternoon: 'こんにちは！',
+                afternoon2: 'お疲れ様です',
+                afternoon3: '午後の時間、効率的なクエリを',
+                afternoon4: '午後の日差し、データ分析に適しています',
+                afternoon5: 'ランチ後、データで新しい視点を',
+                evening: 'こんばんは！',
+                evening2: 'お疲れ様でした',
+                evening3: '夕方の時間、一日の収穫をまとめましょう',
+                evening4: '夕日が美しく、データ分析も美しい',
+                evening5: '夕食前、最後のクエリはいかがですか',
+                lateNight: '夜更かしご苦労様です',
+                lateNight2: '夜深く、静かにデータと対話',
+                lateNight3: '深夜勤務お疲れ様、適度な休息を',
+                lateNight4: 'こんなに遅くまで頑張って、本当にお疲れ様！',
+                lateNight5: '夜更かしモード起動、でも健康の方が大切です',
+                midnight: 'もう夜中、早めに休んで体に良いです',
+                earlyMorning: '早朝ですね、データより健康の方が大切です'
+            }
+        },
+        
+        // エラーメッセージ
+        errors: {
+            networkError: 'ネットワークエラー、接続を確認してください',
+            serverError: 'サーバーエラー、後でもう一度お試しください',
+            permissionError: 'アクセス権限がありません',
+            validationError: 'データ形式エラー',
+            generalError: 'エラーが発生しました、もう一度お試しください',
+            languageSwitchedJa: '言語が日本語に切り替わりました',
+            languageSwitchedEn: 'Language switched to English'
+        },
+        
+        // 通知メッセージ
+        notifications: {
+            apiConnected: 'API接続成功！',
+            modelSaved: 'モデル設定が保存されました',
+            saveFailed: '保存失敗',
+            dbConnected: 'データベース接続成功！',
+            dbConfigSaved: 'データベース設定が保存されました',
+            uiSettingsSaved: 'インターフェース設定が保存されました',
+            sendFailed: '送信失敗、再試行してください',
+            requestFailed: 'リクエスト処理失敗。ネットワーク接続を確認するか、後で再試行してください。'
+        },
+        
+        // クエリ関連
+        query: {
+            executeComplete: 'クエリ実行完了',
+            loadingChart: 'チャート読み込み中...',
+            chartLoadFailed: 'チャート読み込み失敗',
+            dataFound: 'データの取得に成功しました',
+            queryFailed: 'クエリ失敗',
+            noDataDetected: 'データクエリ結果が検出されませんでした',
+            sqlExecuted: '{count}個のSQLクエリを実行しました',
+            noSqlDetected: 'SQLクエリコマンドが検出されませんでした',
+            chartGenerated: '可視化チャートの生成に成功しました',
+            noChartGenerated: 'このクエリでは可視化チャートが生成されませんでした',
+            generatedCharts: '生成されたチャート：',
+            processing: 'クエリを処理中です。しばらくお待ちください...',
+            rawData: '生データ',
+            step: 'ステップ',
+            codeExecution: 'コード実行',
+            consoleOutput: 'コンソール出力',
+            error: 'エラー',
+            systemMessage: 'システムメッセージ',
+            summary: '要約',
+            finalOutput: '最終出力'
+        },
+        
+        // ヒントメッセージ
+        tips: {
+            notSatisfied: '満足できませんか？詳細を追加してAIに再度フィードバックを提供してみてください',
+            errorOccurred: 'エラーが発生しましたか？クエリ条件を簡素化するか、テーブル名が正しいかを確認してみてください',
+            notPrecise: 'クエリが十分に正確ではありませんか？具体的な時間範囲やデータ次元を指定してみてください'
+        },
+        
+        // エクスポート機能
+        export: {
+            title: '結果をエクスポート',
+            options: 'エクスポートオプション',
+            format: 'エクスポート形式',
+            content: 'コンテンツを含む'
+        },
+        
+        // システム設定
+        config: {
+            configuration: '設定',
+            model: 'モデル',
+            settings: '設定'
         }
     }
 };
