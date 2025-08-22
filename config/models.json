@@ -1,11 +1,14 @@
 {
   "models": [
     {
-      "api_base": "http://localhost:11434/v1",
+      "api_base": "https://api.vveai.com/v1/",
       "id": "gpt-4.1",
       "name": "GPT-4.1",
       "status": "active",
-      "type": "OpenAI"
+      "type": "openai",
+      "api_key": "sk-It6GYaJHoajzLt1i7f3463Ae8223491cA81bF258B55a4529",
+      "max_tokens": 4096,
+      "temperature": 0.7
     },
     {
       "api_base": "http://localhost:11434/v1",
@@ -23,13 +26,13 @@
     },
     {
       "api_base": "http://localhost:11434/v1",
+      "api_key": "not_needed_for_local",
       "id": "qwen-3-coder",
+      "max_tokens": 4096,
       "name": "Qwen",
       "status": "active",
-      "type": "qwen",
-      "api_key": "not_needed_for_local",
-      "max_tokens": 4096,
-      "temperature": 0.7
+      "temperature": 0.7,
+      "type": "qwen"
     }
   ]
 }

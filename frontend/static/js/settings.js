@@ -334,6 +334,17 @@ class SettingsManager {
             // 保存到后端
             await api.saveModels(this.models);
             
+            // 如果是当前选中的模型，更新全局API配置
+            const currentModel = document.getElementById('current-model').value;
+            if (modelData.id === currentModel || this.models.length === 1) {
+                // 保存API配置到.env文件
+                await api.saveConfig({
+                    api_key: modelData.api_key,
+                    api_base: modelData.api_base,
+                    default_model: modelData.id
+                });
+            }
+            
             this.renderModelsList();
             this.closeModelModal();
             app.showNotification('模型保存成功', 'success');

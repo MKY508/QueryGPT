@@ -179,8 +179,22 @@ class DataAnalysisPlatform {
         });
 
         // 模型选择
-        document.getElementById('current-model').addEventListener('change', (e) => {
+        document.getElementById('current-model').addEventListener('change', async (e) => {
             this.config.current_model = e.target.value;
+            
+            // 查找选中模型的配置
+            if (window.settingsManager && window.settingsManager.models) {
+                const selectedModel = window.settingsManager.models.find(m => m.id === e.target.value);
+                if (selectedModel && selectedModel.api_key && selectedModel.api_base) {
+                    // 更新API配置到.env
+                    await api.saveConfig({
+                        api_key: selectedModel.api_key,
+                        api_base: selectedModel.api_base,
+                        default_model: selectedModel.id
+                    });
+                }
+            }
+            
             this.saveConfig();
         });
 
