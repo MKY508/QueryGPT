@@ -244,6 +244,18 @@ MIT License - 详见 [LICENSE](LICENSE)
 - GitHub Issues: [提交问题](https://github.com/MKY508/QueryGPT/issues)
 - Email: mky369258@gmail.com
 
+## ⭐ Star History
+
+<div align="center">
+  <a href="https://star-history.com/#MKY508/QueryGPT&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+    </picture>
+  </a>
+</div>
+
 ---
 
 <div align="center">
