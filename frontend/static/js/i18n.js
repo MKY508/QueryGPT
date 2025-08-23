@@ -88,7 +88,8 @@ const i18n = {
         
         // 数据库配置
         database: {
-            title: 'Doris数据库配置',
+            title: 'MySQL数据库配置',
+            compatibility: '兼容所有 MySQL 协议数据库：OLAP（Doris、StarRocks、ClickHouse）、NewSQL（TiDB、OceanBase）',
             host: '主机地址',
             hostPlaceholder: '例如: localhost 或 192.168.1.100',
             port: '端口',
@@ -413,7 +414,8 @@ const i18n = {
         
         // Database configuration
         database: {
-            title: 'Doris Database Configuration',
+            title: 'MySQL Database Configuration',
+            compatibility: 'Compatible with all MySQL protocol databases: OLAP (Doris, StarRocks, ClickHouse), NewSQL (TiDB, OceanBase)',
             host: 'Host Address',
             hostPlaceholder: 'e.g., localhost or 192.168.1.100',
             port: 'Port',
@@ -1074,7 +1076,8 @@ const i18n = {
         },
         
         database: {
-            title: 'Doris資料庫配置',
+            title: 'MySQL資料庫配置',
+            compatibility: '相容所有 MySQL 協議資料庫：OLAP（Doris、StarRocks、ClickHouse）、NewSQL（TiDB、OceanBase）',
             host: '主機地址',
             hostPlaceholder: '例如: localhost 或 192.168.1.100',
             port: '埠號',
