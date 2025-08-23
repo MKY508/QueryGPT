@@ -3274,7 +3274,7 @@ const i18n = {
 // 语言管理器
 class LanguageManager {
     constructor() {
-        this.currentLang = localStorage.getItem('language') || 'en';
+        this.currentLang = localStorage.getItem('language') || 'zh';
         this.translations = i18n;
     }
     
