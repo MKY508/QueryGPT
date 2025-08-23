@@ -301,7 +301,11 @@
                     <!-- 数据库配置标签页 -->
                     <div class="settings-panel" id="database-settings">
                         <div class="settings-card">
-                            <h3><i class="fas fa-database"></i> <span data-i18n="database.title">Doris数据库配置</span></h3>
+                            <h3><i class="fas fa-database"></i> <span data-i18n="database.title">MySQL数据库配置</span></h3>
+                            <div style="background-color: #f0f9ff; padding: 10px; margin-bottom: 20px; border-radius: 5px; border-left: 3px solid #3498db; font-size: 13px; color: #2c3e50;">
+                                <i class="fas fa-info-circle" style="color: #3498db; margin-right: 5px;"></i>
+                                <span data-i18n="database.compatibility">兼容所有 MySQL 协议数据库：OLAP（Doris、StarRocks、ClickHouse）、NewSQL（TiDB、OceanBase）</span>
+                            </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label data-i18n="database.host">主机地址</label>
@@ -492,8 +496,8 @@
                         <div class="tech-group">
                             <h3><i class="fas fa-database"></i> <span data-i18n="nav.databaseConfig">数据库</span></h3>
                             <div class="tech-badges">
-                                <span class="tech-badge">Apache Doris</span>
                                 <span class="tech-badge">MySQL Protocol</span>
+                                <span class="tech-badge">Compatible Databases</span>
                             </div>
                         </div>
                     </div>
