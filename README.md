@@ -90,7 +90,7 @@
 ## 📦 环境要求
 
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
-- doris数据库
+- MySQL 协议兼容的数据库（详见下方支持列表）
 
 <br/>
 
@@ -211,11 +211,30 @@ docker run -p 5000:5000 --env-file .env querygpt
 - **本地模型**: 通过 Ollama 支持 Llama, Mistral, Qwen 等(基准线为qwen2.5 7b以上,否则代码能力几乎不支持完成agent过程)
 
 ### 数据库支持
-- MySQL 5.7+
-- MariaDB 10.3+
-- TiDB
-- OceanBase
-- 其他 MySQL 协议兼容数据库
+
+系统使用标准 MySQL 协议，支持以下数据库：
+
+#### ✅ 完全兼容
+- **Apache Doris** / **StarRocks** - OLAP 分析型数据库（推荐用于大数据分析）
+- **MySQL 5.7+** / **MariaDB 10.3+** - 传统关系型数据库
+- **TiDB** - 分布式 NewSQL 数据库
+- **OceanBase** - 分布式数据库（MySQL 模式）
+- **PolarDB** - 阿里云原生数据库
+
+#### ⚠️ 需要注意
+- 本系统使用**只读查询**（SELECT、SHOW、DESCRIBE）
+- 不依赖存储过程、触发器、外键等特性
+- 支持跨库查询（配置时不指定数据库名即可）
+
+#### 🔧 连接配置
+```bash
+# .env 配置示例
+DB_HOST=localhost
+DB_PORT=9030      # Doris/StarRocks: 9030, MySQL: 3306, TiDB: 4000
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=          # 留空支持跨库查询
+```
 
 ## 📚 文档
 
