@@ -87,10 +87,10 @@
 - **数据安全**: 只读权限、SQL 注入防护、敏感数据脱敏
 - **灵活导出**: 支持 Excel、PDF、HTML 等多种格式
 
-## 📦 技术要求
+## 📦 环境要求
 
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
-- MySQL 或兼容数据库
+- doris数据库
 
 <br/>
 
