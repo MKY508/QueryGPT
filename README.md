@@ -241,8 +241,9 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 ## 📧 联系方式
 
-- GitHub Issues: [提交问题](https://github.com/MKY508/QueryGPT/issues)
+- GitHub Issues: [提交问题](https://github.com/MKY508/QueryGPT/issues) 
 - Email: mky369258@gmail.com
+- 这是作者第一个作品,有任何疑问或者可能需要的改动,都可以提交issue或者pr,我会尽可能进行调整
 
 ## ⭐ Star History
 
