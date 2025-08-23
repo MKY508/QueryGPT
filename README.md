@@ -176,7 +176,7 @@ python backend/app.py
 ## 🐳 Docker 部署
 
 ```bash
-# 使用 docker-compose（推荐）
+# 使用 docker-compose（推荐）  ps:但可能有点问题,因为作者对docker部署不太熟练都是跟着gpt学的
 docker-compose up -d
 
 # 或单独运行
@@ -186,7 +186,7 @@ docker run -p 5000:5000 --env-file .env querygpt
 
 ## 💡 使用示例
 
-### 基础查询
+### 基础查询       ps:后续可能考虑自动路由不生成图,因为考虑到提示词的分层构建和自动路由可能不智能的问题默认还是都出图的
 - "显示最近一个月的销售数据"
 - "分析产品类别的销售占比"
 - "查找销售额最高的前10个客户"
@@ -205,10 +205,10 @@ docker run -p 5000:5000 --env-file .env querygpt
 ## 🔧 配置说明
 
 ### 支持的模型
-- **OpenAI**: GPT-4, GPT-4-turbo, GPT-3.5
-- **Anthropic**: Claude 3 Opus, Sonnet, Haiku
-- **Google**: Gemini Pro, Gemini Ultra
-- **本地模型**: 通过 Ollama 支持 Llama, Mistral, Qwen 等
+- **OpenAI**: GPT-5, GPT-4.1(经济)
+- **Anthropic**: Claude 4 Opus, Sonnet(评分最高,最智能的模型,调用工具频繁)
+- **Google**: Gemini 2.5pro(litellm可能兼容性有点问题)
+- **本地模型**: 通过 Ollama 支持 Llama, Mistral, Qwen 等(基准线为qwen2.5 7b以上,否则代码能力几乎不支持完成agent过程)
 
 ### 数据库支持
 - MySQL 5.7+
