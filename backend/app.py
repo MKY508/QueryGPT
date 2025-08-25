@@ -27,6 +27,9 @@ from backend.config_loader import ConfigLoader
 from backend.history_manager import HistoryManager
 from backend.auth import require_auth, optional_auth, auth_manager
 from backend.rate_limiter import rate_limit, strict_limiter, cleanup_rate_limiters
+from backend.smart_router import SmartRouter
+from backend.ai_router import RouteType
+from backend.sql_executor import DirectSQLExecutor
 
 # 配置日志
 logging.basicConfig(
@@ -66,20 +69,31 @@ interpreter_manager = None
 database_manager = None
 history_manager = None
 prompt_templates = PromptTemplates()
+smart_router = None
+sql_executor = None
 
 # 存储正在执行的查询任务
 active_queries = {}
 
 def init_managers():
     """初始化各个管理器"""
-    global interpreter_manager, database_manager, history_manager
+    global interpreter_manager, database_manager, history_manager, smart_router, sql_executor
     try:
-        interpreter_manager = InterpreterManager()
+        # 初始化基础管理器
         database_manager = DatabaseManager()
+        interpreter_manager = InterpreterManager()
+        
+        # 初始化SQL执行器
+        sql_executor = DirectSQLExecutor(database_manager)
+        
+        # 初始化智能路由器
+        smart_router = SmartRouter(database_manager, interpreter_manager)
+        
         # 确保data目录存在
         os.makedirs('backend/data', exist_ok=True)
         history_manager = HistoryManager()
-        logger.info("管理器初始化成功")
+        
+        logger.info("所有管理器初始化成功，智能路由已启用")
     except Exception as e:
         logger.error(f"管理器初始化失败: {e}")
         import traceback
@@ -317,15 +331,47 @@ def chat():
             )
         
         try:
-            # 执行查询，传递会话ID以支持上下文
-            result = interpreter_manager.execute_query(
-                full_query, 
-                context=context,
-                model_name=model_name,
-                conversation_id=conversation_id,  # 传递会话ID
-                stop_checker=lambda: active_queries.get(conversation_id, {}).get('should_stop', False),
-                language=user_language  # 传递语言设置
-            )
+            # 检查智能路由是否启用
+            config = ConfigLoader.load_config()
+            smart_routing_enabled = config.get('features', {}).get('smart_routing', {}).get('enabled', False)
+            
+            # 使用智能路由系统
+            if smart_router and smart_routing_enabled:
+                logger.info("🚀 使用智能路由系统处理查询 [BETA]")
+                # 准备路由上下文
+                router_context = {
+                    'model_name': model_name,
+                    'conversation_id': conversation_id,
+                    'language': user_language,
+                    'use_database': use_database,
+                    'context_rounds': context_rounds,
+                    'stop_checker': lambda: active_queries.get(conversation_id, {}).get('should_stop', False)
+                }
+                
+                # 智能路由处理
+                result = smart_router.route(full_query, router_context)
+                
+                # 如果路由返回了query_type，记录统计
+                if 'query_type' in result:
+                    logger.info(f"📊 查询类型: {result['query_type']}, 执行时间: {result.get('execution_time', 'N/A')}s")
+                    # 在结果中标记使用了智能路由
+                    result['smart_routing_used'] = True
+            else:
+                # 降级到原有流程
+                if not smart_routing_enabled:
+                    logger.info("智能路由已禁用，使用标准AI流程")
+                else:
+                    logger.info("智能路由未初始化，使用标准AI流程")
+                    
+                result = interpreter_manager.execute_query(
+                    full_query, 
+                    context=context,
+                    model_name=model_name,
+                    conversation_id=conversation_id,  # 传递会话ID
+                    stop_checker=lambda: active_queries.get(conversation_id, {}).get('should_stop', False),
+                    language=user_language  # 传递语言设置
+                )
+                result['smart_routing_used'] = False
         finally:
             # 清理活跃查询记录
             if conversation_id in active_queries:
@@ -548,6 +594,43 @@ def test_model():
             "message": f"测试失败: {str(e)}"
         }), 500
 
+@app.route('/api/routing-stats', methods=['GET'])
+def get_routing_stats():
+    """获取智能路由统计信息"""
+    try:
+        if smart_router:
+            stats = smart_router.get_routing_stats()
+            
+            # 计算额外的统计信息
+            if stats['total_queries'] > 0:
+                stats['avg_time_saved_per_query'] = stats['total_time_saved'] / stats['total_queries']
+                stats['routing_efficiency'] = (stats['simple_queries'] / stats['total_queries']) * 100
+            else:
+                stats['avg_time_saved_per_query'] = 0
+                stats['routing_efficiency'] = 0
+            
+            return jsonify({
+                "success": True,
+                "stats": stats,
+                "enabled": True
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "stats": {
+                    "total_queries": 0,
+                    "simple_queries": 0,
+                    "ai_queries": 0,
+                    "cache_hits": 0,
+                    "total_time_saved": 0
+                },
+                "enabled": False,
+                "message": "智能路由系统未启用"
+            })
+    except Exception as e:
+        logger.error(f"获取路由统计失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
     """获取或保存配置"""
@@ -558,6 +641,13 @@ def handle_config():
             # 始终从.env加载最新配置
             api_config = ConfigLoader.get_api_config()
             db_config = ConfigLoader.get_database_config()
+            
+            # 加载完整配置包括特性设置
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    full_config = json.load(f)
+            except:
+                full_config = {}
             
             # 构建返回的配置
             config = {
@@ -570,7 +660,8 @@ def handle_config():
                     {"id": "deepseek-r1", "name": "DeepSeek R1", "type": "deepseek"},
                     {"id": "qwen-flagship", "name": "Qwen 旗舰模型", "type": "qwen"}
                 ],
-                "database": db_config
+                "database": db_config,
+                "features": full_config.get("features", {})
             }
             
             # 如果config.json存在，合并其他非关键配置
@@ -1078,6 +1169,11 @@ def save_prompts():
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         
+        # 如果有routing prompt，更新智能路由器的prompt
+        if 'routing' in data and smart_router:
+            smart_router.update_routing_prompt(data['routing'])
+            logger.info("智能路由Prompt已更新")
+        
         logger.info("Prompt设置已保存")
         return jsonify({"success": True, "message": "Prompt设置已保存"})
     except Exception as e:
@@ -1092,6 +1188,7 @@ def reset_prompts():
         import json
         
         default_prompts = {
+            "routing": "你是一个查询路由分类器。分析用户查询，选择最适合的执行路径。\n\n用户查询：{query}\n\n数据库信息：\n- 类型：{db_type}\n- 可用表：{available_tables}\n\n请从以下选项中选择最合适的路由：\n\n1. DIRECT_SQL - 简单查询，可以直接转换为SQL执行\n   适用：查看数据、统计数量、简单筛选、排序\n   示例：显示所有订单、统计用户数量、查看最新记录\n\n2. SIMPLE_ANALYSIS - 需要SQL查询+简单数据处理\n   适用：分组统计、简单计算、数据汇总\n   示例：按月统计销售额、计算平均值、对比不同类别\n\n3. COMPLEX_ANALYSIS - 需要复杂分析或多步处理\n   适用：趋势分析、预测、复杂计算、需要编程逻辑\n   示例：分析销售趋势、预测未来销量、相关性分析\n\n4. VISUALIZATION - 需要生成图表或可视化\n   适用：任何明确要求图表、图形、可视化的查询\n   示例：生成销售图表、绘制趋势图、创建饼图\n\n输出格式（JSON）：\n{\n  \"route\": \"选择的路由类型\",\n  \"confidence\": 0.95,\n  \"reason\": \"选择此路由的原因\",\n  \"suggested_sql\": \"如果是DIRECT_SQL，提供建议的SQL语句\"\n}\n\n重要：\n- 只要用户提到\"图\"、\"图表\"、\"可视化\"、\"绘制\"等词，必须选择 VISUALIZATION\n- 如果查询包含\"为什么\"、\"原因\"、\"预测\"等需要推理的词，选择 COMPLEX_ANALYSIS\n- 尽可能选择简单的路由以提高性能",
             "exploration": "先理解用户需求中的业务语义：\n* \"销量\"通常指实际销售数量（sale_num/sale_qty/quantity）\n* \"七折销量\"：销量字段 * 0.7\n* \"订单金额\"指实际成交金额（knead_pay_amount/pay_amount）\n\n数据库选择优先级：\n* 优先探索数据仓库：center_dws > dws > dwh > dw\n* 其次考虑：ods（原始数据）> ads（汇总数据）",
             "tableSelection": "优先选择包含：trd/trade/order/sale + detail/day 的表（交易明细表）\n避免：production/forecast/plan/budget（计划类表）\n检查表数据量和日期范围，确保包含所需时间段",
             "fieldMapping": "月份字段：v_month > month > year_month > year_of_month\n销量字段：sale_num > sale_qty > quantity > qty\n金额字段：pay_amount > order_amount > total_amount",
@@ -1104,6 +1201,11 @@ def reset_prompts():
         # 保存默认设置到文件
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(default_prompts, f, ensure_ascii=False, indent=2)
+        
+        # 更新智能路由器的prompt为默认值
+        if smart_router and 'routing' in default_prompts:
+            smart_router.update_routing_prompt(default_prompts['routing'])
+            logger.info("智能路由Prompt已恢复默认")
         
         logger.info("已恢复默认Prompt设置")
         return jsonify({"success": True, "message": "已恢复默认Prompt设置"})

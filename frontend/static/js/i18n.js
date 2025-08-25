@@ -61,7 +61,10 @@ const i18n = {
             noHistory: '不保留历史（单轮对话）',
             roundHistory: '保留{n}轮历史',
             recommended: '（推荐）',
-            mayAffectPerformance: '（可能影响性能）'
+            mayAffectPerformance: '（可能影响性能）',
+            smartRouting: '智能路由',
+            smartRoutingStatus: '已启用',
+            smartRoutingDesc: '使用AI智能判断查询类型，自动选择最优执行路径，可显著提升简单查询的响应速度'
         },
         
         // 模型管理
@@ -111,6 +114,13 @@ const i18n = {
         prompts: {
             title: 'Prompt设置',
             description: '自定义查询模块使用的提示词，可以根据您的业务需求调整AI的行为模式。',
+            routingPrompt: '智能路由提示词',
+            routingClassifier: '路由分类策略',
+            routingStrategy: '路由策略',
+            directSqlPrompt: '直接SQL执行提示词',
+            simpleAnalysisPrompt: '简单分析提示词',
+            complexAnalysisPrompt: '复杂分析提示词（默认）',
+            visualizationPrompt: '可视化提示词',
             databaseQuery: '数据库查询提示词',
             explorationStrategy: '探索策略',
             businessTerms: '业务术语',
@@ -417,7 +427,10 @@ const i18n = {
             noHistory: 'No history (Single round)',
             roundHistory: 'Keep {n} round(s) history',
             recommended: '(Recommended)',
-            mayAffectPerformance: '(May affect performance)'
+            mayAffectPerformance: '(May affect performance)',
+            smartRouting: 'Smart Routing',
+            smartRoutingStatus: 'Enabled',
+            smartRoutingDesc: 'Use AI to intelligently determine query types and automatically select optimal execution paths, significantly improving response speed for simple queries'
         },
         
         // Model management
@@ -467,6 +480,13 @@ const i18n = {
         prompts: {
             title: 'Prompt Settings',
             description: 'Customize prompts used by the query module to adjust AI behavior for your business needs.',
+            routingPrompt: 'Smart Routing Prompts',
+            routingClassifier: 'Routing Classification Strategy',
+            routingStrategy: 'Routing Strategy',
+            directSqlPrompt: 'Direct SQL Execution Prompt',
+            simpleAnalysisPrompt: 'Simple Analysis Prompt',
+            complexAnalysisPrompt: 'Complex Analysis Prompt (Default)',
+            visualizationPrompt: 'Visualization Prompt',
             databaseQuery: 'Database Query Prompts',
             explorationStrategy: 'Exploration Strategy',
             businessTerms: 'Business Terms',
