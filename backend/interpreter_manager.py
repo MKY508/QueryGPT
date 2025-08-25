@@ -118,8 +118,21 @@ class InterpreterManager:
             # 创建新的interpreter实例
             interpreter = self.create_interpreter(model_name)
             
+            # 加载prompt配置来设置系统消息
+            prompt_config = {}
+            config_path = os.path.join(os.path.dirname(__file__), 'prompt_config.json')
+            try:
+                if os.path.exists(config_path):
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        prompt_config = json.load(f)
+            except Exception as e:
+                logger.warning(f"加载prompt配置失败: {e}")
+            
             # 根据语言设置系统消息
-            if language == 'en':
+            lang_key = 'en' if language == 'en' else 'zh'
+            if prompt_config and 'systemMessage' in prompt_config and lang_key in prompt_config['systemMessage']:
+                interpreter.system_message = prompt_config['systemMessage'][lang_key]
+            elif language == 'en':
                 interpreter.system_message = """
                 You are a data analysis assistant. Help users query databases and generate visualizations.
                 Use pandas for data processing and plotly for creating charts.
@@ -203,6 +216,7 @@ class InterpreterManager:
         """构建简洁的提示词，让 OpenInterpreter 自主工作，支持多语言"""
         
         import os
+        import json
         
         # 如果有数据库连接信息，提供最基础的信息
         if context and context.get('connection_info'):
@@ -212,98 +226,94 @@ class InterpreterManager:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             output_dir = os.path.join(project_root, 'backend', 'output')
             
+            # 加载prompt配置
+            prompt_config = {}
+            config_path = os.path.join(os.path.dirname(__file__), 'prompt_config.json')
+            try:
+                if os.path.exists(config_path):
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        prompt_config = json.load(f)
+            except Exception as e:
+                logger.warning(f"加载prompt配置失败，使用默认配置: {e}")
+            
             # 根据语言构建提示词
+            lang_key = 'en' if language == 'en' else 'zh'
+            
             if language == 'en':
-                # 英文版prompt
-                prompt = f"""Database Connection (Apache Doris, MySQL Protocol):
-host = '{conn['host']}'
-port = {conn['port']}
-user = '{conn['user']}'
-password = '{conn['password']}'
-database = '{conn.get('database', '')}'  # Initial database, can be switched
-
-User Request: {query}
-
-Important Requirements:
-1. Use pymysql to connect to database (not sqlalchemy)
-
-2. **Smart Exploration Strategy**:
-   - Understand business semantics in user requirements:
-     * "Sales" usually means actual sales quantity (sale_num/sale_qty/quantity), not production plans
-     * "70% sales" or "0.7x sales": Calculate as sales_field * 0.7
-     * "Order amount" refers to actual transaction amount (pay_amount/order_amount/total_amount)
-   - Database selection priority:
-     * Prioritize data warehouse: center_dws > dws > dwh > dw
-     * Then consider: ods (raw data) > ads (aggregated data)
-   - Table selection strategy:
-     * Prefer tables containing: trd/trade/order/sale + detail/day
-     * Avoid: production/forecast/plan/budget tables
-     * Check data volume and date range
-   - Field identification:
-     * Month fields: v_month > month > year_month
-     * Sales fields: sale_num > sale_qty > quantity > qty
-     * Amount fields: pay_amount > order_amount > total_amount
-
-3. **Data Processing Notes**:
-   - Convert Decimal type to float for calculations
-   - Standardize date format (e.g., '2025-01' format)
-   - Detect data anomalies and explain if found
-   - Filter negative or abnormal values in SQL WHERE clause
-   - When multiple tables exist:
-     * Check total count: SELECT COUNT(*)
-     * Check date range: SELECT MIN(date_field), MAX(date_field)
-     * View sample data: SELECT * LIMIT 5
-     * Choose table with most complete data
-
-4. Use plotly for data visualization
-5. Save HTML files to: {output_dir}
-6. Create output directory: os.makedirs('{output_dir}', exist_ok=True)
-7. Keep database connection open until all operations complete
-
-Please provide a concise summary including:
-- What task was completed
-- Full path of generated files
-- Key findings from the data (if any)
-- **IMPORTANT: Please respond in English**
-"""
+                # 英文版prompt - 从配置文件构建
+                prompt_parts = [
+                    f"Database Connection (Apache Doris, MySQL Protocol):",
+                    f"host = '{conn['host']}'",
+                    f"port = {conn['port']}",
+                    f"user = '{conn['user']}'",
+                    f"password = '{conn['password']}'",
+                    f"database = '{conn.get('database', '')}'  # Initial database, can be switched",
+                    f"\nUser Request: {query}\n",
+                    "Important Requirements:"
+                ]
+                
+                # 添加配置中的各个部分
+                if prompt_config:
+                    sections = [
+                        ('databaseConnection', '1. Database Connection'),
+                        ('exploration', '2. Exploration Strategy'),
+                        ('businessTerms', '3. Business Terms'),
+                        ('tableSelection', '4. Table Selection'),
+                        ('fieldMapping', '5. Field Mapping'),
+                        ('dataProcessing', '6. Data Processing'),
+                        ('visualization', '7. Visualization'),
+                        ('outputRequirements', '8. Output Requirements'),
+                        ('errorHandling', '9. Error Handling')
+                    ]
+                    
+                    for key, title in sections:
+                        if key in prompt_config and lang_key in prompt_config[key]:
+                            prompt_parts.append(f"\n{title}:")
+                            prompt_parts.append(prompt_config[key][lang_key])
+                
+                # 添加输出目录信息
+                prompt_parts.append(f"\nOutput Directory: {output_dir}")
+                prompt_parts.append(f"Create output directory: os.makedirs('{output_dir}', exist_ok=True)")
+                
+                prompt = "\n".join(prompt_parts)
             
             else:
-                # 中文版prompt
-                prompt = f"""数据库连接信息（Apache Doris，MySQL协议）：
-host = '{conn['host']}'
-port = {conn['port']}
-user = '{conn['user']}'
-password = '{conn['password']}'
-database = '{conn.get('database', '')}'  # 初始数据库，可以切换
-
-用户需求：{query}
-
-重要要求：
-1. 使用 pymysql 连接数据库（不要用 sqlalchemy）
-
-2. **智能探索策略**：
-   - 先理解用户需求中的业务语义
-   - 数据库选择优先级：center_dws > dws > dwh > dw > ods > ads
-   - 表选择：优先选择包含 trd/trade/order/sale 的表
-   - 字段识别：月份字段、销量字段、金额字段等
-
-3. **数据处理注意事项**：
-   - Decimal类型需转换为float进行计算
-   - 日期格式统一处理
-   - 数据异常检测并说明
-   - 在SQL中过滤异常值
-
-4. 使用 plotly 生成可视化图表
-5. 将 HTML 文件保存到：{output_dir}
-6. 确保创建输出目录：os.makedirs('{output_dir}', exist_ok=True)
-7. 保持连接直到所有操作完成
-
-最后请提供简洁的总结，包括：
-- 完成了什么任务
-- 生成的文件完整路径
-- 数据的关键发现（如有）
-- **重要：请用中文回复**
-"""
+                # 中文版prompt - 从配置文件构建
+                prompt_parts = [
+                    f"数据库连接信息（Apache Doris，MySQL协议）：",
+                    f"host = '{conn['host']}'",
+                    f"port = {conn['port']}",
+                    f"user = '{conn['user']}'",
+                    f"password = '{conn['password']}'",
+                    f"database = '{conn.get('database', '')}'  # 初始数据库，可以切换",
+                    f"\n用户需求：{query}\n",
+                    "重要要求："
+                ]
+                
+                # 添加配置中的各个部分
+                if prompt_config:
+                    sections = [
+                        ('databaseConnection', '1. 数据库连接'),
+                        ('exploration', '2. 探索策略'),
+                        ('businessTerms', '3. 业务术语'),
+                        ('tableSelection', '4. 表选择'),
+                        ('fieldMapping', '5. 字段映射'),
+                        ('dataProcessing', '6. 数据处理'),
+                        ('visualization', '7. 可视化'),
+                        ('outputRequirements', '8. 输出要求'),
+                        ('errorHandling', '9. 错误处理')
+                    ]
+                    
+                    for key, title in sections:
+                        if key in prompt_config and lang_key in prompt_config[key]:
+                            prompt_parts.append(f"\n{title}：")
+                            prompt_parts.append(prompt_config[key][lang_key])
+                
+                # 添加输出目录信息
+                prompt_parts.append(f"\n输出目录：{output_dir}")
+                prompt_parts.append(f"确保创建输出目录：os.makedirs('{output_dir}', exist_ok=True)")
+                
+                prompt = "\n".join(prompt_parts)
             
             # 如果有可用数据库列表，添加参考信息
             if context.get('available_databases'):
