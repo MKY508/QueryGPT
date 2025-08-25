@@ -127,75 +127,74 @@
 - **思考过程透明**：实时看到 AI 在想什么，可以随时介入指导
 - **真正免费开源**：MIT 协议，没有任何付费墙
 
-## 🚀 快速开始
+## 🚀 快速开始（真·懒人模式）
 
-### 🎯 不确定用哪个脚本？运行智能启动器：
+### 一键启动（自动识别系统）
 ```bash
-./start.sh  # 自动检测系统并推荐最佳方案
-```
-
----
-
-### 🪟 Windows 用户（WSL）
-
-#### 首次安装
-```bash
-# 1. 在 WSL Ubuntu 中克隆项目
+# 克隆项目
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 2. 修复脚本格式（重要！）
-dos2unix *.sh  # 或 sed -i 's/\r$//' *.sh
-chmod +x *.sh
+# 一键启动（自动检测系统、安装依赖、启动服务）
+./start.sh
 
-# 3. 运行 Windows 专用启动脚本
-./start_windows.sh
+# 就这么简单！
 ```
 
-#### 后续使用
-```bash
-./start_windows.sh  # 或 ./quick_start.sh
-```
-
-📖 详细说明请查看 [Windows 安装指南](WINDOWS_SETUP.md)
+脚本会自动：
+- ✅ 检测你的系统（Windows/Mac/Linux）
+- ✅ 识别架构（x86/ARM/Apple Silicon）
+- ✅ 首次运行自动安装（5-30分钟）
+- ✅ 已安装直接启动（秒级）
+- ✅ Windows 自动修复换行符
 
 ---
 
-### 🍎 macOS / Linux 用户
+### 💡 进阶用户（可选）
 
-#### 首次安装
+<details>
+<summary>🪟 Windows WSL 手动安装</summary>
+
 ```bash
-# 1. 克隆项目
-git clone https://github.com/MKY508/QueryGPT.git
-cd QueryGPT
+dos2unix *.sh  # 修复换行符
+chmod +x *.sh  # 添加权限
+./start_windows.sh  # Windows 专用脚本
+```
+</details>
 
-# 2. 运行安装脚本
-# Intel Mac / Linux x86:
+<details>
+<summary>🍎 macOS 手动安装</summary>
+
+```bash
+# Intel Mac
 ./setup.sh
 
-# Apple Silicon (M1/M2/M3) / ARM Linux:
+# Apple Silicon (M1/M2/M3)
 ./setup_arm.sh
-
-# ⚠️ 首次安装需要时间较长（下载数百MB依赖库）
-# ⏱️ 预计时间：3-10分钟（x86）或 10-30分钟（ARM需编译）
 ```
+</details>
 
-#### 后续使用
-```bash
-./quick_start.sh  # 秒级启动
-```
-
----
-
-### 🔍 不确定你的系统？
+<details>
+<summary>🐧 Linux 手动安装</summary>
 
 ```bash
-# 运行架构检测
-./check_arch.sh
+# x86_64
+./setup.sh
 
-# 或运行诊断工具
-./diagnose.sh
+# ARM (树莓派等)
+./setup_arm.sh
 ```
+</details>
+
+<details>
+<summary>🔧 诊断工具</summary>
+
+```bash
+./check_arch.sh   # 检查架构
+./diagnose.sh     # 环境诊断
+./test_windows.sh # Windows 测试
+```
+</details>
 
 系统会自动查找可用端口（5000-5010），启动后会显示访问地址。
 
