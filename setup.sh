@@ -479,11 +479,13 @@ find_available_port() {
             return 0
         fi
         
-        print_message "info" "端口 $port 已被占用，尝试下一个... / Port $port occupied, trying next..."
+        # 输出到 stderr 而不是 stdout，避免污染返回值
+        print_message "info" "端口 $port 已被占用，尝试下一个... / Port $port occupied, trying next..." >&2
         port=$((port + 1))
     done
     
-    print_message "error" "无法找到可用端口 / No available port found"
+    # 输出到 stderr
+    print_message "error" "无法找到可用端口 / No available port found" >&2
     return 1
 }
 
