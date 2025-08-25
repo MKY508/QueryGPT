@@ -237,6 +237,22 @@
                                 </select>
                                 <small data-i18n="settings.contextDesc">设置AI记住之前几轮对话的内容，用于错误修正和上下文理解</small>
                             </div>
+                            
+                            <!-- 智能路由开关 -->
+                            <div class="form-group">
+                                <label>
+                                    <span data-i18n="settings.smartRouting">智能路由</span>
+                                    <span class="beta-badge">BETA</span>
+                                </label>
+                                <div class="toggle-container">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="smart-routing-toggle" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span class="toggle-label" data-i18n="settings.smartRoutingStatus">已启用</span>
+                                </div>
+                                <small data-i18n="settings.smartRoutingDesc">使用AI智能判断查询类型，自动选择最优执行路径，可显著提升简单查询的响应速度</small>
+                            </div>
                         </div>
                     </div>
                     
@@ -365,6 +381,103 @@
                             <p class="settings-description">
                                 <span data-i18n="prompts.description">自定义查询模块使用的提示词，可以根据您的业务需求调整AI的行为模式。</span>
                             </p>
+                            
+                            <!-- 智能路由提示词部分 -->
+                            <div class="prompt-section" id="routing-prompts-section">
+                                <h4 class="collapsible-header">
+                                    <i class="fas fa-route"></i> 
+                                    <span data-i18n="prompts.routingPrompt">智能路由提示词</span>
+                                    <i class="fas fa-chevron-down collapse-icon"></i>
+                                </h4>
+                                
+                                <div class="collapsible-content">
+                                    <!-- 路由分类提示词 -->
+                                    <div class="form-group">
+                                        <label data-i18n="prompts.routingClassifier">路由分类策略</label>
+                                        <textarea id="prompt-routing" rows="8" placeholder="设置智能路由分类策略..." class="routing-prompt">你是一个查询路由分类器。分析用户查询，选择最适合的执行路径。
+
+用户查询：{query}
+
+数据库信息：
+- 类型：{db_type}
+- 可用表：{available_tables}
+
+请从以下选项中选择最合适的路由：
+
+1. DIRECT_SQL - 简单查询，可以直接转换为SQL执行
+   适用：查看数据、统计数量、简单筛选、排序
+   示例：显示所有订单、统计用户数量、查看最新记录
+
+2. SIMPLE_ANALYSIS - 需要SQL查询+简单数据处理
+   适用：分组统计、简单计算、数据汇总
+   示例：按月统计销售额、计算平均值、对比不同类别
+
+3. COMPLEX_ANALYSIS - 需要复杂分析或多步处理
+   适用：趋势分析、预测、复杂计算、需要编程逻辑
+   示例：分析销售趋势、预测未来销量、相关性分析
+
+4. VISUALIZATION - 需要生成图表或可视化
+   适用：任何明确要求图表、图形、可视化的查询
+   示例：生成销售图表、绘制趋势图、创建饼图
+
+输出格式（JSON）：
+{
+  "route": "选择的路由类型",
+  "confidence": 0.95,
+  "reason": "选择此路由的原因",
+  "suggested_sql": "如果是DIRECT_SQL，提供建议的SQL语句"
+}
+
+重要：
+- 只要用户提到"图"、"图表"、"可视化"、"绘制"等词，必须选择 VISUALIZATION
+- 如果查询包含"为什么"、"原因"、"预测"等需要推理的词，选择 COMPLEX_ANALYSIS
+- 尽可能选择简单的路由以提高性能</textarea>
+                                    </div>
+                                    
+                                    <!-- 各路由类型的独立prompt -->
+                                    <div class="route-type-prompts">
+                                        <!-- DIRECT_SQL路由prompt -->
+                                        <div class="form-group">
+                                            <label data-i18n="prompts.directSqlPrompt">直接SQL执行提示词</label>
+                                            <textarea id="prompt-direct-sql" rows="4" placeholder="设置直接SQL执行的提示词..." class="routing-prompt">对于简单的数据查询，直接生成SQL语句执行：
+- 优先使用SELECT语句查询数据
+- 检查表名和字段名的正确性
+- 添加必要的WHERE条件和排序</textarea>
+                                        </div>
+                                        
+                                        <!-- SIMPLE_ANALYSIS路由prompt -->
+                                        <div class="form-group">
+                                            <label data-i18n="prompts.simpleAnalysisPrompt">简单分析提示词</label>
+                                            <textarea id="prompt-simple-analysis" rows="4" placeholder="设置简单分析的提示词..." class="routing-prompt">执行SQL查询并进行简单数据处理：
+- 使用GROUP BY进行分组统计
+- 计算平均值、总和等聚合函数
+- 进行简单的数据比较和排序</textarea>
+                                        </div>
+                                        
+                                        <!-- COMPLEX_ANALYSIS路由prompt（原始prompt） -->
+                                        <div class="form-group">
+                                            <label data-i18n="prompts.complexAnalysisPrompt">复杂分析提示词（默认）</label>
+                                            <textarea id="prompt-complex-analysis" rows="6" placeholder="设置复杂分析的提示词..." class="routing-prompt">你是一个数据分析专家，请完成以下任务：
+1. 理解用户的业务需求
+2. 探索相关数据表和字段
+3. 编写并执行必要的代码
+4. 提供详细的分析结果
+5. 如果需要，生成可视化图表
+这是智能路由关闭时使用的默认提示词</textarea>
+                                        </div>
+                                        
+                                        <!-- VISUALIZATION路由prompt -->
+                                        <div class="form-group">
+                                            <label data-i18n="prompts.visualizationPrompt">可视化提示词</label>
+                                            <textarea id="prompt-visualization" rows="5" placeholder="设置可视化的提示词..." class="routing-prompt">生成数据可视化图表：
+- 使用plotly创建交互式图表
+- 选择合适的图表类型（柱状图、折线图、饼图等）
+- 设置清晰的标题和标签
+- 将图表保存为HTML文件到output目录</textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             
                             <div class="prompt-section">
                                 <h4 data-i18n="prompts.databaseQuery">数据库查询提示词</h4>
