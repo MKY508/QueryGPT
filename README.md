@@ -155,23 +155,6 @@ cd QueryGPT
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
 - MySQL 或兼容数据库
 
-### 手动配置（可选）
-
-如需手动配置，创建 `.env` 文件：
-```bash
-# LLM API 配置
-API_KEY=your_api_key_here
-API_BASE_URL=https://api.openai.com/v1  # 或其他兼容 API
-DEFAULT_MODEL=gpt-4
-
-# 数据库配置
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=your_username
-DB_PASSWORD=your_password
-DB_DATABASE=your_database
-```
-
 ## 💡 使用示例
 
 ### 基础查询(后续会改进路由系统)       
