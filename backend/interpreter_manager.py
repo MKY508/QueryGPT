@@ -249,7 +249,13 @@ class InterpreterManager:
                     f"port = {conn['port']}",
                     f"user = '{conn['user']}'",
                     f"password = '{conn['password']}'",
-                    f"database = '{conn.get('database', '')}'  # Initial database, can be switched",
+                    f"database = '{conn.get('database', '')}'  # If empty, explore available databases first",
+                    "\n【Database Exploration Steps】:",
+                    "1. If no database specified, run SHOW DATABASES to see all available databases",
+                    "2. Select appropriate database based on business needs (e.g., containing sales/order/trade keywords)",
+                    "3. USE the selected database, then SHOW TABLES to view table structure",
+                    "4. Run DESCRIBE to understand field structure, SELECT * LIMIT 10 to view sample data",
+                    "5. Based on data characteristics and user needs, write and execute appropriate SQL queries",
                     f"\nUser Request: {query}\n",
                     "Important Requirements:"
                 ]
@@ -289,7 +295,13 @@ class InterpreterManager:
                     f"port = {conn['port']}",
                     f"user = '{conn['user']}'",
                     f"password = '{conn['password']}'",
-                    f"database = '{conn.get('database', '')}'  # 初始数据库，可以切换",
+                    f"database = '{conn.get('database', '')}'  # 如果为空，需要先探索可用数据库",
+                    "\n【数据库探索步骤】：",
+                    "1. 如果没有指定数据库，先执行 SHOW DATABASES 查看所有可用数据库",
+                    "2. 根据业务需求选择合适的数据库（如包含sales/order/trade等关键词的库）",
+                    "3. USE 选中的数据库，然后 SHOW TABLES 查看表结构",
+                    "4. 对相关表执行 DESCRIBE 了解字段结构，执行 SELECT * LIMIT 10 查看样本数据",
+                    "5. 根据数据特征和用户需求，编写并执行相应的SQL查询",
                     f"\n用户需求：{query}\n",
                     "重要要求："
                 ]
