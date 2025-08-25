@@ -136,17 +136,16 @@
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 2. 运行安装脚本（自动配置环境）
+# 2. 运行安装脚本（自动配置环境并启动）
 ./setup.sh
-
-# 3. 启动服务
-./start.sh
+# ⚠️ 首次安装需要时间较长（下载数百MB依赖库）
+# ⏱️ 预计时间：3-10分钟（取决于网速）
 ```
 
 ### 后续使用
 
 ```bash
-# 直接快速启动
+# 直接快速启动（秒级启动）
 ./quick_start.sh
 ```
 
