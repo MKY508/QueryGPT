@@ -1037,6 +1037,80 @@ def replay_conversation(conversation_id):
         logger.error(f"复现对话失败: {e}")
         return jsonify({"error": str(e)}), 500
 
+# ============ Prompt设置相关API ============
+
+@app.route('/api/prompts', methods=['GET'])
+def get_prompts():
+    """获取当前的Prompt设置"""
+    try:
+        import os
+        config_path = os.path.join(os.path.dirname(__file__), 'prompt_config.json')
+        
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                import json
+                prompts = json.load(f)
+                return jsonify(prompts)
+        else:
+            # 返回默认设置
+            return jsonify({
+                "exploration": "先理解用户需求中的业务语义...",
+                "tableSelection": "优先选择包含...",
+                "fieldMapping": "月份字段...",
+                "dataProcessing": "Decimal类型...",
+                "outputRequirements": "使用 plotly..."
+            })
+    except Exception as e:
+        logger.error(f"获取Prompt设置失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/prompts', methods=['POST'])
+def save_prompts():
+    """保存Prompt设置"""
+    try:
+        import os
+        import json
+        
+        data = request.json
+        config_path = os.path.join(os.path.dirname(__file__), 'prompt_config.json')
+        
+        # 保存到文件
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        logger.info("Prompt设置已保存")
+        return jsonify({"success": True, "message": "Prompt设置已保存"})
+    except Exception as e:
+        logger.error(f"保存Prompt设置失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/prompts/reset', methods=['POST'])
+def reset_prompts():
+    """恢复默认Prompt设置"""
+    try:
+        import os
+        import json
+        
+        default_prompts = {
+            "exploration": "先理解用户需求中的业务语义：\n* \"销量\"通常指实际销售数量（sale_num/sale_qty/quantity）\n* \"七折销量\"：销量字段 * 0.7\n* \"订单金额\"指实际成交金额（knead_pay_amount/pay_amount）\n\n数据库选择优先级：\n* 优先探索数据仓库：center_dws > dws > dwh > dw\n* 其次考虑：ods（原始数据）> ads（汇总数据）",
+            "tableSelection": "优先选择包含：trd/trade/order/sale + detail/day 的表（交易明细表）\n避免：production/forecast/plan/budget（计划类表）\n检查表数据量和日期范围，确保包含所需时间段",
+            "fieldMapping": "月份字段：v_month > month > year_month > year_of_month\n销量字段：sale_num > sale_qty > quantity > qty\n金额字段：pay_amount > order_amount > total_amount",
+            "dataProcessing": "Decimal类型需转换为float进行计算\n日期格式统一处理（如 '2025-01' 格式）\n如果发现负销量或异常值，在SQL中用WHERE条件过滤",
+            "outputRequirements": "使用 plotly 生成可视化图表\n将 HTML 文件保存到 output 目录\n提供简洁的总结，包括完成的任务和关键发现"
+        }
+        
+        config_path = os.path.join(os.path.dirname(__file__), 'prompt_config.json')
+        
+        # 保存默认设置到文件
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(default_prompts, f, ensure_ascii=False, indent=2)
+        
+        logger.info("已恢复默认Prompt设置")
+        return jsonify({"success": True, "message": "已恢复默认Prompt设置"})
+    except Exception as e:
+        logger.error(f"恢复默认Prompt设置失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.errorhandler(404)
 def not_found(error):
     """处理404错误"""

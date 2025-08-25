@@ -14,6 +14,7 @@ const i18n = {
             basicSettings: '基础设置',
             modelManagement: '模型管理',
             databaseConfig: '数据库配置',
+            promptSettings: 'Prompt设置',
             about: '关于'
         },
         
@@ -104,6 +105,35 @@ const i18n = {
             saveConfig: '保存配置',
             connectionSuccess: '连接成功',
             connectionInfo: '数据库连接正常，共发现 {count} 个表'
+        },
+        
+        // Prompt设置
+        prompts: {
+            title: 'Prompt设置',
+            description: '自定义查询模块使用的提示词，可以根据您的业务需求调整AI的行为模式。',
+            databaseQuery: '数据库查询提示词',
+            explorationStrategy: '探索策略',
+            businessTerms: '业务术语',
+            tableSelection: '表选择策略',
+            fieldMapping: '字段识别规则',
+            dataProcessing: '数据处理规则',
+            outputRequirements: '输出要求',
+            save: '保存设置',
+            reset: '恢复默认',
+            export: '导出配置',
+            import: '导入配置',
+            tipsTitle: '使用提示',
+            tip1: '修改提示词可以让AI更好地理解您的业务场景',
+            tip2: '建议先备份当前配置再进行修改',
+            tip3: '恢复默认会将所有提示词重置为系统默认值',
+            tip4: '支持导入导出配置，方便在不同环境间迁移',
+            saveSuccess: 'Prompt设置已保存',
+            resetSuccess: '已恢复默认设置',
+            exportSuccess: '配置已导出',
+            importSuccess: '配置已导入',
+            saveFailed: '保存失败，请重试',
+            resetFailed: '恢复默认失败，请重试',
+            importFailed: '导入失败，请检查文件格式'
         },
         
         // 关于页面
@@ -340,6 +370,7 @@ const i18n = {
             basicSettings: 'Basic Settings',
             modelManagement: 'Model Management',
             databaseConfig: 'Database Config',
+            promptSettings: 'Prompt Settings',
             about: 'About'
         },
         
@@ -430,6 +461,35 @@ const i18n = {
             saveConfig: 'Save Config',
             connectionSuccess: 'Connection Successful',
             connectionInfo: 'Database connected, found {count} table(s)'
+        },
+        
+        // Prompt Settings
+        prompts: {
+            title: 'Prompt Settings',
+            description: 'Customize prompts used by the query module to adjust AI behavior for your business needs.',
+            databaseQuery: 'Database Query Prompts',
+            explorationStrategy: 'Exploration Strategy',
+            businessTerms: 'Business Terms',
+            tableSelection: 'Table Selection Strategy',
+            fieldMapping: 'Field Mapping Rules',
+            dataProcessing: 'Data Processing Rules',
+            outputRequirements: 'Output Requirements',
+            save: 'Save Settings',
+            reset: 'Reset to Defaults',
+            export: 'Export Config',
+            import: 'Import Config',
+            tipsTitle: 'Usage Tips',
+            tip1: 'Modifying prompts helps AI better understand your business scenario',
+            tip2: 'Recommend backing up current config before making changes',
+            tip3: 'Reset will restore all prompts to system defaults',
+            tip4: 'Support import/export for easy migration between environments',
+            saveSuccess: 'Prompt settings saved successfully',
+            resetSuccess: 'Reset to defaults successfully',
+            exportSuccess: 'Configuration exported successfully',
+            importSuccess: 'Configuration imported successfully',
+            saveFailed: 'Failed to save, please try again',
+            resetFailed: 'Failed to reset, please try again',
+            importFailed: 'Import failed, please check file format'
         },
         
         // About page

@@ -86,6 +86,11 @@
                                     <i class="fas fa-database"></i> <span data-i18n="nav.databaseConfig">数据库配置</span>
                                 </a>
                             </li>
+                            <li>
+                                <a href="#" class="nav-link" data-tab="settings" data-settings-tab="prompts">
+                                    <i class="fas fa-edit"></i> <span data-i18n="nav.promptSettings">Prompt设置</span>
+                                </a>
+                            </li>
                         </ul>
                     </li>
                     
@@ -349,6 +354,83 @@
                                     <h4 data-i18n="database.connectionSuccess">连接成功</h4>
                                     <p><span data-i18n="database.connectionInfo">数据库连接正常，共发现</span> <span id="table-count">0</span> <span>个表</span></p>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Prompt设置标签页 -->
+                    <div class="settings-panel" id="prompts-settings">
+                        <div class="settings-card">
+                            <h3><i class="fas fa-edit"></i> <span data-i18n="prompts.title">Prompt设置</span></h3>
+                            <p class="settings-description">
+                                <span data-i18n="prompts.description">自定义查询模块使用的提示词，可以根据您的业务需求调整AI的行为模式。</span>
+                            </p>
+                            
+                            <div class="prompt-section">
+                                <h4 data-i18n="prompts.databaseQuery">数据库查询提示词</h4>
+                                <div class="form-group">
+                                    <label data-i18n="prompts.explorationStrategy">探索策略</label>
+                                    <textarea id="prompt-exploration" rows="6" placeholder="设置数据库探索策略...">先理解用户需求中的业务语义：
+* "销量"通常指实际销售数量（sale_num/sale_qty/quantity）
+* "订单金额"指实际成交金额（knead_pay_amount/pay_amount）
+
+数据库选择优先级：
+* 优先探索数据仓库：center_dws > dws > dwh > dw
+* 其次考虑：ods（原始数据）> ads（汇总数据）</textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label data-i18n="prompts.tableSelection">表选择策略</label>
+                                    <textarea id="prompt-table-selection" rows="4" placeholder="设置表选择策略...">优先选择包含：trd/trade/order/sale + detail/day 的表（交易明细表）
+避免：production/forecast/plan/budget（计划类表）
+检查表数据量和日期范围，确保包含所需时间段</textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label data-i18n="prompts.fieldMapping">字段识别规则</label>
+                                    <textarea id="prompt-field-mapping" rows="4" placeholder="设置字段识别规则...">月份字段：v_month > month > year_month > year_of_month
+销量字段：sale_num > sale_qty > quantity > qty
+金额字段：pay_amount > order_amount > total_amount</textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label data-i18n="prompts.dataProcessing">数据处理规则</label>
+                                    <textarea id="prompt-data-processing" rows="4" placeholder="设置数据处理规则...">Decimal类型需转换为float进行计算
+日期格式统一处理（如 '2025-01' 格式）
+如果发现负销量或异常值，在SQL中用WHERE条件过滤</textarea>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label data-i18n="prompts.outputRequirements">输出要求</label>
+                                    <textarea id="prompt-output-requirements" rows="4" placeholder="设置输出要求...">使用 plotly 生成可视化图表
+将 HTML 文件保存到 output 目录
+提供简洁的总结，包括完成的任务和关键发现</textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="button-group">
+                                <button class="btn-primary" id="save-prompts">
+                                    <i class="fas fa-save"></i> <span data-i18n="prompts.save">保存设置</span>
+                                </button>
+                                <button class="btn-secondary" id="reset-prompts">
+                                    <i class="fas fa-undo"></i> <span data-i18n="prompts.reset">恢复默认</span>
+                                </button>
+                                <button class="btn-secondary" id="export-prompts">
+                                    <i class="fas fa-download"></i> <span data-i18n="prompts.export">导出配置</span>
+                                </button>
+                                <button class="btn-secondary" id="import-prompts">
+                                    <i class="fas fa-upload"></i> <span data-i18n="prompts.import">导入配置</span>
+                                </button>
+                            </div>
+                            
+                            <div class="prompt-tips">
+                                <h4><i class="fas fa-info-circle"></i> <span data-i18n="prompts.tipsTitle">使用提示</span></h4>
+                                <ul>
+                                    <li data-i18n="prompts.tip1">修改提示词可以让AI更好地理解您的业务场景</li>
+                                    <li data-i18n="prompts.tip2">建议先备份当前配置再进行修改</li>
+                                    <li data-i18n="prompts.tip3">恢复默认会将所有提示词重置为系统默认值</li>
+                                    <li data-i18n="prompts.tip4">支持导入导出配置，方便在不同环境间迁移</li>
+                                </ul>
                             </div>
                         </div>
                     </div>

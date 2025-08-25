@@ -1,6 +1,74 @@
 /* ===========================
    关于系统页面样式
    =========================== */
+
+/* Prompt设置样式 */
+.prompt-section {
+    margin-top: 20px;
+}
+
+.prompt-section h4 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 16px;
+    font-weight: 600;
+    border-left: 3px solid #4a90e2;
+    padding-left: 10px;
+}
+
+.prompt-section textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    background: #f9f9f9;
+    resize: vertical;
+    transition: all 0.3s ease;
+}
+
+.prompt-section textarea:focus {
+    outline: none;
+    border-color: #4a90e2;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.settings-description {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.prompt-tips {
+    margin-top: 30px;
+    padding: 15px;
+    background: #f0f8ff;
+    border-radius: 8px;
+    border-left: 4px solid #4a90e2;
+}
+
+.prompt-tips h4 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 15px;
+}
+
+.prompt-tips ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #555;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.prompt-tips li {
+    margin-bottom: 5px;
+}
 .about-header {
     margin-bottom: 30px;
 }

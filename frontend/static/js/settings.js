@@ -72,6 +72,9 @@ class SettingsManager {
                 }
             });
         });
+        
+        // 设置Prompt相关事件
+        this.setupPromptEvents();
     }
 
     /**
@@ -706,6 +709,253 @@ class SettingsManager {
         }
         
         console.log('批量测试完成');
+    }
+    
+    /**
+     * 设置Prompt相关事件
+     */
+    setupPromptEvents() {
+        // 保存Prompt设置
+        const savePromptsBtn = document.getElementById('save-prompts');
+        if (savePromptsBtn) {
+            savePromptsBtn.addEventListener('click', () => this.savePromptSettings());
+        }
+        
+        // 恢复默认Prompt
+        const resetPromptsBtn = document.getElementById('reset-prompts');
+        if (resetPromptsBtn) {
+            resetPromptsBtn.addEventListener('click', () => this.resetPromptSettings());
+        }
+        
+        // 导出Prompt配置
+        const exportPromptsBtn = document.getElementById('export-prompts');
+        if (exportPromptsBtn) {
+            exportPromptsBtn.addEventListener('click', () => this.exportPromptSettings());
+        }
+        
+        // 导入Prompt配置
+        const importPromptsBtn = document.getElementById('import-prompts');
+        if (importPromptsBtn) {
+            importPromptsBtn.addEventListener('click', () => this.importPromptSettings());
+        }
+        
+        // 加载保存的Prompt设置
+        this.loadPromptSettings();
+    }
+    
+    /**
+     * 获取默认Prompt设置
+     */
+    getDefaultPromptSettings() {
+        return {
+            exploration: `先理解用户需求中的业务语义：
+* "销量"通常指实际销售数量（sale_num/sale_qty/quantity）
+* "七折销量"：销量字段 * 0.7
+* "订单金额"指实际成交金额（knead_pay_amount/pay_amount）
+
+数据库选择优先级：
+* 优先探索数据仓库：center_dws > dws > dwh > dw
+* 其次考虑：ods（原始数据）> ads（汇总数据）`,
+            
+            tableSelection: `优先选择包含：trd/trade/order/sale + detail/day 的表（交易明细表）
+避免：production/forecast/plan/budget（计划类表）
+检查表数据量和日期范围，确保包含所需时间段`,
+            
+            fieldMapping: `月份字段：v_month > month > year_month > year_of_month
+销量字段：sale_num > sale_qty > quantity > qty
+金额字段：pay_amount > order_amount > total_amount`,
+            
+            dataProcessing: `Decimal类型需转换为float进行计算
+日期格式统一处理（如 '2025-01' 格式）
+如果发现负销量或异常值，在SQL中用WHERE条件过滤`,
+            
+            outputRequirements: `使用 plotly 生成可视化图表
+将 HTML 文件保存到 output 目录
+提供简洁的总结，包括完成的任务和关键发现`
+        };
+    }
+    
+    /**
+     * 保存Prompt设置
+     */
+    async savePromptSettings() {
+        const promptSettings = {
+            exploration: document.getElementById('prompt-exploration').value,
+            tableSelection: document.getElementById('prompt-table-selection').value,
+            fieldMapping: document.getElementById('prompt-field-mapping').value,
+            dataProcessing: document.getElementById('prompt-data-processing').value,
+            outputRequirements: document.getElementById('prompt-output-requirements').value
+        };
+        
+        try {
+            // 保存到后端
+            const response = await fetch('/api/prompts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(promptSettings)
+            });
+            
+            if (response.ok) {
+                // 保存到本地存储
+                localStorage.setItem('prompt_settings', JSON.stringify(promptSettings));
+                app.showNotification('Prompt设置已保存', 'success');
+            } else {
+                throw new Error('保存失败');
+            }
+        } catch (error) {
+            console.error('保存Prompt设置失败:', error);
+            // 即使后端保存失败，也保存到本地
+            localStorage.setItem('prompt_settings', JSON.stringify(promptSettings));
+            app.showNotification('Prompt设置已保存到本地', 'info');
+        }
+    }
+    
+    /**
+     * 恢复默认Prompt设置
+     */
+    async resetPromptSettings() {
+        if (!confirm('确定要恢复默认的Prompt设置吗？当前的修改将会丢失。')) {
+            return;
+        }
+        
+        const defaultSettings = this.getDefaultPromptSettings();
+        
+        // 更新界面
+        document.getElementById('prompt-exploration').value = defaultSettings.exploration;
+        document.getElementById('prompt-table-selection').value = defaultSettings.tableSelection;
+        document.getElementById('prompt-field-mapping').value = defaultSettings.fieldMapping;
+        document.getElementById('prompt-data-processing').value = defaultSettings.dataProcessing;
+        document.getElementById('prompt-output-requirements').value = defaultSettings.outputRequirements;
+        
+        // 保存默认设置
+        try {
+            const response = await fetch('/api/prompts/reset', {
+                method: 'POST'
+            });
+            
+            if (response.ok) {
+                localStorage.setItem('prompt_settings', JSON.stringify(defaultSettings));
+                app.showNotification('已恢复默认Prompt设置', 'success');
+            }
+        } catch (error) {
+            console.error('恢复默认设置失败:', error);
+            localStorage.setItem('prompt_settings', JSON.stringify(defaultSettings));
+            app.showNotification('已恢复默认Prompt设置（本地）', 'info');
+        }
+    }
+    
+    /**
+     * 导出Prompt设置
+     */
+    exportPromptSettings() {
+        const promptSettings = {
+            exploration: document.getElementById('prompt-exploration').value,
+            tableSelection: document.getElementById('prompt-table-selection').value,
+            fieldMapping: document.getElementById('prompt-field-mapping').value,
+            dataProcessing: document.getElementById('prompt-data-processing').value,
+            outputRequirements: document.getElementById('prompt-output-requirements').value,
+            exportTime: new Date().toISOString()
+        };
+        
+        // 创建下载链接
+        const dataStr = JSON.stringify(promptSettings, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        
+        const exportFileDefaultName = `prompt_settings_${new Date().getTime()}.json`;
+        
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+        
+        app.showNotification('Prompt配置已导出', 'success');
+    }
+    
+    /**
+     * 导入Prompt设置
+     */
+    importPromptSettings() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            try {
+                const text = await file.text();
+                const settings = JSON.parse(text);
+                
+                // 验证导入的数据
+                if (settings.exploration !== undefined) {
+                    document.getElementById('prompt-exploration').value = settings.exploration;
+                }
+                if (settings.tableSelection !== undefined) {
+                    document.getElementById('prompt-table-selection').value = settings.tableSelection;
+                }
+                if (settings.fieldMapping !== undefined) {
+                    document.getElementById('prompt-field-mapping').value = settings.fieldMapping;
+                }
+                if (settings.dataProcessing !== undefined) {
+                    document.getElementById('prompt-data-processing').value = settings.dataProcessing;
+                }
+                if (settings.outputRequirements !== undefined) {
+                    document.getElementById('prompt-output-requirements').value = settings.outputRequirements;
+                }
+                
+                app.showNotification('Prompt配置已导入', 'success');
+                
+                // 自动保存导入的设置
+                this.savePromptSettings();
+            } catch (error) {
+                console.error('导入失败:', error);
+                app.showNotification('导入配置失败，请检查文件格式', 'error');
+            }
+        };
+        
+        input.click();
+    }
+    
+    /**
+     * 加载Prompt设置
+     */
+    async loadPromptSettings() {
+        try {
+            // 尝试从后端加载
+            const response = await fetch('/api/prompts');
+            let settings;
+            
+            if (response.ok) {
+                settings = await response.json();
+            } else {
+                // 从本地存储加载
+                const savedSettings = localStorage.getItem('prompt_settings');
+                settings = savedSettings ? JSON.parse(savedSettings) : this.getDefaultPromptSettings();
+            }
+            
+            // 更新界面
+            if (document.getElementById('prompt-exploration')) {
+                document.getElementById('prompt-exploration').value = settings.exploration || this.getDefaultPromptSettings().exploration;
+                document.getElementById('prompt-table-selection').value = settings.tableSelection || this.getDefaultPromptSettings().tableSelection;
+                document.getElementById('prompt-field-mapping').value = settings.fieldMapping || this.getDefaultPromptSettings().fieldMapping;
+                document.getElementById('prompt-data-processing').value = settings.dataProcessing || this.getDefaultPromptSettings().dataProcessing;
+                document.getElementById('prompt-output-requirements').value = settings.outputRequirements || this.getDefaultPromptSettings().outputRequirements;
+            }
+        } catch (error) {
+            console.error('加载Prompt设置失败:', error);
+            // 使用默认设置
+            const defaultSettings = this.getDefaultPromptSettings();
+            if (document.getElementById('prompt-exploration')) {
+                document.getElementById('prompt-exploration').value = defaultSettings.exploration;
+                document.getElementById('prompt-table-selection').value = defaultSettings.tableSelection;
+                document.getElementById('prompt-field-mapping').value = defaultSettings.fieldMapping;
+                document.getElementById('prompt-data-processing').value = defaultSettings.dataProcessing;
+                document.getElementById('prompt-output-requirements').value = defaultSettings.outputRequirements;
+            }
+        }
     }
 }
 
