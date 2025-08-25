@@ -90,7 +90,8 @@ find_available_port() {
             fi
         fi
         
-        echo -e "${YELLOW}[INFO]${NC} 端口 $port 已被占用，尝试 / Port $port occupied, trying $((port+1))..."
+        # 输出信息到 stderr，避免污染函数返回值
+        echo -e "${YELLOW}[INFO]${NC} 端口 $port 已被占用，尝试 / Port $port occupied, trying $((port+1))..." >&2
         port=$((port + 1))
     done
     
