@@ -438,8 +438,8 @@
                                     <div class="route-type-prompts">
                                         <!-- DIRECT_SQL路由prompt -->
                                         <div class="form-group">
-                                            <label data-i18n="prompts.directSqlPrompt">直接SQL执行提示词</label>
-                                            <textarea id="prompt-direct-sql" rows="4" placeholder="设置直接SQL执行的提示词..." class="routing-prompt">对于简单的数据查询，直接生成SQL语句执行：
+                                            <label>DIRECT_SQL Prompt</label>
+                                            <textarea id="prompt-direct-sql" rows="4" placeholder="设置DIRECT_SQL的提示词..." class="routing-prompt">对于简单的数据查询，直接生成SQL语句执行：
 - 优先使用SELECT语句查询数据
 - 检查表名和字段名的正确性
 - 添加必要的WHERE条件和排序</textarea>
@@ -447,8 +447,8 @@
                                         
                                         <!-- SIMPLE_ANALYSIS路由prompt -->
                                         <div class="form-group">
-                                            <label data-i18n="prompts.simpleAnalysisPrompt">简单分析提示词</label>
-                                            <textarea id="prompt-simple-analysis" rows="4" placeholder="设置简单分析的提示词..." class="routing-prompt">执行SQL查询并进行简单数据处理：
+                                            <label>SIMPLE_ANALYSIS Prompt</label>
+                                            <textarea id="prompt-simple-analysis" rows="4" placeholder="设置SIMPLE_ANALYSIS的提示词..." class="routing-prompt">执行SQL查询并进行简单数据处理：
 - 使用GROUP BY进行分组统计
 - 计算平均值、总和等聚合函数
 - 进行简单的数据比较和排序</textarea>
@@ -456,8 +456,8 @@
                                         
                                         <!-- COMPLEX_ANALYSIS路由prompt（原始prompt） -->
                                         <div class="form-group">
-                                            <label data-i18n="prompts.complexAnalysisPrompt">复杂分析提示词（默认）</label>
-                                            <textarea id="prompt-complex-analysis" rows="6" placeholder="设置复杂分析的提示词..." class="routing-prompt">你是一个数据分析专家，请完成以下任务：
+                                            <label>COMPLEX_ANALYSIS Prompt（默认）</label>
+                                            <textarea id="prompt-complex-analysis" rows="6" placeholder="设置COMPLEX_ANALYSIS的提示词..." class="routing-prompt">你是一个数据分析专家，请完成以下任务：
 1. 理解用户的业务需求
 2. 探索相关数据表和字段
 3. 编写并执行必要的代码
@@ -468,8 +468,8 @@
                                         
                                         <!-- VISUALIZATION路由prompt -->
                                         <div class="form-group">
-                                            <label data-i18n="prompts.visualizationPrompt">可视化提示词</label>
-                                            <textarea id="prompt-visualization" rows="5" placeholder="设置可视化的提示词..." class="routing-prompt">生成数据可视化图表：
+                                            <label>VISUALIZATION Prompt</label>
+                                            <textarea id="prompt-visualization" rows="5" placeholder="设置VISUALIZATION的提示词..." class="routing-prompt">生成数据可视化图表：
 - 使用plotly创建交互式图表
 - 选择合适的图表类型（柱状图、折线图、饼图等）
 - 设置清晰的标题和标签
