@@ -50,8 +50,7 @@ output/*.png
 output/*.jpg
 
 # 配置文件（包含隐私信息）
-config/
-config.json
+# 配置文件（保留示例文件）
 config/*.json
 !config/*.example.json
 backend/config/
