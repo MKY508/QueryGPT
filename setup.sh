@@ -276,47 +276,62 @@ EOF
     fi
     
     if [ -f ".env" ]; then
-        print_message "info" "检测到现有配置文件 / Existing configuration detected"
-        
-        # 备份现有配置
-        local backup_file="backup/.env.backup.$BACKUP_SUFFIX"
-        mkdir -p backup
-        cp ".env" "$backup_file"
-        print_message "success" "配置已备份至 / Configuration backed up to: $backup_file"
+        print_message "success" "检测到现有配置文件，保持不变 / Existing configuration detected, keeping it"
+        print_message "info" "如需重置配置，请删除 .env 文件后重新运行"
+        print_message "info" "To reset config, delete .env and run again"
     else
         print_message "info" "创建配置文件... / Creating configuration file..."
         
-        # 创建默认配置，使用免费的Ollama本地模型
-        cat > .env << 'EOF'
-# API配置 - 默认使用本地Ollama（免费）
-# API Configuration - Default to local Ollama (free)
-API_KEY=not-needed-for-local
-API_BASE_URL=http://localhost:11434/v1
-DEFAULT_MODEL=llama2
+        # 先检查是否有.env.example
+        if [ -f ".env.example" ]; then
+            print_message "info" "从模板创建配置 / Creating from template"
+            cp .env.example .env
+            
+            # 交互式询问用户选择API类型
+            echo ""
+            print_message "info" "请选择API类型 / Please choose API type:"
+            echo "  1) GPT API (需要API密钥 / Requires API key)"
+            echo "  2) Ollama 本地模型 (免费 / Free)"
+            echo ""
+            read -p "请输入选择 (1-2) / Enter choice (1-2): " api_choice
+            
+            if [ "$api_choice" = "2" ]; then
+                # 修改为Ollama配置
+                sed -i.bak 's/^API_KEY=sk-YOUR-API-KEY-HERE/API_KEY=not-needed-for-local/' .env
+                sed -i.bak 's|^API_BASE_URL=https://api.vveai.com/v1/|API_BASE_URL=http://localhost:11434/v1|' .env
+                sed -i.bak 's/^DEFAULT_MODEL=gpt-4.1/DEFAULT_MODEL=llama2/' .env
+                rm -f .env.bak
+                print_message "success" "已配置为Ollama本地模型 / Configured for Ollama"
+            else
+                print_message "warning" "请编辑 .env 文件填入你的API密钥"
+                print_message "warning" "Please edit .env file to add your API key"
+            fi
+        else
+            # 创建默认配置
+            cat > .env << 'EOF'
+# API配置
+API_KEY=sk-YOUR-API-KEY-HERE
+API_BASE_URL=https://api.vveai.com/v1/
+DEFAULT_MODEL=gpt-4.1
 
-# 如需使用其他API，请修改以下配置：
-# For other APIs, modify below:
-# API_KEY=your-api-key-here
-# API_BASE_URL=https://api.openai.com/v1/
-# DEFAULT_MODEL=gpt-4
-
-# 数据库配置 / Database Configuration
+# 数据库配置
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
 DB_DATABASE=test
 
-# 系统配置 / System Configuration
+# 系统配置
 LOG_LEVEL=INFO
 LOG_FILE=logs/app.log
 CACHE_TTL=3600
 OUTPUT_DIR=output
 CACHE_DIR=cache
 EOF
-        print_message "success" "配置文件已创建 / Configuration created"
-        print_message "warning" "默认配置使用本地Ollama，如需其他API请编辑.env文件"
-        print_message "warning" "Default config uses local Ollama, edit .env for other APIs"
+            print_message "success" "配置文件已创建 / Configuration created"
+            print_message "warning" "默认配置使用本地Ollama，如需其他API请编辑.env文件"
+            print_message "warning" "Default config uses local Ollama, edit .env for other APIs"
+        fi
     fi
     
     # 创建模型配置
