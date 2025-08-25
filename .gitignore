@@ -200,7 +200,6 @@ SUPPORT.md
 docker-compose.dev.yml
 docker-compose.override.yml
 docker-start.sh
-setup.sh
 install.sh
 bootstrap.sh
 requirements-dev.txt
