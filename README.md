@@ -216,12 +216,13 @@ docker run -p 5000:5000 --env-file .env querygpt
 
 ## 🔧 配置说明
 
-### 支持的模型
+### 支持的模型(选一个能力强的模型是成功出表的关键条件)
 - **OpenAI**: GPT-5, GPT-4.1(经济)
 - **Anthropic**: Claude 4 Opus, Sonnet(评分最高,最智能的模型,调用工具频繁)
 - **Google**: Gemini 2.5pro(litellm可能兼容性有点问题)
 - **国产模型**:qwen,deepseek(包括思考模型,但不建议)
 - **本地模型**: 通过 Ollama 支持 Llama, Mistral, Qwen 等(基准线为qwen2.5 7b以上,否则代码能力几乎不支持完成agent过程)
+- 实践证明成功率最高是Claude4系列模型,gpt-5是比较经济下还很强的选择(甚至由于输入token价格比4.1低),开源模型通用通常比coder模型表现好(不过请自测,这里针对于qwen),思考模型的花费时间太长尤其是deepseek长think-chain,所以不推荐.
 
 ### 数据库支持
 
