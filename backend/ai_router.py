@@ -174,12 +174,19 @@ class AIRoutingClassifier:
         解析LLM响应
         """
         try:
+            # 清理响应字符串
+            response = response.strip()
+            
             # 尝试解析JSON响应
             if '{' in response and '}' in response:
                 # 提取JSON部分
                 json_start = response.find('{')
                 json_end = response.rfind('}') + 1
                 json_str = response[json_start:json_end]
+                
+                # 清理可能的转义字符
+                json_str = json_str.replace('\n', '').replace('\r', '').strip()
+                
                 result = json.loads(json_str)
                 
                 # 验证必需字段

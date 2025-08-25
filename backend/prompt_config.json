@@ -4,5 +4,5 @@
   "tableSelection": "优先选择包含：trd/trade/order/sale + detail/day 的表（交易明细表）\n避免：production/forecast/plan/budget（计划类表）\n检查表数据量和日期范围，确保包含所需时间段",
   "fieldMapping": "月份字段：v_month > month > year_month > year_of_month\n销量字段：sale_num > sale_qty > quantity > qty\n金额字段：pay_amount > order_amount > total_amount",
   "dataProcessing": "Decimal类型需转换为float进行计算\n日期格式统一处理（如 '2025-01' 格式）\n如果发现负销量或异常值，在SQL中用WHERE条件过滤",
-  "outputRequirements": "使用 plotly 生成可视化图表\n将 HTML 文件保存到 output 目录\n提供简洁的总结，包括完成的任务和关键发现"
+  "outputRequirements": "必须从数据库查询数据，不要查找CSV文件\n使用 pymysql 连接数据库并执行SQL\n使用 plotly 生成可视化图表\n将结果图表保存为 HTML 文件到 output 目录\n提供简洁的总结，包括完成的任务和关键发现"
 }

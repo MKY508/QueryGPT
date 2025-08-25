@@ -886,13 +886,16 @@ class SettingsManager {
      */
     setupSmartRoutingToggle() {
         const toggle = document.getElementById('smart-routing-toggle');
-        const toggleLabel = document.querySelector('.toggle-label');
+        const routingGroup = document.querySelector('.smart-routing-group');
+        const statusText = document.querySelector('.status-text');
+        const statusIcon = document.querySelector('.status-icon');
         
         if (toggle) {
             // 加载保存的状态
             const savedState = localStorage.getItem('smart_routing_enabled');
             if (savedState !== null) {
                 toggle.checked = savedState === 'true';
+                this.updateRoutingUI(toggle.checked);
             }
             
             // 设置折叠功能
@@ -907,6 +910,7 @@ class SettingsManager {
                 
                 // 更新UI状态
                 this.updateSmartRoutingState(enabled);
+                this.updateRoutingUI(enabled);
                 
                 // 保存到后端
                 try {
@@ -935,9 +939,23 @@ class SettingsManager {
                     console.error('更新智能路由状态失败:', error);
                     toggle.checked = !enabled; // 恢复原状态
                     this.updateSmartRoutingState(!enabled);
+                    this.updateRoutingUI(!enabled);
                     app.showNotification('更新失败，请重试', 'error');
                 }
             });
+        }
+    }
+    
+    /**
+     * 更新路由UI状态
+     */
+    updateRoutingUI(enabled) {
+        const statusText = document.getElementById('routing-status-text');
+        
+        if (statusText) {
+            statusText.textContent = enabled ? '已启用' : '已禁用';
+            statusText.setAttribute('data-i18n', enabled ? 'settings.smartRoutingEnabled' : 'settings.smartRoutingDisabled');
+            statusText.style.color = enabled ? '#4CAF50' : '#dc3545';
         }
     }
     

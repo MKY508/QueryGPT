@@ -332,7 +332,13 @@ def chat():
         
         try:
             # 检查智能路由是否启用
-            config = ConfigLoader.load_config()
+            import json
+            config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.json')
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            else:
+                config = {}
             smart_routing_enabled = config.get('features', {}).get('smart_routing', {}).get('enabled', False)
             
             # 使用智能路由系统
@@ -345,7 +351,8 @@ def chat():
                     'language': user_language,
                     'use_database': use_database,
                     'context_rounds': context_rounds,
-                    'stop_checker': lambda: active_queries.get(conversation_id, {}).get('should_stop', False)
+                    'stop_checker': lambda: active_queries.get(conversation_id, {}).get('should_stop', False),
+                    'connection_info': context['connection_info']  # 传递数据库连接信息
                 }
                 
                 # 智能路由处理
