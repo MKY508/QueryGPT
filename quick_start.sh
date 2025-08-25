@@ -49,6 +49,25 @@ echo -e "${GREEN}[SUCCESS]${NC} 使用端口 / Using port: $PORT"
 # 创建必要目录 / Create necessary directories
 mkdir -p output cache config
 
+# 初始化配置文件 / Initialize configuration files
+# 初始化.env文件（最重要）
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+    echo -e "${YELLOW}[IMPORTANT]${NC} 初始化环境配置... / Initializing environment config..."
+    cp .env.example .env
+    echo -e "${YELLOW}[WARNING]${NC} 请编辑 .env 文件配置API密钥 / Please edit .env file to configure API keys"
+fi
+
+# 初始化可选的UI配置文件
+if [ ! -f "config/config.json" ] && [ -f "config/config.example.json" ]; then
+    echo -e "${BLUE}[INFO]${NC} 初始化配置文件... / Initializing config file..."
+    cp config/config.example.json config/config.json
+fi
+
+if [ ! -f "config/models.json" ] && [ -f "config/models.example.json" ]; then
+    echo -e "${BLUE}[INFO]${NC} 初始化模型配置... / Initializing model config..."
+    cp config/models.example.json config/models.json
+fi
+
 echo ""
 echo -e "${GREEN}✓ 启动中... / Starting...${NC}"
 echo -e "访问 / Visit: ${BLUE}http://localhost:${PORT}${NC}"

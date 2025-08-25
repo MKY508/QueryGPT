@@ -498,11 +498,23 @@ def handle_models():
     
     else:  # POST - 保存模型
         try:
-            models = request.json
+            data = request.json
             os.makedirs(os.path.dirname(models_file), exist_ok=True)
-            # 保存时包装成 {"models": [...]} 格式
+            
+            # 兼容两种输入格式
+            if isinstance(data, list):
+                # 如果接收到的是数组，包装成 {"models": [...]}
+                models_data = {"models": data}
+            elif isinstance(data, dict) and 'models' in data:
+                # 如果已经是 {"models": [...]} 格式
+                models_data = data
+            else:
+                # 其他格式，尝试包装
+                models_data = {"models": data if isinstance(data, list) else [data]}
+            
+            # 保存到文件
             with open(models_file, 'w', encoding='utf-8') as f:
-                json.dump({"models": models}, f, indent=2, ensure_ascii=False)
+                json.dump(models_data, f, indent=2, ensure_ascii=False)
             return jsonify({"success": True})
         except Exception as e:
             logger.error(f"保存模型失败: {e}")
