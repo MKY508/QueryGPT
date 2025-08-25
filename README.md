@@ -127,26 +127,33 @@
 - **思考过程透明**：实时看到 AI 在想什么，可以随时介入指导
 - **真正免费开源**：MIT 协议，没有任何付费墙
 
-## 🚀 快速开始（真·懒人模式）
+## 🚀 快速开始（懒人模式）
 
-### 一键启动（自动识别系统）
+### 方式一：智能启动（推荐）
 ```bash
 # 克隆项目
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 一键启动（自动检测系统、安装依赖、启动服务）
+# 智能启动（自动判断是否需要安装）
 ./start.sh
-
-# 就这么简单！
 ```
 
-脚本会自动：
-- ✅ 检测你的系统（Windows/Mac/Linux）
-- ✅ 识别架构（x86/ARM/Apple Silicon）
-- ✅ 首次运行自动安装（5-30分钟）
-- ✅ 已安装直接启动（秒级）
-- ✅ Windows 自动修复换行符
+`start.sh` 会自动：
+- ✅ 首次运行 → 调用 `setup.sh` 完成安装并启动
+- ✅ 已安装 → 调用 `quick_start.sh` 秒级启动
+- ✅ Windows WSL → 自动修复换行符
+- ✅ ARM 架构 → 自动选择 `setup_arm.sh`
+
+### 方式二：标准流程
+```bash
+# 首次使用（安装并启动）
+./setup.sh        # x86 架构
+./setup_arm.sh    # ARM 架构（M1/M2/树莓派）
+
+# 后续使用（快速启动）
+./quick_start.sh
+```
 
 ---
 
