@@ -216,7 +216,7 @@ docker run -p 5000:5000 --env-file .env querygpt
 
 ## 🔧 配置说明
 
-### 支持的模型(选一个能力强的模型是成功出表的关键条件)
+### 支持的模型(选一个能力强的模型是成功出表的关键条件,实践证明成功率最高是gpt-5和Claude4系列模型)
 - **OpenAI**: GPT-5, GPT-4.1(经济)
 - **Anthropic**: Claude 4 Opus, Sonnet(评分最高,最智能的模型,调用工具频繁)
 - **Google**: Gemini 2.5pro(litellm可能兼容性有点问题)
