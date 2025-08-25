@@ -127,26 +127,74 @@
 - **思考过程透明**：实时看到 AI 在想什么，可以随时介入指导
 - **真正免费开源**：MIT 协议，没有任何付费墙
 
-## 🚀 快速开始（懒人模式）
+## 🚀 快速开始
 
-### 首次使用
+### 🎯 不确定用哪个脚本？运行智能启动器：
+```bash
+./start.sh  # 自动检测系统并推荐最佳方案
+```
 
+---
+
+### 🪟 Windows 用户（WSL）
+
+#### 首次安装
+```bash
+# 1. 在 WSL Ubuntu 中克隆项目
+git clone https://github.com/MKY508/QueryGPT.git
+cd QueryGPT
+
+# 2. 修复脚本格式（重要！）
+dos2unix *.sh  # 或 sed -i 's/\r$//' *.sh
+chmod +x *.sh
+
+# 3. 运行 Windows 专用启动脚本
+./start_windows.sh
+```
+
+#### 后续使用
+```bash
+./start_windows.sh  # 或 ./quick_start.sh
+```
+
+📖 详细说明请查看 [Windows 安装指南](WINDOWS_SETUP.md)
+
+---
+
+### 🍎 macOS / Linux 用户
+
+#### 首次安装
 ```bash
 # 1. 克隆项目
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 2. 运行安装脚本（自动配置环境并启动）
+# 2. 运行安装脚本
+# Intel Mac / Linux x86:
 ./setup.sh
+
+# Apple Silicon (M1/M2/M3) / ARM Linux:
+./setup_arm.sh
+
 # ⚠️ 首次安装需要时间较长（下载数百MB依赖库）
-# ⏱️ 预计时间：3-10分钟（取决于网速）
+# ⏱️ 预计时间：3-10分钟（x86）或 10-30分钟（ARM需编译）
 ```
 
-### 后续使用
+#### 后续使用
+```bash
+./quick_start.sh  # 秒级启动
+```
+
+---
+
+### 🔍 不确定你的系统？
 
 ```bash
-# 直接快速启动（秒级启动）
-./quick_start.sh
+# 运行架构检测
+./check_arch.sh
+
+# 或运行诊断工具
+./diagnose.sh
 ```
 
 系统会自动查找可用端口（5000-5010），启动后会显示访问地址。
@@ -155,16 +203,17 @@ cd QueryGPT
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
 - MySQL 或兼容数据库
 
-### 架构支持
-- **x86_64 (Intel/AMD)**: ✅ 完全支持
-- **Apple Silicon (M1/M2/M3)**: ✅ 支持（使用 `./setup_arm.sh`）
-- **ARM64 Linux**: ✅ 支持（使用 `./setup_arm.sh`）
-- **Windows WSL**: ✅ 支持（使用 `./start_windows.sh`）
+### 架构兼容性
+| 平台 | 架构 | 安装脚本 | 说明 |
+|------|------|----------|------|
+| Windows WSL | x86_64 | `./start_windows.sh` | 最佳兼容性 |
+| Windows WSL | ARM64 | `./setup_arm.sh` | Surface Pro X |
+| macOS | Intel | `./setup.sh` | 标准安装 |
+| macOS | Apple Silicon | `./setup_arm.sh` | M1/M2/M3 |
+| Linux | x86_64 | `./setup.sh` | 标准安装 |
+| Linux | ARM64 | `./setup_arm.sh` | 树莓派等 |
 
-检查架构兼容性：
-```bash
-./check_arch.sh  # 检测系统架构和兼容性
-```
+📖 详细兼容性说明请查看 [兼容性文档](COMPATIBILITY.md)
 
 ## 💡 使用示例
 
