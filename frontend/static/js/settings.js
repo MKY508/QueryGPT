@@ -75,6 +75,9 @@ class SettingsManager {
         
         // 设置Prompt相关事件
         this.setupPromptEvents();
+        
+        // 设置智能路由开关事件
+        this.setupSmartRoutingToggle();
     }
 
     /**
@@ -169,6 +172,173 @@ class SettingsManager {
             if (confirm('确定要清空所有缓存吗？')) {
                 await this.clearCache();
             }
+        });
+        
+        // 智能路由开关
+        this.setupSmartRoutingToggle();
+    }
+    
+    /**
+     * 设置智能路由开关
+     */
+    setupSmartRoutingToggle() {
+        const toggle = document.getElementById('smart-routing-toggle');
+        const statsBtn = document.getElementById('view-routing-stats');
+        
+        if (toggle) {
+            // 从配置加载当前状态
+            const smartRouting = this.config?.features?.smart_routing;
+            if (smartRouting) {
+                toggle.checked = smartRouting.enabled;
+                // 如果是Beta功能，添加标识
+                if (smartRouting.beta) {
+                    const label = toggle.parentElement?.querySelector('label');
+                    if (label && !label.querySelector('.beta-badge')) {
+                        const betaBadge = document.createElement('span');
+                        betaBadge.className = 'beta-badge';
+                        betaBadge.textContent = 'BETA';
+                        betaBadge.style.cssText = 'margin-left: 8px; padding: 2px 6px; background: #ff6b6b; color: white; border-radius: 4px; font-size: 10px; vertical-align: middle;';
+                        label.appendChild(betaBadge);
+                    }
+                }
+            }
+            
+            // 监听开关变化
+            toggle.addEventListener('change', async (e) => {
+                await this.toggleSmartRouting(e.target.checked);
+            });
+        }
+        
+        // 查看统计按钮
+        if (statsBtn) {
+            statsBtn.addEventListener('click', async () => {
+                await this.showRoutingStats();
+            });
+        }
+    }
+    
+    /**
+     * 切换智能路由
+     */
+    async toggleSmartRouting(enabled) {
+        try {
+            // 更新配置
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    features: {
+                        smart_routing: {
+                            enabled: enabled
+                        }
+                    }
+                })
+            });
+            
+            if (!response.ok) throw new Error('Failed to update configuration');
+            
+            // 显示提示
+            const message = enabled ? 
+                window.i18nManager?.t('settings.smartRoutingEnabled') || '智能路由已启用' :
+                window.i18nManager?.t('settings.smartRoutingDisabled') || '智能路由已禁用';
+                
+            window.showNotification?.(message, 'success') || alert(message);
+            
+            // 重新加载配置
+            await this.loadConfig();
+            
+        } catch (error) {
+            console.error('Failed to toggle smart routing:', error);
+            window.showNotification?.('切换失败，请重试', 'error') || alert('切换失败');
+            // 恢复开关状态
+            const toggle = document.getElementById('smart-routing-toggle');
+            if (toggle) toggle.checked = !enabled;
+        }
+    }
+    
+    /**
+     * 显示路由统计
+     */
+    async showRoutingStats() {
+        try {
+            const response = await fetch('/api/routing-stats');
+            const data = await response.json();
+            
+            if (!data.success) throw new Error(data.message || 'Failed to get stats');
+            
+            const stats = data.stats;
+            const enabled = data.enabled;
+            
+            // 构建统计信息HTML
+            const statsHtml = `
+                <div class="routing-stats">
+                    <h4>${window.i18nManager?.t('settings.routingStats') || '智能路由统计'}</h4>
+                    <div class="stats-status">
+                        <span>状态：</span>
+                        <span class="${enabled ? 'text-success' : 'text-muted'}">
+                            ${enabled ? '已启用' : '未启用'}
+                        </span>
+                    </div>
+                    ${enabled ? `
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-label">总查询数</div>
+                                <div class="stat-value">${stats.total_queries || 0}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">简单查询</div>
+                                <div class="stat-value">${stats.simple_queries || 0}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">AI查询</div>
+                                <div class="stat-value">${stats.ai_queries || 0}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">路由效率</div>
+                                <div class="stat-value">${((stats.simple_queries / (stats.total_queries || 1)) * 100).toFixed(1)}%</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">节省时间</div>
+                                <div class="stat-value">${(stats.total_time_saved || 0).toFixed(1)}秒</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">平均节省</div>
+                                <div class="stat-value">${(stats.avg_time_saved_per_query || 0).toFixed(2)}秒</div>
+                            </div>
+                        </div>
+                    ` : '<p>智能路由未启用</p>'}
+                </div>
+            `;
+            
+            // 显示统计模态框
+            this.showStatsModal(statsHtml);
+            
+        } catch (error) {
+            console.error('Failed to get routing stats:', error);
+            window.showNotification?.('获取统计失败', 'error');
+        }
+    }
+    
+    /**
+     * 显示统计模态框
+     */
+    showStatsModal(content) {
+        // 创建模态框
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+        
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        modalContent.style.cssText = 'background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto;';
+        modalContent.innerHTML = content + '<button class="btn btn-primary mt-3" onclick="this.closest(\'.modal\').remove()">关闭</button>';
+        
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        
+        // 点击背景关闭
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
         });
     }
 
@@ -712,6 +882,131 @@ class SettingsManager {
     }
     
     /**
+     * 设置智能路由开关
+     */
+    setupSmartRoutingToggle() {
+        const toggle = document.getElementById('smart-routing-toggle');
+        const toggleLabel = document.querySelector('.toggle-label');
+        
+        if (toggle) {
+            // 加载保存的状态
+            const savedState = localStorage.getItem('smart_routing_enabled');
+            if (savedState !== null) {
+                toggle.checked = savedState === 'true';
+            }
+            
+            // 设置折叠功能
+            this.setupCollapsibleSections();
+            
+            // 更新状态
+            this.updateSmartRoutingState(toggle.checked);
+            
+            // 监听开关变化
+            toggle.addEventListener('change', async () => {
+                const enabled = toggle.checked;
+                
+                // 更新UI状态
+                this.updateSmartRoutingState(enabled);
+                
+                // 保存到后端
+                try {
+                    const response = await fetch('/api/config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            features: {
+                                smart_routing: {
+                                    enabled: enabled
+                                }
+                            }
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        localStorage.setItem('smart_routing_enabled', enabled.toString());
+                        app.showNotification(
+                            enabled ? '智能路由已启用' : '智能路由已关闭',
+                            'success'
+                        );
+                    }
+                } catch (error) {
+                    console.error('更新智能路由状态失败:', error);
+                    toggle.checked = !enabled; // 恢复原状态
+                    this.updateSmartRoutingState(!enabled);
+                    app.showNotification('更新失败，请重试', 'error');
+                }
+            });
+        }
+    }
+    
+    /**
+     * 设置折叠部分的功能
+     */
+    setupCollapsibleSections() {
+        // 为所有可折叠的标题添加点击事件
+        document.querySelectorAll('.collapsible-header').forEach(header => {
+            const content = header.nextElementSibling;
+            if (content && content.classList.contains('collapsible-content')) {
+                // 默认展开状态
+                header.classList.remove('collapsed');
+                content.classList.remove('collapsed');
+                
+                // 添加点击事件
+                header.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    header.classList.toggle('collapsed');
+                    content.classList.toggle('collapsed');
+                    
+                    // 保存折叠状态到localStorage
+                    const sectionId = header.closest('.prompt-section')?.id;
+                    if (sectionId) {
+                        const isCollapsed = header.classList.contains('collapsed');
+                        localStorage.setItem(`collapsed_${sectionId}`, isCollapsed);
+                    }
+                });
+                
+                // 恢复保存的折叠状态
+                const sectionId = header.closest('.prompt-section')?.id;
+                if (sectionId) {
+                    const savedState = localStorage.getItem(`collapsed_${sectionId}`);
+                    if (savedState === 'true') {
+                        header.classList.add('collapsed');
+                        content.classList.add('collapsed');
+                    }
+                }
+            }
+        });
+    }
+    
+    /**
+     * 更新智能路由相关UI状态
+     */
+    updateSmartRoutingState(enabled) {
+        const toggleLabel = document.querySelector('.toggle-label');
+        const routingPrompts = document.querySelectorAll('.routing-prompt');
+        
+        // 更新标签文本
+        if (toggleLabel) {
+            toggleLabel.textContent = enabled ? '已启用' : '已关闭';
+            toggleLabel.style.color = enabled ? '#4CAF50' : '#999';
+        }
+        
+        // 更新prompt编辑权限
+        routingPrompts.forEach(textarea => {
+            textarea.disabled = !enabled;
+            if (!enabled) {
+                textarea.classList.add('readonly-notice');
+                textarea.title = '智能路由已关闭，提示词为只读状态';
+            } else {
+                textarea.classList.remove('readonly-notice');
+                textarea.title = '';
+            }
+        });
+    }
+    
+    /**
      * 设置Prompt相关事件
      */
     setupPromptEvents() {
@@ -741,6 +1036,11 @@ class SettingsManager {
         
         // 加载保存的Prompt设置
         this.loadPromptSettings();
+        
+        // 初始化折叠功能（在Prompt设置加载后）
+        setTimeout(() => {
+            this.setupCollapsibleSections();
+        }, 100);
     }
     
     /**
@@ -748,6 +1048,69 @@ class SettingsManager {
      */
     getDefaultPromptSettings() {
         return {
+            routing: `你是一个查询路由分类器。分析用户查询，选择最适合的执行路径。
+
+用户查询：{query}
+
+数据库信息：
+- 类型：{db_type}
+- 可用表：{available_tables}
+
+请从以下选项中选择最合适的路由：
+
+1. DIRECT_SQL - 简单查询，可以直接转换为SQL执行
+   适用：查看数据、统计数量、简单筛选、排序
+   示例：显示所有订单、统计用户数量、查看最新记录
+
+2. SIMPLE_ANALYSIS - 需要SQL查询+简单数据处理
+   适用：分组统计、简单计算、数据汇总
+   示例：按月统计销售额、计算平均值、对比不同类别
+
+3. COMPLEX_ANALYSIS - 需要复杂分析或多步处理
+   适用：趋势分析、预测、复杂计算、需要编程逻辑
+   示例：分析销售趋势、预测未来销量、相关性分析
+
+4. VISUALIZATION - 需要生成图表或可视化
+   适用：任何明确要求图表、图形、可视化的查询
+   示例：生成销售图表、绘制趋势图、创建饼图
+
+输出格式（JSON）：
+{
+  "route": "选择的路由类型",
+  "confidence": 0.95,
+  "reason": "选择此路由的原因",
+  "suggested_sql": "如果是DIRECT_SQL，提供建议的SQL语句"
+}
+
+重要：
+- 只要用户提到"图"、"图表"、"可视化"、"绘制"等词，必须选择 VISUALIZATION
+- 如果查询包含"为什么"、"原因"、"预测"等需要推理的词，选择 COMPLEX_ANALYSIS
+- 尽可能选择简单的路由以提高性能`,
+            
+            directSql: `对于简单的数据查询，直接生成SQL语句执行：
+- 优先使用SELECT语句查询数据
+- 检查表名和字段名的正确性
+- 添加必要的WHERE条件和排序`,
+            
+            simpleAnalysis: `执行SQL查询并进行简单数据处理：
+- 使用GROUP BY进行分组统计
+- 计算平均值、总和等聚合函数
+- 进行简单的数据比较和排序`,
+            
+            complexAnalysis: `你是一个数据分析专家，请完成以下任务：
+1. 理解用户的业务需求
+2. 探索相关数据表和字段
+3. 编写并执行必要的代码
+4. 提供详细的分析结果
+5. 如果需要，生成可视化图表
+这是智能路由关闭时使用的默认提示词`,
+            
+            visualization: `生成数据可视化图表：
+- 使用plotly创建交互式图表
+- 选择合适的图表类型（柱状图、折线图、饼图等）
+- 设置清晰的标题和标签
+- 将图表保存为HTML文件到output目录`,
+            
             exploration: `先理解用户需求中的业务语义：
 * "销量"通常指实际销售数量（sale_num/sale_qty/quantity）
 * "七折销量"：销量字段 * 0.7
@@ -779,7 +1142,13 @@ class SettingsManager {
      * 保存Prompt设置
      */
     async savePromptSettings() {
+        const defaults = this.getDefaultPromptSettings();
         const promptSettings = {
+            routing: document.getElementById('prompt-routing')?.value || defaults.routing,
+            directSql: document.getElementById('prompt-direct-sql')?.value || defaults.directSql,
+            simpleAnalysis: document.getElementById('prompt-simple-analysis')?.value || defaults.simpleAnalysis,
+            complexAnalysis: document.getElementById('prompt-complex-analysis')?.value || defaults.complexAnalysis,
+            visualization: document.getElementById('prompt-visualization')?.value || defaults.visualization,
             exploration: document.getElementById('prompt-exploration').value,
             tableSelection: document.getElementById('prompt-table-selection').value,
             fieldMapping: document.getElementById('prompt-field-mapping').value,
@@ -823,6 +1192,9 @@ class SettingsManager {
         const defaultSettings = this.getDefaultPromptSettings();
         
         // 更新界面
+        if (document.getElementById('prompt-routing')) {
+            document.getElementById('prompt-routing').value = defaultSettings.routing;
+        }
         document.getElementById('prompt-exploration').value = defaultSettings.exploration;
         document.getElementById('prompt-table-selection').value = defaultSettings.tableSelection;
         document.getElementById('prompt-field-mapping').value = defaultSettings.fieldMapping;
@@ -851,6 +1223,7 @@ class SettingsManager {
      */
     exportPromptSettings() {
         const promptSettings = {
+            routing: document.getElementById('prompt-routing')?.value || this.getDefaultPromptSettings().routing,
             exploration: document.getElementById('prompt-exploration').value,
             tableSelection: document.getElementById('prompt-table-selection').value,
             fieldMapping: document.getElementById('prompt-field-mapping').value,
@@ -890,6 +1263,9 @@ class SettingsManager {
                 const settings = JSON.parse(text);
                 
                 // 验证导入的数据
+                if (settings.routing !== undefined && document.getElementById('prompt-routing')) {
+                    document.getElementById('prompt-routing').value = settings.routing;
+                }
                 if (settings.exploration !== undefined) {
                     document.getElementById('prompt-exploration').value = settings.exploration;
                 }
@@ -938,17 +1314,40 @@ class SettingsManager {
             
             // 更新界面
             if (document.getElementById('prompt-exploration')) {
-                document.getElementById('prompt-exploration').value = settings.exploration || this.getDefaultPromptSettings().exploration;
-                document.getElementById('prompt-table-selection').value = settings.tableSelection || this.getDefaultPromptSettings().tableSelection;
-                document.getElementById('prompt-field-mapping').value = settings.fieldMapping || this.getDefaultPromptSettings().fieldMapping;
-                document.getElementById('prompt-data-processing').value = settings.dataProcessing || this.getDefaultPromptSettings().dataProcessing;
-                document.getElementById('prompt-output-requirements').value = settings.outputRequirements || this.getDefaultPromptSettings().outputRequirements;
+                const defaults = this.getDefaultPromptSettings();
+                
+                // 路由相关prompt
+                if (document.getElementById('prompt-routing')) {
+                    document.getElementById('prompt-routing').value = settings.routing || defaults.routing;
+                }
+                if (document.getElementById('prompt-direct-sql')) {
+                    document.getElementById('prompt-direct-sql').value = settings.directSql || defaults.directSql;
+                }
+                if (document.getElementById('prompt-simple-analysis')) {
+                    document.getElementById('prompt-simple-analysis').value = settings.simpleAnalysis || defaults.simpleAnalysis;
+                }
+                if (document.getElementById('prompt-complex-analysis')) {
+                    document.getElementById('prompt-complex-analysis').value = settings.complexAnalysis || defaults.complexAnalysis;
+                }
+                if (document.getElementById('prompt-visualization')) {
+                    document.getElementById('prompt-visualization').value = settings.visualization || defaults.visualization;
+                }
+                
+                // 数据库相关prompt
+                document.getElementById('prompt-exploration').value = settings.exploration || defaults.exploration;
+                document.getElementById('prompt-table-selection').value = settings.tableSelection || defaults.tableSelection;
+                document.getElementById('prompt-field-mapping').value = settings.fieldMapping || defaults.fieldMapping;
+                document.getElementById('prompt-data-processing').value = settings.dataProcessing || defaults.dataProcessing;
+                document.getElementById('prompt-output-requirements').value = settings.outputRequirements || defaults.outputRequirements;
             }
         } catch (error) {
             console.error('加载Prompt设置失败:', error);
             // 使用默认设置
             const defaultSettings = this.getDefaultPromptSettings();
             if (document.getElementById('prompt-exploration')) {
+                if (document.getElementById('prompt-routing')) {
+                    document.getElementById('prompt-routing').value = defaultSettings.routing;
+                }
                 document.getElementById('prompt-exploration').value = defaultSettings.exploration;
                 document.getElementById('prompt-table-selection').value = defaultSettings.tableSelection;
                 document.getElementById('prompt-field-mapping').value = defaultSettings.fieldMapping;
