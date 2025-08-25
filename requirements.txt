@@ -1,5 +1,5 @@
 open-interpreter==0.4.3
-flask==2.3.3
+flask==3.1.2
 flask-cors==4.0.0
 flasgger==0.9.7.1
 pymysql==1.1.0
