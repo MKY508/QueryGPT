@@ -150,7 +150,7 @@ cd QueryGPT
 ./quick_start.sh
 ```
 
-访问 `http://localhost:5000` 开始使用！
+系统会自动查找可用端口（5000-5010），启动后会显示访问地址。
 
 ### 环境要求
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
