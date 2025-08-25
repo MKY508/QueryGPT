@@ -429,16 +429,56 @@ EOF
     fi
 }
 
-# 查找可用端口
+# 查找可用端口 - 跨平台版本
 find_available_port() {
     local port=5000
     local max_port=5010
     
+    # 检测运行环境
+    local is_wsl=false
+    local is_macos=false
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+        is_wsl=true
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        is_macos=true
+    fi
+    
     while [ $port -le $max_port ]; do
-        if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        local port_available=false
+        
+        if [ "$is_macos" = true ]; then
+            # macOS: 使用 lsof
+            if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+                port_available=true
+            fi
+        elif [ "$is_wsl" = true ] || [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            # WSL/Linux: 使用 ss 或 netstat
+            if command -v ss >/dev/null 2>&1; then
+                if ! ss -tln | grep -q ":$port "; then
+                    port_available=true
+                fi
+            elif command -v netstat >/dev/null 2>&1; then
+                if ! netstat -tln 2>/dev/null | grep -q ":$port "; then
+                    port_available=true
+                fi
+            else
+                # 最后尝试直接连接测试
+                if ! (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
+                    port_available=true
+                fi
+            fi
+        else
+            # 默认方法
+            if ! (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
+                port_available=true
+            fi
+        fi
+        
+        if [ "$port_available" = true ]; then
             echo $port
             return 0
         fi
+        
         print_message "info" "端口 $port 已被占用，尝试下一个... / Port $port occupied, trying next..."
         port=$((port + 1))
     done
