@@ -7,5 +7,5 @@ pandas==2.0.3
 plotly==5.17.0
 numpy==1.24.3
 cryptography==41.0.3
-pyyaml==6.0.1
+pyyaml==6.0.2
 aiohttp>=3.10.0  # 修复 litellm 兼容性问题
