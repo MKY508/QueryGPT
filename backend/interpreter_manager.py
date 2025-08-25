@@ -242,7 +242,9 @@ class InterpreterManager:
             if language == 'en':
                 # 英文版prompt - 从配置文件构建
                 prompt_parts = [
-                    f"Database Connection (Apache Doris, MySQL Protocol):",
+                    "【IMPORTANT】: All data is in MySQL database, DO NOT look for CSV or any files!",
+                    "Use pymysql to connect to database and execute SQL queries directly.",
+                    f"\nDatabase Connection (Apache Doris, MySQL Protocol):",
                     f"host = '{conn['host']}'",
                     f"port = {conn['port']}",
                     f"user = '{conn['user']}'",
@@ -280,7 +282,9 @@ class InterpreterManager:
             else:
                 # 中文版prompt - 从配置文件构建
                 prompt_parts = [
-                    f"数据库连接信息（Apache Doris，MySQL协议）：",
+                    "【重要】：所有数据都在MySQL数据库中，不要查找CSV或任何文件！",
+                    "直接使用pymysql连接数据库并执行SQL查询。",
+                    f"\n数据库连接信息（Apache Doris，MySQL协议）：",
                     f"host = '{conn['host']}'",
                     f"port = {conn['port']}",
                     f"user = '{conn['user']}'",
