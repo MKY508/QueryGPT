@@ -21,7 +21,7 @@
 #### 1.1 克隆代码
 ```bash
 git clone <repository-url>
-cd data_in_openinterpreter
+cd QueryGPT
 ```
 
 #### 1.2 环境配置
@@ -202,7 +202,7 @@ sudo yum install python310 python310-pip -y
 
 # 克隆代码并部署
 git clone <repository-url>
-cd data_in_openinterpreter
+cd QueryGPT
 ./start.sh
 ```
 
