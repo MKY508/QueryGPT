@@ -116,8 +116,9 @@ def health_check():
 
 @app.route('/output/<path:filename>')
 def serve_output(filename):
-    """安全地服务output目录中的HTML文件 - 修复路径遍历漏洞"""
+    """安全地服务output目录中的HTML文件 - 支持跨平台路径"""
     import os.path
+    import platform
     
     # 1. 规范化路径，移除 ../ 等危险元素
     safe_filename = os.path.normpath(filename)
@@ -128,17 +129,64 @@ def serve_output(filename):
         return jsonify({"error": "非法的文件路径"}), 403
     
     # 3. 只允许特定的文件扩展名
-    ALLOWED_EXTENSIONS = {'.html', '.png', '.jpg', '.jpeg', '.svg', '.pdf'}
+    ALLOWED_EXTENSIONS = {'.html', '.png', '.jpg', '.jpeg', '.svg', '.pdf', '.json', '.csv'}
     file_ext = os.path.splitext(safe_filename)[1].lower()
     if file_ext not in ALLOWED_EXTENSIONS:
         return jsonify({"error": f"不允许访问{file_ext}文件"}), 403
     
-    # 4. 构建安全的文件路径
+    # 4. 构建安全的文件路径 - 根据系统类型添加不同的搜索路径
     output_dirs = [
         os.path.join(PROJECT_ROOT, 'backend', 'output'),
         OUTPUT_DIR,
         os.path.join(os.path.dirname(__file__), 'output')
     ]
+    
+    # 检测系统类型并添加特定路径
+    system = platform.system().lower()
+    logger.info(f"检测到系统类型: {system}, 平台信息: {platform.platform()}")
+    
+    # Windows 或 WSL 环境
+    if system == 'linux':
+        # 检查是否是 WSL 环境
+        try:
+            with open('/proc/version', 'r') as f:
+                version_info = f.read().lower()
+                if 'microsoft' in version_info or 'wsl' in version_info:
+                    logger.info("检测到 WSL 环境，添加额外搜索路径")
+                    # WSL 环境可能的文件位置
+                    # 注意：文件通常还是在 Linux 侧的 output 目录
+                    # 但我们也检查可能的 Windows 路径映射
+                    wsl_paths = [
+                        '/mnt/c/tmp/output',
+                        '/mnt/c/Users/Public/output'
+                    ]
+                    for wsl_path in wsl_paths:
+                        if os.path.exists(wsl_path):
+                            output_dirs.append(wsl_path)
+        except:
+            pass
+    
+    # Windows 原生环境
+    elif system == 'windows':
+        windows_paths = [
+            'C:\\tmp\\output',
+            os.path.expanduser('~\\Documents\\QueryGPT\\output')
+        ]
+        for win_path in windows_paths:
+            if os.path.exists(win_path):
+                output_dirs.append(win_path)
+    
+    # macOS 环境
+    elif system == 'darwin':
+        mac_paths = [
+            os.path.expanduser('~/Documents/QueryGPT/output'),
+            '/tmp/querygpt_output'
+        ]
+        for mac_path in mac_paths:
+            if os.path.exists(mac_path):
+                output_dirs.append(mac_path)
+    
+    logger.debug(f"搜索路径列表: {output_dirs}")
     
     for output_dir in output_dirs:
         # 确保输出目录是绝对路径
