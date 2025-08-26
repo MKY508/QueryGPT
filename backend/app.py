@@ -400,7 +400,7 @@ def chat():
                     'use_database': use_database,
                     'context_rounds': context_rounds,
                     'stop_checker': lambda: active_queries.get(conversation_id, {}).get('should_stop', False),
-                    'connection_info': context['connection_info']  # 传递数据库连接信息
+                    'connection_info': context.get('connection_info', {})  # 安全访问，避免KeyError
                 }
                 
                 # 智能路由处理
