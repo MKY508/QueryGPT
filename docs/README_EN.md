@@ -204,11 +204,12 @@ docker run -p 5000:5000 --env-file .env querygpt
 
 ## 🔧 Configuration
 
-### Supported Models
-- **OpenAI**: GPT-4, GPT-4-turbo, GPT-3.5
-- **Anthropic**: Claude 3 Opus, Sonnet, Haiku
-- **Google**: Gemini Pro, Gemini Ultra
-- **Local Models**: Support Llama, Mistral, Qwen etc. via Ollama
+### Supported Models (Choose a powerful model for best results)
+- **OpenAI**: GPT-5, GPT-4.1 (economical)
+- **Anthropic**: Claude 4 Opus, Sonnet (highest rated, most intelligent, frequent tool use)
+- **Google**: Gemini 2.5 Pro (may have litellm compatibility issues)
+- **Domestic Models**: Qwen, DeepSeek (including thinking models, but not recommended)
+- **Local Models**: via Ollama - Llama, Mistral, Qwen etc. (baseline: qwen2.5 7b+, otherwise insufficient for agent processes)
 
 ### Database Support
 - MySQL 5.7+

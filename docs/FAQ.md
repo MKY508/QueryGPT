@@ -16,7 +16,7 @@
 - 现代浏览器（Chrome、Firefox、Safari、Edge）
 
 **Related Links / 相关链接:**
-- [Installation Guide / 安装指南](./installation.md)
+- [Quick Start / 快速开始](../README.md#🚀-快速开始懒人模式)
 - [Python Downloads](https://www.python.org/downloads/)
 
 ### Q: How do I install dependencies? / 如何安装依赖？
@@ -86,16 +86,16 @@ DB_NAME=你的数据库名
 **A:**
 Add to your `.env` file:
 ```env
-OPENAI_API_KEY=your_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1  # Optional: for custom endpoints
+API_KEY=your_api_key_here
+API_BASE_URL=https://api.openai.com/v1  # Optional: for custom endpoints
 OPENAI_MODEL=gpt-3.5-turbo  # Optional: default model
 ```
 
 **解答：**
 在`.env`文件中添加：
 ```env
-OPENAI_API_KEY=你的API密钥
-OPENAI_BASE_URL=https://api.openai.com/v1  # 可选：自定义端点
+API_KEY=你的API密钥
+API_BASE_URL=https://api.openai.com/v1  # 可选：自定义端点
 OPENAI_MODEL=gpt-3.5-turbo  # 可选：默认模型
 ```
 
@@ -144,8 +144,8 @@ python app.py --production
 ```
 
 **Related Links / 相关链接:**
-- [User Guide / 用户指南](./user-guide.md)
-- [CLI Options / 命令行选项](./cli-reference.md)
+- [Configuration / 配置说明](./CONFIGURATION.md)
+- [API Documentation / API 文档](./API.md)
 
 ### Q: How do I query data using natural language? / 如何使用自然语言查询数据？
 **A:**
@@ -449,7 +449,7 @@ docker build -t querygpt .
 # Run container
 docker run -d -p 5000:5000 \
   -e DB_HOST=host.docker.internal \
-  -e OPENAI_API_KEY=your_key \
+  -e API_KEY=your_key \
   querygpt
 ```
 
@@ -461,7 +461,7 @@ docker build -t querygpt .
 # 运行容器
 docker run -d -p 5000:5000 \
   -e DB_HOST=host.docker.internal \
-  -e OPENAI_API_KEY=your_key \
+  -e API_KEY=your_key \
   querygpt
 ```
 
@@ -577,8 +577,8 @@ services:
    - 可用的错误日志
 
 **Related Links / 相关链接:**
-- [Issue Template / 问题模板](.github/ISSUE_TEMPLATE.md)
-- [Bug Reports / 错误报告](https://github.com/yourusername/QueryGPT/issues)
+- [Bug Reports / 错误报告](https://github.com/MKY508/QueryGPT/issues)
+- [Feature Requests / 功能请求](https://github.com/MKY508/QueryGPT/issues/new)
 
 ---
 
@@ -594,12 +594,12 @@ services:
 
 If your question isn't answered here:
 1. Search the [documentation](./index.md)
-2. Check [GitHub Issues](https://github.com/yourusername/QueryGPT/issues)
+2. Check [GitHub Issues](https://github.com/MKY508/QueryGPT/issues)
 3. Join our [Discord server](https://discord.gg/querygpt)
-4. Contact support: support@querygpt.com
+4. Submit an issue on GitHub
 
 如果您的问题未在此处解答：
 1. 搜索[文档](./index.md)
-2. 查看[GitHub Issues](https://github.com/yourusername/QueryGPT/issues)
+2. 查看[GitHub Issues](https://github.com/MKY508/QueryGPT/issues)
 3. 加入我们的[Discord服务器](https://discord.gg/querygpt)
-4. 联系支持：support@querygpt.com
+4. 在 GitHub 上提交问题
