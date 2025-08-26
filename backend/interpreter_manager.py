@@ -150,9 +150,15 @@ class InterpreterManager:
             conversation_history = None
             if conversation_id:
                 conversation_history = self._get_conversation_history(conversation_id)
+                logger.info(f"[会话上下文] 会话ID: {conversation_id}, 历史消息数: {len(conversation_history) if conversation_history else 0}")
+                if conversation_history:
+                    logger.debug(f"[会话上下文] 最近消息: {conversation_history[-2:] if len(conversation_history) >= 2 else conversation_history}")
+            else:
+                logger.warning("[会话上下文] 未提供会话ID，无法维持对话上下文")
             
             # 构建包含历史的提示词（使用增强后的查询）
             full_prompt = self._build_prompt_with_context(enhanced_query, context, conversation_history, language)
+            logger.debug(f"[会话上下文] 构建的完整提示词长度: {len(full_prompt)} 字符")
             
             # 存储当前的interpreter以便停止
             if conversation_id:
@@ -505,13 +511,48 @@ class InterpreterManager:
         return list(self.config.get("models", {}).keys())
     
     def _get_conversation_history(self, conversation_id: str) -> list:
-        """获取会话历史"""
-        return self._conversation_history.get(conversation_id, [])
+        """获取会话历史 - 优先从内存，其次从数据库"""
+        # 先检查内存缓存
+        if conversation_id in self._conversation_history:
+            logger.info(f"从内存获取会话历史: {conversation_id}, 消息数: {len(self._conversation_history[conversation_id])}")
+            return self._conversation_history[conversation_id]
+        
+        # 如果内存中没有，尝试从数据库加载
+        try:
+            from backend.history_manager import HistoryManager
+            history_manager = HistoryManager()
+            
+            # 从数据库获取历史
+            history_data = history_manager.get_conversation_history(conversation_id)
+            if history_data and 'messages' in history_data:
+                # 转换格式并缓存到内存
+                messages = []
+                for msg in history_data['messages']:
+                    messages.append({
+                        "role": "user" if msg['type'] == "user" else "assistant",
+                        "content": msg['content'],
+                        "timestamp": msg.get('timestamp', '')
+                    })
+                
+                # 保存到内存缓存
+                self._conversation_history[conversation_id] = messages
+                logger.info(f"从数据库加载会话历史: {conversation_id}, 消息数: {len(messages)}")
+                return messages
+        except Exception as e:
+            logger.warning(f"从数据库加载会话历史失败: {e}")
+        
+        # 如果都没有，返回空列表并初始化
+        logger.info(f"创建新会话历史: {conversation_id}")
+        self._conversation_history[conversation_id] = []
+        return []
     
     def _save_to_history(self, conversation_id: str, query: str, result: Any):
-        """保存到会话历史"""
+        """保存到会话历史 - 同时保存到内存和数据库"""
+        logger.info(f"[保存历史] 开始保存会话历史: {conversation_id}")
+        
         if conversation_id not in self._conversation_history:
             self._conversation_history[conversation_id] = []
+            logger.info(f"[保存历史] 创建新的内存历史记录: {conversation_id}")
         
         history = self._conversation_history[conversation_id]
         
@@ -595,21 +636,44 @@ class InterpreterManager:
         return base_prompt
     
     def _format_history(self, conversation_history: list) -> str:
-        """格式化会话历史为文本"""
+        """格式化会话历史为文本 - 保留更多上下文信息"""
         if not conversation_history:
             return ""
         
         formatted_parts = []
-        for msg in conversation_history[-6:]:  # 只取最近3轮对话
+        # 计算要显示的历史轮数
+        max_messages = min(len(conversation_history), self.max_history_rounds * 2)
+        recent_history = conversation_history[-max_messages:] if max_messages > 0 else []
+        
+        logger.info(f"格式化历史: 总消息数={len(conversation_history)}, 显示最近={max_messages}")
+        
+        for i, msg in enumerate(recent_history):
             role = msg.get('role', '')
             content = msg.get('content', '')
             
+            # 保留更多内容以维持上下文
+            max_length = 500  # 增加显示长度
+            if len(content) > max_length:
+                content = content[:max_length] + "..."
+            
             if role == 'user':
-                formatted_parts.append(f"用户问: {content[:200]}...")
+                formatted_parts.append(f"【用户查询 {i//2 + 1}】: {content}")
             elif role == 'assistant':
-                formatted_parts.append(f"助手答: {content[:300]}...")
+                # 对于助手回复，提取关键信息
+                if '```sql' in content.lower():
+                    # 提取SQL查询
+                    import re
+                    sql_match = re.search(r'```sql\n(.*?)\n```', content, re.DOTALL | re.IGNORECASE)
+                    if sql_match:
+                        formatted_parts.append(f"【系统执行】: SQL查询 - {sql_match.group(1)[:200]}")
+                    else:
+                        formatted_parts.append(f"【系统回复】: {content}")
+                else:
+                    formatted_parts.append(f"【系统回复】: {content}")
         
-        return '\n'.join(formatted_parts)
+        if formatted_parts:
+            return "=== 对话历史 ===\n" + '\n\n'.join(formatted_parts) + "\n=== 历史结束 ==="
+        return ""
     
     def clear_conversation(self, conversation_id: str):
         """清除特定会话的历史"""
