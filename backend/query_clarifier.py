@@ -47,12 +47,16 @@ class QueryClarifier:
         if has_business_term:
             # 检查是否有明确的时间
             time_patterns = [
-                r'\d{4}年',  # 2024年
-                r'\d{1,2}月',  # 7月
+                r'\d{4}\s*年',  # 2024年 或 2024 年
+                r'\d{1,2}\s*月',  # 7月 或 7 月
+                r'\d{1,2}[-–—]\d{1,2}\s*月',  # 1-7月、1–7月
                 r'本月|上月|本年|去年|今年',
                 r'第[一二三四]季度',
                 r'[0-9]{4}-[0-9]{2}',  # 2024-07
-                r'最近|近期'
+                r'最近|近期',
+                r'Q[1-4]',  # Q1, Q2等
+                r'\d{1,2}/\d{1,2}',  # 1/1, 7/31等
+                r'全年|年度'
             ]
             
             has_time = any(re.search(pattern, query) for pattern in time_patterns)

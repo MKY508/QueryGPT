@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from interpreter import OpenInterpreter
 import logging
 from backend.config_loader import ConfigLoader
-from backend.query_clarifier import SmartQueryProcessor
+# from backend.query_clarifier import SmartQueryProcessor  # 已禁用查询澄清器
 import time
 from threading import Lock
 
@@ -90,30 +90,8 @@ class InterpreterManager:
         执行查询并返回结果，支持会话上下文和中断
         """
         try:
-            # 先检查查询是否需要澄清
-            processor = SmartQueryProcessor()
-            clarification_result = processor.process(query)
-            
-            if clarification_result['status'] == 'needs_clarification':
-                # 需要澄清，返回友好提示
-                clarification_msg = processor.format_clarification_response(clarification_result)
-                logger.info(f"查询需要澄清: {query[:50]}...")
-                
-                return {
-                    "success": True,
-                    "needs_clarification": True,
-                    "result": {
-                        "content": [{
-                            "type": "text",
-                            "content": clarification_msg
-                        }]
-                    },
-                    "model": model_name or self.config.get("current_model"),
-                    "conversation_id": conversation_id
-                }
-            
-            # 使用增强后的查询
-            enhanced_query = clarification_result.get('query', query)
+            # 查询澄清检查已禁用 - 让 OpenInterpreter 自行处理所有查询
+            # 直接使用原始查询，不进行预处理
             # 创建新的interpreter实例
             interpreter = self.create_interpreter(model_name)
             
@@ -157,7 +135,7 @@ class InterpreterManager:
                 logger.warning("[会话上下文] 未提供会话ID，无法维持对话上下文")
             
             # 构建包含历史的提示词（使用增强后的查询）
-            full_prompt = self._build_prompt_with_context(enhanced_query, context, conversation_history, language)
+            full_prompt = self._build_prompt_with_context(query, context, conversation_history, language)
             logger.debug(f"[会话上下文] 构建的完整提示词长度: {len(full_prompt)} 字符")
             
             # 存储当前的interpreter以便停止
