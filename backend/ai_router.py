@@ -5,6 +5,7 @@ AI驱动的智能查询路由系统
 import logging
 import json
 import time
+import re  # 添加re模块导入，修复运行时NameError
 from typing import Dict, Any, Optional, Tuple
 from enum import Enum
 

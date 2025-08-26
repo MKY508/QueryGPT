@@ -182,6 +182,10 @@ class SmartRouter:
         """
         logger.info("执行复杂分析路径 - 使用完整AI流程")
         
+        # 防御性编程：确保context不为None
+        if context is None:
+            context = {}
+        
         if self.interpreter_manager:
             result = self.interpreter_manager.execute_query(
                 query=query,
