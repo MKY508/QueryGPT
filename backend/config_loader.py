@@ -41,19 +41,19 @@ class ConfigLoader:
         db_host = os.getenv("DB_HOST")
         db_port = os.getenv("DB_PORT")
         db_user = os.getenv("DB_USER")
-        db_password = os.getenv("DB_PASSWORD")
+        db_password = os.getenv("DB_PASSWORD", "")  # 允许空密码
         
-        # 验证必需的配置
-        if not all([db_host, db_port, db_user, db_password]):
+        # 验证必需的配置（密码可以为空字符串）
+        if not db_host or not db_port or not db_user:
             raise ValueError(
-                "数据库配置不完整，请确保.env文件包含：DB_HOST, DB_PORT, DB_USER, DB_PASSWORD"
+                "数据库配置不完整，请确保.env文件包含：DB_HOST, DB_PORT, DB_USER"
             )
         
         return {
             "host": db_host,
             "port": int(db_port),
             "user": db_user,
-            "password": db_password,
+            "password": db_password if db_password else "",  # 确保密码至少是空字符串
             "database": os.getenv("DB_DATABASE", "")
         }
     
