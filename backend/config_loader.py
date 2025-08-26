@@ -59,24 +59,42 @@ class ConfigLoader:
     
     @staticmethod
     def get_api_config() -> Dict[str, Any]:
-        """获取API配置 - 支持多种命名方式以保持向后兼容"""
+        """获取API配置 - 优先从config.json读取，其次从环境变量"""
         ConfigLoader.load_env()
         
-        # 支持多种环境变量名称，优先使用标准命名
+        # 先尝试从 config.json 文件读取
+        config_from_file = {}
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.json')
+        if os.path.exists(config_path):
+            try:
+                import json
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_from_file = json.load(f)
+                logger.info(f"从config.json加载配置: {config_from_file.get('default_model', 'N/A')}")
+            except Exception as e:
+                logger.warning(f"读取config.json失败: {e}")
+        
+        # 优先使用文件配置，其次环境变量
         api_key = (
-            os.getenv("OPENAI_API_KEY") or      # 标准OpenAI命名
-            os.getenv("API_KEY") or              # 旧命名（向后兼容）
-            os.getenv("LLM_API_KEY")             # 备选命名
+            config_from_file.get("api_key") or           # 从config.json
+            os.getenv("OPENAI_API_KEY") or               # 标准OpenAI命名
+            os.getenv("API_KEY") or                      # 旧命名（向后兼容）
+            os.getenv("LLM_API_KEY")                     # 备选命名
         )
         
         api_base = (
-            os.getenv("OPENAI_BASE_URL") or      # 标准命名
-            os.getenv("OPENAI_API_BASE") or      # OpenAI SDK标准
-            os.getenv("API_BASE_URL") or         # 旧命名（向后兼容）
-            os.getenv("LLM_BASE_URL")            # 备选命名
+            config_from_file.get("api_base") or          # 从config.json
+            os.getenv("OPENAI_BASE_URL") or              # 标准命名
+            os.getenv("OPENAI_API_BASE") or              # OpenAI SDK标准
+            os.getenv("API_BASE_URL") or                 # 旧命名（向后兼容）
+            os.getenv("LLM_BASE_URL")                    # 备选命名
         )
         
-        default_model = os.getenv("DEFAULT_MODEL", "gpt-4.1")
+        # 优先使用config.json中的default_model
+        default_model = (
+            config_from_file.get("default_model") or     # 从config.json
+            os.getenv("DEFAULT_MODEL", "gpt-4.1")        # 从环境变量
+        )
         
         # 验证必需的API配置
         if not api_key:
@@ -84,11 +102,25 @@ class ConfigLoader:
         if not api_base:
             raise ValueError("API基础URL未配置，请在.env文件中设置 OPENAI_BASE_URL 或 API_BASE_URL")
         
+        # 记录实际使用的模型
+        logger.info(f"使用模型配置: default_model={default_model}")
+        
         return {
             "api_key": api_key,
             "api_base": api_base,
             "default_model": default_model,
+            "current_model": default_model,  # 添加 current_model 字段
             "models": {
+                default_model: {  # 使用配置的默认模型
+                    "api_key": api_key,
+                    "base_url": api_base,
+                    "model_name": default_model
+                },
+                "gpt-5": {
+                    "api_key": api_key,
+                    "base_url": api_base,
+                    "model_name": "gpt-5"
+                },
                 "gpt-4.1": {
                     "api_key": api_key,
                     "base_url": api_base,
