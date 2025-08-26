@@ -765,11 +765,40 @@ class DataAnalysisPlatform {
                         item.content.includes('数据') || item.content.includes('结果')) {
                         queryData.push(item.content.substring(0, 200));
                     }
-                    // 检查HTML生成 - 简化路径匹配，只提取文件名
-                    const htmlMatches = item.content.match(/[\w\u4e00-\u9fa5_\-]+\.html/g);
-                    if (htmlMatches) {
+                    // 检查HTML生成 - 改进路径匹配，支持 WSL 和多种格式
+                    const patterns = [
+                        // WSL 路径格式: /mnt/c/Users/.../output/xxx.html
+                        /\/mnt\/[a-z]\/.*?\/([^\s\/\\]+\.html)/gi,
+                        // Windows 路径格式: C:\Users\...\output\xxx.html
+                        /[a-zA-Z]:\\.*?\\([^\s\/\\]+\.html)/gi,
+                        // Unix 路径格式: /path/to/output/xxx.html
+                        /(?:output\/|\/output\/|\.\/output\/)?([^\s\/\\]+\.html)/gi,
+                        // 带中文关键词的格式
+                        /保存[为到][：:\s]*(?:.*[\/\\])?([^\s\/\\]+\.html)/gi,
+                        /生成了?[：:\s]*(?:.*[\/\\])?([^\s\/\\]+\.html)/gi,
+                        /文件[：:\s]*(?:.*[\/\\])?([^\s\/\\]+\.html)/gi,
+                        // 简单文件名格式
+                        /([\w\u4e00-\u9fa5_\-]+\.html)/g
+                    ];
+                    
+                    let foundPaths = new Set();
+                    for (const pattern of patterns) {
+                        const matches = item.content.matchAll(pattern);
+                        for (const match of matches) {
+                            // 提取纯文件名（移除所有路径部分）
+                            let filename = match[1] || match[0];
+                            // 处理 Windows 和 Unix 路径分隔符
+                            filename = filename.split(/[\/\\]/).pop();
+                            if (filename && filename.endsWith('.html') && !filename.includes(' ')) {
+                                foundPaths.add(filename);
+                                console.log('检测到HTML文件:', filename);
+                            }
+                        }
+                    }
+                    
+                    if (foundPaths.size > 0) {
                         htmlGenerated = true;
-                        chartPaths.push(...htmlMatches);
+                        chartPaths.push(...Array.from(foundPaths));
                     }
                 }
                 if (item.type === 'error') {
