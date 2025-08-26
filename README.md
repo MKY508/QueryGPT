@@ -152,71 +152,7 @@ cd QueryGPT
 ./quick_start.sh
 ```
 
----
-
-### 💡 进阶用户（可选）
-
-<details>
-<summary>🪟 Windows WSL 手动安装</summary>
-
-```bash
-dos2unix *.sh  # 修复换行符
-chmod +x *.sh  # 添加权限
-./start_windows.sh  # Windows 专用脚本
-```
-</details>
-
-<details>
-<summary>🍎 macOS 手动安装</summary>
-
-```bash
-# Intel Mac
-./setup.sh
-
-# Apple Silicon (M1/M2/M3)
-./setup_arm.sh
-```
-</details>
-
-<details>
-<summary>🐧 Linux 手动安装</summary>
-
-```bash
-# x86_64
-./setup.sh
-
-# ARM (树莓派等)
-./setup_arm.sh
-```
-</details>
-
-<details>
-<summary>🔧 诊断工具</summary>
-
-```bash
-./check_arch.sh   # 检查架构
-./diagnose.sh     # 环境诊断
-./test_windows.sh # Windows 测试
-```
-</details>
-
 系统会自动查找可用端口（5000-5010），启动后会显示访问地址。
-
-### 环境要求
-- Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
-- MySQL 或兼容数据库
-
-### 架构兼容性
-| 平台 | 架构 | 安装脚本 | 说明 |
-|------|------|----------|------|
-| Windows WSL | x86_64 | `./start_windows.sh` | 最佳兼容性 |
-| Windows WSL | ARM64 | `./setup_arm.sh` | Surface Pro X |
-| macOS | Intel | `./setup.sh` | 标准安装 |
-| macOS | Apple Silicon | `./setup_arm.sh` | M1/M2/M3 |
-| Linux | x86_64 | `./setup.sh` | 标准安装 |
-| Linux | ARM64 | `./setup_arm.sh` | 树莓派等 |
-
-📖 详细兼容性说明请查看 [兼容性文档](COMPATIBILITY.md)
 
 ## 💡 使用示例
 
