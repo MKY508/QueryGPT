@@ -161,9 +161,11 @@ class AIRoutingClassifier:
                 max_tokens=200
             )
             
-            # 更新token统计
-            if hasattr(response, 'usage'):
-                self.stats["total_tokens_used"] += response.usage.get('total_tokens', 0)
+            # 更新token统计（response是字典，不是对象）
+            if isinstance(response, dict) and 'usage' in response:
+                usage = response['usage']
+                if isinstance(usage, dict):
+                    self.stats["total_tokens_used"] += usage.get('total_tokens', 0)
             
             return response.get('content', '')
         except Exception as e:
