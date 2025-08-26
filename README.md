@@ -129,29 +129,26 @@
 
 ## 🚀 快速开始（懒人模式）
 
-### 方式一：智能启动（推荐）
 ```bash
-# 克隆项目
+# 1. 克隆项目
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 智能启动（自动判断是否需要安装）
+# 2. 安装依赖
+./setup.sh
+
+# 3. 启动服务
 ./start.sh
 ```
 
-`start.sh` 会自动：
-- ✅ 首次运行 → 调用 `setup.sh` 完成安装并启动
-- ✅ 已安装 → 调用 `quick_start.sh` 秒级启动
-- ✅ Windows WSL → 自动修复换行符
-- ✅ ARM 架构 → 自动选择 `setup_arm.sh`
+就这么简单！✨ 系统会自动：
+- ✅ 检测环境并安装依赖
+- ✅ 创建配置文件
+- ✅ 启动服务（默认 http://localhost:5000）
 
-### 方式二：标准流程
+### 后续使用
 ```bash
-# 首次使用（安装并启动）
-./setup.sh        # x86 架构
-./setup_arm.sh    # ARM 架构（M1/M2/树莓派）
-
-# 后续使用（快速启动）
+# 快速启动（跳过安装步骤）
 ./quick_start.sh
 ```
 
