@@ -850,7 +850,7 @@ class DataAnalysisPlatform {
                         <div class="chart-section">
                             <h4><i class="fas fa-chart-bar"></i> 生成的图表：</h4>
                             ${this.currentViewMode === 'user' ? 
-                                // 用户视图：直接嵌入图表
+                                // 用户视图：同时显示iframe嵌入和下载链接
                                 chartPaths.map(path => {
                                     const filename = path.split('/').pop();
                                     const iframeId = 'chart-iframe-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -880,6 +880,16 @@ class DataAnalysisPlatform {
                                             onload="document.getElementById('loading-${iframeId}').style.display='none';"
                                             onerror="document.getElementById('loading-${iframeId}').innerHTML='<i class=\"fas fa-exclamation-triangle\"></i> 图表加载失败';">
                                         </iframe>
+                                        <div class="chart-download-link" style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+                                            <i class="fas fa-download"></i> 
+                                            <a href="/output/${filename}" download="${filename}" class="html-file-link">
+                                                📊 下载图表: ${filename}
+                                            </a>
+                                            <span style="margin-left: 10px;">|</span>
+                                            <a href="/output/${filename}" target="_blank" class="html-file-link" style="margin-left: 10px;">
+                                                <i class="fas fa-external-link-alt"></i> 在新标签页打开
+                                            </a>
+                                        </div>
                                     </div>
                                 `;
                                 }).join('') :
