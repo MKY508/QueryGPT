@@ -52,13 +52,21 @@ class API {
     /**
      * 发送聊天消息
      */
-    async sendMessage(message, conversationId = null, viewMode = 'user') {
+    async sendMessage(message, conversationId = null, viewMode = 'user', modelName = null) {
+        // 获取当前选中的模型
+        const currentModel = modelName || 
+                            document.getElementById('current-model')?.value ||
+                            window.app?.config?.default_model || 
+                            localStorage.getItem('default_model') || 
+                            'gpt-5-high';
+        
         return this.request('/api/chat', {
             method: 'POST',
             body: JSON.stringify({
                 message,
                 conversation_id: conversationId,
-                view_mode: viewMode
+                view_mode: viewMode,
+                model: currentModel
             })
         });
     }
@@ -67,19 +75,26 @@ class API {
      * 流式发送消息（支持实时响应）
      * 注意：当前后端不支持流式响应，改为普通请求
      */
-    async sendMessageStream(message, conversationId = null, viewMode = 'user', onProgress = null) {
+    async sendMessageStream(message, conversationId = null, viewMode = 'user', onProgress = null, modelName = null) {
         try {
             // 显示思考状态
             if (onProgress) {
                 onProgress({ type: 'thinking', content: window.i18nManager.t('common.thinking') });
             }
             
+            // 获取当前选中的模型，优先使用传入的参数
+            const currentModel = modelName || 
+                                document.getElementById('current-model')?.value ||
+                                window.app?.config?.default_model || 
+                                localStorage.getItem('default_model') || 
+                                'gpt-5-high';
+            
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: this.headers,
                 body: JSON.stringify({
                     query: message,  // 注意字段名是query
-                    model: localStorage.getItem('default_model') || 'gpt-4.1',
+                    model: currentModel,  // 使用当前选中的模型
                     use_database: true,
                     conversation_id: conversationId,  // 传递会话ID
                     context_rounds: window.app?.contextRounds || 3,  // 传递上下文轮数

@@ -655,20 +655,66 @@ class SettingsManager {
     async saveBasicSettings() {
         console.log('saveBasicSettings 被调用');
         
+        // 添加空值检查，避免元素不存在导致的错误
+        const defaultModelElement = document.getElementById('default-model');
+        const defaultViewModeElement = document.getElementById('default-view-mode');
+        const contextRoundsElement = document.getElementById('context-rounds');
+        
+        // 从现有配置或默认值获取
         const settings = {
-            default_model: document.getElementById('default-model').value,
-            default_view_mode: document.getElementById('default-view-mode').value,
-            context_rounds: parseInt(document.getElementById('context-rounds').value) || 3
+            default_model: defaultModelElement?.value || this.config?.default_model || 'gpt-5',
+            default_view_mode: defaultViewModeElement?.value || this.config?.default_view_mode || 'dual',
+            context_rounds: parseInt(contextRoundsElement?.value) || this.config?.context_rounds || 3
         };
         
         console.log('要保存的设置:', settings);
 
         try {
-            // 保存到后端API
-            await api.saveSettings(settings);
+            // 先获取最新的后端配置，确保不丢失关键字段
+            let currentConfig = {};
+            try {
+                const configResponse = await fetch('/api/config');
+                if (configResponse.ok) {
+                    currentConfig = await configResponse.json();
+                }
+            } catch (e) {
+                console.warn('获取当前配置失败，使用本地配置:', e);
+                currentConfig = this.config || {};
+            }
             
-            // 保存到本地存储
+            // 构建完整的配置对象，保留所有必要字段
+            const configToSave = {
+                ...currentConfig,  // 保留现有的所有配置（包括 api_key, api_base 等）
+                ...settings        // 覆盖基础设置字段
+            };
+            
+            console.log('准备保存的完整配置:', configToSave);
+            
+            // 保存到后端API
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(configToSave)
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('后端返回错误:', errorText);
+                throw new Error(`保存配置失败: ${response.status}`);
+            }
+            
+            // 更新本地配置副本
+            if (!this.config) {
+                this.config = {};
+            }
+            Object.assign(this.config, settings);
+            
+            // 保存到本地存储作为备份
             localStorage.setItem('basic_settings', JSON.stringify(settings));
+            // 也单独保存 default_model 以便 API 调用时使用
+            localStorage.setItem('default_model', settings.default_model);
             
             // 更新应用的上下文轮数设置
             if (window.app) {
@@ -676,6 +722,10 @@ class SettingsManager {
                 // 更新默认视图模式
                 window.app.currentViewMode = settings.default_view_mode;
                 localStorage.setItem('view_mode', settings.default_view_mode);
+                // 更新应用配置中的默认模型
+                if (window.app.config) {
+                    window.app.config.default_model = settings.default_model;
+                }
             }
             
             // 显示成功通知
@@ -787,16 +837,66 @@ class SettingsManager {
      */
     async loadSettings() {
         try {
-            // 加载基础设置
+            // 优先从后端配置加载设置
+            if (this.config) {
+                // 加载后端配置中的基础设置
+                if (this.config.default_model) {
+                    const defaultModelSelect = document.getElementById('default-model');
+                    if (defaultModelSelect) {
+                        defaultModelSelect.value = this.config.default_model;
+                    }
+                }
+                if (this.config.default_view_mode) {
+                    const defaultViewModeSelect = document.getElementById('default-view-mode');
+                    if (defaultViewModeSelect) {
+                        defaultViewModeSelect.value = this.config.default_view_mode;
+                    }
+                }
+                if (this.config.context_rounds !== undefined) {
+                    const contextRoundsSelect = document.getElementById('context-rounds');
+                    if (contextRoundsSelect) {
+                        contextRoundsSelect.value = this.config.context_rounds;
+                        console.log('从后端配置加载 context_rounds:', this.config.context_rounds);
+                    }
+                    // 同时更新应用的 contextRounds
+                    if (window.app) {
+                        window.app.contextRounds = this.config.context_rounds;
+                        console.log('更新 app.contextRounds 为:', this.config.context_rounds);
+                    }
+                }
+            }
+            
+            // 如果后端配置中没有，再从localStorage加载
             const basicSettings = JSON.parse(localStorage.getItem('basic_settings') || '{}');
-            if (basicSettings.default_model) {
-                document.getElementById('default-model').value = basicSettings.default_model;
+            if (!this.config || this.config.default_model === undefined) {
+                if (basicSettings.default_model) {
+                    const defaultModelSelect = document.getElementById('default-model');
+                    if (defaultModelSelect) {
+                        defaultModelSelect.value = basicSettings.default_model;
+                    }
+                }
             }
-            if (basicSettings.default_view_mode) {
-                document.getElementById('default-view-mode').value = basicSettings.default_view_mode;
+            if (!this.config || this.config.default_view_mode === undefined) {
+                if (basicSettings.default_view_mode) {
+                    const defaultViewModeSelect = document.getElementById('default-view-mode');
+                    if (defaultViewModeSelect) {
+                        defaultViewModeSelect.value = basicSettings.default_view_mode;
+                    }
+                }
             }
-            if (basicSettings.context_rounds !== undefined) {
-                document.getElementById('context-rounds').value = basicSettings.context_rounds;
+            if (!this.config || this.config.context_rounds === undefined) {
+                if (basicSettings.context_rounds !== undefined) {
+                    const contextRoundsSelect = document.getElementById('context-rounds');
+                    if (contextRoundsSelect) {
+                        contextRoundsSelect.value = basicSettings.context_rounds;
+                        console.log('从localStorage加载 context_rounds:', basicSettings.context_rounds);
+                    }
+                    // 同时更新应用的 contextRounds
+                    if (window.app) {
+                        window.app.contextRounds = basicSettings.context_rounds;
+                        console.log('更新 app.contextRounds 为:', basicSettings.context_rounds);
+                    }
+                }
             }
 
             // 加载系统设置

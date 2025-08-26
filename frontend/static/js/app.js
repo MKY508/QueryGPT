@@ -68,6 +68,24 @@ class DataAnalysisPlatform {
             }
         });
         
+        // 从 localStorage 加载基础设置（包括 context_rounds）
+        try {
+            const basicSettings = JSON.parse(localStorage.getItem('basic_settings') || '{}');
+            
+            // 如果后端配置中没有 context_rounds，使用 localStorage 中的值
+            if (this.config && this.config.context_rounds === undefined && basicSettings.context_rounds !== undefined) {
+                this.contextRounds = basicSettings.context_rounds;
+                console.log('从 localStorage 加载 context_rounds:', this.contextRounds);
+            }
+            
+            // 更新默认视图模式
+            if (basicSettings.default_view_mode) {
+                this.currentViewMode = basicSettings.default_view_mode;
+            }
+        } catch (error) {
+            console.warn('加载基础设置失败:', error);
+        }
+        
         // 设置事件监听器（不依赖后端）
         this.setupEventListeners();
         
@@ -437,7 +455,12 @@ class DataAnalysisPlatform {
             // 创建可取消的请求
             this.abortController = new AbortController();
             
-            // 发送消息并处理流式响应
+            // 获取当前选中的模型
+            const currentModelElement = document.getElementById('current-model');
+            const selectedModel = currentModelElement?.value || this.config?.default_model || 'gpt-5-high';
+            console.log('当前选择的模型:', selectedModel);
+            
+            // 发送消息并处理流式响应，传递模型参数
             const response = await api.sendMessageStream(
                 message,
                 this.currentConversationId,
@@ -456,7 +479,8 @@ class DataAnalysisPlatform {
                         }
                     }
                     this.handleStreamResponse(data, thinkingId);
-                }
+                },
+                selectedModel  // 传递选中的模型
             );
             
             // 更新会话ID（从最终响应）
@@ -1738,6 +1762,12 @@ class DataAnalysisPlatform {
                 if (modelSelect) {
                     modelSelect.value = this.config.current_model;
                 }
+            }
+            
+            // 加载上下文轮数设置
+            if (this.config.context_rounds !== undefined) {
+                this.contextRounds = this.config.context_rounds;
+                console.log('从配置加载 context_rounds:', this.contextRounds);
             }
         } catch (error) {
             // 静默处理错误，使用默认配置
