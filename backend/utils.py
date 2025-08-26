@@ -123,11 +123,50 @@ def sanitize_sql_query(query: str) -> str:
         if keyword in query_upper:
             raise ValueError(f"不允许执行{keyword}操作")
     
-    # 移除注释
-    query = query.replace('--', '')
-    query = query.replace('/*', '').replace('*/', '')
+    # 智能移除注释，避免误删字符串字面量中的内容
+    cleaned_query = []
+    in_single_quote = False
+    in_double_quote = False
+    i = 0
     
-    return query.strip()
+    while i < len(query):
+        # 处理字符串字面量
+        if query[i] == "'" and not in_double_quote:
+            in_single_quote = not in_single_quote
+            cleaned_query.append(query[i])
+            i += 1
+        elif query[i] == '"' and not in_double_quote:
+            in_double_quote = not in_double_quote
+            cleaned_query.append(query[i])
+            i += 1
+        # 只在字符串外移除注释
+        elif not in_single_quote and not in_double_quote:
+            # 检查单行注释 --
+            if i < len(query) - 1 and query[i:i+2] == '--':
+                # 跳过直到行尾
+                while i < len(query) and query[i] != '\n':
+                    i += 1
+                if i < len(query):
+                    cleaned_query.append('\n')  # 保留换行
+                    i += 1
+            # 检查多行注释 /* */
+            elif i < len(query) - 1 and query[i:i+2] == '/*':
+                # 跳过直到 */
+                i += 2
+                while i < len(query) - 1:
+                    if query[i:i+2] == '*/':
+                        i += 2
+                        break
+                    i += 1
+            else:
+                cleaned_query.append(query[i])
+                i += 1
+        else:
+            # 在字符串内，保留所有字符
+            cleaned_query.append(query[i])
+            i += 1
+    
+    return ''.join(cleaned_query).strip()
 
 def format_datetime(dt) -> str:
     """
