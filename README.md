@@ -127,7 +127,7 @@
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 2. 安装依赖（首次安装需要下载 100-200MB）
+# 2. 安装依赖（首次安装需下载上百MB，可能需要等待几分钟）
 ./setup.sh
 
 # 3. 启动服务
