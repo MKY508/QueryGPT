@@ -710,16 +710,10 @@ class DataAnalysisPlatform {
             finalSummary = data.summary;
         }
         
-        // 如果 data.content 是字符串（整个响应就是总结）
-        if (typeof data.content === 'string') {
-            // 检查是否包含总结关键词
-            if (data.content.includes('总结') || 
-                data.content.includes('任务') || 
-                data.content.includes('关键') ||
-                data.content.includes('生成文件')) {
-                finalSummary = data.content;
-                // 找到字符串格式的总结
-            }
+        // 如果 data.content 是字符串，直接使用它作为总结
+        if (typeof data.content === 'string' && data.content.trim().length > 0) {
+            finalSummary = data.content;
+            console.log('使用字符串内容作为总结');
         }
         
         if (data.content && Array.isArray(data.content)) {
@@ -857,117 +851,87 @@ class DataAnalysisPlatform {
                 </div>
             `;
         } else {
-            // 如果没有总结，使用原来的结构化显示
-            summaryHtml = `
-                <div class="user-summary-content">
-                    <div class="summary-header">
-                        <i class="fas fa-check-circle"></i> 查询执行完成
-                    </div>
-                    
-                    <div class="summary-points">
-                    <!-- 1. 查询到的数据 -->
-                    <div class="summary-point">
-                        <div class="point-header">
-                            <i class="fas fa-database"></i>
-                            <strong>1. 查询到了哪些数据</strong>
-                        </div>
-                        <div class="point-content">
-                            ${queryData.length > 0 ? 
-                                `<p class="success">✅ 成功查询到数据</p>
-                                 <div class="data-preview">${queryData[0]}</div>` : 
-                                errorMessages.length > 0 ?
-                                `<p class="error">❌ 查询失败: ${errorMessages[0]}</p>` :
-                                `<p class="warning">⚠️ 未检测到数据查询结果</p>`
-                            }
-                        </div>
-                    </div>
-                    
-                    <!-- 2. SQL命令 -->
-                    <div class="summary-point">
-                        <div class="point-header">
-                            <i class="fas fa-code"></i>
-                            <strong>2. 执行的SQL命令</strong>
-                        </div>
-                        <div class="point-content">
-                            ${sqlCommands.length > 0 ? 
-                                `<p class="success">✅ 执行了 ${sqlCommands.length} 条SQL查询</p>
-                                 <div class="sql-preview">
-                                     ${sqlCommands.slice(0, 2).map(sql => 
-                                         `<code>${sql.substring(0, 80)}${sql.length > 80 ? '...' : ''}</code>`
-                                     ).join('<br>')}
-                                     ${sqlCommands.length > 2 ? `<br><small>...还有 ${sqlCommands.length - 2} 条查询</small>` : ''}
-                                 </div>` : 
-                                `<p class="warning">⚠️ 未检测到SQL查询命令</p>`
-                            }
-                        </div>
-                    </div>
-                    
-                    <!-- 3. HTML生成状态 -->
-                    <div class="summary-point">
-                        <div class="point-header">
-                            <i class="fas fa-chart-bar"></i>
-                            <strong>3. 可视化图表生成</strong>
-                        </div>
-                        <div class="point-content">
-                            ${htmlGenerated ? 
-                                `<p class="success">✅ 成功生成可视化图表</p>
-                                 ${this.currentViewMode === 'user' ?
-                                     // 用户视图：嵌入图表
-                                     `<div class="chart-embeds">
-                                         ${chartPaths.map(filename => {
-                                             const iframeId = 'chart-iframe-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-                                             return `
-                                             <div class="chart-embed-container">
-                                                 <div class="chart-embed-header">
-                                                     <span class="chart-filename">📊 ${filename}</span>
-                                                     <div class="chart-actions">
-                                                         <button class="btn-fullscreen" onclick="app.toggleFullscreen('${iframeId}')" title="全屏">
-                                                             <i class="fas fa-expand"></i>
-                                                         </button>
-                                                         <button class="btn-new-tab" onclick="app.openChart('${filename}')" title="新标签页打开">
-                                                             <i class="fas fa-external-link-alt"></i>
-                                                         </button>
-                                                     </div>
-                                                 </div>
-                                                 <div class="chart-embed-loading" id="loading-${iframeId}">
-                                                     <i class="fas fa-spinner fa-spin"></i> 加载图表中...
-                                                 </div>
-                                                 <iframe 
-                                                     id="${iframeId}"
-                                                     src="/output/${filename}" 
-                                                     class="chart-iframe"
-                                                     frameborder="0"
-                                                     width="100%"
-                                                     height="600"
-                                                     onload="document.getElementById('loading-${iframeId}').style.display='none';"
-                                                     onerror="document.getElementById('loading-${iframeId}').innerHTML='<i class=\"fas fa-exclamation-triangle\"></i> 图表加载失败';">
-                                                 </iframe>
-                                             </div>
-                                         `;
-                                         }).join('')}
-                                     </div>` :
-                                     // 开发者视图：显示按钮
-                                     `<div class="chart-files">
-                                         ${chartPaths.map(filename => {
-                                             return `
-                                                 <div class="chart-file">
-                                                     <span>📊 ${filename}</span>
-                                                     <button class="btn-open-chart" onclick="app.openChart('${filename}')">
-                                                         查看图表
-                                                     </button>
-                                                 </div>
-                                             `;
-                                         }).join('')}
-                                     </div>`
-                                 }` : 
-                                `<p class="info">ℹ️ 本次查询未生成可视化图表</p>`
-                            }
-                        </div>
-                    </div>
-                </div>
+            // 如果没有找到总结，尝试显示原始内容
+            let contentText = '';
+            
+            // 收集所有文本内容
+            if (data.content && Array.isArray(data.content)) {
+                const textContents = [];
+                data.content.forEach(item => {
+                    if (item.type === 'text' || item.type === 'message' || item.type === 'assistant') {
+                        if (item.content && item.content.trim()) {
+                            textContents.push(item.content);
+                        }
+                    }
+                });
                 
-            </div>
-            `;
+                if (textContents.length > 0) {
+                    contentText = textContents.join('\n\n');
+                }
+            }
+            
+            // 如果还是没有内容，使用原始数据
+            if (!contentText && data.content) {
+                if (typeof data.content === 'string') {
+                    contentText = data.content;
+                } else if (typeof data.content === 'object') {
+                    contentText = JSON.stringify(data.content, null, 2);
+                }
+            }
+            
+            // 如果有任何内容，显示它
+            if (contentText) {
+                summaryHtml = `
+                    <div class="user-summary-content">
+                        <div class="ai-summary">
+                            ${this.renderMarkdown(contentText)}
+                        </div>
+                        
+                        ${chartPaths.length > 0 ? `
+                            <div class="chart-section">
+                                <h4><i class="fas fa-chart-bar"></i> 生成的图表：</h4>
+                                ${chartPaths.map(path => {
+                                    const filename = path.split('/').pop();
+                                    const iframeId = 'chart-iframe-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                                    return `
+                                    <div class="chart-embed-container">
+                                        <div class="chart-embed-header">
+                                            <span class="chart-filename">📊 ${filename}</span>
+                                            <div class="chart-actions">
+                                                <button class="btn-fullscreen" onclick="app.toggleFullscreen('${iframeId}')" title="全屏">
+                                                    <i class="fas fa-expand"></i>
+                                                </button>
+                                                <button class="btn-new-tab" onclick="app.openChart('${filename}')" title="新标签页打开">
+                                                    <i class="fas fa-external-link-alt"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <iframe 
+                                            id="${iframeId}"
+                                            src="/output/${filename}" 
+                                            class="chart-iframe"
+                                            frameborder="0"
+                                            width="100%"
+                                            height="600"
+                                            loading="lazy">
+                                        </iframe>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            } else {
+                // 真的没有任何内容时的后备显示
+                summaryHtml = `
+                    <div class="user-summary-content">
+                        <div class="ai-summary">
+                            <p>查询已执行，但未返回可显示的内容。</p>
+                        </div>
+                    </div>
+                `;
+            }
         }
         
         // 在总结末尾添加优化提示
@@ -2463,8 +2427,9 @@ class DataAnalysisPlatform {
                                 const dualViewContainer = this.createDualViewContainer(wrappedContent);
                                 this.addMessage('bot', dualViewContainer);
                             } else {
-                                // 其他对象格式
-                                this.addMessage('bot', JSON.stringify(content, null, 2));
+                                // 其他对象格式 - 也通过双视图容器处理
+                                const dualViewContainer = this.createDualViewContainer(content);
+                                this.addMessage('bot', dualViewContainer);
                             }
                         } else if (typeof content === 'string') {
                             // 纯文本消息
@@ -2475,8 +2440,13 @@ class DataAnalysisPlatform {
                         }
                     } catch (error) {
                         console.error('解析历史消息失败:', error, msg);
-                        // 降级处理：显示原始内容
-                        this.addMessage('bot', typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content));
+                        // 降级处理：也通过双视图容器处理
+                        if (typeof msg.content === 'string') {
+                            this.addMessage('bot', msg.content);
+                        } else {
+                            const dualViewContainer = this.createDualViewContainer(msg.content);
+                            this.addMessage('bot', dualViewContainer);
+                        }
                     }
                 }
             });

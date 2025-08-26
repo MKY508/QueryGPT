@@ -85,25 +85,9 @@ Database: {conn.get('database', '')}"""
         if not connection_info:
             connection_info = PromptTemplates._get_default_connection()
         
-        # 先检查查询是否需要澄清
-        clarification_check = f"""
-# 查询澄清检查
-from backend.query_clarifier import SmartQueryProcessor
-processor = SmartQueryProcessor()
-result = processor.process('{user_query}')
-
-if result['status'] == 'needs_clarification':
-    # 需要澄清，返回提示
-    print(processor.format_clarification_response(result))
-    # 不执行查询，直接返回
-else:
-    # 查询清晰，继续执行
-    enhanced_query = result['query']
-"""
+        # 查询澄清检查已禁用 - 让 OpenInterpreter 自行处理查询
         
         return f"""任务：{user_query}
-
-{clarification_check}
 
 数据库连接（Apache Doris）：
 {PromptTemplates._format_connection(connection_info)}
