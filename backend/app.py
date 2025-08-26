@@ -7,6 +7,7 @@ import sys
 import json
 import logging
 import re
+import threading
 from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from flask_cors import CORS
 from datetime import datetime
@@ -72,8 +73,14 @@ prompt_templates = PromptTemplates()
 smart_router = None
 sql_executor = None
 
-# 存储正在执行的查询任务
+# 存储正在执行的查询任务（使用线程锁保护）
 active_queries = {}
+active_queries_lock = threading.RLock()  # 使用可重入锁支持嵌套调用
+
+def _get_stop_status(conversation_id):
+    """线程安全地获取停止状态"""
+    with active_queries_lock:
+        return active_queries.get(conversation_id, {}).get('should_stop', False)
 
 def init_managers():
     """初始化各个管理器"""
@@ -359,11 +366,12 @@ def chat():
         else:
             full_query = user_query
         
-        # 标记查询开始
-        active_queries[conversation_id] = {
-            'start_time': datetime.now(),
-            'should_stop': False
-        }
+        # 标记查询开始（线程安全）
+        with active_queries_lock:
+            active_queries[conversation_id] = {
+                'start_time': datetime.now(),
+                'should_stop': False
+            }
         
         # 保存用户消息到历史记录
         if history_manager and conversation_id:
@@ -399,7 +407,7 @@ def chat():
                     'language': user_language,
                     'use_database': use_database,
                     'context_rounds': context_rounds,
-                    'stop_checker': lambda: active_queries.get(conversation_id, {}).get('should_stop', False),
+                    'stop_checker': lambda: _get_stop_status(conversation_id),
                     'connection_info': context.get('connection_info', {})  # 安全访问，避免KeyError
                 }
                 
@@ -423,14 +431,15 @@ def chat():
                     context=context,
                     model_name=model_name,
                     conversation_id=conversation_id,  # 传递会话ID
-                    stop_checker=lambda: active_queries.get(conversation_id, {}).get('should_stop', False),
+                    stop_checker=lambda: _get_stop_status(conversation_id),
                     language=user_language  # 传递语言设置
                 )
                 result['smart_routing_used'] = False
         finally:
-            # 清理活跃查询记录
-            if conversation_id in active_queries:
-                del active_queries[conversation_id]
+            # 清理活跃查询记录（线程安全）
+            with active_queries_lock:
+                if conversation_id in active_queries:
+                    del active_queries[conversation_id]
         
         # 保存助手响应到历史记录
         if history_manager and conversation_id:
@@ -988,15 +997,19 @@ def stop_query():
         if not conversation_id:
             return jsonify({"error": "需要提供会话ID"}), 400
         
-        # 检查是否有正在执行的查询
-        if conversation_id in active_queries:
-            query_info = active_queries[conversation_id]
-            query_info['should_stop'] = True
+        # 检查是否有正在执行的查询（线程安全）
+        query_found = False
+        with active_queries_lock:
+            if conversation_id in active_queries:
+                query_info = active_queries[conversation_id]
+                query_info['should_stop'] = True
+                query_found = True
             
             # 如果有interpreter实例，尝试停止它
             if interpreter_manager:
                 interpreter_manager.stop_query(conversation_id)
-            
+        
+        if query_found:
             logger.info(f"停止查询请求: {conversation_id}")
             return jsonify({
                 "success": True,
