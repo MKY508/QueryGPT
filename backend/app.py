@@ -737,7 +737,8 @@ def handle_config():
                     with open(config_path, 'r') as f:
                         saved_config = json.load(f)
                         # 只合并UI相关的配置，不覆盖API和数据库配置
-                        for key in ['interface_language', 'interface_theme', 'auto_run_code', 'show_thinking']:
+                        for key in ['interface_language', 'interface_theme', 'auto_run_code', 'show_thinking', 
+                                   'context_rounds', 'default_view_mode']:
                             if key in saved_config:
                                 config[key] = saved_config[key]
                 except:
