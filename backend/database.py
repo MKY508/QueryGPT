@@ -10,8 +10,7 @@ from contextlib import contextmanager
 import os
 from backend.config_loader import ConfigLoader
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
+# 获取日志记录器
 logger = logging.getLogger(__name__)
 
 class DatabaseManager:
@@ -219,6 +218,44 @@ class DatabaseManager:
             return db_list
         except Exception as e:
             logger.error(f"获取数据库列表失败: {e}")
+            return []
+    
+    def get_tables(self, database: Optional[str] = None) -> List[str]:
+        """
+        获取数据库中的所有表
+        
+        Args:
+            database: 指定数据库名，如果为None则使用当前数据库
+            
+        Returns:
+            表名列表
+        """
+        try:
+            query = "SHOW TABLES"
+            if database:
+                query = f"SHOW TABLES FROM `{database}`"
+            
+            with self.get_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query)
+                    results = cursor.fetchall()
+                    
+                    if not results:
+                        return []
+                    
+                    # 提取表名
+                    tables = []
+                    for row in results:
+                        # 获取字典的第一个值（表名）
+                        table_name = list(row.values())[0] if row else None
+                        if table_name:
+                            tables.append(table_name)
+                    
+                    logger.info(f"获取到 {len(tables)} 个表")
+                    return tables
+                    
+        except Exception as e:
+            logger.error(f"获取表列表失败: {e}")
             return []
     
     def get_connection_info(self) -> Dict[str, Any]:

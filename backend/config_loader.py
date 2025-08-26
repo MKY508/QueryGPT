@@ -59,19 +59,30 @@ class ConfigLoader:
     
     @staticmethod
     def get_api_config() -> Dict[str, Any]:
-        """获取API配置"""
+        """获取API配置 - 支持多种命名方式以保持向后兼容"""
         ConfigLoader.load_env()
         
-        # 不要提供默认的API密钥
-        api_key = os.getenv("API_KEY")
-        api_base = os.getenv("API_BASE_URL")
+        # 支持多种环境变量名称，优先使用标准命名
+        api_key = (
+            os.getenv("OPENAI_API_KEY") or      # 标准OpenAI命名
+            os.getenv("API_KEY") or              # 旧命名（向后兼容）
+            os.getenv("LLM_API_KEY")             # 备选命名
+        )
+        
+        api_base = (
+            os.getenv("OPENAI_BASE_URL") or      # 标准命名
+            os.getenv("OPENAI_API_BASE") or      # OpenAI SDK标准
+            os.getenv("API_BASE_URL") or         # 旧命名（向后兼容）
+            os.getenv("LLM_BASE_URL")            # 备选命名
+        )
+        
         default_model = os.getenv("DEFAULT_MODEL", "gpt-4.1")
         
         # 验证必需的API配置
         if not api_key:
-            raise ValueError("API_KEY未配置，请在.env文件中设置")
+            raise ValueError("API密钥未配置，请在.env文件中设置 OPENAI_API_KEY 或 API_KEY")
         if not api_base:
-            raise ValueError("API_BASE_URL未配置，请在.env文件中设置")
+            raise ValueError("API基础URL未配置，请在.env文件中设置 OPENAI_BASE_URL 或 API_BASE_URL")
         
         return {
             "api_key": api_key,

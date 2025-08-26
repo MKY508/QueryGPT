@@ -12,8 +12,7 @@ from backend.query_clarifier import SmartQueryProcessor
 import time
 from threading import Lock
 
-# 配置日志
-logging.basicConfig(level=logging.INFO)
+# 获取日志记录器
 logger = logging.getLogger(__name__)
 
 class InterpreterManager:
@@ -440,20 +439,45 @@ class InterpreterManager:
         
         for msg in conversation_history:
             content = str(msg.get('content', ''))
+            
             # 查找SHOW DATABASES的结果
-            if 'SHOW DATABASES' in content or 'Tables_in_' in content:
-                # 提取数据库或表名（简化处理）
+            if 'SHOW DATABASES' in content:
+                lines = content.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    # 跳过标题行和空行
+                    if line and not line.startswith('Database') and not line.startswith('---'):
+                        explored_dbs.add(line)
+            
+            # 查找SHOW TABLES的结果
+            if 'Tables_in_' in content or 'SHOW TABLES' in content:
                 lines = content.split('\n')
                 for line in lines:
                     if 'Tables_in_' in line:
+                        # 提取数据库名
                         db_name = line.split('Tables_in_')[1].split()[0] if 'Tables_in_' in line else None
                         if db_name:
                             explored_dbs.add(db_name)
-                    # 可以添加更多的模式匹配来提取表名
+                    else:
+                        line = line.strip()
+                        # 提取表名，跳过标题和分隔线
+                        if line and not line.startswith('Tables') and not line.startswith('---') and '|' not in line:
+                            explored_tables.add(line)
         
         # 构建摘要
         if explored_dbs:
-            summary_parts.append(f"已探索的数据库: {', '.join(explored_dbs)}")
+            # 限制显示的数据库数量
+            db_list = list(explored_dbs)[:5]
+            summary_parts.append(f"已探索的数据库: {', '.join(db_list)}")
+            if len(explored_dbs) > 5:
+                summary_parts.append(f"  (共 {len(explored_dbs)} 个数据库)")
+        
+        if explored_tables:
+            # 限制显示的表数量
+            table_list = list(explored_tables)[:10]
+            summary_parts.append(f"已探索的表: {', '.join(table_list)}")
+            if len(explored_tables) > 10:
+                summary_parts.append(f"  (共 {len(explored_tables)} 个表)")
         
         # 添加最近查询的摘要
         if len(recent_messages) > 0:
