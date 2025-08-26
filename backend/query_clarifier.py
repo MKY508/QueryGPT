@@ -213,5 +213,9 @@ class SmartQueryProcessor:
                     response += f"  {i}. {suggestion}\n"
             
             return response
-        
-        return ""
+        elif result["status"] == "ready":
+            # 为正常查询提供标准响应
+            return "查询已就绪，正在处理您的请求..."
+        else:
+            # 处理其他状态
+            return f"查询状态: {result.get('status', '未知')}"

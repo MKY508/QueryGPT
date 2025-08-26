@@ -215,34 +215,72 @@ class AIRoutingClassifier:
     
     def _parse_text_response(self, response: str) -> Dict[str, Any]:
         """
-        解析文本格式的响应
+        解析文本格式的响应 - 使用更严格的匹配规则
         """
+        import re
         response_lower = response.lower()
         
-        if 'direct_sql' in response_lower or '1' in response:
-            return {
-                'route': RouteType.DIRECT_SQL.value,
-                'confidence': 0.7,
-                'reason': '检测到简单查询'
-            }
-        elif 'simple_analysis' in response_lower or '2' in response:
-            return {
-                'route': RouteType.SIMPLE_ANALYSIS.value,
-                'confidence': 0.7,
-                'reason': '检测到简单分析需求'
-            }
-        elif 'visualization' in response_lower or '4' in response:
-            return {
-                'route': RouteType.VISUALIZATION.value,
-                'confidence': 0.7,
-                'reason': '检测到可视化需求'
-            }
-        else:
-            return {
-                'route': RouteType.COMPLEX_ANALYSIS.value,
-                'confidence': 0.6,
-                'reason': '默认使用复杂分析'
-            }
+        # 定义更严格的匹配模式
+        patterns = {
+            RouteType.DIRECT_SQL.value: [
+                r'\bdirect_sql\b', 
+                r'^1\b',
+                r'^\s*1\s*\.', 
+                r'选择.*direct.*sql',
+                r'路由.*1\b'
+            ],
+            RouteType.SIMPLE_ANALYSIS.value: [
+                r'\bsimple_analysis\b',
+                r'^2\b',
+                r'^\s*2\s*\.',
+                r'选择.*simple.*analysis',
+                r'路由.*2\b'
+            ],
+            RouteType.COMPLEX_ANALYSIS.value: [
+                r'\bcomplex_analysis\b',
+                r'^3\b',
+                r'^\s*3\s*\.',
+                r'选择.*complex.*analysis',
+                r'路由.*3\b'
+            ],
+            RouteType.VISUALIZATION.value: [
+                r'\bvisualization\b',
+                r'^4\b',
+                r'^\s*4\s*\.',
+                r'选择.*visualization',
+                r'路由.*4\b'
+            ]
+        }
+        
+        # 计算每个路由类型的匹配分数
+        scores = {}
+        for route_type, route_patterns in patterns.items():
+            score = 0
+            for pattern in route_patterns:
+                if re.search(pattern, response_lower):
+                    score += 1
+            scores[route_type] = score
+        
+        # 选择得分最高的路由
+        if scores:
+            best_route = max(scores, key=scores.get)
+            max_score = scores[best_route]
+            
+            if max_score > 0:
+                # 根据匹配数量计算置信度
+                confidence = min(0.5 + max_score * 0.15, 0.95)
+                return {
+                    'route': best_route,
+                    'confidence': confidence,
+                    'reason': f'文本匹配分析（匹配度: {max_score}）'
+                }
+        
+        # 默认返回复杂分析路由
+        return {
+            'route': RouteType.COMPLEX_ANALYSIS.value,
+            'confidence': 0.5,
+            'reason': '无法确定路由类型，使用默认复杂分析'
+        }
     
     def _get_default_route(self, query: str) -> Dict[str, Any]:
         """
