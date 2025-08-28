@@ -704,24 +704,33 @@ class SemanticLayerManager {
     
     // 扫描数据源
     async scanDatasource() {
-        const datasourceId = prompt('请输入数据源标识（例如：main_db）：');
-        if (!datasourceId) {
+        // 显示确认对话框
+        const confirmScan = confirm(
+            '即将扫描所有可访问的数据库并自动分析语义信息。\n\n' +
+            '这将：\n' +
+            '• 自动连接到已配置的数据库\n' +
+            '• 扫描所有表和字段结构\n' +
+            '• 智能推断业务语义\n' +
+            '• 识别度量和维度\n\n' +
+            '是否继续？'
+        );
+        
+        if (!confirmScan) {
             return;
         }
-        
-        const displayName = prompt('请输入数据源显示名称（例如：主数据库）：', datasourceId);
         
         try {
             this.showLoading('正在扫描数据库，请稍候...');
             
-            const response = await fetch(`/api/semantic/datasources/${datasourceId}/scan`, {
+            // 使用 'auto' 作为数据源ID，让后端自动扫描所有数据库
+            const response = await fetch('/api/semantic/datasources/auto/scan', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 },
                 body: JSON.stringify({
-                    display_name: displayName || datasourceId
+                    display_name: '主数据源'
                 })
             });
             

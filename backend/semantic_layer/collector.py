@@ -8,6 +8,7 @@ import pymysql
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import json
+from .semantic_analyzer import SemanticAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class MetadataCollector:
         """
         self.connection_config = connection_config
         self.connection = None
+        self.analyzer = SemanticAnalyzer()  # 初始化语义分析器
         
     def connect(self):
         """建立数据库连接"""
@@ -358,10 +360,14 @@ class MetadataCollector:
                     # 获取关系信息
                     relationships = self.get_table_relationships(db, table_name)
                     
+                    # 使用语义分析器分析表
+                    semantic_analysis = self.analyzer.analyze_table(table_name, columns)
+                    
                     table_metadata = {
                         'info': table_info,
                         'columns': columns,
-                        'relationships': relationships
+                        'relationships': relationships,
+                        'semantic_analysis': semantic_analysis  # 添加语义分析结果
                     }
                     
                     db_metadata['tables'][table_name] = table_metadata

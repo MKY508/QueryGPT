@@ -107,8 +107,12 @@ def scan_datasource(datasource_id):
         # 创建元数据采集器
         collector = MetadataCollector(connection_config)
         
-        # 采集元数据
-        metadata = collector.collect_full_metadata()
+        # 采集元数据 - 如果没有指定数据源ID或为'auto'，则扫描所有数据库
+        if not datasource_id or datasource_id == 'auto':
+            metadata = collector.collect_full_metadata()  # 扫描所有数据库
+            datasource_id = 'main_db'  # 使用默认名称
+        else:
+            metadata = collector.collect_full_metadata(datasource_id)
         
         # 保存到管理器
         manager, _ = init_semantic_layer()
@@ -117,7 +121,7 @@ def scan_datasource(datasource_id):
         datasource_info = {
             'datasource_id': datasource_id,
             'name': datasource_id,
-            'display_name': request.json.get('display_name', datasource_id),
+            'display_name': request.json.get('display_name', '主数据源'),
             'type': 'mysql',
             'connection_config': connection_config
         }
@@ -126,12 +130,18 @@ def scan_datasource(datasource_id):
         # 保存表和字段信息
         for db_name, db_data in metadata['datasources'].items():
             for table_name, table_data in db_data['tables'].items():
-                # 保存表语义
+                # 获取语义分析结果
+                semantic_analysis = table_data.get('semantic_analysis', {})
+                
+                # 保存表语义（使用智能分析的结果）
                 table_semantic = {
-                    'display_name': table_data['info'].get('comment', ''),
-                    'description': '',
-                    'category': '',
-                    'tags': []
+                    'display_name': semantic_analysis.get('suggested_name', table_data['info'].get('comment', '')),
+                    'description': semantic_analysis.get('suggested_description', ''),
+                    'category': semantic_analysis.get('business_category', ''),
+                    'tags': [
+                        semantic_analysis.get('table_type', ''),
+                        semantic_analysis.get('aggregation_level', '')
+                    ]
                 }
                 
                 table_id = manager.save_table_semantic(
@@ -139,17 +149,42 @@ def scan_datasource(datasource_id):
                 )
                 
                 # 保存列语义
+                # 先检查语义分析中的度量和维度
+                measures = {m['column_name']: m for m in semantic_analysis.get('measures', [])}
+                dimensions = {d['column_name']: d for d in semantic_analysis.get('dimensions', [])}
+                time_dims = {t['column_name']: t for t in semantic_analysis.get('time_dimensions', [])}
+                
                 for column in table_data['columns']:
+                    col_name = column['column_name']
+                    
+                    # 优先使用语义分析的结果
+                    if col_name in measures:
+                        col_analysis = measures[col_name]
+                        semantic_type = 'measure'
+                    elif col_name in time_dims:
+                        col_analysis = time_dims[col_name]
+                        semantic_type = 'time_dimension'
+                    elif col_name in dimensions:
+                        col_analysis = dimensions[col_name]
+                        semantic_type = 'dimension'
+                    else:
+                        col_analysis = column.get('suggestions', {})
+                        semantic_type = 'dimension'
+                    
                     column_semantic = {
                         'data_type': column['data_type'],
-                        'display_name': column['suggestions'].get('display_name', ''),
+                        'display_name': col_analysis.get('suggested_name', column['suggestions'].get('display_name', '')),
                         'description': column.get('comment', ''),
-                        'business_type': column['suggestions'].get('business_type', ''),
-                        'unit': column['suggestions'].get('unit', ''),
+                        'business_type': col_analysis.get('business_type', column['suggestions'].get('business_type', '')),
+                        'semantic_type': semantic_type,
+                        'unit': col_analysis.get('unit', column['suggestions'].get('unit', '')),
+                        'suggested_aggregations': col_analysis.get('suggested_aggregations', []),
                         'synonyms': [],
                         'examples': column.get('sample_values', []),
                         'is_required': column.get('is_nullable') == 'NO',
-                        'is_sensitive': False
+                        'is_sensitive': False,
+                        'is_primary_key': col_analysis.get('is_primary_key', False),
+                        'is_foreign_key': col_analysis.get('is_foreign_key', False)
                     }
                     
                     manager.save_column_semantic(
