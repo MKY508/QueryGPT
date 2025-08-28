@@ -187,7 +187,7 @@ cp .env.example .env
 
 ```bash
 # Inicio rápido directo
-./quick_start.sh
+./start.sh
 ```
 
 El servicio se ejecuta en http://localhost:5000 por defecto

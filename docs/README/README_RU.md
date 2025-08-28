@@ -156,7 +156,7 @@ cp .env.example .env
 
 ```bash
 # Использование скрипта быстрого запуска
-./quick_start.sh
+./start.sh
 ```
 
 Сервис будет доступен по адресу: http://localhost:5000

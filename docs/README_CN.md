@@ -115,8 +115,8 @@ cd QueryGPT
 ### 后续使用
 
 ```bash
-# 直接快速启动
-./quick_start.sh
+# 直接启动（已安装环境）
+./start.sh
 ```
 
 服务默认运行在 http://localhost:5000
