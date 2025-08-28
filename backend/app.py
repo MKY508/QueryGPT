@@ -1487,7 +1487,7 @@ if __name__ == '__main__':
     os.makedirs('cache', exist_ok=True)
     
     # 启动服务器
-    port = int(os.environ.get('PORT', 5001))
+    port = int(os.environ.get('PORT', 5002))
     logger.info(f"启动服务器，端口: {port}")
     
     app.run(
