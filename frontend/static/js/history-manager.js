@@ -280,11 +280,6 @@ class HistoryManager {
                     <span class="history-meta-count">
                         <i class="fas fa-comment"></i> ${conversation.message_count || 0}
                     </span>
-                    ${conversation.model ? `
-                        <span class="history-meta-model">
-                            <i class="fas fa-brain"></i> ${conversation.model}
-                        </span>
-                    ` : ''}
                 </div>
             </div>
         `;
