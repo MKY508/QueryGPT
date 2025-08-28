@@ -135,6 +135,11 @@ def test_onboarding():
         return send_from_directory(os.path.dirname(test_file), 'test_onboarding.html')
     return jsonify({"error": "测试页面不存在"}), 404
 
+@app.route('/debug_onboarding')
+def debug_onboarding():
+    """新手引导调试页面"""
+    return send_from_directory(TEMPLATE_DIR, 'debug_onboarding.html')
+
 @app.route('/config/<path:filename>')
 def serve_config(filename):
     """服务配置文件"""

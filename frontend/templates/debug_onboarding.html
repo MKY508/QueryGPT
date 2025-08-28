@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新手引导调试工具</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .status-card {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        .status-key {
+            font-weight: bold;
+            color: #495057;
+        }
+        .status-value {
+            color: #28a745;
+            font-family: monospace;
+        }
+        .status-value.false {
+            color: #dc3545;
+        }
+        .status-value.null {
+            color: #6c757d;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        .console {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .console-log {
+            margin: 5px 0;
+        }
+        .console-info {
+            color: #66d9ef;
+        }
+        .console-success {
+            color: #a6e22e;
+        }
+        .console-error {
+            color: #f92672;
+        }
+        .console-warn {
+            color: #fd971f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 新手引导调试工具</h1>
+        
+        <div class="status-card">
+            <h3>📊 当前状态</h3>
+            <div id="status-list">
+                <div class="status-item">
+                    <span class="status-key">正在加载...</span>
+                    <span class="status-value">...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-card">
+            <h3>⚙️ 配置信息</h3>
+            <div id="config-list">
+                <div class="status-item">
+                    <span class="status-key">正在加载...</span>
+                    <span class="status-value">...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-primary" onclick="refreshStatus()">🔄 刷新状态</button>
+            <button class="btn-success" onclick="forceShowGuide()">▶️ 强制显示引导</button>
+            <button class="btn-warning" onclick="resetGuide()">🔄 重置引导状态</button>
+            <button class="btn-danger" onclick="clearAllStorage()">🗑️ 清除所有存储</button>
+            <button class="btn-primary" onclick="testConfigLoad()">🧪 测试配置加载</button>
+            <button class="btn-primary" onclick="goToMainApp()">🏠 返回主应用</button>
+        </div>
+
+        <div class="console" id="console">
+            <div class="console-log console-info">控制台已准备就绪...</div>
+        </div>
+    </div>
+
+    <script>
+        const storageKeys = {
+            completed: 'querygpt_onboarding_completed',
+            version: 'querygpt_onboarding_version',
+            session: 'querygpt_onboarding_shown_session'
+        };
+
+        function log(message, type = 'info') {
+            const console = document.getElementById('console');
+            const logEntry = document.createElement('div');
+            logEntry.className = `console-log console-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            console.appendChild(logEntry);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        async function refreshStatus() {
+            log('刷新状态...', 'info');
+            
+            // 获取localStorage状态
+            const statusData = {
+                '已完成标记': localStorage.getItem(storageKeys.completed) || 'null',
+                '版本号': localStorage.getItem(storageKeys.version) || 'null',
+                '会话标记': sessionStorage.getItem(storageKeys.session) || 'null',
+                'localStorage总项数': localStorage.length,
+                'sessionStorage总项数': sessionStorage.length
+            };
+
+            // 更新状态显示
+            const statusList = document.getElementById('status-list');
+            statusList.innerHTML = '';
+            
+            for (const [key, value] of Object.entries(statusData)) {
+                const item = document.createElement('div');
+                item.className = 'status-item';
+                
+                let valueClass = 'status-value';
+                if (value === 'false' || value === false) valueClass += ' false';
+                if (value === 'null' || value === null) valueClass += ' null';
+                
+                item.innerHTML = `
+                    <span class="status-key">${key}:</span>
+                    <span class="${valueClass}">${value}</span>
+                `;
+                statusList.appendChild(item);
+            }
+
+            // 尝试加载配置
+            try {
+                const response = await fetch('/config/onboarding_config.json');
+                const config = await response.json();
+                
+                const configData = {
+                    '启用状态': config.onboarding?.enabled ?? 'undefined',
+                    '显示给新用户': config.onboarding?.show_for_new_users ?? 'undefined',
+                    '强制显示': config.onboarding?.force_show ?? 'undefined',
+                    '配置版本': config.onboarding?.version ?? 'undefined',
+                    '自动启动延迟': config.onboarding?.auto_start_delay ?? 'undefined'
+                };
+
+                const configList = document.getElementById('config-list');
+                configList.innerHTML = '';
+                
+                for (const [key, value] of Object.entries(configData)) {
+                    const item = document.createElement('div');
+                    item.className = 'status-item';
+                    
+                    let valueClass = 'status-value';
+                    if (value === false) valueClass += ' false';
+                    if (value === 'undefined') valueClass += ' null';
+                    
+                    item.innerHTML = `
+                        <span class="status-key">${key}:</span>
+                        <span class="${valueClass}">${value}</span>
+                    `;
+                    configList.appendChild(item);
+                }
+                
+                log('配置加载成功', 'success');
+            } catch (error) {
+                log(`配置加载失败: ${error.message}`, 'error');
+                document.getElementById('config-list').innerHTML = 
+                    '<div class="status-item"><span class="status-key">错误:</span><span class="status-value false">无法加载配置</span></div>';
+            }
+            
+            log('状态刷新完成', 'success');
+        }
+
+        function clearAllStorage() {
+            if (confirm('确定要清除所有存储数据吗？这将重置新手引导状态。')) {
+                // 清除新手引导相关的存储
+                localStorage.removeItem(storageKeys.completed);
+                localStorage.removeItem(storageKeys.version);
+                sessionStorage.removeItem(storageKeys.session);
+                
+                log('已清除所有新手引导存储数据', 'warn');
+                refreshStatus();
+            }
+        }
+
+        function resetGuide() {
+            localStorage.removeItem(storageKeys.completed);
+            localStorage.removeItem(storageKeys.version);
+            sessionStorage.removeItem(storageKeys.session);
+            
+            log('新手引导状态已重置', 'success');
+            log('下次访问主页面时将显示引导', 'info');
+            refreshStatus();
+        }
+
+        function forceShowGuide() {
+            // 清除存储并跳转到主页面
+            resetGuide();
+            log('正在跳转到主页面并强制显示引导...', 'info');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        }
+
+        async function testConfigLoad() {
+            log('测试配置文件加载...', 'info');
+            
+            try {
+                const response = await fetch('/config/onboarding_config.json');
+                log(`HTTP状态码: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const config = await response.json();
+                    log('配置文件加载成功', 'success');
+                    log(`配置内容: ${JSON.stringify(config, null, 2)}`, 'info');
+                } else {
+                    log(`加载失败: HTTP ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`加载异常: ${error.message}`, 'error');
+            }
+        }
+
+        function goToMainApp() {
+            window.location.href = '/';
+        }
+
+        // 页面加载时自动刷新状态
+        window.addEventListener('DOMContentLoaded', () => {
+            refreshStatus();
+            log('调试工具已初始化', 'success');
+            
+            // 检测是否在iframe中
+            if (window.self !== window.top) {
+                log('警告：页面在iframe中运行', 'warn');
+            }
+        });
+    </script>
+</body>
+</html>
