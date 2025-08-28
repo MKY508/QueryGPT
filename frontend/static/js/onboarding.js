@@ -166,19 +166,9 @@ class OnboardingGuide {
         const completedVersion = localStorage.getItem(this.versionKey);
         const currentVersion = this.config?.version || this.defaultConfig.version;
         
-        // 如果版本号相同，说明已经完成了当前版本的引导
-        if (completedVersion === currentVersion) {
-            return true;
-        }
-        
-        // 兼容旧版本：如果有旧的完成标记但没有版本号，视为已完成
-        if (localStorage.getItem(this.storageKey) === 'true' && !completedVersion) {
-            // 更新到新的存储格式
-            localStorage.setItem(this.versionKey, currentVersion);
-            return true;
-        }
-        
-        return false;
+        // 只有当版本号完全匹配时才视为已完成
+        // 这样可以在版本更新时重新显示引导
+        return completedVersion === currentVersion;
     }
     
     /**
@@ -254,11 +244,144 @@ class OnboardingGuide {
         // 如果配置允许跳过，点击遮罩跳过引导
         if (this.config?.settings?.allow_skip !== false) {
             this.overlay.addEventListener('click', () => {
-                if (confirm('要跳过新手引导吗？')) {
-                    this.complete();
-                }
+                this.showSkipConfirmDialog();
             });
         }
+    }
+    
+    /**
+     * 显示跳过确认对话框
+     */
+    showSkipConfirmDialog() {
+        // 创建确认对话框
+        const dialog = document.createElement('div');
+        dialog.className = 'onboarding-confirm-dialog';
+        dialog.innerHTML = `
+            <div class="confirm-dialog-content">
+                <div class="confirm-dialog-icon">
+                    <i class="fas fa-question-circle"></i>
+                </div>
+                <div class="confirm-dialog-title">跳过新手引导</div>
+                <div class="confirm-dialog-message">
+                    确定要跳过新手引导吗？<br>
+                    您可以稍后在帮助菜单中重新启动引导。
+                </div>
+                <div class="confirm-dialog-buttons">
+                    <button class="btn-cancel">继续引导</button>
+                    <button class="btn-confirm">跳过</button>
+                </div>
+            </div>
+        `;
+        
+        // 添加样式
+        dialog.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            padding: 0;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            z-index: 10002;
+            min-width: 320px;
+            animation: confirmDialogShow 0.3s ease;
+        `;
+        
+        // 添加动画样式（如果还没有）
+        if (!document.querySelector('#onboarding-confirm-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'onboarding-confirm-styles';
+            styles.textContent = `
+                @keyframes confirmDialogShow {
+                    from {
+                        opacity: 0;
+                        transform: translate(-50%, -50%) scale(0.9);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translate(-50%, -50%) scale(1);
+                    }
+                }
+                .onboarding-confirm-dialog .confirm-dialog-content {
+                    padding: 24px;
+                    text-align: center;
+                }
+                .onboarding-confirm-dialog .confirm-dialog-icon {
+                    font-size: 48px;
+                    color: #ffc107;
+                    margin-bottom: 16px;
+                }
+                .onboarding-confirm-dialog .confirm-dialog-title {
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: #333;
+                    margin-bottom: 12px;
+                }
+                .onboarding-confirm-dialog .confirm-dialog-message {
+                    font-size: 14px;
+                    color: #666;
+                    line-height: 1.6;
+                    margin-bottom: 24px;
+                }
+                .onboarding-confirm-dialog .confirm-dialog-buttons {
+                    display: flex;
+                    gap: 12px;
+                    justify-content: center;
+                }
+                .onboarding-confirm-dialog button {
+                    padding: 8px 24px;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    font-weight: 500;
+                }
+                .onboarding-confirm-dialog .btn-cancel {
+                    background: #f0f0f0;
+                    color: #333;
+                }
+                .onboarding-confirm-dialog .btn-cancel:hover {
+                    background: #e0e0e0;
+                }
+                .onboarding-confirm-dialog .btn-confirm {
+                    background: #007bff;
+                    color: white;
+                }
+                .onboarding-confirm-dialog .btn-confirm:hover {
+                    background: #0056b3;
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        // 添加到页面
+        document.body.appendChild(dialog);
+        
+        // 绑定事件
+        const cancelBtn = dialog.querySelector('.btn-cancel');
+        const confirmBtn = dialog.querySelector('.btn-confirm');
+        
+        const closeDialog = () => {
+            dialog.style.animation = 'confirmDialogShow 0.2s ease reverse';
+            setTimeout(() => {
+                dialog.remove();
+            }, 200);
+        };
+        
+        cancelBtn.addEventListener('click', closeDialog);
+        confirmBtn.addEventListener('click', () => {
+            closeDialog();
+            this.complete();
+        });
+        
+        // 点击对话框外部不关闭（防止误操作）
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) {
+                e.stopPropagation();
+            }
+        });
     }
     
     /**
@@ -619,9 +742,7 @@ class OnboardingGuide {
         const skipBtn = bubble.querySelector('.bubble-btn-skip');
         if (skipBtn) {
             skipBtn.addEventListener('click', () => {
-                if (confirm('要跳过新手引导吗？')) {
-                    this.complete();
-                }
+                this.showSkipConfirmDialog();
             });
         }
     }
