@@ -75,6 +75,110 @@ body {
 /* 侧边栏主题 - 保持原来的深灰色 */
 .sidebar {
     background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+}
+
+/* 限制侧边栏头部高度 */
+.sidebar-header {
+    flex-shrink: 0 !important;
+    max-height: 120px !important;
+    overflow: hidden !important;
+}
+
+/* 确保侧边栏导航区域有足够空间 */
+.sidebar-nav {
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    min-height: 0 !important;
+    padding: 10px 0 !important;
+}
+
+/* 防止页脚占用过多空间 */
+.sidebar-footer {
+    flex-shrink: 0 !important;
+    margin-top: auto !important;
+    max-height: 100px !important;
+}
+
+/* 确保菜单列表有适当的高度和滚动 */
+.sidebar-nav .menu-list {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+}
+
+.sidebar-nav .menu-item {
+    display: block !important;
+    margin-bottom: 5px !important;
+}
+
+/* 确保子菜单正确显示 */
+.sidebar-nav .submenu {
+    display: none;
+    padding-left: 0 !important;
+    list-style: none !important;
+}
+
+.sidebar-nav .menu-item.expanded .submenu {
+    display: block !important;
+}
+
+/* 修复菜单项的可见性 */
+.sidebar-nav .menu-header,
+.sidebar-nav .nav-link {
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    position: relative !important;
+    z-index: 1 !important;
+}
+
+/* 确保菜单文字可见 */
+.sidebar-nav .menu-header span,
+.sidebar-nav .nav-link span {
+    color: rgba(255, 255, 255, 0.9) !important;
+    visibility: visible !important;
+}
+
+/* 调试：为每个菜单项添加边框以查看实际位置 */
+.sidebar-nav .menu-item {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin: 2px 5px;
+}
+
+/* 确保整个侧边栏布局正确，但不滚动 */
+.sidebar {
+    overflow: hidden !important;
+}
+
+/* 只让导航区域滚动 */
+.sidebar-nav {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.3) transparent;
+}
+
+/* Webkit滚动条样式 */
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.3);
+    border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255,255,255,0.5);
 }
 
 /* 修复所有页面上方的黑色覆盖问题 */
