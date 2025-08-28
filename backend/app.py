@@ -31,7 +31,7 @@ from backend.rate_limiter import rate_limit, strict_limiter, cleanup_rate_limite
 from backend.smart_router import SmartRouter
 from backend.ai_router import RouteType
 from backend.sql_executor import DirectSQLExecutor
-from backend.semantic_layer.api import register_semantic_routes
+# from backend.semantic_layer.api import register_semantic_routes  # 暂时禁用以隔离问题
 
 # 配置日志
 logging.basicConfig(
@@ -139,10 +139,6 @@ def init_managers():
         # 确保data目录存在
         os.makedirs('backend/data', exist_ok=True)
         history_manager = HistoryManager()
-        
-        # 注册语义层路由
-        register_semantic_routes(app)
-        logger.info("语义层路由已注册")
         
         logger.info("所有管理器初始化成功")
     except Exception as e:
