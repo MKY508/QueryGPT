@@ -143,7 +143,7 @@ cd QueryGPT
 
 ```bash
 # Início rápido direto
-./quick_start.sh
+./start.sh
 ```
 
 O serviço será executado em http://localhost:5000 por padrão
