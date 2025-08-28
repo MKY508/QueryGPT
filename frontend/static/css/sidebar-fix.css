@@ -1,0 +1,32 @@
+/* 单一干净的侧边栏修复方案 */
+
+/* 修复侧边栏基本布局 */
+.sidebar {
+    width: 260px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 导航区域可滚动 */
+.sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 确保菜单项显示 */
+.menu-item {
+    display: block;
+}
+
+/* 子菜单默认隐藏 */
+.submenu {
+    display: none;
+}
+
+/* 展开时显示子菜单 */
+.menu-item.expanded .submenu {
+    display: block;
+}
