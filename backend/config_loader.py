@@ -59,68 +59,65 @@ class ConfigLoader:
     
     @staticmethod
     def get_api_config() -> Dict[str, Any]:
-        """获取API配置 - 优先从config.json读取，其次从环境变量"""
+        """获取API配置 - 优先从models.json读取模型配置，其次从环境变量"""
         ConfigLoader.load_env()
         
-        # 先尝试从 config.json 文件读取
-        config_from_file = {}
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.json')
-        if os.path.exists(config_path):
+        # 先尝试从 models.json 文件读取模型配置
+        models_config = {}
+        models_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'models.json')
+        if os.path.exists(models_path):
             try:
                 import json
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config_from_file = json.load(f)
-                logger.info(f"从config.json加载配置: {config_from_file.get('default_model', 'N/A')}")
+                with open(models_path, 'r', encoding='utf-8') as f:
+                    models_data = json.load(f)
+                    # 兼容两种格式：直接的数组或者 {"models": [...]}
+                    if isinstance(models_data, dict) and 'models' in models_data:
+                        models_config = models_data['models']
+                    elif isinstance(models_data, list):
+                        models_config = models_data
+                    logger.info(f"从models.json加载了 {len(models_config)} 个模型配置")
             except Exception as e:
-                logger.warning(f"读取config.json失败: {e}")
+                logger.warning(f"读取models.json失败: {e}")
         
-        # 优先使用文件配置，其次环境变量
+        # 从环境变量获取默认的API配置
         api_key = (
-            config_from_file.get("api_key") or           # 从config.json
             os.getenv("OPENAI_API_KEY") or               # 标准OpenAI命名
             os.getenv("API_KEY") or                      # 旧命名（向后兼容）
-            os.getenv("LLM_API_KEY")                     # 备选命名
+            os.getenv("LLM_API_KEY") or                  # 备选命名
+            "not-needed"                                 # 默认值（用于本地模型）
         )
         
         api_base = (
-            config_from_file.get("api_base") or          # 从config.json
             os.getenv("OPENAI_BASE_URL") or              # 标准命名
             os.getenv("OPENAI_API_BASE") or              # OpenAI SDK标准
             os.getenv("API_BASE_URL") or                 # 旧命名（向后兼容）
-            os.getenv("LLM_BASE_URL")                    # 备选命名
+            os.getenv("LLM_BASE_URL") or                 # 备选命名
+            "http://localhost:11434/v1"                  # 默认Ollama地址
         )
         
-        # 优先使用config.json中的default_model
-        default_model = (
-            config_from_file.get("default_model") or     # 从config.json
-            os.getenv("DEFAULT_MODEL", "gpt-4.1")        # 从环境变量
-        )
+        # 获取默认模型
+        default_model = os.getenv("DEFAULT_MODEL", "gpt-4.1")
         
-        # 验证必需的API配置
-        if not api_key:
-            raise ValueError("API密钥未配置，请在.env文件中设置 OPENAI_API_KEY 或 API_KEY")
-        if not api_base:
-            raise ValueError("API基础URL未配置，请在.env文件中设置 OPENAI_BASE_URL 或 API_BASE_URL")
-        
-        # 记录实际使用的模型
-        logger.info(f"使用模型配置: default_model={default_model}")
-        
-        return {
-            "api_key": api_key,
-            "api_base": api_base,
-            "default_model": default_model,
-            "current_model": default_model,  # 添加 current_model 字段
-            "models": {
-                default_model: {  # 使用配置的默认模型
-                    "api_key": api_key,
-                    "base_url": api_base,
-                    "model_name": default_model
-                },
-                "gpt-5": {
-                    "api_key": api_key,
-                    "base_url": api_base,
-                    "model_name": "gpt-5"
-                },
+        # 构建模型字典：如果有models.json配置就使用，否则使用默认配置
+        models = {}
+        if models_config:
+            # 使用models.json中的配置
+            for model in models_config:
+                model_id = model.get('id', model.get('name', ''))
+                if model_id:
+                    models[model_id] = {
+                        "api_key": model.get('api_key', api_key),
+                        "base_url": model.get('api_base', api_base),
+                        "model_name": model_id,
+                        "status": model.get('status', 'active')
+                    }
+            # 设置默认模型为第一个active的模型
+            active_models = [m for m in models_config if m.get('status') == 'active']
+            if active_models:
+                default_model = active_models[0].get('id', default_model)
+        else:
+            # 如果没有models.json，使用默认配置
+            models = {
                 "gpt-4.1": {
                     "api_key": api_key,
                     "base_url": api_base,
@@ -142,6 +139,16 @@ class ConfigLoader:
                     "model_name": "qwen-flagship"
                 }
             }
+        
+        # 记录实际使用的模型
+        logger.info(f"使用模型配置: default_model={default_model}, 总共 {len(models)} 个模型")
+        
+        return {
+            "api_key": api_key,
+            "api_base": api_base,
+            "default_model": default_model,
+            "current_model": default_model,  # 添加 current_model 字段
+            "models": models
         }
     
     @staticmethod
