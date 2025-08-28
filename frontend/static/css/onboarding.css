@@ -1,0 +1,332 @@
+/**
+ * Onboarding Guide Styles
+ * Bubble tooltip design with consistent UI theme
+ */
+
+/* ================== 高亮效果 ================== */
+.onboarding-highlight {
+    position: relative !important;
+    z-index: 9999 !important;
+    box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25) !important;
+    border-radius: 4px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(0, 123, 255, 0.15);
+    }
+    100% {
+        box-shadow: 0 0 0 4px rgba(0, 123, 255, 0.25);
+    }
+}
+
+/* ================== 气泡提示 ================== */
+.onboarding-bubble {
+    position: fixed;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    z-index: 10000;
+    min-width: 320px;
+    max-width: 400px;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: all 0.3s ease;
+}
+
+.onboarding-bubble.show {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.bubble-content {
+    padding: 20px;
+}
+
+.bubble-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #6c757d;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.bubble-close:hover {
+    background: #f8f9fa;
+    color: #343a40;
+}
+
+.bubble-title {
+    margin: 0 0 10px 0;
+    color: #343a40;
+    font-size: 18px;
+    font-weight: 600;
+    padding-right: 30px;
+}
+
+.bubble-text {
+    margin: 0 0 20px 0;
+    color: #6c757d;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.bubble-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
+}
+
+.bubble-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.progress-text {
+    color: #6c757d;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 4px;
+    background: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+    max-width: 80px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #007bff;
+    transition: width 0.3s ease;
+}
+
+.bubble-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.bubble-btn {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.bubble-btn-next,
+.bubble-btn-complete {
+    background: #007bff;
+    color: white;
+}
+
+.bubble-btn-next:hover,
+.bubble-btn-complete:hover {
+    background: #0056b3;
+    transform: translateY(-1px);
+}
+
+.bubble-btn-prev {
+    background: #e9ecef;
+    color: #6c757d;
+}
+
+.bubble-btn-prev:hover {
+    background: #dee2e6;
+    color: #495057;
+}
+
+.bubble-btn-skip {
+    background: transparent;
+    color: #6c757d;
+    padding: 6px 10px;
+}
+
+.bubble-btn-skip:hover {
+    color: #343a40;
+}
+
+/* ================== 箭头 ================== */
+.bubble-arrow {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: white;
+    border: 1px solid #dee2e6;
+    transform: rotate(45deg);
+    z-index: -1;
+}
+
+.arrow-top {
+    top: -7px;
+    left: 50%;
+    margin-left: -6px;
+    border-right: none !important;
+    border-bottom: none !important;
+}
+
+.arrow-bottom {
+    bottom: -7px;
+    left: 50%;
+    margin-left: -6px;
+    border-left: none !important;
+    border-top: none !important;
+}
+
+.arrow-left {
+    left: -7px;
+    top: 50%;
+    margin-top: -6px;
+    border-right: none !important;
+    border-top: none !important;
+}
+
+.arrow-right {
+    right: -7px;
+    top: 50%;
+    margin-top: -6px;
+    border-left: none !important;
+    border-bottom: none !important;
+}
+
+/* ================== 完成消息 ================== */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+        transform: translate(-50%, -10px);
+    }
+}
+
+/* ================== 响应式设计 ================== */
+@media (max-width: 768px) {
+    .onboarding-bubble {
+        min-width: 280px;
+        max-width: calc(100vw - 40px);
+    }
+    
+    .bubble-content {
+        padding: 15px;
+    }
+    
+    .bubble-title {
+        font-size: 16px;
+    }
+    
+    .bubble-text {
+        font-size: 13px;
+    }
+    
+    .bubble-footer {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .bubble-progress {
+        justify-content: center;
+    }
+    
+    .bubble-actions {
+        justify-content: center;
+    }
+    
+    .progress-bar {
+        max-width: 120px;
+    }
+}
+
+@media (max-width: 480px) {
+    .onboarding-bubble {
+        min-width: 260px;
+    }
+    
+    .bubble-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+/* ================== 深色主题兼容 ================== */
+@media (prefers-color-scheme: dark) {
+    .onboarding-bubble {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .bubble-title {
+        color: #e2e8f0;
+    }
+    
+    .bubble-text {
+        color: #a0aec0;
+    }
+    
+    .bubble-close {
+        color: #a0aec0;
+    }
+    
+    .bubble-close:hover {
+        background: #374151;
+        color: #e2e8f0;
+    }
+    
+    .bubble-footer {
+        border-top-color: #4a5568;
+    }
+    
+    .progress-bar {
+        background: #4a5568;
+    }
+    
+    .bubble-arrow {
+        background: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .bubble-btn-prev {
+        background: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .bubble-btn-prev:hover {
+        background: #5a6578;
+    }
+}
