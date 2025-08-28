@@ -147,30 +147,78 @@ quick_start() {
     
     echo ""
     echo -e "${GREEN}✓ 启动中...${NC}"
-    echo -e "访问: ${BLUE}http://localhost:${PORT}${NC}"
-    echo -e "停止: ${YELLOW}Ctrl+C${NC}"
-    echo -e "${YELLOW}⚠ 首次启动可能比较慢，请耐心等待页面加载完成，刷新即可正常使用${NC}"
+    echo -e "${YELLOW}⚠ 首次启动可能需要5-10秒，请耐心等待${NC}"
     echo ""
     
-    # 自动打开浏览器（根据环境）
-    if [[ "$env_type" == "macOS" ]]; then
-        sleep 2 && open "http://localhost:${PORT}" &
-    elif [[ "$env_type" == "WSL" ]]; then
-        # WSL: 使用 Windows 的浏览器
-        if command -v cmd.exe >/dev/null 2>&1; then
-            sleep 2 && cmd.exe /c start "http://localhost:${PORT}" 2>/dev/null &
-        elif command -v wslview >/dev/null 2>&1; then
-            sleep 2 && wslview "http://localhost:${PORT}" &
+    # 等待服务可用的函数
+    wait_for_service() {
+        local max_attempts=30
+        local attempt=0
+        local url="http://localhost:${PORT}/api/health"
+        
+        echo -n "正在启动服务"
+        while [ $attempt -lt $max_attempts ]; do
+            # 检查健康端点
+            if curl -s "$url" > /dev/null 2>&1; then
+                echo -e "\n${GREEN}✅ 服务已就绪！${NC}"
+                return 0
+            fi
+            
+            # 显示进度点
+            echo -n "."
+            sleep 1
+            attempt=$((attempt + 1))
+            
+            # 每10秒显示一次提示
+            if [ $((attempt % 10)) -eq 0 ]; then
+                echo -e "\n${BLUE}[INFO]${NC} 初始化中，请稍候..."
+                echo -n "正在启动服务"
+            fi
+        done
+        
+        echo -e "\n${RED}❌ 服务启动超时${NC}"
+        return 1
+    }
+    
+    # 打开浏览器的函数
+    open_browser() {
+        echo -e "${GREEN}➜ 正在打开浏览器...${NC}"
+        echo -e "访问: ${BLUE}http://localhost:${PORT}${NC}"
+        echo -e "停止: ${YELLOW}Ctrl+C${NC}"
+        
+        if [[ "$env_type" == "macOS" ]]; then
+            open "http://localhost:${PORT}"
+        elif [[ "$env_type" == "WSL" ]]; then
+            # WSL: 使用 Windows 的浏览器
+            if command -v cmd.exe >/dev/null 2>&1; then
+                cmd.exe /c start "http://localhost:${PORT}" 2>/dev/null
+            elif command -v wslview >/dev/null 2>&1; then
+                wslview "http://localhost:${PORT}"
+            fi
+        elif [[ "$env_type" == "Linux" ]]; then
+            # Linux: 尝试 xdg-open
+            if command -v xdg-open >/dev/null 2>&1; then
+                xdg-open "http://localhost:${PORT}"
+            fi
         fi
-    elif [[ "$env_type" == "Linux" ]]; then
-        # Linux: 尝试 xdg-open
-        if command -v xdg-open >/dev/null 2>&1; then
-            sleep 2 && xdg-open "http://localhost:${PORT}" &
-        fi
+    }
+    
+    # 在后台启动Flask应用
+    cd backend && python app.py &
+    FLASK_PID=$!
+    
+    # 等待服务可用
+    if wait_for_service; then
+        # 服务就绪，打开浏览器
+        open_browser
+    else
+        # 服务启动失败或超时
+        echo -e "${YELLOW}请手动访问: http://localhost:${PORT}${NC}"
+        echo -e "${YELLOW}或检查日志文件了解详情${NC}"
     fi
     
-    # 启动Flask应用
-    cd backend && python app.py
+    # 等待Flask进程（前台运行）
+    wait $FLASK_PID
 }
 
 # 主函数
