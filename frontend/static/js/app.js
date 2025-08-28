@@ -128,7 +128,9 @@ class DataAnalysisPlatform {
                 const tabName = header.dataset.tab;
                 if (tabName && !submenu) {
                     // 直接切换到对应标签页
-                    this.switchTab(tabName);
+                    if (window.app && window.app.switchTab) {
+                        window.app.switchTab(tabName);
+                    }
                     return;
                 }
                 
@@ -165,7 +167,9 @@ class DataAnalysisPlatform {
                 const tabName = link.dataset.tab;
                 const settingsTab = link.dataset.settingsTab;
                 
-                this.switchTab(tabName, settingsTab);
+                if (window.app && window.app.switchTab) {
+                    window.app.switchTab(tabName, settingsTab);
+                }
                 
                 // 如果是设置页面，切换到对应的设置标签
                 if (tabName === 'settings' && settingsTab && window.settingsManager) {
