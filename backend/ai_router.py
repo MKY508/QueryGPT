@@ -12,11 +12,9 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 class RouteType(Enum):
-    """路由类型"""
-    DIRECT_SQL = "direct_sql"        # 直接SQL执行
-    SIMPLE_ANALYSIS = "simple_analysis"  # 简单分析（SQL+轻处理）  
-    COMPLEX_ANALYSIS = "complex_analysis"  # 复杂分析（完整AI）
-    VISUALIZATION = "visualization"    # 需要生成图表
+    """路由类型（简化版：2种路由）"""
+    DIRECT_SQL = "direct_sql"        # 直接SQL执行（简单查询）
+    AI_ANALYSIS = "ai_analysis"      # AI处理（包括分析、可视化等所有复杂任务）
 
 class AIRoutingClassifier:
     """
@@ -24,7 +22,7 @@ class AIRoutingClassifier:
     使用LLM判断查询类型并选择最优路径
     """
     
-    # 默认路由分类Prompt
+    # 默认路由分类Prompt（简化版）
     DEFAULT_ROUTING_PROMPT = """你是一个查询路由分类器。分析用户查询，选择最适合的执行路径。
 
 用户查询：{query}
@@ -33,36 +31,31 @@ class AIRoutingClassifier:
 - 类型：{db_type}
 - 可用表：{available_tables}
 
-请从以下选项中选择最合适的路由：
+请从以下2个选项中选择最合适的路由：
 
 1. DIRECT_SQL - 简单查询，可以直接转换为SQL执行
-   适用：查看数据、统计数量、简单筛选、排序
-   示例：显示所有订单、统计用户数量、查看最新记录
+   适用：查看数据、统计数量、简单筛选、排序、基础聚合
+   示例：显示所有订单、统计用户数量、查看最新记录、按月统计销售额
+   特征：不需要复杂计算、不需要图表、不需要多步处理
 
-2. SIMPLE_ANALYSIS - 需要SQL查询+简单数据处理
-   适用：分组统计、简单计算、数据汇总
-   示例：按月统计销售额、计算平均值、对比不同类别
-
-3. COMPLEX_ANALYSIS - 需要复杂分析或多步处理
-   适用：趋势分析、预测、复杂计算、需要编程逻辑
-   示例：分析销售趋势、预测未来销量、相关性分析
-
-4. VISUALIZATION - 需要生成图表或可视化
-   适用：任何明确要求图表、图形、可视化的查询
-   示例：生成销售图表、绘制趋势图、创建饼图
+2. AI_ANALYSIS - 需要AI智能处理的查询
+   适用：数据分析、生成图表、趋势预测、复杂计算、多步处理
+   示例：分析销售趋势、生成可视化图表、预测分析、原因探索
+   特征：需要可视化、需要推理、需要编程逻辑、复杂数据处理
 
 输出格式（JSON）：
 {
-  "route": "选择的路由类型",
+  "route": "DIRECT_SQL 或 AI_ANALYSIS",
   "confidence": 0.95,
   "reason": "选择此路由的原因",
   "suggested_sql": "如果是DIRECT_SQL，提供建议的SQL语句"
 }
 
-重要：
-- 只要用户提到"图"、"图表"、"可视化"、"绘制"等词，必须选择 VISUALIZATION
-- 如果查询包含"为什么"、"原因"、"预测"等需要推理的词，选择 COMPLEX_ANALYSIS
-- 尽可能选择简单的路由以提高性能"""
+判断规则：
+- 如果查询包含"图"、"图表"、"可视化"、"绘制"、"plot"、"chart"等词 → 选择 AI_ANALYSIS
+- 如果查询包含"分析"、"趋势"、"预测"、"为什么"、"原因"等词 → 选择 AI_ANALYSIS  
+- 如果只是简单的数据查询、统计、筛选 → 选择 DIRECT_SQL
+- 当不确定时，倾向选择 AI_ANALYSIS 以确保功能完整"""
     
     def __init__(self, llm_service=None, custom_prompt=None):
         """
@@ -75,14 +68,12 @@ class AIRoutingClassifier:
         self.llm_service = llm_service
         self.routing_prompt = custom_prompt or self.DEFAULT_ROUTING_PROMPT
         
-        # 分类统计
+        # 分类统计（简化版）
         self.stats = {
             "total_classifications": 0,
             "route_counts": {
                 RouteType.DIRECT_SQL.value: 0,
-                RouteType.SIMPLE_ANALYSIS.value: 0,
-                RouteType.COMPLEX_ANALYSIS.value: 0,
-                RouteType.VISUALIZATION.value: 0
+                RouteType.AI_ANALYSIS.value: 0
             },
             "avg_classification_time": 0,
             "total_tokens_used": 0
@@ -124,7 +115,7 @@ class AIRoutingClassifier:
                 result = self._get_default_route(query)
             
             # 更新统计
-            route_type = result.get('route', RouteType.COMPLEX_ANALYSIS.value)
+            route_type = result.get('route', RouteType.AI_ANALYSIS.value)
             self.stats["route_counts"][route_type] = self.stats["route_counts"].get(route_type, 0) + 1
             
             # 计算平均分类时间
@@ -174,11 +165,19 @@ class AIRoutingClassifier:
     
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """
-        解析LLM响应
+        解析LLM响应（增强错误处理）
         """
         try:
             # 清理响应字符串
             response = response.strip()
+            
+            # 处理可能的不完整JSON响应
+            if response.startswith('{') and not response.endswith('}'):
+                # 尝试补全不完整的JSON
+                logger.warning(f"检测到不完整的JSON响应，尝试补全: {response[:100]}...")
+                # 计算需要的闭合括号
+                open_braces = response.count('{') - response.count('}')
+                response += '}' * open_braces
             
             # 尝试解析JSON响应
             if '{' in response and '}' in response:
@@ -187,25 +186,57 @@ class AIRoutingClassifier:
                 json_end = response.rfind('}') + 1
                 json_str = response[json_start:json_end]
                 
-                # 清理可能的转义字符
-                json_str = json_str.replace('\n', '').replace('\r', '').strip()
+                # 清理可能的转义字符和换行
+                json_str = json_str.replace('\n', ' ').replace('\r', '').strip()
                 
-                result = json.loads(json_str)
+                # 尝试修复常见的JSON错误
+                # 处理可能的尾随逗号
+                json_str = re.sub(r',\s*}', '}', json_str)
+                json_str = re.sub(r',\s*]', ']', json_str)
+                
+                try:
+                    result = json.loads(json_str)
+                except json.JSONDecodeError as je:
+                    logger.warning(f"JSON解析失败，尝试修复: {je}")
+                    # 尝试使用更宽松的解析
+                    import ast
+                    try:
+                        # 将单引号转换为双引号
+                        json_str = json_str.replace("'", '"')
+                        result = json.loads(json_str)
+                    except:
+                        # 如果还是失败，返回降级路由
+                        logger.error(f"无法解析JSON: {json_str[:200]}")
+                        return self._get_fallback_route("")
                 
                 # 验证必需字段
                 if 'route' not in result:
-                    raise ValueError("响应中缺少route字段")
+                    # 尝试从响应文本中提取路由类型
+                    if 'DIRECT_SQL' in response:
+                        result['route'] = 'DIRECT_SQL'
+                    elif 'AI_ANALYSIS' in response:
+                        result['route'] = 'AI_ANALYSIS'
+                    else:
+                        raise ValueError("响应中缺少route字段")
                 
-                # 规范化路由类型
+                # 规范化路由类型（简化版）
                 route_map = {
                     'DIRECT_SQL': RouteType.DIRECT_SQL.value,
-                    'SIMPLE_ANALYSIS': RouteType.SIMPLE_ANALYSIS.value,
-                    'COMPLEX_ANALYSIS': RouteType.COMPLEX_ANALYSIS.value,
-                    'VISUALIZATION': RouteType.VISUALIZATION.value,
+                    'AI_ANALYSIS': RouteType.AI_ANALYSIS.value,
+                    'direct_sql': RouteType.DIRECT_SQL.value,
+                    'ai_analysis': RouteType.AI_ANALYSIS.value,
+                    # 兼容旧的路由类型
+                    'SIMPLE_ANALYSIS': RouteType.AI_ANALYSIS.value,
+                    'COMPLEX_ANALYSIS': RouteType.AI_ANALYSIS.value,
+                    'VISUALIZATION': RouteType.AI_ANALYSIS.value,
                 }
                 
-                result['route'] = route_map.get(result['route'], RouteType.COMPLEX_ANALYSIS.value)
+                result['route'] = route_map.get(result['route'], RouteType.AI_ANALYSIS.value)
                 result['confidence'] = float(result.get('confidence', 0.8))
+                
+                # 确保有reason字段
+                if 'reason' not in result:
+                    result['reason'] = '基于查询内容判断'
                 
                 return result
             else:
@@ -218,40 +249,35 @@ class AIRoutingClassifier:
     
     def _parse_text_response(self, response: str) -> Dict[str, Any]:
         """
-        解析文本格式的响应 - 使用更严格的匹配规则
+        解析文本格式的响应 - 简化版（2种路由）
         """
         import re
         response_lower = response.lower()
         
-        # 定义更严格的匹配模式
+        # 定义简化的匹配模式
         patterns = {
             RouteType.DIRECT_SQL.value: [
                 r'\bdirect_sql\b', 
                 r'^1\b',
                 r'^\s*1\s*\.', 
                 r'选择.*direct.*sql',
-                r'路由.*1\b'
+                r'路由.*1\b',
+                r'简单查询',
+                r'直接.*sql'
             ],
-            RouteType.SIMPLE_ANALYSIS.value: [
-                r'\bsimple_analysis\b',
+            RouteType.AI_ANALYSIS.value: [
+                r'\bai_analysis\b',
                 r'^2\b',
                 r'^\s*2\s*\.',
-                r'选择.*simple.*analysis',
-                r'路由.*2\b'
-            ],
-            RouteType.COMPLEX_ANALYSIS.value: [
+                r'选择.*ai.*analysis',
+                r'路由.*2\b',
+                # 兼容旧的路由类型
+                r'\bsimple_analysis\b',
                 r'\bcomplex_analysis\b',
-                r'^3\b',
-                r'^\s*3\s*\.',
-                r'选择.*complex.*analysis',
-                r'路由.*3\b'
-            ],
-            RouteType.VISUALIZATION.value: [
                 r'\bvisualization\b',
-                r'^4\b',
-                r'^\s*4\s*\.',
-                r'选择.*visualization',
-                r'路由.*4\b'
+                r'需要.*分析',
+                r'需要.*可视化',
+                r'生成.*图表'
             ]
         }
         
@@ -278,27 +304,35 @@ class AIRoutingClassifier:
                     'reason': f'文本匹配分析（匹配度: {max_score}）'
                 }
         
-        # 默认返回复杂分析路由
+        # 默认返回AI分析路由
         return {
-            'route': RouteType.COMPLEX_ANALYSIS.value,
+            'route': RouteType.AI_ANALYSIS.value,
             'confidence': 0.5,
-            'reason': '无法确定路由类型，使用默认复杂分析'
+            'reason': '无法确定路由类型，使用默认AI分析'
         }
     
     def _get_default_route(self, query: str) -> Dict[str, Any]:
         """
-        获取默认路由（当LLM不可用时）
+        获取默认路由（当LLM不可用时） - 简化版
         """
         query_lower = query.lower()
         
         # 简单的关键词匹配作为后备方案
-        if any(word in query_lower for word in ['图', '图表', '可视化', 'chart', 'graph', 'plot']):
+        # 检查是否需要AI处理的关键词
+        ai_keywords = ['图', '图表', '可视化', 'chart', 'graph', 'plot', 
+                      '分析', '趋势', '预测', '为什么', '原因', 'analyze']
+        
+        # 检查是否是简单SQL查询的关键词
+        sql_keywords = ['select', 'show', '显示', '查看', '列出', '统计', '数量']
+        
+        if any(word in query_lower for word in ai_keywords):
             return {
-                'route': RouteType.VISUALIZATION.value,
+                'route': RouteType.AI_ANALYSIS.value,
                 'confidence': 0.6,
-                'reason': '检测到可视化关键词（规则匹配）'
+                'reason': '检测到分析/可视化关键词（规则匹配）'
             }
-        elif any(word in query_lower for word in ['select', 'show', '显示', '查看', '列出']):
+        elif any(word in query_lower for word in sql_keywords) and \
+             not any(word in query_lower for word in ai_keywords):
             return {
                 'route': RouteType.DIRECT_SQL.value,
                 'confidence': 0.5,
@@ -306,19 +340,19 @@ class AIRoutingClassifier:
             }
         else:
             return {
-                'route': RouteType.COMPLEX_ANALYSIS.value,
+                'route': RouteType.AI_ANALYSIS.value,
                 'confidence': 0.4,
-                'reason': '默认路由（无LLM服务）'
+                'reason': '默认使用AI分析（无LLM服务）'
             }
     
     def _get_fallback_route(self, query: str) -> Dict[str, Any]:
         """
-        获取失败时的后备路由
+        获取失败时的后备路由 - 简化版
         """
         return {
-            'route': RouteType.COMPLEX_ANALYSIS.value,
+            'route': RouteType.AI_ANALYSIS.value,
             'confidence': 0.3,
-            'reason': '分类失败，使用最安全的路由',
+            'reason': '分类失败，使用最安全的AI分析路由',
             'error': True
         }
     

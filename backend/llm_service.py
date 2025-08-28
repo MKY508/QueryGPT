@@ -66,7 +66,7 @@ class LLMService:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a query routing assistant. Analyze queries and determine the best execution path."
+                        "content": "You are a query routing assistant. Analyze queries and determine the best execution path. Always respond in JSON format."
                     },
                     {
                         "role": "user",
@@ -78,9 +78,10 @@ class LLMService:
                 "response_format": {"type": "json_object"}  # 请求JSON格式响应
             }
             
-            # 发送请求
+            # 发送请求 - 处理URL拼接，避免双斜杠
+            api_url = self.api_base.rstrip('/') + '/chat/completions'
             response = requests.post(
-                f"{self.api_base}/chat/completions",
+                api_url,
                 headers=headers,
                 json=data,
                 timeout=10

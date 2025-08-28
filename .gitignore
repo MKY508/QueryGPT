@@ -59,6 +59,8 @@ backend/semantic_layer.json
 backend/table_classification.json
 !backend/semantic_layer.json.example
 *.log
+logs/
+app.log
 *.pid
 *.seed
 *.pid.lock
@@ -129,7 +131,11 @@ create_*.py
 # 测试文件
 test_*.py
 test_*.js
+test_*.html
 backend_standalone.py
+backend/assess_database.py
+backend/quick_assess.py
+frontend/templates/test_guide.html
 
 # 临时文档
 AWESOME_*.md
