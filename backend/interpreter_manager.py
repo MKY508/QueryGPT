@@ -6,8 +6,20 @@ import os
 import json
 import signal
 from typing import Dict, Any, Optional, Set
-from interpreter import OpenInterpreter
 import logging
+
+# 尝试导入OpenInterpreter，如果失败则设置标志
+try:
+    from interpreter import OpenInterpreter
+    INTERPRETER_AVAILABLE = True
+except ImportError:
+    logger = logging.getLogger(__name__)
+    logger.warning("OpenInterpreter未安装，相关功能将被禁用。请运行: pip install open-interpreter==0.4.3")
+    INTERPRETER_AVAILABLE = False
+    # 创建一个占位类
+    class OpenInterpreter:
+        def __init__(self):
+            raise NotImplementedError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
 from backend.config_loader import ConfigLoader
 # from backend.query_clarifier import SmartQueryProcessor  # 已禁用查询澄清器
 import time
@@ -23,6 +35,13 @@ class InterpreterManager:
     
     def __init__(self, config_path: str = None):
         """初始化管理器"""
+        # 检查OpenInterpreter是否可用
+        if not INTERPRETER_AVAILABLE:
+            logger.warning("InterpreterManager初始化失败：OpenInterpreter未安装")
+            self.enabled = False
+            return
+        
+        self.enabled = True
         # 从.env文件加载配置
         api_config = ConfigLoader.get_api_config()
         self.config = {
@@ -67,6 +86,9 @@ class InterpreterManager:
         创建新的Interpreter实例
         每次创建新实例以避免状态污染
         """
+        if not self.enabled:
+            raise RuntimeError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
+        
         model_name = model_name or self.config.get("current_model", "gpt-4.1")
         model_config = self.config.get("models", {}).get(model_name)
         
@@ -470,6 +492,9 @@ class InterpreterManager:
         获取或创建interpreter实例
         如果提供conversation_id，尝试重用现有会话
         """
+        if not self.enabled:
+            raise RuntimeError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
+        
         with self._session_lock:
             # 清理过期会话
             self._cleanup_expired_sessions()
