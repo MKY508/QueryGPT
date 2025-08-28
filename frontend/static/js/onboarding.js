@@ -6,6 +6,8 @@
 class OnboardingGuide {
     constructor() {
         this.storageKey = 'querygpt_onboarding_completed';
+        this.versionKey = 'querygpt_onboarding_version';
+        this.sessionKey = 'querygpt_onboarding_shown_session';
         this.currentStep = 0;
         this.isActive = false;
         this.bubbles = [];
@@ -18,6 +20,7 @@ class OnboardingGuide {
             show_for_new_users: true,
             auto_start_delay: 1500,
             force_show: false,
+            version: '1.0.0',
             settings: {
                 allow_skip: true,
                 show_progress: true,
@@ -91,8 +94,31 @@ class OnboardingGuide {
         // 检查是否强制显示（用于测试）
         const forceShow = this.config?.force_show || false;
         
-        // 检查是否是首次访问或强制显示
-        if (forceShow || (!this.hasCompletedOnboarding() && this.config?.show_for_new_users)) {
+        // 决定是否显示引导的逻辑
+        let shouldShowGuide = false;
+        
+        if (forceShow) {
+            // 强制显示（测试模式）
+            shouldShowGuide = true;
+            console.log('新手引导：强制显示模式');
+        } else if (this.hasCompletedOnboarding()) {
+            // 已完成当前版本的引导
+            shouldShowGuide = false;
+            console.log('新手引导：用户已完成当前版本引导');
+        } else if (this.hasShownInSession()) {
+            // 本会话已显示过（避免刷新页面重复显示）
+            shouldShowGuide = false;
+            console.log('新手引导：本会话已显示过');
+        } else if (this.config?.show_for_new_users) {
+            // 新用户，显示引导
+            shouldShowGuide = true;
+            console.log('新手引导：为新用户显示');
+        }
+        
+        if (shouldShowGuide) {
+            // 标记本会话已显示
+            this.markShownInSession();
+            
             // 使用配置的延迟时间
             const delay = this.config?.auto_start_delay || 1500;
             setTimeout(() => {
@@ -136,14 +162,47 @@ class OnboardingGuide {
      * 检查是否已完成引导
      */
     hasCompletedOnboarding() {
-        return localStorage.getItem(this.storageKey) === 'true';
+        // 检查是否已完成当前版本的引导
+        const completedVersion = localStorage.getItem(this.versionKey);
+        const currentVersion = this.config?.version || this.defaultConfig.version;
+        
+        // 如果版本号相同，说明已经完成了当前版本的引导
+        if (completedVersion === currentVersion) {
+            return true;
+        }
+        
+        // 兼容旧版本：如果有旧的完成标记但没有版本号，视为已完成
+        if (localStorage.getItem(this.storageKey) === 'true' && !completedVersion) {
+            // 更新到新的存储格式
+            localStorage.setItem(this.versionKey, currentVersion);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * 检查本会话是否已显示过引导
+     */
+    hasShownInSession() {
+        return sessionStorage.getItem(this.sessionKey) === 'true';
+    }
+    
+    /**
+     * 标记本会话已显示引导
+     */
+    markShownInSession() {
+        sessionStorage.setItem(this.sessionKey, 'true');
     }
     
     /**
      * 标记引导已完成
      */
     markAsCompleted() {
+        const currentVersion = this.config?.version || this.defaultConfig.version;
         localStorage.setItem(this.storageKey, 'true');
+        localStorage.setItem(this.versionKey, currentVersion);
+        this.markShownInSession();
     }
     
     /**
@@ -662,7 +721,11 @@ class OnboardingGuide {
      * 重置引导（用于测试）
      */
     reset() {
+        // 清除所有相关存储
         localStorage.removeItem(this.storageKey);
+        localStorage.removeItem(this.versionKey);
+        sessionStorage.removeItem(this.sessionKey);
+        console.log('新手引导已重置');
         location.reload();
     }
 }
@@ -677,3 +740,24 @@ document.addEventListener('DOMContentLoaded', () => {
         onboardingGuide.init();
     }
 });
+
+// 导出到全局作用域，方便调试
+window.OnboardingGuide = {
+    // 获取当前状态
+    getStatus: () => {
+        return {
+            completed: onboardingGuide.hasCompletedOnboarding(),
+            shownInSession: onboardingGuide.hasShownInSession(),
+            version: localStorage.getItem(onboardingGuide.versionKey) || 'none',
+            currentVersion: onboardingGuide.config?.version || onboardingGuide.defaultConfig.version,
+            enabled: onboardingGuide.config?.enabled !== false,
+            forceShow: onboardingGuide.config?.force_show || false
+        };
+    },
+    // 重置引导
+    reset: () => onboardingGuide.reset(),
+    // 手动启动引导
+    start: () => onboardingGuide.start(),
+    // 完成引导
+    complete: () => onboardingGuide.complete()
+};
