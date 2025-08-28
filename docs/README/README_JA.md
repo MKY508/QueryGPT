@@ -137,8 +137,8 @@ cp .env.example .env
 ### 後続の使用
 
 ```bash
-# クイックスタート
-./quick_start.sh
+# 直接起動（インストール済み環境）
+./start.sh
 ```
 
 サービスはデフォルトで http://localhost:5000 で実行されます

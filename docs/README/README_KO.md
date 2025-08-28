@@ -151,7 +151,7 @@ cd QueryGPT
 
 ```bash
 # 빠른 시작
-./quick_start.sh
+./start.sh
 ```
 
 서비스는 기본적으로 http://localhost:5000 에서 실행됩니다.

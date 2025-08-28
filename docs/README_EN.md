@@ -164,8 +164,8 @@ DB_NAME=your_database  # Optional, leave empty for cross-database queries
 
 #### 4. Start System
 ```bash
-# Quick start
-./quick_start.sh
+# Start the system
+./start.sh
 
 # Or manual start
 python backend/app.py

@@ -97,19 +97,29 @@ class OnboardingGuide {
         // 决定是否显示引导的逻辑
         let shouldShowGuide = false;
         
+        const hasCompleted = this.hasCompletedOnboarding();
+        const hasShownInSession = this.hasShownInSession();
+        
+        console.log('开始判断是否显示引导:', {
+            forceShow: forceShow,
+            hasCompleted: hasCompleted,
+            hasShownInSession: hasShownInSession,
+            showForNewUsers: this.config?.show_for_new_users
+        });
+        
         if (forceShow) {
             // 强制显示（测试模式）
             shouldShowGuide = true;
             console.log('新手引导：强制显示模式');
-        } else if (this.hasCompletedOnboarding()) {
-            // 已完成当前版本的引导
+        } else if (hasCompleted) {
+            // 已完成当前版本的引导，不再显示
             shouldShowGuide = false;
             console.log('新手引导：用户已完成当前版本引导');
-        } else if (this.hasShownInSession()) {
-            // 本会话已显示过（避免刷新页面重复显示）
+        } else if (!hasCompleted && hasShownInSession) {
+            // 未完成但本会话已显示过（避免刷新页面重复显示）
             shouldShowGuide = false;
-            console.log('新手引导：本会话已显示过');
-        } else if (this.config?.show_for_new_users) {
+            console.log('新手引导：本会话已显示过（未完成）');
+        } else if (!hasCompleted && this.config?.show_for_new_users) {
             // 新用户，显示引导
             shouldShowGuide = true;
             console.log('新手引导：为新用户显示');
@@ -166,6 +176,13 @@ class OnboardingGuide {
         const completedVersion = localStorage.getItem(this.versionKey);
         const currentVersion = this.config?.version || this.defaultConfig.version;
         
+        console.log('检查引导完成状态:', {
+            versionKey: this.versionKey,
+            completedVersion: completedVersion,
+            currentVersion: currentVersion,
+            isCompleted: completedVersion === currentVersion
+        });
+        
         // 只有当版本号完全匹配时才视为已完成
         // 这样可以在版本更新时重新显示引导
         return completedVersion === currentVersion;
@@ -190,9 +207,29 @@ class OnboardingGuide {
      */
     markAsCompleted() {
         const currentVersion = this.config?.version || this.defaultConfig.version;
+        
+        console.log('标记引导已完成:', {
+            currentVersion: currentVersion,
+            storageKey: this.storageKey,
+            versionKey: this.versionKey
+        });
+        
+        // 保存完成状态到 localStorage
         localStorage.setItem(this.storageKey, 'true');
         localStorage.setItem(this.versionKey, currentVersion);
-        this.markShownInSession();
+        
+        // 清除 sessionStorage，因为已经完成了，不需要防止重复显示
+        sessionStorage.removeItem(this.sessionKey);
+        
+        // 验证保存是否成功
+        const savedVersion = localStorage.getItem(this.versionKey);
+        const savedStatus = localStorage.getItem(this.storageKey);
+        console.log('验证保存结果:', {
+            savedVersion: savedVersion,
+            savedStatus: savedStatus,
+            success: savedVersion === currentVersion,
+            sessionCleared: sessionStorage.getItem(this.sessionKey) === null
+        });
     }
     
     /**

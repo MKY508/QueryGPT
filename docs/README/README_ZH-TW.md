@@ -140,7 +140,7 @@ cp .env.example .env
 
 ```bash
 # 快速啟動
-./quick_start.sh
+./start.sh
 ```
 
 服務預設運行在 http://localhost:5000
