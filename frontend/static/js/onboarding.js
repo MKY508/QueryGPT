@@ -81,13 +81,27 @@ class OnboardingGuide {
     /**
      * 初始化引导系统
      */
-    async init() {
+    async init(retryCount = 0) {
         // 先加载配置
         await this.loadConfig();
         
         // 检查配置是否启用引导
         if (!this.isOnboardingEnabled()) {
             console.log('新手引导已在配置中禁用');
+            return;
+        }
+        
+        // 检查关键DOM元素是否存在
+        const requiredElement = document.querySelector('.sidebar-header');
+        if (!requiredElement && retryCount < 3) {
+            // 如果元素还不存在，稍后重试
+            console.log(`新手引导：等待DOM元素加载... (重试 ${retryCount + 1}/3)`);
+            setTimeout(() => {
+                this.init(retryCount + 1);
+            }, 500);
+            return;
+        } else if (!requiredElement) {
+            console.log('新手引导：无法找到必需的DOM元素，放弃初始化');
             return;
         }
         
@@ -100,11 +114,18 @@ class OnboardingGuide {
         const hasCompleted = this.hasCompletedOnboarding();
         const hasShownInSession = this.hasShownInSession();
         
-        console.log('开始判断是否显示引导:', {
+        console.log('新手引导判断条件:', {
             forceShow: forceShow,
             hasCompleted: hasCompleted,
             hasShownInSession: hasShownInSession,
-            showForNewUsers: this.config?.show_for_new_users
+            showForNewUsers: this.config?.show_for_new_users,
+            localStorage: {
+                completed: localStorage.getItem(this.storageKey),
+                version: localStorage.getItem(this.versionKey)
+            },
+            sessionStorage: {
+                shown: sessionStorage.getItem(this.sessionKey)
+            }
         });
         
         if (forceShow) {
@@ -123,6 +144,8 @@ class OnboardingGuide {
             // 新用户，显示引导
             shouldShowGuide = true;
             console.log('新手引导：为新用户显示');
+        } else {
+            console.log('新手引导：没有满足显示条件');
         }
         
         if (shouldShowGuide) {
@@ -131,7 +154,9 @@ class OnboardingGuide {
             
             // 使用配置的延迟时间
             const delay = this.config?.auto_start_delay || 1500;
+            console.log(`新手引导：将在 ${delay}ms 后启动`);
             setTimeout(() => {
+                console.log('新手引导：开始启动引导流程');
                 this.start();
             }, delay);
         }
@@ -172,6 +197,14 @@ class OnboardingGuide {
      * 检查是否已完成引导
      */
     hasCompletedOnboarding() {
+        // 首先清理可能存在的旧版本标记
+        const oldCompletedKey = 'querygpt_onboarding_completed';
+        if (localStorage.getItem(oldCompletedKey) === 'true' && !localStorage.getItem(this.versionKey)) {
+            // 存在旧版本标记但没有版本号，清除旧标记
+            console.log('清除旧版本完成标记');
+            localStorage.removeItem(oldCompletedKey);
+        }
+        
         // 检查是否已完成当前版本的引导
         const completedVersion = localStorage.getItem(this.versionKey);
         const currentVersion = this.config?.version || this.defaultConfig.version;
@@ -883,8 +916,64 @@ class OnboardingGuide {
         localStorage.removeItem(this.storageKey);
         localStorage.removeItem(this.versionKey);
         sessionStorage.removeItem(this.sessionKey);
-        console.log('新手引导已重置');
+        
+        // 清除可能存在的旧版本存储键
+        localStorage.removeItem('querygpt_onboarding_completed');
+        localStorage.removeItem('onboarding_completed');
+        localStorage.removeItem('tour_completed');
+        
+        console.log('新手引导已重置，所有存储已清除');
         location.reload();
+    }
+    
+    /**
+     * 诊断函数 - 检查为什么引导不显示
+     */
+    diagnose() {
+        console.log('===== 新手引导诊断 =====');
+        console.log('配置状态:', {
+            enabled: this.config?.enabled,
+            show_for_new_users: this.config?.show_for_new_users,
+            force_show: this.config?.force_show,
+            version: this.config?.version
+        });
+        
+        console.log('存储状态:', {
+            localStorage_completed: localStorage.getItem(this.storageKey),
+            localStorage_version: localStorage.getItem(this.versionKey),
+            sessionStorage_shown: sessionStorage.getItem(this.sessionKey),
+            
+            // 检查可能的旧键
+            old_completed: localStorage.getItem('querygpt_onboarding_completed'),
+            old_tour: localStorage.getItem('tour_completed')
+        });
+        
+        console.log('判断结果:', {
+            hasCompleted: this.hasCompletedOnboarding(),
+            hasShownInSession: this.hasShownInSession(),
+            isEnabled: this.isOnboardingEnabled()
+        });
+        
+        console.log('DOM元素:', {
+            sidebar: !!document.querySelector('.sidebar-header'),
+            input: !!document.querySelector('#message-input'),
+            button: !!document.querySelector('#send-button')
+        });
+        
+        // 诊断建议
+        if (!this.isOnboardingEnabled()) {
+            console.log('❌ 引导被禁用 - 检查config/onboarding_config.json');
+        } else if (this.hasCompletedOnboarding()) {
+            console.log('❌ 已完成当前版本 - 使用 window.OnboardingGuide.reset() 重置');
+        } else if (this.hasShownInSession()) {
+            console.log('❌ 本会话已显示 - 关闭标签页重新打开');
+        } else if (!document.querySelector('.sidebar-header')) {
+            console.log('❌ DOM元素未找到 - 页面可能还未完全加载');
+        } else {
+            console.log('✅ 应该显示引导 - 可能存在其他问题');
+        }
+        
+        console.log('===== 诊断结束 =====');
     }
 }
 
@@ -892,12 +981,30 @@ class OnboardingGuide {
 const onboardingGuide = new OnboardingGuide();
 
 // 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
-    // 只在主页面初始化
-    if (document.querySelector('.sidebar-header')) {
-        onboardingGuide.init();
-    }
-});
+// 处理DOMContentLoaded可能已经触发的情况
+if (document.readyState === 'loading') {
+    // 文档还在加载，添加事件监听器
+    document.addEventListener('DOMContentLoaded', () => {
+        // 只在主页面初始化
+        if (document.querySelector('.sidebar-header')) {
+            console.log('新手引导：DOMContentLoaded事件触发，开始初始化');
+            onboardingGuide.init();
+        } else {
+            console.log('新手引导：未找到.sidebar-header，跳过初始化');
+        }
+    });
+} else {
+    // 文档已经加载完成，直接初始化
+    // 使用setTimeout确保其他脚本已经执行完毕
+    setTimeout(() => {
+        if (document.querySelector('.sidebar-header')) {
+            console.log('新手引导：文档已就绪，直接初始化');
+            onboardingGuide.init();
+        } else {
+            console.log('新手引导：未找到.sidebar-header，跳过初始化');
+        }
+    }, 100);
+}
 
 // 导出到全局作用域，方便调试
 window.OnboardingGuide = {
@@ -917,5 +1024,7 @@ window.OnboardingGuide = {
     // 手动启动引导
     start: () => onboardingGuide.start(),
     // 完成引导
-    complete: () => onboardingGuide.complete()
+    complete: () => onboardingGuide.complete(),
+    // 诊断问题
+    diagnose: () => onboardingGuide.diagnose()
 };
