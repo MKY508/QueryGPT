@@ -388,7 +388,7 @@ class HistoryManager:
             
             cursor.execute(f"""
                 SELECT c.*, 
-                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as message_count,
+                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.type = 'user') as message_count,
                        (SELECT m.content FROM messages m 
                         WHERE m.conversation_id = c.id AND m.type = 'user'
                         ORDER BY m.timestamp DESC LIMIT 1) as last_query
