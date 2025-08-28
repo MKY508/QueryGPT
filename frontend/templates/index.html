@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="/static/css/history.css">
     <link rel="stylesheet" href="/static/css/model-modal.css">
     <link rel="stylesheet" href="/static/css/onboarding.css">
+    <link rel="stylesheet" href="/static/css/semantic-layer.css">
 </head>
 <body>
     <div class="container">
@@ -93,6 +94,15 @@
                                 </a>
                             </li>
                         </ul>
+                    </li>
+                    
+                    <!-- 语义层菜单 -->
+                    <li class="menu-item">
+                        <a href="#" class="menu-header" data-tab="semantic">
+                            <i class="fas fa-tags"></i>
+                            <span data-i18n="nav.semantic">语义层</span>
+                            <i class="submenu-arrow-placeholder"></i>
+                        </a>
                     </li>
                     
                     <!-- 关于菜单 -->
@@ -530,6 +540,170 @@
                 </div>
             </div>
             
+            <!-- 语义层页面 -->
+            <div class="tab-content" id="semantic-tab">
+                <div class="semantic-header">
+                    <h1>
+                        <i class="fas fa-tags"></i> 
+                        <span data-i18n="semantic.title">数据语义层管理</span>
+                    </h1>
+                    <div class="header-actions">
+                        <button class="btn-primary" id="scan-datasource">
+                            <i class="fas fa-sync"></i> <span>扫描数据库</span>
+                        </button>
+                        <button class="btn-secondary" id="import-semantic">
+                            <i class="fas fa-upload"></i> <span>导入</span>
+                        </button>
+                        <button class="btn-secondary" id="export-semantic">
+                            <i class="fas fa-download"></i> <span>导出</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="semantic-container">
+                    <!-- 左侧：数据源树 -->
+                    <div class="semantic-sidebar">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h3><i class="fas fa-database"></i> 数据源</h3>
+                                <button class="btn-small" id="refresh-datasources">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            <div class="panel-body">
+                                <div class="datasource-tree" id="datasource-tree">
+                                    <!-- 数据源树将由JavaScript动态生成 -->
+                                    <div class="tree-placeholder">
+                                        <i class="fas fa-spinner fa-spin"></i> 加载中...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 标注进度 -->
+                        <div class="panel mt-3">
+                            <div class="panel-header">
+                                <h3><i class="fas fa-chart-pie"></i> 标注进度</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div class="progress-stats">
+                                    <div class="stat-item">
+                                        <span class="stat-label">表标注</span>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="table-progress" style="width: 0%"></div>
+                                        </div>
+                                        <span class="stat-value" id="table-progress-text">0%</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">字段标注</span>
+                                        <div class="progress-bar">
+                                            <div class="progress-fill" id="column-progress" style="width: 0%"></div>
+                                        </div>
+                                        <span class="stat-value" id="column-progress-text">0%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 中间：表格编辑区 -->
+                    <div class="semantic-main">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h3 id="current-table-name">
+                                    <i class="fas fa-table"></i> 请选择数据表
+                                </h3>
+                                <div class="panel-actions">
+                                    <button class="btn-small" id="save-semantic" disabled>
+                                        <i class="fas fa-save"></i> 保存
+                                    </button>
+                                    <button class="btn-small" id="batch-edit" disabled>
+                                        <i class="fas fa-edit"></i> 批量编辑
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="panel-body">
+                                <!-- 表信息编辑 -->
+                                <div class="table-info-editor" id="table-info-editor" style="display: none;">
+                                    <div class="form-group">
+                                        <label>表中文名</label>
+                                        <input type="text" id="table-display-name" class="form-control" placeholder="请输入表的中文名称">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>表描述</label>
+                                        <textarea id="table-description" class="form-control" rows="2" placeholder="请输入表的业务描述"></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>分类标签</label>
+                                        <div class="tags-input" id="table-tags">
+                                            <input type="text" placeholder="输入标签后按回车" class="tag-input">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 字段编辑表格 -->
+                                <div class="columns-editor" id="columns-editor">
+                                    <table class="semantic-table">
+                                        <thead>
+                                            <tr>
+                                                <th width="20"><input type="checkbox" id="select-all-columns"></th>
+                                                <th>字段名</th>
+                                                <th>类型</th>
+                                                <th>中文名</th>
+                                                <th>业务描述</th>
+                                                <th>同义词</th>
+                                                <th>示例</th>
+                                                <th width="80">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="columns-tbody">
+                                            <!-- 字段列表将由JavaScript动态生成 -->
+                                            <tr>
+                                                <td colspan="8" class="text-center text-muted">
+                                                    请从左侧选择数据表
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 右侧：智能助手 -->
+                    <div class="semantic-assistant">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <h3><i class="fas fa-robot"></i> 智能建议</h3>
+                            </div>
+                            <div class="panel-body">
+                                <div class="assistant-content" id="assistant-content">
+                                    <div class="assistant-placeholder">
+                                        <i class="fas fa-lightbulb"></i>
+                                        <p>选择字段后，这里将显示智能建议</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 业务术语 -->
+                        <div class="panel mt-3">
+                            <div class="panel-header">
+                                <h3><i class="fas fa-book"></i> 业务术语</h3>
+                                <button class="btn-small" id="add-glossary">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <div class="panel-body">
+                                <div class="glossary-list" id="glossary-list">
+                                    <!-- 术语列表将由JavaScript动态生成 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- 关于页面 -->
             <div class="tab-content" id="about-tab">
                 <div class="about-header">
@@ -843,5 +1017,6 @@
     <script src="/static/js/app.js"></script>
     <script src="/static/js/context-rounds-fix.js"></script>
     <script src="/static/js/onboarding.js"></script>
+    <script src="/static/js/semantic-layer.js"></script>
 </body>
 </html>
