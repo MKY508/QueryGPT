@@ -4,13 +4,16 @@ OpenInterpreter Manager Module
 """
 import os
 import json
-from typing import Dict, Any, Optional
+import signal
+from typing import Dict, Any, Optional, Set
 from interpreter import OpenInterpreter
 import logging
 from backend.config_loader import ConfigLoader
 # from backend.query_clarifier import SmartQueryProcessor  # 已禁用查询澄清器
 import time
-from threading import Lock
+import psutil
+import signal
+from threading import Lock, Thread, Event
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -36,6 +39,15 @@ class InterpreterManager:
         self._session_lock = Lock()
         # 会话超时时间（秒）
         self.session_timeout = 1800  # 30分钟
+        
+        # 进程跟踪：conversation_id -> set of PIDs
+        self._active_processes: Dict[str, Set[int]] = {}
+        self._process_lock = Lock()
+        
+        # 进程监控线程管理
+        self._monitor_threads: Dict[str, Thread] = {}
+        self._stop_events: Dict[str, Event] = {}
+        self._monitor_lock = Lock()
         
         # 会话历史存储（内存中，重启后清空）
         self._conversation_history = {}
@@ -105,24 +117,91 @@ class InterpreterManager:
             except Exception as e:
                 logger.warning(f"加载prompt配置失败: {e}")
             
-            # 根据语言设置系统消息
+            # 根据路由类型和语言设置系统消息
             lang_key = 'en' if language == 'en' else 'zh'
-            if prompt_config and 'systemMessage' in prompt_config and lang_key in prompt_config['systemMessage']:
-                interpreter.system_message = prompt_config['systemMessage'][lang_key]
-            elif language == 'en':
-                interpreter.system_message = """
-                You are a data analysis assistant. Help users query databases and generate visualizations.
-                Use pandas for data processing and plotly for creating charts.
-                Save results as HTML files to the output directory.
-                IMPORTANT: Please respond in English.
-                """
+            route_type = context.get('route_type', 'AI_ANALYSIS') if context else 'AI_ANALYSIS'
+            
+            # 根据路由类型选择不同的系统消息
+            if route_type == 'DIRECT_SQL':
+                # DIRECT_SQL路由：从配置文件读取或使用默认值
+                if prompt_config and 'systemMessage' in prompt_config and 'DIRECT_SQL' in prompt_config['systemMessage']:
+                    direct_sql_config = prompt_config['systemMessage']['DIRECT_SQL']
+                    if lang_key in direct_sql_config:
+                        interpreter.system_message = direct_sql_config[lang_key]
+                    else:
+                        # 默认的DIRECT_SQL prompt
+                        interpreter.system_message = """
+                        你是一个SQL查询助手。你的任务是：
+                        1. 连接数据库并执行SQL查询
+                        2. 以清晰的格式返回查询结果
+                        3. 不要创建任何可视化或图表
+                        4. 不要保存任何文件
+                        5. 只专注于检索和显示数据
+                        """ if lang_key == 'zh' else """
+                        You are a SQL query assistant. Your task is to:
+                        1. Connect to the database and execute SQL queries
+                        2. Return query results in a clear format
+                        3. DO NOT create any visualizations or charts
+                        4. DO NOT save any files
+                        5. Focus only on retrieving and displaying data
+                        """
+                else:
+                    # 默认的DIRECT_SQL prompt
+                    if language == 'en':
+                        interpreter.system_message = """
+                        You are a SQL query assistant. Your task is to:
+                        1. Connect to the database and execute SQL queries
+                        2. Return query results in a clear format
+                        3. DO NOT create any visualizations or charts
+                        4. DO NOT save any files
+                        5. Focus only on retrieving and displaying data
+                        IMPORTANT: Please respond in English.
+                        """
+                    else:
+                        interpreter.system_message = """
+                        你是一个SQL查询助手。你的任务是：
+                        1. 连接数据库并执行SQL查询
+                        2. 以清晰的格式返回查询结果
+                        3. 不要创建任何可视化或图表
+                        4. 不要保存任何文件
+                        5. 只专注于检索和显示数据
+                        重要：请用中文回复。
+                        """
+                logger.info(f"使用DIRECT_SQL路由的限制性prompt")
             else:
-                interpreter.system_message = """
-                你是一个数据分析助手。请帮助用户查询数据库并生成可视化。
-                使用pandas处理数据，使用plotly创建图表。
-                将结果保存为HTML文件到output目录。
-                重要：请用中文回复。
-                """
+                # AI_ANALYSIS路由：从配置文件读取或使用默认值
+                if prompt_config and 'systemMessage' in prompt_config and 'AI_ANALYSIS' in prompt_config['systemMessage']:
+                    ai_analysis_config = prompt_config['systemMessage']['AI_ANALYSIS']
+                    if lang_key in ai_analysis_config:
+                        interpreter.system_message = ai_analysis_config[lang_key]
+                    else:
+                        # 默认的AI_ANALYSIS prompt
+                        interpreter.system_message = """
+                        你是一个数据分析助手。请帮助用户查询数据库并生成可视化。
+                        使用pandas处理数据，使用plotly创建图表。
+                        将结果保存为HTML文件到output目录。
+                        """ if lang_key == 'zh' else """
+                        You are a data analysis assistant. Help users query databases and generate visualizations.
+                        Use pandas for data processing and plotly for creating charts.
+                        Save results as HTML files to the output directory.
+                        """
+                else:
+                    # 默认的AI_ANALYSIS prompt
+                    if language == 'en':
+                        interpreter.system_message = """
+                        You are a data analysis assistant. Help users query databases and generate visualizations.
+                        Use pandas for data processing and plotly for creating charts.
+                        Save results as HTML files to the output directory.
+                        IMPORTANT: Please respond in English.
+                        """
+                    else:
+                        interpreter.system_message = """
+                        你是一个数据分析助手。请帮助用户查询数据库并生成可视化。
+                        使用pandas处理数据，使用plotly创建图表。
+                        将结果保存为HTML文件到output目录。
+                        重要：请用中文回复。
+                        """
+                logger.info(f"使用AI_ANALYSIS路由的完整功能prompt")
             
             # 获取会话历史（如果有）
             conversation_history = None
@@ -157,7 +236,66 @@ class InterpreterManager:
                     "conversation_id": conversation_id
                 }
             
-            result = interpreter.chat(full_prompt)
+            # 启动持续进程监控
+            if conversation_id:
+                self._start_process_monitoring(conversation_id)
+            
+            # 执行查询（带停止检查）
+            try:
+                # 创建一个包装函数来定期检查停止状态
+                result = None
+                error_occurred = False
+                
+                def execute_with_check():
+                    nonlocal result, error_occurred
+                    try:
+                        result = interpreter.chat(full_prompt)
+                    except KeyboardInterrupt:
+                        logger.info(f"查询被键盘中断: {conversation_id}")
+                        error_occurred = True
+                    except Exception as e:
+                        logger.error(f"执行出错: {e}")
+                        error_occurred = True
+                        result = str(e)
+                
+                # 在单独线程执行，以便能够中断
+                exec_thread = Thread(target=execute_with_check)
+                exec_thread.start()
+                
+                # 等待执行完成或停止信号
+                while exec_thread.is_alive():
+                    if stop_checker and stop_checker():
+                        logger.info(f"检测到停止信号，尝试中断执行: {conversation_id}")
+                        
+                        # 尝试中断interpreter
+                        if hasattr(interpreter, 'stop') and callable(interpreter.stop):
+                            interpreter.stop()
+                        
+                        # 终止所有子进程
+                        self._terminate_processes(conversation_id)
+                        
+                        # 等待线程结束
+                        exec_thread.join(timeout=2)
+                        
+                        return {
+                            "success": False,
+                            "error": "查询被用户中断",
+                            "interrupted": True,
+                            "model": model_name or self.config.get("current_model"),
+                            "conversation_id": conversation_id
+                        }
+                    
+                    time.sleep(0.1)  # 每100ms检查一次
+                
+                exec_thread.join()
+                
+                if error_occurred:
+                    raise Exception(f"执行出错: {result}")
+                
+            finally:
+                # 停止进程监控
+                if conversation_id:
+                    self._stop_process_monitoring(conversation_id)
             
             # 保存到会话历史
             if conversation_id:
@@ -659,16 +797,227 @@ class InterpreterManager:
             del self._conversation_history[conversation_id]
             logger.info(f"清除会话历史: {conversation_id}")
     
+    def _continuous_process_monitor(self, conversation_id: str, parent_pid: int):
+        """持续监控进程，捕获动态创建的子进程"""
+        logger.info(f"启动进程监控线程: {conversation_id}")
+        
+        while not self._stop_events.get(conversation_id, Event()).is_set():
+            try:
+                # 获取当前进程及其所有子进程
+                parent = psutil.Process(parent_pid)
+                children = parent.children(recursive=True)
+                
+                with self._process_lock:
+                    if conversation_id not in self._active_processes:
+                        self._active_processes[conversation_id] = set()
+                    
+                    # 添加新发现的进程
+                    for child in children:
+                        if child.pid not in self._active_processes[conversation_id]:
+                            self._active_processes[conversation_id].add(child.pid)
+                            logger.debug(f"发现新进程: {child.pid} ({child.name()}) - 会话: {conversation_id}")
+                
+            except psutil.NoSuchProcess:
+                # 父进程已结束
+                logger.debug(f"父进程已结束: {parent_pid}")
+                break
+            except Exception as e:
+                logger.error(f"监控进程时出错: {e}")
+            
+            # 每0.5秒扫描一次
+            time.sleep(0.5)
+        
+        logger.info(f"进程监控线程结束: {conversation_id}")
+    
+    def _start_process_monitoring(self, conversation_id: str):
+        """启动进程监控线程"""
+        with self._monitor_lock:
+            # 创建停止事件
+            self._stop_events[conversation_id] = Event()
+            
+            # 启动监控线程
+            monitor_thread = Thread(
+                target=self._continuous_process_monitor,
+                args=(conversation_id, os.getpid()),
+                daemon=True
+            )
+            monitor_thread.start()
+            self._monitor_threads[conversation_id] = monitor_thread
+            
+            logger.info(f"已启动进程监控: {conversation_id}")
+    
+    def _stop_process_monitoring(self, conversation_id: str):
+        """停止进程监控线程"""
+        with self._monitor_lock:
+            if conversation_id in self._stop_events:
+                # 设置停止标志
+                self._stop_events[conversation_id].set()
+                
+                # 等待线程结束
+                if conversation_id in self._monitor_threads:
+                    thread = self._monitor_threads[conversation_id]
+                    thread.join(timeout=2)
+                    del self._monitor_threads[conversation_id]
+                
+                # 清理事件
+                del self._stop_events[conversation_id]
+                
+                logger.info(f"已停止进程监控: {conversation_id}")
+    
+    def _track_processes(self, conversation_id: str):
+        """跟踪当前Python进程的所有子进程（保留用于初始跟踪）"""
+        try:
+            current_process = psutil.Process()
+            children = current_process.children(recursive=True)
+            
+            with self._process_lock:
+                if conversation_id not in self._active_processes:
+                    self._active_processes[conversation_id] = set()
+                
+                # 添加所有子进程PID
+                for child in children:
+                    self._active_processes[conversation_id].add(child.pid)
+                    logger.debug(f"初始跟踪进程: {child.pid} (会话: {conversation_id})")
+        except Exception as e:
+            logger.error(f"跟踪进程失败: {e}")
+    
+    def _terminate_processes(self, conversation_id: str, timeout: int = 3):
+        """终止与会话相关的所有进程（增强版）"""
+        with self._process_lock:
+            if conversation_id not in self._active_processes:
+                logger.debug(f"没有找到会话 {conversation_id} 的进程记录")
+                return
+            
+            pids = self._active_processes.get(conversation_id, set()).copy()  # 复制以避免修改时出错
+            if not pids:
+                logger.debug(f"会话 {conversation_id} 没有活跃进程")
+                return
+            
+            logger.info(f"准备终止 {len(pids)} 个进程: {pids}")
+            
+            # 按进程树层级排序（子进程先终止）
+            processes_to_kill = []
+            for pid in pids:
+                try:
+                    process = psutil.Process(pid)
+                    processes_to_kill.append((pid, process))
+                except psutil.NoSuchProcess:
+                    logger.debug(f"进程 {pid} 已经不存在")
+            
+            # 先尝试优雅终止所有进程
+            for pid, process in processes_to_kill:
+                try:
+                    # 获取进程的子进程
+                    children = process.children(recursive=True)
+                    
+                    # 先终止子进程
+                    for child in children:
+                        try:
+                            logger.debug(f"终止子进程 {child.pid}")
+                            child.terminate()
+                        except:
+                            pass
+                    
+                    # 再终止父进程
+                    process.terminate()
+                    logger.debug(f"发送SIGTERM到进程 {pid}")
+                    
+                except psutil.NoSuchProcess:
+                    logger.debug(f"进程 {pid} 已经不存在")
+                except Exception as e:
+                    logger.error(f"终止进程 {pid} 时出错: {e}")
+            
+            # 等待进程终止
+            time.sleep(0.5)
+            
+            # 强制杀死仍存活的进程
+            for pid, process in processes_to_kill:
+                try:
+                    if process.is_running():
+                        # 强制终止
+                        process.kill()
+                        logger.warning(f"强制终止进程 {pid}")
+                        
+                        # 如果是Unix系统，尝试使用进程组终止
+                        if hasattr(os, 'killpg'):
+                            try:
+                                os.killpg(os.getpgid(pid), signal.SIGKILL)
+                                logger.warning(f"强制终止进程组 {pid}")
+                            except:
+                                pass
+                except psutil.NoSuchProcess:
+                    pass
+                except Exception as e:
+                    logger.error(f"强制终止进程 {pid} 失败: {e}")
+            
+            # 清理进程记录
+            del self._active_processes[conversation_id]
+            logger.info(f"已清理会话 {conversation_id} 的所有进程")
+    
     def stop_query(self, conversation_id: str):
-        """尝试停止正在执行的查询"""
+        """尝试停止正在执行的查询，包括终止所有子进程（增强版）"""
+        logger.info(f"开始停止查询: {conversation_id}")
+        
+        # 1. 首先停止进程监控（防止新进程被添加）
+        self._stop_process_monitoring(conversation_id)
+        
+        # 2. 终止所有相关进程
+        self._terminate_processes(conversation_id)
+        
+        # 3. 清理interpreter实例
         with self._session_lock:
             if conversation_id in self._session_cache:
-                interpreter = self._session_cache[conversation_id]
-                # OpenInterpreter 0.4.3 没有直接的stop方法
-                # 但我们可以通过删除实例来尝试中断
-                logger.info(f"尝试停止查询: {conversation_id}")
                 try:
-                    # 清理interpreter实例
+                    interpreter = self._session_cache[conversation_id]
+                    
+                    # 尝试调用interpreter的停止方法（如果存在）
+                    if hasattr(interpreter, 'terminate') and callable(interpreter.terminate):
+                        try:
+                            interpreter.terminate()
+                            logger.info(f"调用了interpreter.terminate(): {conversation_id}")
+                        except:
+                            pass
+                    
+                    if hasattr(interpreter, 'stop') and callable(interpreter.stop):
+                        try:
+                            interpreter.stop()
+                            logger.info(f"调用了interpreter.stop(): {conversation_id}")
+                        except:
+                            pass
+                    
+                    # 清空消息历史
+                    if hasattr(interpreter, 'messages'):
+                        interpreter.messages = []
+                    
+                    # 如果有computer属性（代码执行器），也尝试停止它
+                    if hasattr(interpreter, 'computer'):
+                        if hasattr(interpreter.computer, 'terminate') and callable(interpreter.computer.terminate):
+                            try:
+                                interpreter.computer.terminate()
+                                logger.info(f"终止了interpreter.computer: {conversation_id}")
+                            except:
+                                pass
+                    
+                    # 删除缓存的实例
                     del self._session_cache[conversation_id]
+                    logger.info(f"已清理interpreter实例: {conversation_id}")
+                    
                 except Exception as e:
-                    logger.error(f"停止查询时出错: {e}")
+                    logger.error(f"清理interpreter实例失败: {e}")
+            
+            # 清理会话活跃时间记录
+            if conversation_id in self._session_last_active:
+                del self._session_last_active[conversation_id]
+        
+        # 4. 清理会话历史（可选）
+        if conversation_id in self._conversation_history:
+            # 保留历史但标记为已中断
+            history = self._conversation_history.get(conversation_id, [])
+            if history:
+                history.append({
+                    "role": "system",
+                    "content": "[会话被用户中断]",
+                    "timestamp": time.time()
+                })
+        
+        logger.info(f"查询停止完成: {conversation_id}")
