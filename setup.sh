@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# QueryGPT 完整安装启动脚本 v2.0
-# Complete Setup & Start Script v2.0
-# 整合了setup.sh的智能配置和start.sh的启动功能
+# QueryGPT 环境配置脚本 v2.0
+# Environment Setup Script v2.0
+# 仅进行环境配置，不启动服务
 
 set -e
 
@@ -42,7 +42,7 @@ print_banner() {
     clear
     echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}║${NC}     ${BOLD}QueryGPT Setup v2.0${NC}                              ${CYAN}║${NC}"
-    echo -e "${CYAN}║${NC}     完整安装配置并启动 / Complete Setup & Start       ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}     环境配置脚本 / Environment Setup Only             ${CYAN}║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -286,26 +286,9 @@ EOF
         if [ -f ".env.example" ]; then
             print_message "info" "从模板创建配置 / Creating from template"
             cp .env.example .env
-            
-            # 交互式询问用户选择API类型
-            echo ""
-            print_message "info" "请选择API类型 / Please choose API type:"
-            echo "  1) GPT API (需要API密钥 / Requires API key)"
-            echo "  2) Ollama 本地模型 (免费 / Free)"
-            echo ""
-            read -p "请输入选择 (1-2) / Enter choice (1-2): " api_choice
-            
-            if [ "$api_choice" = "2" ]; then
-                # 修改为Ollama配置
-                sed -i.bak 's/^API_KEY=sk-YOUR-API-KEY-HERE/API_KEY=not-needed-for-local/' .env
-                sed -i.bak 's|^API_BASE_URL=https://api.vveai.com/v1/|API_BASE_URL=http://localhost:11434/v1|' .env
-                sed -i.bak 's/^DEFAULT_MODEL=gpt-4.1/DEFAULT_MODEL=llama2/' .env
-                rm -f .env.bak
-                print_message "success" "已配置为Ollama本地模型 / Configured for Ollama"
-            else
-                print_message "warning" "请编辑 .env 文件填入你的API密钥"
-                print_message "warning" "Please edit .env file to add your API key"
-            fi
+            print_message "success" "配置文件已创建 / Configuration created"
+            print_message "info" "默认配置已生成，请根据需要编辑 .env 文件"
+            print_message "info" "Default configuration created, please edit .env file as needed"
         else
             # 创建默认配置
             cat > .env << 'EOF'
@@ -614,7 +597,7 @@ main() {
         exit 1
     fi
     
-    # 完整的设置和启动流程
+    # 完整的设置流程（不启动服务）
     check_first_run
     check_python
     setup_venv
@@ -622,18 +605,35 @@ main() {
     create_directories
     setup_env
     health_check
-    start_server
+    
+    # 显示完成信息
+    echo ""
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}✓ 环境配置完成！${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    print_message "success" "所有依赖已安装 / All dependencies installed"
+    print_message "success" "配置文件已生成 / Configuration files created"
+    print_message "success" "虚拟环境已就绪 / Virtual environment ready"
+    echo ""
+    print_message "info" "请运行以下命令启动服务："
+    print_message "info" "Please run the following command to start:"
+    echo ""
+    echo -e "    ${CYAN}./start.sh${NC}"
+    echo ""
 }
 
 # 处理命令行参数
 case "${1:-}" in
     --help|-h)
-        echo "QueryGPT Setup - 完整安装启动脚本"
+        echo "QueryGPT Setup - 环境配置脚本"
         echo "用法: ./setup.sh [选项]"
         echo ""
         echo "选项:"
-        echo "  无参数        执行完整安装并启动"
+        echo "  无参数        执行环境配置（不启动服务）"
         echo "  --help, -h    显示帮助信息"
+        echo ""
+        echo "配置完成后，请运行 ./start.sh 启动服务"
         echo ""
         exit 0
         ;;
