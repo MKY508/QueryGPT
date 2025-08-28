@@ -31,7 +31,6 @@ from backend.rate_limiter import rate_limit, strict_limiter, cleanup_rate_limite
 from backend.smart_router import SmartRouter
 from backend.ai_router import RouteType
 from backend.sql_executor import DirectSQLExecutor
-# from backend.semantic_layer.api import register_semantic_routes  # 暂时禁用以隔离问题
 
 # 配置日志
 logging.basicConfig(
@@ -1488,7 +1487,7 @@ if __name__ == '__main__':
     os.makedirs('cache', exist_ok=True)
     
     # 启动服务器
-    port = int(os.environ.get('PORT', 5001))
+    port = int(os.environ.get('PORT', 5002))
     logger.info(f"启动服务器，端口: {port}")
     
     app.run(
