@@ -82,9 +82,39 @@ def _get_stop_status(conversation_id):
     with active_queries_lock:
         return active_queries.get(conversation_id, {}).get('should_stop', False)
 
+def sync_config_files():
+    """同步配置文件，确保.env是唯一的数据库配置来源"""
+    try:
+        # 从.env读取最新的数据库配置
+        db_config = ConfigLoader.get_database_config()
+        
+        # 更新config.json中的数据库配置（如果文件存在）
+        config_json_path = os.path.join(PROJECT_ROOT, 'config', 'config.json')
+        if os.path.exists(config_json_path):
+            try:
+                with open(config_json_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                
+                # 更新或添加数据库配置
+                config_data['database'] = db_config
+                
+                # 写回文件
+                with open(config_json_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=2, ensure_ascii=False)
+                    
+                logger.info("已同步config.json与.env中的数据库配置")
+            except Exception as e:
+                logger.warning(f"同步config.json失败: {e}")
+    except Exception as e:
+        logger.warning(f"同步配置文件失败: {e}")
+
 def init_managers():
     """初始化各个管理器"""
     global interpreter_manager, database_manager, history_manager, smart_router, sql_executor
+    
+    # 首先同步配置文件
+    sync_config_files()
+    
     try:
         # 初始化基础管理器
         database_manager = DatabaseManager()
@@ -835,8 +865,11 @@ def handle_config():
                     elif line.startswith('DB_USER=') and config.get('database', {}).get('user'):
                         new_lines.append(f"DB_USER={config['database']['user']}\n")
                         updated = True
-                    elif line.startswith('DB_PASSWORD=') and config.get('database', {}).get('password'):
+                    elif line.startswith('DB_PASSWORD=') and 'password' in config.get('database', {}):
                         new_lines.append(f"DB_PASSWORD={config['database']['password']}\n")
+                        updated = True
+                    elif line.startswith('DB_DATABASE=') and 'database' in config.get('database', {}):
+                        new_lines.append(f"DB_DATABASE={config['database'].get('database', '')}\n")
                         updated = True
                     else:
                         new_lines.append(line)
@@ -1013,6 +1046,30 @@ def save_database_config():
         # 写入新配置
         with open(env_path, 'w') as f:
             f.writelines(new_lines)
+        
+        # 同时更新config.json中的数据库配置
+        config_json_path = os.path.join(PROJECT_ROOT, 'config', 'config.json')
+        if os.path.exists(config_json_path):
+            try:
+                with open(config_json_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                
+                # 更新数据库配置部分
+                config_data['database'] = {
+                    'host': config_map['DB_HOST'],
+                    'port': int(config_map['DB_PORT']),
+                    'user': config_map['DB_USER'],
+                    'password': config_map['DB_PASSWORD'],
+                    'database': config_map['DB_DATABASE']
+                }
+                
+                # 写回config.json
+                with open(config_json_path, 'w', encoding='utf-8') as f:
+                    json.dump(config_data, f, indent=2, ensure_ascii=False)
+                    
+                logger.info("已同步更新config.json中的数据库配置")
+            except Exception as e:
+                logger.warning(f"更新config.json失败，但.env已更新: {e}")
         
         # 重新加载配置
         global database_manager
@@ -1419,6 +1476,9 @@ def internal_error(error):
     return jsonify({"error": "内部服务器错误"}), 500
 
 if __name__ == '__main__':
+    # 同步配置文件，确保一致性
+    sync_config_files()
+    
     # 初始化管理器
     init_managers()
     
