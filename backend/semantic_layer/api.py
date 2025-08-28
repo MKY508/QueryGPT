@@ -11,8 +11,22 @@ import os
 from .manager import SemanticLayerManager
 from .collector import MetadataCollector
 from .mapper import SemanticMapper
-from ..database import DatabaseManager
-from ..auth import require_auth
+try:
+    from ..database import DatabaseManager
+except ImportError:
+    # 如果无法导入主应用的模块，创建一个占位类
+    class DatabaseManager:
+        def get_connection_config(self):
+            # 返回默认的数据库配置
+            return {
+                'host': 'localhost',
+                'port': 3306,
+                'user': 'root',
+                'password': ''
+            }
+
+# 使用独立的认证包装器
+from .auth_wrapper import require_auth
 
 logger = logging.getLogger(__name__)
 
