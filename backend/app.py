@@ -241,8 +241,8 @@ def chat_stream():
                 except Exception:
                     smart_enabled = False
 
-        if smart_router and smart_enabled:
-            yield _sse_format('progress', { 'stage': 'classify', 'message': '正在判断最佳执行路径…' })
+                if smart_router and smart_enabled:
+                    yield _sse_format('progress', { 'stage': 'classify', 'message': '正在判断最佳执行路径…' })
                     router_ctx = {
                         'model_name': model_name,
                         'conversation_id': conv_id,

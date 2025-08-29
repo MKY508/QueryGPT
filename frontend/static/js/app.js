@@ -512,9 +512,12 @@ class DataAnalysisPlatform {
                         this.currentConversationId,
                         this.currentViewMode,
                         (evt) => {
-                            if (evt.type === 'progress') {
+                            if (evt.type === 'progress_plan') {
+                                const labels = evt.data?.labels || [];
+                                this.renderProgressPlan(thinkingId, labels);
+                            } else if (evt.type === 'progress') {
                                 const tip = evt.data?.message || window.i18nManager?.t('common.processing') || '处理中...';
-                                this.updateThinkingProcess(thinkingId, tip);
+                                this.updateProgressStage(thinkingId, tip);
                             } else if (evt.type === 'result') {
                                 const payload = evt.data;
                                 this.currentConversationId = payload.conversation_id || this.currentConversationId;
@@ -1545,6 +1548,49 @@ class DataAnalysisPlatform {
         
         this.addMessage('bot', thinking);
         return thinkingId;
+    }
+
+    // 渲染AI规划的进度标签（不超过10字），创建一组预置的圆圈进度
+    renderProgressPlan(thinkingId, labels = []) {
+        const thinking = document.getElementById(thinkingId);
+        if (!thinking) return;
+        const stages = thinking.querySelector('.thinking-stages');
+        if (!stages) return;
+        stages.innerHTML = '';
+        (labels || []).forEach((label, idx) => {
+            const el = document.createElement('div');
+            el.className = `thinking-stage ${idx === 0 ? 'active' : ''}`;
+            el.innerHTML = `
+                <div class="stage-icon">${idx === 0 ? '<i class=\"fas fa-spinner fa-spin\"></i>' : '<i class=\"far fa-circle\"></i>'}</div>
+                <span class="stage-text">${String(label).slice(0, 10)}</span>
+            `;
+            stages.appendChild(el);
+        });
+    }
+
+    // 依据SSE进度推进一个阶段；如果没有预置，则回退到追加模式
+    updateProgressStage(thinkingId, tipText) {
+        const thinking = document.getElementById(thinkingId);
+        if (!thinking) return this.updateThinkingProcess(thinkingId, tipText);
+        const stages = thinking.querySelector('.thinking-stages');
+        if (!stages) return this.updateThinkingProcess(thinkingId, tipText);
+        const active = stages.querySelector('.thinking-stage.active');
+        if (active) {
+            active.classList.remove('active');
+            active.classList.add('completed');
+            const icon = active.querySelector('.stage-icon');
+            if (icon) icon.innerHTML = '<i class=\"fas fa-check\"></i>';
+        }
+        const next = stages.querySelector('.thinking-stage:not(.completed):not(.active)');
+        if (next) {
+            next.classList.add('active');
+            const icon = next.querySelector('.stage-icon');
+            if (icon) icon.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i>';
+            const text = next.querySelector('.stage-text');
+            if (text && tipText) text.textContent = String(tipText).slice(0, 10);
+        } else {
+            this.updateThinkingProcess(thinkingId, tipText);
+        }
     }
 
     /**
