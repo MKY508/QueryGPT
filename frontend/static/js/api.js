@@ -155,6 +155,43 @@ class API {
     }
 
     /**
+     * 使用 SSE 发送消息，实时接收进度与结果
+     */
+    sendMessageSSE(message, conversationId = null, viewMode = 'user', onEvent = null, modelName = null) {
+        if (!('EventSource' in window)) {
+            throw new Error('SSE not supported');
+        }
+        const currentModel = modelName || document.getElementById('current-model')?.value || window.app?.config?.default_model || localStorage.getItem('default_model') || 'gpt-5-high';
+        const lang = localStorage.getItem('language') || 'zh';
+        const ctxRounds = window.app?.contextRounds || 3;
+        const params = new URLSearchParams({
+            query: message,
+            model: currentModel,
+            use_database: 'true',
+            language: lang,
+            context_rounds: String(ctxRounds)
+        });
+        const url = `/api/chat/stream?${params.toString()}`;
+        const es = new EventSource(url);
+        es.addEventListener('progress', (e) => {
+            try { const data = JSON.parse(e.data); onEvent && onEvent({ type: 'progress', data }); } catch(_){}
+        });
+        es.addEventListener('result', (e) => {
+            try { const data = JSON.parse(e.data); onEvent && onEvent({ type: 'result', data }); } catch(_){}
+        });
+        es.addEventListener('done', (e) => {
+            try { const data = JSON.parse(e.data); onEvent && onEvent({ type: 'done', data }); } catch(_){}
+            es.close();
+        });
+        es.addEventListener('error', (e) => {
+            try { const data = e.data ? JSON.parse(e.data) : { message: 'error' }; onEvent && onEvent({ type: 'error', data }); } catch(_){}
+            es.close();
+        });
+        es.onerror = () => { es.close(); };
+        return es;
+    }
+
+    /**
      * 获取可用模型列表
      */
     async getModels() {

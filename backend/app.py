@@ -9,6 +9,7 @@ import logging
 import re
 import threading
 from flask import Flask, request, jsonify, render_template, send_from_directory, session
+from flask import Response
 from flask_cors import CORS
 from datetime import datetime
 import uuid as uuid_module
@@ -144,6 +145,150 @@ def init_managers():
         logger.error(f"管理器初始化失败: {e}")
         import traceback
         traceback.print_exc()
+
+
+def _sse_format(event: str, data: dict) -> str:
+    try:
+        payload = json.dumps(data, ensure_ascii=False)
+    except Exception:
+        payload = json.dumps({"message": str(data)})
+    return f"event: {event}\n" f"data: {payload}\n\n"
+
+
+@app.route('/api/chat/stream', methods=['GET'])
+@optional_auth
+@rate_limit(max_requests=20, window_seconds=60)
+def chat_stream():
+    """SSE流式查询：仅推送友好的进度与最终结果，不包含代码。"""
+    try:
+        if interpreter_manager is None:
+            return Response(_sse_format('error', {"error": "LLM 解释器未初始化"}), mimetype='text/event-stream')
+
+        # 读取参数（EventSource为GET）
+        user_query = request.args.get('query', '')
+        model_name = request.args.get('model')
+        use_database = request.args.get('use_database', 'true').lower() != 'false'
+        context_rounds = int(request.args.get('context_rounds', '3') or 3)
+        user_language = request.args.get('language', 'zh')
+
+        if not user_query:
+            return Response(_sse_format('error', {"error": "查询内容不能为空"}), mimetype='text/event-stream')
+
+        # 创建会话ID
+        conv_id = None
+        if history_manager:
+            title = user_query[:50] + ('...' if len(user_query) > 50 else '')
+            conv_id = history_manager.create_conversation(title=title, model=model_name or 'default')
+        else:
+            conv_id = str(uuid_module.uuid4())
+
+        # 标记查询开始
+        with active_queries_lock:
+            active_queries[conv_id] = { 'start_time': datetime.now(), 'should_stop': False }
+
+        # 设置上下文轮数
+        if interpreter_manager and context_rounds:
+            interpreter_manager.max_history_rounds = context_rounds
+
+        def generate():
+            try:
+                # 起始事件
+                yield _sse_format('progress', { 'stage': 'start', 'message': '开始处理请求…', 'conversation_id': conv_id })
+
+                # 路由阶段
+                route_info = {'route_type': 'AI_ANALYSIS', 'confidence': 0}
+                config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.json')
+                smart_enabled = False
+                try:
+                    if os.path.exists(config_path):
+                        with open(config_path, 'r', encoding='utf-8') as f:
+                            cfg = json.load(f)
+                            smart_enabled = cfg.get('features', {}).get('smart_routing', {}).get('enabled', False)
+                except Exception:
+                    smart_enabled = False
+
+                if smart_router and smart_enabled:
+                    yield _sse_format('progress', { 'stage': 'classify', 'message': '正在判断最佳执行路径…' })
+                    router_ctx = {
+                        'model_name': model_name,
+                        'conversation_id': conv_id,
+                        'language': user_language,
+                        'use_database': use_database,
+                        'context_rounds': context_rounds,
+                        'stop_checker': lambda: _get_stop_status(conv_id),
+                    }
+                    try:
+                        classification = smart_router.ai_classifier.classify(user_query, smart_router._prepare_routing_context(router_ctx)) if smart_router.ai_classifier else {}
+                        route_type = classification.get('route', 'ai_analysis')
+                        route_info['route_type'] = route_type
+                        route_info['confidence'] = classification.get('confidence', 0)
+                        yield _sse_format('progress', { 'stage': 'route', 'message': f"执行路径：{route_type}", 'route': route_info })
+                    except Exception:
+                        yield _sse_format('progress', { 'stage': 'route', 'message': '使用默认AI分析路径' })
+
+                # 构建执行上下文
+                context = {}
+                if use_database:
+                    try:
+                        db_config = ConfigLoader.get_database_config()
+                        context['connection_info'] = {
+                            'host': db_config['host'],
+                            'port': db_config['port'],
+                            'user': db_config['user'],
+                            'password': db_config['password'],
+                            'database': db_config.get('database', '')
+                        }
+                    except Exception:
+                        pass
+
+                # 友好阶段提示
+                if route_info['route_type'] == 'direct_sql':
+                    yield _sse_format('progress', { 'stage': 'execute', 'message': '正在执行数据库查询…' })
+                else:
+                    yield _sse_format('progress', { 'stage': 'analyze', 'message': '正在分析数据与生成图表…' })
+
+                # 执行查询
+                result = interpreter_manager.execute_query(
+                    user_query,
+                    context=context,
+                    model_name=model_name,
+                    conversation_id=conv_id,
+                    stop_checker=lambda: _get_stop_status(conv_id),
+                    language=user_language
+                )
+
+                # 结果事件（不包含代码，沿用后端汇总）
+                yield _sse_format('result', {
+                    'success': result.get('success', False),
+                    'result': result.get('result') or result.get('error'),
+                    'model': result.get('model'),
+                    'conversation_id': conv_id
+                })
+
+                yield _sse_format('done', { 'conversation_id': conv_id })
+
+            except GeneratorExit:
+                # 客户端断开
+                with active_queries_lock:
+                    if conv_id in active_queries:
+                        active_queries[conv_id]['should_stop'] = True
+                if interpreter_manager:
+                    interpreter_manager.stop_query(conv_id)
+            except Exception as e:
+                yield _sse_format('error', { 'error': str(e), 'conversation_id': conv_id })
+            finally:
+                with active_queries_lock:
+                    active_queries.pop(conv_id, None)
+
+        headers = {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+        }
+        return Response(generate(), headers=headers)
+
+    except Exception as e:
+        return Response(_sse_format('error', { 'error': str(e) }), mimetype='text/event-stream')
 
 # 路由定义
 @app.route('/')
