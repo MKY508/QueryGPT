@@ -132,11 +132,11 @@ class DataAnalysisPlatform {
                 this._devViewEnabledCache = false;
                 return false;
             }
-            // 默认禁用开发者视图
-            this._devViewEnabledCache = false;
-            return false;
+            // 默认启用开发者视图（用户可随时切换）
+            this._devViewEnabledCache = true;
+            return true;
         } catch (_) {
-            return false;
+            return true;
         }
     }
 
@@ -503,47 +503,64 @@ class DataAnalysisPlatform {
         const thinkingId = this.showThinkingProcess();
 
         try {
-            // 创建可取消的请求
-            this.abortController = new AbortController();
-            
-            // 获取当前选中的模型
-            const currentModelElement = document.getElementById('current-model');
-            const selectedModel = currentModelElement?.value || this.config?.default_model || 'gpt-5-high';
-            console.log('当前选择的模型:', selectedModel);
-            
-            // 发送消息并处理流式响应，传递模型参数
-            const response = await api.sendMessageStream(
-                message,
-                this.currentConversationId,
-                this.currentViewMode,
-                (data) => {
-                    // 更新会话ID（如果是新会话）
-                    if (data.conversationId) {
-                        this.currentConversationId = data.conversationId;
-                        localStorage.setItem('currentConversationId', data.conversationId);
-                        console.log('新会话ID (从回调):', this.currentConversationId);
-                        
-                        // 新对话创建成功，标记需要刷新历史记录
-                        if (window.HistoryManager && window.HistoryManager.instance) {
-                            window.HistoryManager.instance.needsRefresh = true;
-                            console.log('标记历史记录需要刷新');
+            // 优先尝试 SSE 实时进度
+            let usedSSE = false;
+            if (window.EventSource) {
+                try {
+                    api.sendMessageSSE(
+                        message,
+                        this.currentConversationId,
+                        this.currentViewMode,
+                        (evt) => {
+                            if (evt.type === 'progress') {
+                                const tip = evt.data?.message || window.i18nManager?.t('common.processing') || '处理中...';
+                                this.updateThinkingMessage(thinkingId, tip);
+                            } else if (evt.type === 'result') {
+                                const payload = evt.data;
+                                this.currentConversationId = payload.conversation_id || this.currentConversationId;
+                                if (payload.success) {
+                                    this.handleStreamResponse({ type: 'result', content: payload.result, conversationId: this.currentConversationId }, thinkingId);
+                                } else {
+                                    this.handleStreamResponse({ type: 'error', message: payload.result || '执行失败' }, thinkingId);
+                                }
+                            } else if (evt.type === 'error') {
+                                this.handleStreamResponse({ type: 'error', message: evt.data?.error || '执行失败' }, thinkingId);
+                            }
                         }
+                    );
+                    usedSSE = true;
+                } catch (e) {
+                    usedSSE = false;
+                }
+            }
+
+            if (!usedSSE) {
+                // 回退到原有的非SSE流式（模拟）
+                this.abortController = new AbortController();
+                const currentModelElement = document.getElementById('current-model');
+                const selectedModel = currentModelElement?.value || this.config?.default_model || 'gpt-5-high';
+                const response = await api.sendMessageStream(
+                    message,
+                    this.currentConversationId,
+                    this.currentViewMode,
+                    (data) => {
+                        if (data.conversationId) {
+                            this.currentConversationId = data.conversationId;
+                            localStorage.setItem('currentConversationId', data.conversationId);
+                            if (window.HistoryManager && window.HistoryManager.instance) {
+                                window.HistoryManager.instance.needsRefresh = true;
+                            }
+                        }
+                        this.handleStreamResponse(data, thinkingId);
+                    },
+                    selectedModel
+                );
+                if (response && response.conversation_id) {
+                    this.currentConversationId = response.conversation_id;
+                    localStorage.setItem('currentConversationId', response.conversation_id);
+                    if (window.HistoryManager && window.HistoryManager.instance) {
+                        window.HistoryManager.instance.needsRefresh = true;
                     }
-                    this.handleStreamResponse(data, thinkingId);
-                },
-                selectedModel  // 传递选中的模型
-            );
-            
-            // 更新会话ID（从最终响应）
-            if (response && response.conversation_id) {
-                this.currentConversationId = response.conversation_id;
-                localStorage.setItem('currentConversationId', response.conversation_id);
-                console.log('新会话ID (从响应):', this.currentConversationId);
-                
-                // 新对话创建成功，标记需要刷新历史记录
-                if (window.HistoryManager && window.HistoryManager.instance) {
-                    window.HistoryManager.instance.needsRefresh = true;
-                    console.log('标记历史记录需要刷新（从最终响应）');
                 }
             }
         } catch (error) {
