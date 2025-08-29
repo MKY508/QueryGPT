@@ -1241,6 +1241,15 @@ class SettingsManager {
             outputRequirements: `使用 plotly 生成可视化图表
 将 HTML 文件保存到 output 目录
 提供简洁的总结，包括完成的任务和关键发现`
+            ,
+            // 高级Prompt默认
+            summarization: '基于分析结果，用2–4句中文业务语言总结关键发现、趋势或异常，避免技术细节。',
+            errorHandling: '当出现错误时，先识别错误类型（连接/权限/语法/超时），用中文简洁解释并给出下一步建议，避免输出堆栈与敏感信息。',
+            visualization: '根据数据特征选择合适的可视化类型（柱/线/饼/散点等），使用中文标题与轴标签，保存为HTML至output目录。',
+            dataAnalysis: '进行数据清洗、聚合、对比、趋势与异常分析，确保结果可解释与复现，必要时输出方法与局限说明（中文）。',
+            sqlGeneration: '从自然语言与schema生成只读SQL，遵循只读限制（SELECT/SHOW/DESCRIBE/EXPLAIN），避免危险语句与全表扫描。',
+            codeReview: '对将要执行的代码进行安全与必要性检查，避免长时/不必要操作，给出简洁优化建议（中文）。',
+            progressPlanner: '将当前执行阶段总结为不超过10字的中文短语，面向非技术用户，如“连接数据库”“查询数据”“生成图表”。'
         };
     }
     
@@ -1257,7 +1266,14 @@ class SettingsManager {
             tableSelection: document.getElementById('prompt-table-selection').value,
             fieldMapping: document.getElementById('prompt-field-mapping').value,
             dataProcessing: document.getElementById('prompt-data-processing').value,
-            outputRequirements: document.getElementById('prompt-output-requirements').value
+            outputRequirements: document.getElementById('prompt-output-requirements').value,
+            summarization: document.getElementById('prompt-summarization')?.value || defaults.summarization,
+            errorHandling: document.getElementById('prompt-error-handling')?.value || defaults.errorHandling,
+            visualization: document.getElementById('prompt-visualization')?.value || defaults.visualization,
+            dataAnalysis: document.getElementById('prompt-data-analysis')?.value || defaults.dataAnalysis,
+            sqlGeneration: document.getElementById('prompt-sql-generation')?.value || defaults.sqlGeneration,
+            codeReview: document.getElementById('prompt-code-review')?.value || defaults.codeReview,
+            progressPlanner: document.getElementById('prompt-progress-planner')?.value || defaults.progressPlanner
         };
         
         try {
@@ -1271,9 +1287,13 @@ class SettingsManager {
             });
             
             if (response.ok) {
+                const resp = await response.json();
+                const saved = resp.prompts || promptSettings;
                 // 保存到本地存储
-                localStorage.setItem('prompt_settings', JSON.stringify(promptSettings));
-                app.showNotification('Prompt设置已保存', 'success');
+                localStorage.setItem('prompt_settings', JSON.stringify(saved));
+                // 立即刷新界面，确保与后端一致
+                await this.loadPromptSettings();
+                app.showNotification(resp.message || 'Prompt设置已保存', 'success');
             } else {
                 throw new Error('保存失败');
             }
@@ -1312,8 +1332,12 @@ class SettingsManager {
             });
             
             if (response.ok) {
-                localStorage.setItem('prompt_settings', JSON.stringify(defaultSettings));
-                app.showNotification('已恢复默认Prompt设置', 'success');
+                const resp = await response.json();
+                const saved = resp.prompts || defaultSettings;
+                localStorage.setItem('prompt_settings', JSON.stringify(saved));
+                // 刷新界面
+                await this.loadPromptSettings();
+                app.showNotification(resp.message || '已恢复默认Prompt设置', 'success');
             }
         } catch (error) {
             console.error('恢复默认设置失败:', error);
@@ -1326,13 +1350,23 @@ class SettingsManager {
      * 导出Prompt设置
      */
     exportPromptSettings() {
+        const d = this.getDefaultPromptSettings();
         const promptSettings = {
-            routing: document.getElementById('prompt-routing')?.value || this.getDefaultPromptSettings().routing,
+            routing: document.getElementById('prompt-routing')?.value || d.routing,
+            directSql: document.getElementById('prompt-direct-sql')?.value || d.directSql,
+            aiAnalysis: document.getElementById('prompt-ai-analysis')?.value || d.aiAnalysis,
             exploration: document.getElementById('prompt-exploration').value,
             tableSelection: document.getElementById('prompt-table-selection').value,
             fieldMapping: document.getElementById('prompt-field-mapping').value,
             dataProcessing: document.getElementById('prompt-data-processing').value,
             outputRequirements: document.getElementById('prompt-output-requirements').value,
+            summarization: document.getElementById('prompt-summarization')?.value || d.summarization,
+            errorHandling: document.getElementById('prompt-error-handling')?.value || d.errorHandling,
+            visualization: document.getElementById('prompt-visualization')?.value || d.visualization,
+            dataAnalysis: document.getElementById('prompt-data-analysis')?.value || d.dataAnalysis,
+            sqlGeneration: document.getElementById('prompt-sql-generation')?.value || d.sqlGeneration,
+            codeReview: document.getElementById('prompt-code-review')?.value || d.codeReview,
+            progressPlanner: document.getElementById('prompt-progress-planner')?.value || d.progressPlanner,
             exportTime: new Date().toISOString()
         };
         
@@ -1367,8 +1401,14 @@ class SettingsManager {
                 const settings = JSON.parse(text);
                 
                 // 验证导入的数据
-                if (settings.routing !== undefined && document.getElementById('prompt-routing')) {
-                    document.getElementById('prompt-routing').value = settings.routing;
+                if (settings.routing !== undefined) {
+                    const el = document.getElementById('prompt-routing'); if (el) el.value = settings.routing;
+                }
+                if (settings.directSql !== undefined) {
+                    const el = document.getElementById('prompt-direct-sql'); if (el) el.value = settings.directSql;
+                }
+                if (settings.aiAnalysis !== undefined) {
+                    const el = document.getElementById('prompt-ai-analysis'); if (el) el.value = settings.aiAnalysis;
                 }
                 if (settings.exploration !== undefined) {
                     document.getElementById('prompt-exploration').value = settings.exploration;
@@ -1384,6 +1424,27 @@ class SettingsManager {
                 }
                 if (settings.outputRequirements !== undefined) {
                     document.getElementById('prompt-output-requirements').value = settings.outputRequirements;
+                }
+                if (settings.summarization !== undefined) {
+                    const el = document.getElementById('prompt-summarization'); if (el) el.value = settings.summarization;
+                }
+                if (settings.errorHandling !== undefined) {
+                    const el = document.getElementById('prompt-error-handling'); if (el) el.value = settings.errorHandling;
+                }
+                if (settings.visualization !== undefined) {
+                    const el = document.getElementById('prompt-visualization'); if (el) el.value = settings.visualization;
+                }
+                if (settings.dataAnalysis !== undefined) {
+                    const el = document.getElementById('prompt-data-analysis'); if (el) el.value = settings.dataAnalysis;
+                }
+                if (settings.sqlGeneration !== undefined) {
+                    const el = document.getElementById('prompt-sql-generation'); if (el) el.value = settings.sqlGeneration;
+                }
+                if (settings.codeReview !== undefined) {
+                    const el = document.getElementById('prompt-code-review'); if (el) el.value = settings.codeReview;
+                }
+                if (settings.progressPlanner !== undefined) {
+                    const el = document.getElementById('prompt-progress-planner'); if (el) el.value = settings.progressPlanner;
                 }
                 
                 app.showNotification('Prompt配置已导入', 'success');
@@ -1439,6 +1500,29 @@ class SettingsManager {
                 document.getElementById('prompt-field-mapping').value = settings.fieldMapping || defaults.fieldMapping;
                 document.getElementById('prompt-data-processing').value = settings.dataProcessing || defaults.dataProcessing;
                 document.getElementById('prompt-output-requirements').value = settings.outputRequirements || defaults.outputRequirements;
+
+                // 高级Prompt
+                if (document.getElementById('prompt-summarization')) {
+                    document.getElementById('prompt-summarization').value = settings.summarization || defaults.summarization;
+                }
+                if (document.getElementById('prompt-error-handling')) {
+                    document.getElementById('prompt-error-handling').value = settings.errorHandling || defaults.errorHandling;
+                }
+                if (document.getElementById('prompt-visualization')) {
+                    document.getElementById('prompt-visualization').value = settings.visualization || defaults.visualization;
+                }
+                if (document.getElementById('prompt-data-analysis')) {
+                    document.getElementById('prompt-data-analysis').value = settings.dataAnalysis || defaults.dataAnalysis;
+                }
+                if (document.getElementById('prompt-sql-generation')) {
+                    document.getElementById('prompt-sql-generation').value = settings.sqlGeneration || defaults.sqlGeneration;
+                }
+                if (document.getElementById('prompt-code-review')) {
+                    document.getElementById('prompt-code-review').value = settings.codeReview || defaults.codeReview;
+                }
+                if (document.getElementById('prompt-progress-planner')) {
+                    document.getElementById('prompt-progress-planner').value = settings.progressPlanner || defaults.progressPlanner;
+                }
             }
         } catch (error) {
             console.error('加载Prompt设置失败:', error);
@@ -1453,6 +1537,17 @@ class SettingsManager {
                 document.getElementById('prompt-field-mapping').value = defaultSettings.fieldMapping;
                 document.getElementById('prompt-data-processing').value = defaultSettings.dataProcessing;
                 document.getElementById('prompt-output-requirements').value = defaultSettings.outputRequirements;
+                // 高级Prompt
+                const map = [
+                    ['prompt-summarization', defaultSettings.summarization],
+                    ['prompt-error-handling', defaultSettings.errorHandling],
+                    ['prompt-visualization', defaultSettings.visualization],
+                    ['prompt-data-analysis', defaultSettings.dataAnalysis],
+                    ['prompt-sql-generation', defaultSettings.sqlGeneration],
+                    ['prompt-code-review', defaultSettings.codeReview],
+                    ['prompt-progress-planner', defaultSettings.progressPlanner]
+                ];
+                map.forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
             }
         }
     }
