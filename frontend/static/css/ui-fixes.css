@@ -209,6 +209,10 @@ body {
 .btn-onboarding i { font-size: 13px; }
 .btn-onboarding:hover { background: #f1f5f9; }
 
+/* 当只展示用户视图时，隐藏视图切换与开发者容器 */
+.dual-view-container.user-only .view-switcher { display: none; }
+.dual-view-container.user-only .developer-view { display: none; }
+
 #history-tab .page-header,
 #settings-tab .page-header,
 #system-info-tab .page-header {
