@@ -507,6 +507,45 @@
                                 </div>
                             </div>
                             
+                            <!-- 高级Prompt（可选） -->
+                            <div class="prompt-section">
+                                <h4 class="collapsible-header">
+                                    <i class="fas fa-tools"></i> 
+                                    <span>高级 Prompt（可选）</span>
+                                    <i class="fas fa-chevron-down collapse-icon"></i>
+                                </h4>
+                                <div class="collapsible-content">
+                                    <div class="form-group">
+                                        <label>总结输出（用户视角）</label>
+                                        <textarea id="prompt-summarization" rows="3" placeholder="设置结果总结的风格与要求..."></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>错误处理（友好说明）</label>
+                                        <textarea id="prompt-error-handling" rows="3" placeholder="设置错误处理的风格与建议..."></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>可视化指引</label>
+                                        <textarea id="prompt-visualization" rows="3" placeholder="设置可视化生成的标准..."></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>数据分析指引</label>
+                                        <textarea id="prompt-data-analysis" rows="3" placeholder="设置数据分析的标准..."></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SQL 生成指引</label>
+                                        <textarea id="prompt-sql-generation" rows="3" placeholder="设置只读SQL生成的标准..."></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>代码审查指引</label>
+                                        <textarea id="prompt-code-review" rows="3" placeholder="设置代码审查的标准..."></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>进度归纳（短标签）</label>
+                                        <textarea id="prompt-progress-planner" rows="3" placeholder="设置将执行阶段归纳为不超过10字短语的规则..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div class="button-group">
                                 <button class="btn-primary" id="save-prompts">
                                     <i class="fas fa-save"></i> <span data-i18n="prompts.save">保存设置</span>
