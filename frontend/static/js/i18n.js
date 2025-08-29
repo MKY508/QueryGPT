@@ -22,6 +22,7 @@ const i18n = {
         chat: {
             title: '数据查询与分析',
             newConversation: '新对话',
+            onboarding: '引导',
             inputPlaceholder: '输入查询内容...',
             welcome: '欢迎使用 QueryGPT 智能数据分析系统',
             welcomeDesc: '我可以帮助您：',
@@ -44,6 +45,34 @@ const i18n = {
             executionComplete: '执行完成',
             finalOutput: '最终输出',
             needChart: '需要图表？尝试在查询中明确要求"生成图表"或"可视化展示"'
+        },
+        // 新手引导
+        onboarding: {
+            step1Title: '欢迎使用 QueryGPT',
+            step1Content: '这是您的智能数据分析助手，让我快速带您了解主要功能',
+            step2Title: '自然语言查询',
+            step2Content: '在这里输入您的问题，比如“显示最近30天的销售数据”',
+            step3Title: '发送查询',
+            step3Content: '点击这里或按 Enter 键发送',
+            step4Title: '切换AI模型',
+            step4Content: '选择不同的AI模型以获得最佳效果',
+            step5Title: '查看历史',
+            step5Content: '这里可以查看所有查询历史',
+            step6Title: '系统设置',
+            step6Content: '在这里配置数据库连接和其他选项',
+            buttons: {
+                prev: '上一步',
+                next: '下一步',
+                complete: '完成',
+                skip: '跳过',
+                close: '关闭'
+            },
+            confirmSkipTitle: '跳过新手引导',
+            confirmSkipMessage: '确定要跳过新手引导吗？\n您可以稍后在帮助菜单中重新启动引导。',
+            confirmSkipContinue: '继续引导',
+            confirmSkipConfirm: '跳过',
+            endConfirmMessage: '要结束新手引导吗？',
+            finishedToast: '新手引导完成！开始探索 QueryGPT 吧'
         },
         
         // 设置页面
@@ -388,6 +417,7 @@ const i18n = {
         chat: {
             title: 'Data Query & Analysis',
             newConversation: 'New Chat',
+            onboarding: 'Guide',
             inputPlaceholder: 'Enter your query...',
             welcome: 'Welcome to QueryGPT Intelligent Data Analysis System',
             welcomeDesc: 'I can help you:',
@@ -410,6 +440,34 @@ const i18n = {
             executionComplete: 'Execution Complete',
             finalOutput: 'Final Output',
             needChart: 'Need a chart? Try explicitly requesting "generate chart" or "visualize data" in your query'
+        },
+        // Onboarding
+        onboarding: {
+            step1Title: 'Welcome to QueryGPT',
+            step1Content: 'Your intelligent data analysis assistant. Let me show you around.',
+            step2Title: 'Natural Language Query',
+            step2Content: 'Type your question here, e.g. “show sales for the last 30 days”.',
+            step3Title: 'Send Query',
+            step3Content: 'Click here or press Enter to send.',
+            step4Title: 'Switch Model',
+            step4Content: 'Choose different AI models for best results.',
+            step5Title: 'History',
+            step5Content: 'View your past queries here.',
+            step6Title: 'Settings',
+            step6Content: 'Configure database and other options here.',
+            buttons: {
+                prev: 'Back',
+                next: 'Next',
+                complete: 'Done',
+                skip: 'Skip',
+                close: 'Close'
+            },
+            confirmSkipTitle: 'Skip the guide',
+            confirmSkipMessage: 'Are you sure you want to skip?\nYou can restart it later from Help.',
+            confirmSkipContinue: 'Continue',
+            confirmSkipConfirm: 'Skip',
+            endConfirmMessage: 'End the onboarding?',
+            finishedToast: 'Onboarding complete! Explore QueryGPT now.'
         },
         
         // Settings page
