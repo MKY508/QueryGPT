@@ -811,6 +811,23 @@ class DataAnalysisPlatform {
             console.log('使用字符串内容作为总结');
         }
         
+        // 额外从 artifacts / files 收集可能的HTML图表文件
+        const collectArtifactPaths = (arr) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach(x => {
+                if (typeof x === 'string' && /\.html?$/i.test(x)) {
+                    const fname = x.split(/[\\/]/).pop();
+                    if (fname) chartPaths.push(fname);
+                }
+                if (x && typeof x === 'object' && x.path && /\.html?$/i.test(x.path)) {
+                    const fname = String(x.path).split(/[\\/]/).pop();
+                    if (fname) chartPaths.push(fname);
+                }
+            });
+        };
+        if (Array.isArray(data?.artifacts)) collectArtifactPaths(data.artifacts);
+        if (Array.isArray(data?.files)) collectArtifactPaths(data.files);
+
         if (data.content && Array.isArray(data.content)) {
             console.log('data.content 是数组，长度:', data.content.length);
             
@@ -1721,14 +1738,8 @@ class DataAnalysisPlatform {
         // 存储原始数据供两个视图使用
         this.lastQueryData = data;
         
-        // 每次创建视图时都重新获取最新的设置，确保使用正确的默认视图
-        const defaultMode = this.getStoredViewMode();
-        // 只有在没有设置当前视图模式时才使用默认值
-        if (!this.currentViewMode || this.currentViewMode === '') {
-            this.currentViewMode = defaultMode;
-        }
-        // 确保始终使用用户设置的默认视图
-        this.currentViewMode = defaultMode;
+        // 统一默认使用用户视图（可切换到开发者视图），避免历史对话落到开发者视图
+        this.currentViewMode = 'user';
         // 使用当前视图模式创建容器
         
         const devEnabled = this.isDeveloperViewEnabled();
@@ -1737,14 +1748,14 @@ class DataAnalysisPlatform {
             // 创建视图切换按钮（仅当启用开发者视图时）
             viewSwitcher = document.createElement('div');
             viewSwitcher.className = 'view-switcher';
-            viewSwitcher.innerHTML = `
-                <button class="view-btn ${this.currentViewMode === 'user' ? 'active' : ''}" data-view="user">
-                    <i class="fas fa-user"></i> ${window.i18nManager.t('chat.userView')}
-                </button>
-                <button class="view-btn ${this.currentViewMode === 'developer' ? 'active' : ''}" data-view="developer">
-                    <i class="fas fa-code"></i> ${window.i18nManager.t('chat.developerView')}
-                </button>
-            `;
+        viewSwitcher.innerHTML = `
+            <button class="view-btn ${this.currentViewMode === 'user' ? 'active' : ''}" data-view="user">
+                <i class="fas fa-user"></i> ${window.i18nManager.t('chat.userView')}
+            </button>
+            <button class="view-btn ${this.currentViewMode === 'developer' ? 'active' : ''}" data-view="developer">
+                <i class="fas fa-code"></i> ${window.i18nManager.t('chat.developerView')}
+            </button>
+        `;
         } else {
             dualViewContainer.classList.add('user-only');
         }
