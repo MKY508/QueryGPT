@@ -16,6 +16,7 @@ class DataAnalysisPlatform {
         this.contextRounds = 3;  // 默认保留3轮历史
         this.historyManager = null;  // 历史记录管理器
         this.tipsManager = null;  // Tips提示管理器
+        this._devViewEnabledCache = null; // 缓存开发者视图开关
         
         this.init();
     }
@@ -108,6 +109,35 @@ class DataAnalysisPlatform {
         
         // 启动时始终显示欢迎消息，不自动恢复历史对话
         this.showWelcomeMessage();
+    }
+
+    /**
+     * 是否启用开发者视图（默认禁用）
+     * 优先读取后端配置 features.developer_view.enabled，其次读取本地存储开关
+     */
+    isDeveloperViewEnabled() {
+        try {
+            if (this._devViewEnabledCache !== null) return this._devViewEnabledCache;
+            const featureFlag = this.config?.features?.developer_view?.enabled;
+            if (typeof featureFlag === 'boolean') {
+                this._devViewEnabledCache = featureFlag;
+                return featureFlag;
+            }
+            const stored = localStorage.getItem('enable_developer_view');
+            if (stored === 'true') {
+                this._devViewEnabledCache = true;
+                return true;
+            }
+            if (stored === 'false') {
+                this._devViewEnabledCache = false;
+                return false;
+            }
+            // 默认禁用开发者视图
+            this._devViewEnabledCache = false;
+            return false;
+        } catch (_) {
+            return false;
+        }
     }
 
     /**
@@ -1638,38 +1668,49 @@ class DataAnalysisPlatform {
         this.currentViewMode = defaultMode;
         // 使用当前视图模式创建容器
         
-        // 创建视图切换按钮
-        const viewSwitcher = document.createElement('div');
-        viewSwitcher.className = 'view-switcher';
-        viewSwitcher.innerHTML = `
-            <button class="view-btn ${this.currentViewMode === 'user' ? 'active' : ''}" data-view="user">
-                <i class="fas fa-user"></i> ${window.i18nManager.t('chat.userView')}
-            </button>
-            <button class="view-btn ${this.currentViewMode === 'developer' ? 'active' : ''}" data-view="developer">
-                <i class="fas fa-code"></i> ${window.i18nManager.t('chat.developerView')}
-            </button>
-        `;
+        const devEnabled = this.isDeveloperViewEnabled();
+        let viewSwitcher = null;
+        if (devEnabled) {
+            // 创建视图切换按钮（仅当启用开发者视图时）
+            viewSwitcher = document.createElement('div');
+            viewSwitcher.className = 'view-switcher';
+            viewSwitcher.innerHTML = `
+                <button class="view-btn ${this.currentViewMode === 'user' ? 'active' : ''}" data-view="user">
+                    <i class="fas fa-user"></i> ${window.i18nManager.t('chat.userView')}
+                </button>
+                <button class="view-btn ${this.currentViewMode === 'developer' ? 'active' : ''}" data-view="developer">
+                    <i class="fas fa-code"></i> ${window.i18nManager.t('chat.developerView')}
+                </button>
+            `;
+        } else {
+            dualViewContainer.classList.add('user-only');
+        }
         
         // 创建用户视图内容
         const userViewContent = this.createUserSummary(data);
         userViewContent.className = `view-content user-view ${this.currentViewMode === 'user' ? 'active' : ''}`;
         
-        // 创建开发者视图内容
-        const devViewContent = this.createDeveloperDetails(data);
-        devViewContent.className = `view-content developer-view ${this.currentViewMode === 'developer' ? 'active' : ''}`;
+        // 创建开发者视图内容（仅当启用时）
+        let devViewContent = null;
+        if (devEnabled) {
+            devViewContent = this.createDeveloperDetails(data);
+            devViewContent.className = `view-content developer-view ${this.currentViewMode === 'developer' ? 'active' : ''}`;
+        }
         
         // 组装容器
-        dualViewContainer.appendChild(viewSwitcher);
+        if (viewSwitcher) dualViewContainer.appendChild(viewSwitcher);
         dualViewContainer.appendChild(userViewContent);
-        dualViewContainer.appendChild(devViewContent);
+        if (devViewContent) dualViewContainer.appendChild(devViewContent);
         
         // 添加视图切换事件
-        viewSwitcher.querySelectorAll('.view-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const view = e.currentTarget.dataset.view;
-                this.switchView(view, dualViewContainer);
+        if (viewSwitcher) {
+            viewSwitcher.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const view = e.currentTarget.dataset.view;
+                    this.switchView(view, dualViewContainer);
+                });
             });
-        });
+        }
         
         return dualViewContainer;
     }
@@ -1679,8 +1720,14 @@ class DataAnalysisPlatform {
      * 切换视图
      */
     switchView(viewType, container) {
-        // 更新当前视图模式
-        this.currentViewMode = viewType;
+        // 若未启用开发者视图，强制使用 user 视图
+        if (!this.isDeveloperViewEnabled()) {
+            this.currentViewMode = 'user';
+            viewType = 'user';
+        } else {
+            // 更新当前视图模式
+            this.currentViewMode = viewType;
+        }
         // 切换到指定视图
         
         // 不保存临时的视图切换，只使用用户在设置中配置的默认值
