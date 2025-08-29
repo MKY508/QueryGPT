@@ -155,6 +155,40 @@ def _sse_format(event: str, data: dict) -> str:
     return f"event: {event}\n" f"data: {payload}\n\n"
 
 
+def _generate_progress_plan(user_query: str, route_type: str = 'ai_analysis', language: str = 'zh'):
+    """调用LLM生成简短进度标签（每项不超过10字，3-6项）。失败时返回默认。"""
+    try:
+        from backend.llm_service import LLMService
+        svc = LLMService()
+        prompt = (
+            "你是数据分析的执行计划助理。请基于用户需求和执行路径，生成一个最多6步的进度标签列表，"
+            "每个标签不超过10个字，简短、友好，便于展示给非技术用户。"
+            f"\n- 用户需求: {user_query[:200]}"
+            f"\n- 执行路径: {route_type.upper()}"
+            "\n只输出JSON，格式如下：\n{\n  \"labels\": [\"准备\", \"解析需求\", \"查询数据\", \"生成图表\", \"总结输出\"]\n}"
+        )
+        if language == 'en':
+            prompt = (
+                "You are a progress planner. Based on the user request and execution route, generate 3-6 short step labels"
+                ", each no longer than 10 characters, friendly for non-technical users."
+                f"\n- User request: {user_query[:200]}"
+                f"\n- Route: {route_type.upper()}"
+                "\nOutput JSON only in the form:\n{\n  \"labels\": [\"Prepare\", \"Parse\", \"Query\", \"Chart\", \"Summarize\"]\n}"
+            )
+        res = svc.complete(prompt, temperature=0.2, max_tokens=200)
+        if res.get('success'):
+            content = res.get('content', '{}')
+            data = json.loads(content)
+            labels = data.get('labels')
+            if isinstance(labels, list) and 1 <= len(labels) <= 8:
+                # 统一截断
+                return [str(x)[:10] for x in labels]
+    except Exception:
+        pass
+    # 默认计划
+    return ['准备', '解析需求', '查询数据', '生成图表', '总结输出'] if language != 'en' else ['Prepare', 'Parse', 'Query', 'Chart', 'Summary']
+
+
 @app.route('/api/chat/stream', methods=['GET'])
 @optional_auth
 @rate_limit(max_requests=20, window_seconds=60)
@@ -207,8 +241,8 @@ def chat_stream():
                 except Exception:
                     smart_enabled = False
 
-                if smart_router and smart_enabled:
-                    yield _sse_format('progress', { 'stage': 'classify', 'message': '正在判断最佳执行路径…' })
+        if smart_router and smart_enabled:
+            yield _sse_format('progress', { 'stage': 'classify', 'message': '正在判断最佳执行路径…' })
                     router_ctx = {
                         'model_name': model_name,
                         'conversation_id': conv_id,
@@ -225,6 +259,13 @@ def chat_stream():
                         yield _sse_format('progress', { 'stage': 'route', 'message': f"执行路径：{route_type}", 'route': route_info })
                     except Exception:
                         yield _sse_format('progress', { 'stage': 'route', 'message': '使用默认AI分析路径' })
+
+                # 生成进度计划（短标签）
+                try:
+                    labels = _generate_progress_plan(user_query, route_info.get('route_type', 'ai_analysis'), user_language)
+                    yield _sse_format('progress_plan', { 'labels': labels })
+                except Exception:
+                    pass
 
                 # 构建执行上下文
                 context = {}

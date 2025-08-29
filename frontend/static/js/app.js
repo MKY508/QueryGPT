@@ -514,7 +514,7 @@ class DataAnalysisPlatform {
                         (evt) => {
                             if (evt.type === 'progress') {
                                 const tip = evt.data?.message || window.i18nManager?.t('common.processing') || '处理中...';
-                                this.updateThinkingMessage(thinkingId, tip);
+                                this.updateThinkingProcess(thinkingId, tip);
                             } else if (evt.type === 'result') {
                                 const payload = evt.data;
                                 this.currentConversationId = payload.conversation_id || this.currentConversationId;
