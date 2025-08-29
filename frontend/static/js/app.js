@@ -234,6 +234,23 @@ class DataAnalysisPlatform {
         // 设置页面事件
         this.setupSettingsEvents();
 
+        // 新手引导按钮（只绑定一次，且避免与引导过程互相干扰）
+        const onboardingBtn = document.getElementById('help-onboarding-btn');
+        if (onboardingBtn) {
+            onboardingBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                try {
+                    // 如果引导已在进行（有遮罩），则不重复启动
+                    if (document.querySelector('.onboarding-overlay')) return;
+                    if (window.OnboardingGuide && typeof window.OnboardingGuide.start === 'function') {
+                        window.OnboardingGuide.start();
+                    }
+                } catch (err) {
+                    console.warn('启动新手引导失败:', err);
+                }
+            }, { passive: true });
+        }
+
     }
 
     /**

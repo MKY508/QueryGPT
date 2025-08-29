@@ -190,6 +190,25 @@ body {
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
 }
 
+/* 顶部新手引导按钮（小号、低调） */
+.btn-onboarding {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1;
+    border: 1px solid #d0d5dd;
+    color: #344054;
+    background: #f8fafc;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-left: 8px;
+    height: 30px;
+}
+.btn-onboarding i { font-size: 13px; }
+.btn-onboarding:hover { background: #f1f5f9; }
+
 #history-tab .page-header,
 #settings-tab .page-header,
 #system-info-tab .page-header {
@@ -1241,4 +1260,3 @@ html, body {
         }
     }
 }
-
