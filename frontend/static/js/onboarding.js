@@ -29,48 +29,61 @@ class OnboardingGuide {
             }
         };
         
-        // 引导步骤配置
-        this.steps = [
+        // 引导步骤配置（使用 i18n 构建）
+        this.steps = this.buildSteps();
+    }
+
+    // 简单的 i18n 访问封装
+    t(key, fallback) {
+        try {
+            return (window.i18nManager && window.i18nManager.t(key)) || fallback || key;
+        } catch (_) {
+            return fallback || key;
+        }
+    }
+
+    buildSteps() {
+        return [
             {
                 element: '.sidebar-header',
-                title: '欢迎使用 QueryGPT',
-                content: '这是您的智能数据分析助手，让我快速带您了解主要功能',
+                title: this.t('onboarding.step1Title', '欢迎使用 QueryGPT'),
+                content: this.t('onboarding.step1Content', '这是您的智能数据分析助手，让我快速带您了解主要功能'),
                 position: 'auto',
                 showNext: true
             },
             {
                 element: '#message-input',
-                title: '自然语言查询',
-                content: '在这里输入您的问题，比如"显示最近30天的销售数据"',
+                title: this.t('onboarding.step2Title', '自然语言查询'),
+                content: this.t('onboarding.step2Content', '在这里输入您的问题，比如“显示最近30天的销售数据”'),
                 position: 'auto',
                 showNext: true
             },
             {
                 element: '#send-button',
-                title: '发送查询',
-                content: '点击这里或按 Enter 键发送',
+                title: this.t('onboarding.step3Title', '发送查询'),
+                content: this.t('onboarding.step3Content', '点击这里或按 Enter 键发送'),
                 position: 'auto',
                 showNext: true
             },
             {
                 element: '.model-selector',
-                title: '切换AI模型',
-                content: '选择不同的AI模型以获得最佳效果',
+                title: this.t('onboarding.step4Title', '切换AI模型'),
+                content: this.t('onboarding.step4Content', '选择不同的AI模型以获得最佳效果'),
                 position: 'auto',
                 showNext: true
             },
             {
                 element: '[data-tab="history"]',
-                title: '查看历史',
-                content: '这里可以查看所有查询历史',
+                title: this.t('onboarding.step5Title', '查看历史'),
+                content: this.t('onboarding.step5Content', '这里可以查看所有查询历史'),
                 position: 'auto',
                 showNext: true
             },
             {
                 element: '.menu-item:has([data-tab="settings"])',
                 alternativeElement: '[data-tab="settings"]',
-                title: '系统设置',
-                content: '在这里配置数据库连接和其他选项',
+                title: this.t('onboarding.step6Title', '系统设置'),
+                content: this.t('onboarding.step6Content', '在这里配置数据库连接和其他选项'),
                 position: 'auto',
                 showNext: false,
                 isLast: true
@@ -331,14 +344,13 @@ class OnboardingGuide {
                 <div class="confirm-dialog-icon">
                     <i class="fas fa-question-circle"></i>
                 </div>
-                <div class="confirm-dialog-title">跳过新手引导</div>
+                <div class="confirm-dialog-title">${this.t('onboarding.confirmSkipTitle', '跳过新手引导')}</div>
                 <div class="confirm-dialog-message">
-                    确定要跳过新手引导吗？<br>
-                    您可以稍后在帮助菜单中重新启动引导。
+                    ${this.t('onboarding.confirmSkipMessage', '确定要跳过新手引导吗？\n您可以稍后在帮助菜单中重新启动引导。')}
                 </div>
                 <div class="confirm-dialog-buttons">
-                    <button class="btn-cancel">继续引导</button>
-                    <button class="btn-confirm">跳过</button>
+                    <button class="btn-cancel">${this.t('onboarding.confirmSkipContinue', '继续引导')}</button>
+                    <button class="btn-confirm">${this.t('onboarding.confirmSkipConfirm', '跳过')}</button>
                 </div>
             </div>
         `;
@@ -538,7 +550,7 @@ class OnboardingGuide {
         bubble.innerHTML = `
             <div class="bubble-arrow"></div>
             <div class="bubble-content">
-                <button class="bubble-close" aria-label="关闭">×</button>
+                <button class="bubble-close" aria-label="${this.t('onboarding.buttons.close', '关闭')}">×</button>
                 <h4 class="bubble-title">${step.title}</h4>
                 <p class="bubble-text">${step.content}</p>
                 <div class="bubble-footer">
@@ -549,10 +561,10 @@ class OnboardingGuide {
                         </div>
                     </div>
                     <div class="bubble-actions">
-                        ${this.currentStep > 0 ? '<button class="bubble-btn bubble-btn-prev">上一步</button>' : ''}
-                        ${step.showNext ? '<button class="bubble-btn bubble-btn-next">下一步</button>' : ''}
-                        ${step.isLast ? '<button class="bubble-btn bubble-btn-complete">完成</button>' : ''}
-                        <button class="bubble-btn bubble-btn-skip">跳过</button>
+                        ${this.currentStep > 0 ? `<button class="bubble-btn bubble-btn-prev">${this.t('onboarding.buttons.prev', '上一步')}</button>` : ''}
+                        ${step.showNext ? `<button class="bubble-btn bubble-btn-next">${this.t('onboarding.buttons.next', '下一步')}</button>` : ''}
+                        ${step.isLast ? `<button class="bubble-btn bubble-btn-complete">${this.t('onboarding.buttons.complete', '完成')}</button>` : ''}
+                        <button class="bubble-btn bubble-btn-skip">${this.t('onboarding.buttons.skip', '跳过')}</button>
                     </div>
                 </div>
             </div>
@@ -877,8 +889,8 @@ class OnboardingGuide {
         const message = document.createElement('div');
         message.className = 'onboarding-completion';
         message.innerHTML = `
-            <i class="fas fa-check-circle"></i>
-            <span>新手引导完成！开始探索 QueryGPT 吧</span>
+            <i class=\"fas fa-check-circle\"></i>
+            <span>${this.t('onboarding.finishedToast', '新手引导完成！开始探索 QueryGPT 吧')}</span>
         `;
         message.style.cssText = `
             position: fixed;
