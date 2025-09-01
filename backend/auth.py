@@ -50,8 +50,39 @@ class SimpleAuth:
     
     def verify_token(self, token: str) -> bool:
         """验证令牌是否有效"""
+        # 安全修复：验证令牌格式，防止注入攻击
+        if not token or not isinstance(token, str):
+            return False
+        
+        # 检查是否包含危险字符（路径遍历、XSS等）
+        dangerous_patterns = [
+            '../',  # 路径遍历
+            '..',   # 路径遍历
+            '<',    # XSS
+            '>',    # XSS
+            'script',  # XSS
+            'javascript:',  # XSS
+            'onclick',  # XSS
+            '\x00',  # 空字节注入
+            '\n',   # 换行符注入
+            '\r',   # 回车符注入
+        ]
+        
+        token_lower = token.lower()
+        for pattern in dangerous_patterns:
+            if pattern in token_lower:
+                logger.warning(f"检测到危险的令牌模式: {pattern}")
+                return False
+        
+        # 验证令牌格式（应该是十六进制字符串）
+        import re
+        if not re.match(r'^[a-f0-9]{64}$', token) and token != "no-auth-token":
+            logger.warning(f"无效的令牌格式: {token[:10]}...")
+            return False
+        
         if not self.api_secret:
-            return True  # 未配置认证时允许访问
+            # 未配置认证时，只允许特定的无认证令牌
+            return token == "no-auth-token"
         
         if token not in self.valid_tokens:
             return False

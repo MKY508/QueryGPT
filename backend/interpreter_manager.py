@@ -58,6 +58,8 @@ class InterpreterManager:
         self._session_lock = Lock()
         # 会话超时时间（秒）
         self.session_timeout = 1800  # 30分钟
+        # 安全修复：限制会话缓存大小，防止内存泄漏
+        self.max_session_cache_size = 100  # 最多缓存100个会话
         
         # 进程跟踪：conversation_id -> set of PIDs
         self._active_processes: Dict[str, Set[int]] = {}
@@ -242,7 +244,19 @@ class InterpreterManager:
             # 存储当前的interpreter以便停止
             if conversation_id:
                 with self._session_lock:
+                    # 安全修复：检查缓存大小限制
+                    if len(self._session_cache) >= self.max_session_cache_size:
+                        # 使用LRU策略：删除最久未使用的会话
+                        if self._session_last_active:
+                            oldest_session = min(self._session_last_active.items(), key=lambda x: x[1])[0]
+                            logger.info(f"缓存已满，删除最旧会话: {oldest_session}")
+                            if oldest_session in self._session_cache:
+                                del self._session_cache[oldest_session]
+                            if oldest_session in self._session_last_active:
+                                del self._session_last_active[oldest_session]
+                    
                     self._session_cache[conversation_id] = interpreter
+                    self._session_last_active[conversation_id] = time.time()
             
             # 执行查询
             logger.info(f"执行查询: {query[:100]}... (会话ID: {conversation_id})")
@@ -519,6 +533,16 @@ class InterpreterManager:
             # 创建新会话并缓存
             logger.info(f"创建新会话: {conversation_id}")
             interpreter = self.create_interpreter(model_name)
+            
+            # 安全修复：检查缓存大小限制
+            if len(self._session_cache) >= self.max_session_cache_size:
+                # 使用LRU策略：删除最久未使用的会话
+                oldest_session = min(self._session_last_active.items(), key=lambda x: x[1])[0]
+                logger.info(f"缓存已满，删除最旧会话: {oldest_session}")
+                if oldest_session in self._session_cache:
+                    del self._session_cache[oldest_session]
+                del self._session_last_active[oldest_session]
+            
             self._session_cache[conversation_id] = interpreter
             self._session_last_active[conversation_id] = time.time()
             return interpreter
