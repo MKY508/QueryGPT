@@ -23,9 +23,10 @@ class DatabaseManager:
         
         # 如果没有指定数据库，说明允许跨库查询
         if not self.config.get('database'):
-            logger.info(f"数据库配置: {self.config['host']}:{self.config['port']} - 用户: {self.config['user']} - 模式: 跨库查询")
+            # 安全日志：隐藏敏感信息
+            logger.info(f"数据库配置: {self.config['host'][:3]}***:{self.config['port']} - 模式: 跨库查询")
         else:
-            logger.info(f"数据库配置: {self.config['host']}:{self.config['port']} - 用户: {self.config['user']} - 数据库: {self.config['database']}")
+            logger.info(f"数据库配置: {self.config['host'][:3]}***:{self.config['port']} - 数据库已配置")
         
     
     @contextmanager
@@ -74,7 +75,7 @@ class DatabaseManager:
         if not READONLY_PATTERN.match(query):
             raise ValueError("只允许执行只读查询（SELECT, SHOW, DESCRIBE, EXPLAIN）")
         
-        # 检查危险的SQL模式
+        # 增强的危险SQL模式检测
         DANGEROUS_PATTERNS = [
             r';\s*(DROP|DELETE|INSERT|UPDATE|ALTER|CREATE|TRUNCATE|EXEC)',
             r'--',  # SQL注释
@@ -82,7 +83,20 @@ class DatabaseManager:
             r'UNION\s+SELECT',  # UNION注入
             r'INTO\s+OUTFILE',  # 文件写入
             r'LOAD_FILE',  # 文件读取
+            r'BENCHMARK',  # DoS攻击
+            r'SLEEP',  # 基于时间的攻击
+            r'WAITFOR',  # SQL Server时间延迟
+            r'CHAR\s*\(',  # 字符编码技巧
+            r'0x[0-9a-fA-F]+',  # 十六进制编码
+            r'CONCAT.*CONCAT.*CONCAT',  # 多重拼接
+            r'@@version',  # 版本泄露
         ]
+        
+        # 对SHOW命令的特殊处理
+        if not re.match(r'^\s*SHOW\s+', query, re.IGNORECASE):
+            if re.search(r'information_schema', query, re.IGNORECASE):
+                logger.warning("尝试在非SHOW命令中访问information_schema")
+                raise ValueError("不允许直接访问information_schema")
         
         for pattern in DANGEROUS_PATTERNS:
             if re.search(pattern, query, re.IGNORECASE):
@@ -98,8 +112,10 @@ class DatabaseManager:
                     logger.info(f"查询成功，返回 {len(result)} 条记录")
                     return result
         except Exception as e:
+            # 不向用户暴露详细错误
             logger.error(f"查询执行失败: {e}")
-            raise
+            # 返回安全的错误消息
+            raise Exception("查询执行失败，请检查查询语法")
     
     def test_connection(self) -> Dict[str, Any]:
         """
@@ -154,7 +170,8 @@ class DatabaseManager:
                 for db in test_result["databases"]:
                     if db in important_dbs:
                         try:
-                            tables = self.execute_query(f"SHOW TABLES FROM {db}")
+                            # 安全修复：使用验证后的get_tables方法
+                            tables = self.get_tables(database=db)
                             table_count = len(tables)
                             total_tables += table_count
                             logger.info(f"数据库 {db} 包含 {table_count} 个表")
@@ -228,13 +245,28 @@ class DatabaseManager:
             表名列表
         """
         try:
-            query = "SHOW TABLES"
-            if database:
-                query = f"SHOW TABLES FROM `{database}`"
-            
             with self.get_connection() as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute(query)
+                    if database:
+                        # 关键修复：先验证数据库是否存在
+                        if not self._validate_identifier(database, 'database'):
+                            logger.warning(f"无效的数据库名: {database}")
+                            return []
+                        
+                        # 使用参数化查询验证数据库存在
+                        cursor.execute(
+                            "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = %s",
+                            (database,)
+                        )
+                        if not cursor.fetchone():
+                            logger.warning(f"数据库 {database} 不存在")
+                            return []
+                        
+                        # 验证后安全使用反引号
+                        cursor.execute(f"SHOW TABLES FROM `{database}`")
+                    else:
+                        cursor.execute("SHOW TABLES")
+                    
                     results = cursor.fetchall()
                     
                     if not results:
@@ -243,7 +275,6 @@ class DatabaseManager:
                     # 提取表名
                     tables = []
                     for row in results:
-                        # 获取字典的第一个值（表名）
                         table_name = list(row.values())[0] if row else None
                         if table_name:
                             tables.append(table_name)
@@ -254,6 +285,48 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"获取表列表失败: {e}")
             return []
+    
+    def _validate_identifier(self, identifier: str, identifier_type: str = "database") -> bool:
+        """
+        验证数据库/表/列标识符以防止注入
+        
+        Args:
+            identifier: 要验证的标识符
+            identifier_type: 标识符类型 ('database', 'table', 'column')
+        
+        Returns:
+            如果有效返回True，否则返回False
+        """
+        import re
+        
+        # MySQL/Doris标识符规则：
+        # - 可以包含字母数字、下划线、美元符号
+        # - 不能以数字开头（除非引用）
+        # - 最大长度64个字符
+        
+        if not identifier or len(identifier) > 64:
+            return False
+        
+        # 检查有效的标识符模式
+        # 允许中文字符（根据业务需求）
+        VALID_IDENTIFIER = re.compile(r'^[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*$')
+        
+        if not VALID_IDENTIFIER.match(identifier):
+            logger.warning(f"无效的{identifier_type}标识符: {identifier}")
+            return False
+        
+        # 检查SQL关键字（基本集）
+        SQL_KEYWORDS = {
+            'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE',
+            'ALTER', 'TRUNCATE', 'EXEC', 'EXECUTE', 'UNION', 'FROM',
+            'WHERE', 'GROUP', 'ORDER', 'HAVING', 'LIMIT'
+        }
+        
+        if identifier.upper() in SQL_KEYWORDS:
+            logger.warning(f"SQL关键字用作{identifier_type}名称: {identifier}")
+            return False
+        
+        return True
     
     def get_connection_info(self) -> Dict[str, Any]:
         """获取连接信息（用于传递给OpenInterpreter）"""

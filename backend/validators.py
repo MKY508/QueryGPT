@@ -159,6 +159,52 @@ class InputValidator:
         
         return text.strip()
 
+def is_readonly_query(query: str) -> bool:
+    """
+    验证SQL查询是否为只读查询
+    
+    Args:
+        query: SQL查询字符串
+        
+    Returns:
+        如果是安全的只读查询返回True，否则返回False
+    """
+    if not query:
+        return False
+    
+    # 移除多余空格和换行
+    query = ' '.join(query.split())
+    
+    # 只允许这些只读操作
+    READONLY_PATTERN = re.compile(
+        r'^\s*(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN)\s+',
+        re.IGNORECASE
+    )
+    
+    if not READONLY_PATTERN.match(query):
+        return False
+    
+    # 检查危险的SQL模式
+    DANGEROUS_PATTERNS = [
+        r';\s*(DROP|DELETE|INSERT|UPDATE|ALTER|CREATE|TRUNCATE|EXEC|GRANT)',
+        r'--',  # SQL注释
+        r'/\*.*\*/',  # 块注释
+        r'UNION\s+SELECT',  # UNION注入
+        r'INTO\s+OUTFILE',  # 文件写入
+        r'LOAD_FILE',  # 文件读取
+        r'BENCHMARK',  # DoS攻击
+        r'SLEEP',  # 基于时间的攻击
+        r'@@version',  # 版本泄露（除非在SELECT中）
+        r'information_schema',  # 架构探测（除非在SHOW命令中）
+    ]
+    
+    for pattern in DANGEROUS_PATTERNS:
+        if re.search(pattern, query, re.IGNORECASE):
+            logger.warning(f"检测到危险的SQL模式: {pattern}")
+            return False
+    
+    return True
+
 def validate_input(rules: Dict[str, Dict] = None):
     """
     输入验证装饰器
