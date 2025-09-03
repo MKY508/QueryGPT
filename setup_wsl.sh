@@ -19,21 +19,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 PYTHON_CMD=""
 VENV_DIR="venv_py310"
-LOG_FILE="logs/setup_$(date +%Y%m%d_%H%M%S).log"
 AUTO_MODE=true  # 默认自动模式
 TARGET_DIR="$HOME/QueryGPT-github"
 
-# 创建日志目录
-mkdir -p logs
+# 先创建日志目录（在设置LOG_FILE之前）
+mkdir -p logs 2>/dev/null || true
 
-# 记录日志
+# 设置日志文件路径
+LOG_FILE="logs/setup_$(date +%Y%m%d_%H%M%S).log"
+
+# 记录日志（加入错误处理）
 log() {
-    echo -e "$1" | tee -a "$LOG_FILE"
+    if [ -n "$LOG_FILE" ]; then
+        echo -e "$1" | tee -a "$LOG_FILE" 2>/dev/null || echo -e "$1"
+    else
+        echo -e "$1"
+    fi
 }
 
 # 静默日志（仅写入文件）
 silent_log() {
-    echo -e "$1" >> "$LOG_FILE"
+    if [ -n "$LOG_FILE" ] && [ -w "$(dirname "$LOG_FILE")" ]; then
+        echo -e "$1" >> "$LOG_FILE" 2>/dev/null
+    fi
 }
 
 # 打印横幅
@@ -74,11 +82,19 @@ verify_wsl() {
             
             cd "$TARGET_DIR"
             SCRIPT_DIR="$TARGET_DIR"
+            # 在新目录创建logs目录
+            mkdir -p logs 2>/dev/null || true
+            # 更新日志文件路径
+            LOG_FILE="logs/setup_$(date +%Y%m%d_%H%M%S).log"
             log "${GREEN}✓ 已自动迁移到Linux文件系统${NC}"
         else
             # 如果目标已存在，直接使用
             cd "$TARGET_DIR"
             SCRIPT_DIR="$TARGET_DIR"
+            # 确保logs目录存在
+            mkdir -p logs 2>/dev/null || true
+            # 更新日志文件路径
+            LOG_FILE="logs/setup_$(date +%Y%m%d_%H%M%S).log"
             log "${GREEN}✓ 使用现有Linux文件系统目录${NC}"
         fi
     fi
