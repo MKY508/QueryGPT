@@ -33,8 +33,13 @@ detect_environment() {
         ENV_TYPE="WSL"
         echo -e "${CYAN}[INFO] 检测到WSL环境${NC}"
         
-        # 修复WSL文件权限和格式
-        fix_wsl_issues
+        # WSL环境下修复文件格式
+        for file in setup.sh start.sh start_wsl.sh; do
+            if [ -f "$file" ] && file "$file" 2>/dev/null | grep -q "CRLF"; then
+                sed -i 's/\r$//' "$file" 2>/dev/null || true
+            fi
+        done
+        chmod +x *.sh 2>/dev/null || true
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         ENV_TYPE="macOS"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -46,23 +51,6 @@ detect_environment() {
     echo "$ENV_TYPE"
 }
 
-# 修复WSL问题
-fix_wsl_issues() {
-    # 修复行结束符
-    for file in setup.sh start.sh; do
-        if [ -f "$file" ] && file "$file" 2>/dev/null | grep -q "CRLF"; then
-            echo -e "${YELLOW}[INFO] 修复 $file 的行结束符...${NC}"
-            if command -v dos2unix &> /dev/null; then
-                dos2unix "$file" 2>/dev/null
-            else
-                sed -i 's/\r$//' "$file" 2>/dev/null || true
-            fi
-        fi
-    done
-    
-    # 确保脚本有执行权限
-    chmod +x setup.sh start.sh 2>/dev/null || true
-}
 
 # 查找可用端口 - 全自动版
 find_available_port() {
