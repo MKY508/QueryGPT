@@ -127,18 +127,36 @@ quick_start() {
     echo -e "${GREEN}✓ 检测到已安装环境${NC}"
     echo -e "${BLUE}[INFO]${NC} 运行环境: $env_type"
     
-    # 激活虚拟环境
+    # 激活虚拟环境 - WSL特殊处理
     if [ -d "venv_py310" ]; then
-        echo -e "${BLUE}[INFO]${NC} 激活Python虚拟环境..."
-        source venv_py310/bin/activate
+        echo -e "${BLUE}[INFO]${NC} 激活Python虚拟环境 (venv_py310)..."
+        if [ "$IS_WSL" = true ]; then
+            # WSL: 显式设置环境变量而不仅依赖source
+            export VIRTUAL_ENV="$(pwd)/venv_py310"
+            export PATH="$VIRTUAL_ENV/bin:$PATH"
+            # 仍然source以获取所有设置
+            source venv_py310/bin/activate 2>/dev/null || true
+        else
+            source venv_py310/bin/activate
+        fi
     elif [ -d "venv" ]; then
-        echo -e "${BLUE}[INFO]${NC} 激活Python虚拟环境..."
-        source venv/bin/activate
+        echo -e "${BLUE}[INFO]${NC} 激活Python虚拟环境 (venv)..."
+        if [ "$IS_WSL" = true ]; then
+            export VIRTUAL_ENV="$(pwd)/venv"
+            export PATH="$VIRTUAL_ENV/bin:$PATH"
+            source venv/bin/activate 2>/dev/null || true
+        else
+            source venv/bin/activate
+        fi
     else
         echo -e "${YELLOW}[WARNING]${NC} 虚拟环境不存在"
         echo "         请先运行: ./setup.sh"
         exit 1
     fi
+    
+    # 验证激活是否成功
+    echo -e "${CYAN}[DEBUG] Python路径: $(which python)${NC}"
+    echo -e "${CYAN}[DEBUG] VIRTUAL_ENV: $VIRTUAL_ENV${NC}"
     
     # 清除代理环境变量
     unset http_proxy
@@ -257,22 +275,93 @@ quick_start() {
         fi
     }
     
-    # 在后台启动Flask应用
-    cd backend && python app.py &
-    FLASK_PID=$!
-    
-    # 等待服务可用
-    if wait_for_service; then
-        # 服务就绪，打开浏览器
-        open_browser
+    # WSL特殊处理：修复后台进程立即停止的问题
+    if [ "$IS_WSL" = true ]; then
+        echo -e "${CYAN}[INFO] WSL环境：使用优化的启动方式${NC}"
+        
+        # 方案1：使用nohup + 完整输出重定向（WSL最可靠）
+        LOG_FILE="logs/app_$(date +%Y%m%d_%H%M%S).log"
+        mkdir -p logs
+        
+        # 使用nohup，确保stdin/stdout/stderr都被正确处理
+        cd backend
+        
+        # 确保使用虚拟环境中的Python（如果存在）
+        if [ -n "$VIRTUAL_ENV" ]; then
+            PYTHON_CMD="$VIRTUAL_ENV/bin/python"
+        else
+            PYTHON_CMD="python"
+        fi
+        
+        # 输出调试信息
+        echo -e "${CYAN}[DEBUG] 使用Python: $PYTHON_CMD${NC}"
+        echo -e "${CYAN}[DEBUG] Python版本: $($PYTHON_CMD --version 2>&1)${NC}"
+        
+        # 启动应用，使用exec确保信号正确传递
+        nohup $PYTHON_CMD -u app.py > "../$LOG_FILE" 2>&1 < /dev/null &
+        FLASK_PID=$!
+        cd ..
+        
+        # 给进程一些启动时间
+        sleep 2
+        
+        # 检查进程是否存活
+        if ! ps -p $FLASK_PID > /dev/null 2>&1; then
+            echo -e "${RED}[ERROR] Flask进程启动失败${NC}"
+            echo -e "${YELLOW}查看错误日志：${NC}"
+            [ -f "$LOG_FILE" ] && tail -n 10 "$LOG_FILE"
+            echo ""
+            echo -e "${YELLOW}尝试前台运行模式...${NC}"
+            echo -e "${CYAN}提示: 使用 Ctrl+C 停止服务${NC}"
+            # 降级到前台运行，确保使用正确的Python
+            cd backend
+            if [ -n "$VIRTUAL_ENV" ]; then
+                exec "$VIRTUAL_ENV/bin/python" app.py
+            else
+                exec python app.py
+            fi
+        fi
+        
+        echo -e "${GREEN}✓ 服务已在后台启动 (PID: $FLASK_PID)${NC}"
+        echo -e "${BLUE}日志文件: $LOG_FILE${NC}"
+        
+        # 等待服务可用
+        if wait_for_service; then
+            open_browser
+        else
+            echo -e "${YELLOW}请手动访问: http://localhost:${PORT}${NC}"
+        fi
+        
+        # 监控日志文件（而不是wait进程）
+        echo -e "${CYAN}[INFO] 正在监控服务日志...${NC}"
+        echo -e "${YELLOW}按 Ctrl+C 停止服务${NC}"
+        
+        # 设置信号处理
+        trap "kill $FLASK_PID 2>/dev/null; echo -e '\n${GREEN}服务已停止${NC}'; exit 0" INT TERM
+        
+        # 持续监控日志
+        tail -f "$LOG_FILE" 2>/dev/null || {
+            # 如果tail失败，使用循环检查进程
+            while ps -p $FLASK_PID > /dev/null 2>&1; do
+                sleep 1
+            done
+            echo -e "${YELLOW}服务已停止${NC}"
+        }
     else
-        # 服务启动失败或超时
-        echo -e "${YELLOW}请手动访问: http://localhost:${PORT}${NC}"
-        echo -e "${YELLOW}或检查日志文件了解详情${NC}"
+        # 非WSL环境：使用原始方式
+        cd backend && python app.py &
+        FLASK_PID=$!
+        
+        # 等待服务可用
+        if wait_for_service; then
+            open_browser
+        else
+            echo -e "${YELLOW}请手动访问: http://localhost:${PORT}${NC}"
+        fi
+        
+        # 等待Flask进程
+        wait $FLASK_PID
     fi
-    
-    # 等待Flask进程（前台运行）
-    wait $FLASK_PID
 }
 
 # 主函数
