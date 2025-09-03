@@ -268,33 +268,67 @@ requests==2.31.0
 EOF
     fi
     
-    # WSL优化：使用国内镜像源加速
-    log "  配置pip镜像源..."
+    # 配置pip使用多个镜像源（网络问题时自动切换）
+    log "  配置pip镜像源以解决网络问题..."
     mkdir -p ~/.pip
     cat > ~/.pip/pip.conf << 'EOF'
 [global]
-index-url = https://pypi.org/simple
-extra-index-url = https://pypi.douban.com/simple
-trusted-host = pypi.douban.com
-timeout = 120
+index-url = https://mirrors.aliyun.com/pypi/simple/
+extra-index-url = 
+    https://pypi.org/simple/
+    https://pypi.mirrors.ustc.edu.cn/simple/
+    https://pypi.tuna.tsinghua.edu.cn/simple/
+trusted-host = 
+    mirrors.aliyun.com
+    pypi.mirrors.ustc.edu.cn
+    pypi.tuna.tsinghua.edu.cn
+timeout = 300
+retries = 5
 EOF
     
-    # 安装依赖
-    log "${YELLOW}  开始安装依赖 (可能需要2-5分钟)...${NC}"
+    # 安装依赖（增强网络错误处理）
+    log "${YELLOW}  开始安装依赖 (如遇网络问题会自动重试)...${NC}"
     
-    # 分批安装避免内存问题
+    # 先尝试快速测试网络
+    if ! $PIP_CMD install --index-url https://mirrors.aliyun.com/pypi/simple/ pip --upgrade --quiet 2>/dev/null; then
+        log "${YELLOW}  阿里云镜像不可用，切换到清华源...${NC}"
+        $PIP_CMD config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple 2>/dev/null
+    fi
+    
+    # 分批安装，每批失败后重试
     local essential_pkgs="Flask flask-cors pymysql python-dotenv"
     local data_pkgs="pandas numpy matplotlib seaborn plotly"
     local api_pkgs="openai litellm requests"
     
     log "  [1/3] 安装核心依赖..."
-    $PIP_CMD install $essential_pkgs --quiet --no-cache-dir
+    for i in {1..3}; do
+        if $PIP_CMD install $essential_pkgs --no-cache-dir 2>/dev/null; then
+            break
+        else
+            log "    重试 $i/3..."
+            sleep 2
+        fi
+    done
     
     log "  [2/3] 安装数据处理库..."
-    $PIP_CMD install $data_pkgs --quiet --no-cache-dir
+    for i in {1..3}; do
+        if $PIP_CMD install $data_pkgs --no-cache-dir 2>/dev/null; then
+            break
+        else
+            log "    重试 $i/3..."
+            sleep 2
+        fi
+    done
     
     log "  [3/3] 安装API客户端..."
-    $PIP_CMD install $api_pkgs --quiet --no-cache-dir
+    for i in {1..3}; do
+        if $PIP_CMD install $api_pkgs --no-cache-dir 2>/dev/null; then
+            break
+        else
+            log "    重试 $i/3..."
+            sleep 2
+        fi
+    done
     
     # 如果requirements.txt中有open-interpreter，特殊处理
     if grep -q "open-interpreter" requirements.txt; then
