@@ -280,80 +280,22 @@ quick_start() {
         fi
     }
     
-    # WSL特殊处理：修复后台进程立即停止的问题
+    # WSL特殊处理：直接前台运行（最稳定）
     if [ "$IS_WSL" = true ]; then
-        echo -e "${CYAN}[INFO] WSL环境：使用优化的启动方式${NC}"
+        echo -e "${CYAN}[INFO] WSL环境检测${NC}"
         
-        # 方案1：使用nohup + 完整输出重定向（WSL最可靠）
-        LOG_FILE="logs/app_$(date +%Y%m%d_%H%M%S).log"
-        mkdir -p logs
+        # 等待服务函数移到前面定义
+        wait_for_service
+        open_browser
         
-        # 使用nohup，确保stdin/stdout/stderr都被正确处理
-        cd backend
-        
-        # 确保使用虚拟环境中的Python（如果存在）
-        if [ -n "$VIRTUAL_ENV" ]; then
-            PYTHON_CMD="$VIRTUAL_ENV/bin/python"
-        else
-            PYTHON_CMD="python"
-        fi
-        
-        # 输出调试信息
-        echo -e "${CYAN}[DEBUG] 使用Python: $PYTHON_CMD${NC}"
-        echo -e "${CYAN}[DEBUG] Python版本: $($PYTHON_CMD --version 2>&1)${NC}"
-        
-        # 启动应用，使用exec确保信号正确传递
-        nohup $PYTHON_CMD -u app.py > "../$LOG_FILE" 2>&1 < /dev/null &
-        FLASK_PID=$!
-        cd ..
-        
-        # 给进程一些启动时间
-        sleep 2
-        
-        # 检查进程是否存活
-        if ! ps -p $FLASK_PID > /dev/null 2>&1; then
-            echo -e "${RED}[ERROR] Flask进程启动失败${NC}"
-            echo -e "${YELLOW}查看错误日志：${NC}"
-            [ -f "$LOG_FILE" ] && tail -n 10 "$LOG_FILE"
-            echo ""
-            echo -e "${YELLOW}尝试前台运行模式...${NC}"
-            echo -e "${CYAN}提示: 使用 Ctrl+C 停止服务${NC}"
-            # 降级到前台运行，确保使用正确的Python
-            cd backend
-            if [ -n "$VIRTUAL_ENV" ]; then
-                exec "$VIRTUAL_ENV/bin/python" app.py
-            else
-                exec python app.py
-            fi
-        fi
-        
-        echo -e "${GREEN}✓ 服务已在后台启动 (PID: $FLASK_PID)${NC}"
-        echo -e "${BLUE}日志文件: $LOG_FILE${NC}"
-        
-        # 等待服务可用
-        if wait_for_service; then
-            open_browser
-        else
-            echo -e "${YELLOW}请手动访问: http://localhost:${PORT}${NC}"
-        fi
-        
-        # 监控日志文件（而不是wait进程）
-        echo -e "${CYAN}[INFO] 正在监控服务日志...${NC}"
+        echo -e "${GREEN}启动服务（前台模式）...${NC}"
         echo -e "${YELLOW}按 Ctrl+C 停止服务${NC}"
         
-        # 设置信号处理
-        trap "kill $FLASK_PID 2>/dev/null; echo -e '\n${GREEN}服务已停止${NC}'; exit 0" INT TERM
-        
-        # 持续监控日志
-        tail -f "$LOG_FILE" 2>/dev/null || {
-            # 如果tail失败，使用循环检查进程
-            while ps -p $FLASK_PID > /dev/null 2>&1; do
-                sleep 1
-            done
-            echo -e "${YELLOW}服务已停止${NC}"
-        }
+        # 直接前台运行（WSL最稳定的方式）
+        cd backend
+        exec python app.py
     else
-        # 非WSL环境：使用原始方式
+        # 非WSL环境：可以使用后台模式
         cd backend && python app.py &
         FLASK_PID=$!
         

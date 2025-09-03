@@ -411,7 +411,7 @@ verify_installation() {
     fi
 }
 
-# 显示下一步（自动版）
+# 显示下一步
 show_next_steps() {
     log ""
     log "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -419,41 +419,46 @@ show_next_steps() {
     log "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
     if [[ "$(pwd)" != "$SCRIPT_DIR" ]]; then
-        log "${CYAN}项目已自动优化到: $(pwd)${NC}"
+        log "${CYAN}项目已优化到: $(pwd)${NC}"
     fi
     
     # 创建快速启动脚本
     create_start_script
     
     log ""
-    log "${CYAN}10秒后自动启动服务...${NC}"
-    log "${YELLOW}按 Ctrl+C 取消自动启动${NC}"
-    
-    # 10秒倒计时自动启动
-    local count=10
-    while [ $count -gt 0 ]; do
-        printf "\r${CYAN}%2d秒后启动...${NC}" $count
-        if ! sleep 1; then
-            log ""
-            log "${YELLOW}已取消自动启动${NC}"
-            log "手动启动: ${GREEN}./start_wsl.sh${NC}"
-            return
-        fi
-        ((count--))
-    done
-    
+    log "${CYAN}启动命令:${NC}"
+    log "  ${GREEN}./start_wsl.sh${NC}    # WSL优化启动"
+    log "  ${GREEN}./start.sh${NC}        # 标准启动"
     log ""
-    log "${GREEN}正在启动服务...${NC}"
     
-    # 自动启动
-    if [ -f "start_wsl.sh" ]; then
-        exec ./start_wsl.sh
-    else
-        # 备用启动
+    # 询问是否启动
+    read -t 5 -p "是否立即启动服务？[Y/n] " -n 1 -r || REPLY="Y"
+    echo ""
+    
+    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+        log "${GREEN}正在启动服务...${NC}"
+        
+        # WSL特殊处理：使用前台运行避免进程停止
         source venv_py310/bin/activate 2>/dev/null || source venv/bin/activate
         export PYTHONUNBUFFERED=1
-        export PORT=5000
-        cd backend && python app.py
+        export FLASK_ENV=development
+        
+        # 查找可用端口
+        PORT=5000
+        while lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; do
+            PORT=$((PORT + 1))
+        done
+        export PORT
+        
+        log "使用端口: ${GREEN}$PORT${NC}"
+        log "访问地址: ${BLUE}http://localhost:$PORT${NC}"
+        log "停止服务: ${YELLOW}Ctrl+C${NC}"
+        log ""
+        
+        # 前台运行（WSL最稳定）
+        cd backend && exec python app.py
+    else
+        log "${YELLOW}请手动启动: ./start_wsl.sh${NC}"
     fi
 }
 
@@ -462,7 +467,7 @@ create_start_script() {
     cat > start_wsl.sh << 'EOF'
 #!/bin/bash
 
-# QueryGPT WSL快速启动脚本
+# QueryGPT WSL启动脚本 - 前台运行版本
 set -e
 
 # 颜色
@@ -472,7 +477,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${BLUE}QueryGPT WSL 启动器${NC}"
+echo -e "${BLUE}QueryGPT 启动器${NC}"
 
 # 激活虚拟环境
 if [ -d "venv_py310" ]; then
@@ -485,35 +490,38 @@ else
     exit 1
 fi
 
-# 查找可用端口
+# 设置环境变量（WSL优化）
+export PYTHONUNBUFFERED=1
+export FLASK_ENV=development
+
+# 简单的端口查找
 PORT=5000
-while lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; do
-    PORT=$((PORT + 1))
+for i in {0..100}; do
+    if ! python3 -c "import socket; s=socket.socket(); s.bind(('127.0.0.1',$((PORT+i)))); s.close()" 2>/dev/null; then
+        continue
+    fi
+    PORT=$((PORT+i))
+    break
 done
 
-echo -e "${GREEN}使用端口: $PORT${NC}"
-
-# 启动服务
 export PORT
-export FLASK_APP=backend/app.py
-
-echo -e "${GREEN}启动服务...${NC}"
+echo -e "${GREEN}使用端口: $PORT${NC}"
 echo -e "访问: ${BLUE}http://localhost:$PORT${NC}"
 echo -e "停止: ${YELLOW}Ctrl+C${NC}"
+echo ""
 
-# 尝试打开浏览器
+# WSL浏览器打开（可选）
 if command -v wslview >/dev/null 2>&1; then
-    sleep 2 && wslview "http://localhost:$PORT" &
-elif command -v cmd.exe >/dev/null 2>&1; then
-    sleep 2 && cmd.exe /c start "http://localhost:$PORT" &
+    (sleep 2 && wslview "http://localhost:$PORT") &
 fi
 
-# 启动Flask
-cd backend && python app.py
+# 前台运行Flask（WSL最稳定的方式）
+cd backend
+exec python app.py
 EOF
     
     chmod +x start_wsl.sh
-    log "${GREEN}✓ 创建了WSL优化启动脚本: start_wsl.sh${NC}"
+    silent_log "创建了启动脚本: start_wsl.sh"
 }
 
 # 错误处理
