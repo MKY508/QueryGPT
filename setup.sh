@@ -31,10 +31,19 @@ detect_environment() {
         IS_WSL=true
         echo -e "${CYAN}检测到WSL环境 / WSL environment detected${NC}"
         
-        # WSL路径警告
+        # WSL自动迁移到Linux文件系统
         if [[ "$SCRIPT_DIR" == /mnt/* ]]; then
-            echo -e "${YELLOW}⚠ 警告: 项目位于Windows文件系统，建议移至WSL文件系统以提升性能${NC}"
-            echo -e "${YELLOW}  建议: cp -r $SCRIPT_DIR ~/QueryGPT-github${NC}"
+            echo -e "${YELLOW}检测到Windows文件系统，自动迁移以提升性能...${NC}"
+            TARGET_DIR="$HOME/QueryGPT-github"
+            
+            if [ ! -d "$TARGET_DIR" ]; then
+                cp -r "$SCRIPT_DIR" "$TARGET_DIR" 2>/dev/null
+            fi
+            
+            cd "$TARGET_DIR"
+            SCRIPT_DIR="$TARGET_DIR"
+            echo -e "${GREEN}✓ 已迁移到Linux文件系统: $TARGET_DIR${NC}"
+            echo ""
         fi
     fi
 }

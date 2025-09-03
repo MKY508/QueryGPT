@@ -33,8 +33,27 @@ detect_environment() {
         ENV_TYPE="WSL"
         echo -e "${CYAN}[INFO] 检测到WSL环境${NC}"
         
-        # WSL环境下修复文件格式
-        for file in setup.sh start.sh start_wsl.sh; do
+        # WSL：如果在Windows文件系统，提示用户
+        CURRENT_DIR=$(pwd)
+        if [[ "$CURRENT_DIR" == /mnt/* ]]; then
+            echo -e "${YELLOW}[警告] 在Windows文件系统运行，性能较差${NC}"
+            
+            # 检查Linux文件系统是否有安装
+            if [ -d "$HOME/QueryGPT-github" ]; then
+                echo -e "${GREEN}[提示] 检测到Linux文件系统安装:${NC}"
+                echo -e "${GREEN}       cd ~/QueryGPT-github && ./start.sh${NC}"
+                echo ""
+                read -t 3 -p "是否切换到Linux文件系统？[Y/n] " -n 1 -r || REPLY="Y"
+                echo ""
+                if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                    cd ~/QueryGPT-github
+                    exec ./start.sh
+                fi
+            fi
+        fi
+        
+        # 修复文件格式
+        for file in setup.sh start.sh; do
             if [ -f "$file" ] && file "$file" 2>/dev/null | grep -q "CRLF"; then
                 sed -i 's/\r$//' "$file" 2>/dev/null || true
             fi
