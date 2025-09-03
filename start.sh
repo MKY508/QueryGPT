@@ -140,29 +140,31 @@ quick_start() {
     echo -e "${GREEN}✓ 检测到已安装环境${NC}"
     echo -e "${BLUE}[INFO]${NC} 运行环境: $env_type"
     
-    # 激活虚拟环境 - WSL特殊处理
+    # 查找虚拟环境（优先当前目录，其次home目录）
+    VENV_FOUND=false
+    
+    # 检查当前目录
     if [ -d "venv_py310" ]; then
-        echo -e "${BLUE}[INFO]${NC} 激活Python虚拟环境 (venv_py310)..."
-        if [ "$IS_WSL" = true ]; then
-            # WSL: 显式设置环境变量而不仅依赖source
-            export VIRTUAL_ENV="$(pwd)/venv_py310"
-            export PATH="$VIRTUAL_ENV/bin:$PATH"
-            # 仍然source以获取所有设置
-            source venv_py310/bin/activate 2>/dev/null || true
-        else
-            source venv_py310/bin/activate
-        fi
+        echo -e "${BLUE}[INFO]${NC} 使用当前目录虚拟环境..."
+        source venv_py310/bin/activate
+        VENV_FOUND=true
     elif [ -d "venv" ]; then
-        echo -e "${BLUE}[INFO]${NC} 激活Python虚拟环境 (venv)..."
-        if [ "$IS_WSL" = true ]; then
-            export VIRTUAL_ENV="$(pwd)/venv"
-            export PATH="$VIRTUAL_ENV/bin:$PATH"
-            source venv/bin/activate 2>/dev/null || true
-        else
-            source venv/bin/activate
-        fi
-    else
-        echo -e "${YELLOW}[WARNING]${NC} 虚拟环境不存在"
+        echo -e "${BLUE}[INFO]${NC} 使用当前目录虚拟环境..."
+        source venv/bin/activate
+        VENV_FOUND=true
+    # 检查home目录（WSL情况）
+    elif [ -d "$HOME/venv_py310" ]; then
+        echo -e "${BLUE}[INFO]${NC} 使用home目录虚拟环境..."
+        source "$HOME/venv_py310/bin/activate"
+        VENV_FOUND=true
+    elif [ -d "$HOME/venv" ]; then
+        echo -e "${BLUE}[INFO]${NC} 使用home目录虚拟环境..."
+        source "$HOME/venv/bin/activate"
+        VENV_FOUND=true
+    fi
+    
+    if [ "$VENV_FOUND" = false ]; then
+        echo -e "${YELLOW}[WARNING]${NC} 未找到虚拟环境"
         echo "         请先运行: ./setup.sh"
         exit 1
     fi
@@ -287,15 +289,33 @@ quick_start() {
         fi
     }
     
+    # 检查backend目录是否存在
+    if [ ! -d "backend" ] || [ ! -f "backend/app.py" ]; then
+        echo -e "${RED}[ERROR]${NC} backend目录不存在于当前位置"
+        echo -e "${YELLOW}当前目录: $(pwd)${NC}"
+        
+        # 提示正确的运行位置
+        if [ -d "$HOME/QueryGPT-github/backend" ]; then
+            echo -e "${GREEN}请运行:${NC}"
+            echo -e "  cd ~/QueryGPT-github"
+            echo -e "  ./start.sh"
+        elif [ -d "/mnt/d/QueryGPT-main/backend" ]; then
+            echo -e "${GREEN}或从源目录运行:${NC}"
+            echo -e "  cd /mnt/d/QueryGPT-main"
+            echo -e "  ./start.sh"
+        fi
+        exit 1
+    fi
+    
     # WSL特殊处理：直接前台运行（最稳定）
     if [ "$IS_WSL" = true ]; then
-        echo -e "${CYAN}[INFO] WSL环境检测${NC}"
+        echo -e "${CYAN}[INFO] WSL环境启动${NC}"
         
         # 等待服务函数移到前面定义
         wait_for_service
         open_browser
         
-        echo -e "${GREEN}启动服务（前台模式）...${NC}"
+        echo -e "${GREEN}启动服务...${NC}"
         echo -e "${YELLOW}按 Ctrl+C 停止服务${NC}"
         
         # 直接前台运行（WSL最稳定的方式）
