@@ -64,33 +64,44 @@ fix_wsl_issues() {
     chmod +x setup.sh start.sh 2>/dev/null || true
 }
 
-# 查找可用端口 - WSL优化版
+# 查找可用端口 - 全自动版
 find_available_port() {
-    local port=$1
-    local max_port=$2
-    local env_type=$3
+    local start_port=${1:-5000}
+    local max_port=${2:-5100}  # 扩大搜索范围到100个端口
+    local env_type=${3:-"auto"}
     
-    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 查找端口 $port-$max_port${NC}" >&2
+    # 自动检测环境
+    if [ "$env_type" = "auto" ]; then
+        if grep -q Microsoft /proc/version 2>/dev/null; then
+            env_type="WSL"
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+            env_type="macOS"
+        else
+            env_type="Linux"
+        fi
+    fi
+    
+    # 静默模式，只在找到端口时输出
+    local port=$start_port
     
     while [ $port -le $max_port ]; do
         local port_available=false
         
-        if [[ "$env_type" == "WSL" ]] || [[ "$env_type" == "Linux" ]]; then
-            # WSL/Linux: 优先ss，其次netstat，最后Python
+        # 最快速的端口检测方法
+        if command -v python3 >/dev/null 2>&1; then
+            # Python方法最可靠且跨平台
+            if python3 -c "import socket; s=socket.socket(); r=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if r!=0 else 1)" 2>/dev/null; then
+                port_available=true
+            fi
+        elif [[ "$env_type" == "WSL" ]] || [[ "$env_type" == "Linux" ]]; then
+            # Linux/WSL备选方案
             if command -v ss >/dev/null 2>&1; then
-                if ! timeout 2 ss -tln 2>/dev/null | grep -q ":$port "; then
+                if ! timeout 1 ss -tln 2>/dev/null | grep -q ":$port "; then
                     port_available=true
                 fi
-            elif command -v netstat >/dev/null 2>&1; then
-                if ! timeout 2 netstat -tln 2>/dev/null | grep -q ":$port "; then
-                    port_available=true
-                fi
-            elif command -v python3 >/dev/null 2>&1; then
-                # Python备选方案，WSL更可靠
-                python3 -c "import socket; s=socket.socket(); result=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if result != 0 else 1)" 2>/dev/null && port_available=true
             else
-                # 最后的尝试，加timeout防止挂起
-                if ! timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+                # 使用/dev/tcp测试
+                if ! timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
                     port_available=true
                 fi
             fi
@@ -99,25 +110,20 @@ find_available_port() {
             if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
                 port_available=true
             fi
-        else
-            # 默认方法
-            if ! (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
-                port_available=true
-            fi
         fi
         
         if [ "$port_available" = true ]; then
-            [ "$IS_DEBUG" = true ] && echo -e "${GREEN}[DEBUG] 端口 $port 可用${NC}" >&2
             echo $port
             return 0
         fi
         
-        [ "$IS_DEBUG" = true ] && echo -e "${YELLOW}[DEBUG] 端口 $port 被占用${NC}" >&2
         port=$((port + 1))
     done
     
-    echo -e "${RED}[ERROR] 无法找到可用端口${NC}" >&2
-    return 1
+    # 如果前100个端口都占用，使用随机端口
+    local random_port=$((RANDOM % 10000 + 20000))
+    echo $random_port
+    return 0
 }
 
 # 快速启动函数
@@ -164,12 +170,11 @@ quick_start() {
     unset HTTP_PROXY
     unset HTTPS_PROXY
     
-    # 查找可用端口
-    PORT=$(find_available_port 5000 5010 "$env_type")
-    if [ -z "$PORT" ]; then
-        echo -e "${RED}[ERROR]${NC} 无法找到可用端口"
-        exit 1
-    fi
+    # 自动查找可用端口（静默且快速）
+    echo -e "${BLUE}[INFO]${NC} 自动查找可用端口..."
+    PORT=$(find_available_port 5000 5100)  # 自动检测环境，扩大搜索范围
+    
+    # 总是能找到端口（最坏情况使用随机高位端口）
     
     # 导出端口环境变量
     export PORT

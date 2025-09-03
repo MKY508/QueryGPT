@@ -1738,9 +1738,49 @@ if __name__ == '__main__':
     os.makedirs(OUTPUT_DIR, exist_ok=True)  # 使用统一的OUTPUT_DIR
     os.makedirs('cache', exist_ok=True)
     
+    # 自动查找可用端口
+    def find_available_port(start_port=5000, max_attempts=100):
+        """自动查找可用端口"""
+        import socket
+        
+        # 首先尝试环境变量指定的端口
+        env_port = os.environ.get('PORT')
+        if env_port:
+            try:
+                port = int(env_port)
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('127.0.0.1', port))
+                return port
+            except:
+                logger.warning(f"环境变量指定的端口 {env_port} 已被占用，自动查找其他端口...")
+        
+        # 自动查找可用端口
+        for i in range(max_attempts):
+            port = start_port + i
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('127.0.0.1', port))
+                return port
+            except OSError:
+                continue
+        
+        # 如果都失败，使用随机高位端口
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', 0))  # 让系统分配
+            port = s.getsockname()[1]
+        return port
+    
     # 启动服务器
-    port = int(os.environ.get('PORT', 5002))
+    port = find_available_port()
     logger.info(f"启动服务器，端口: {port}")
+    
+    # 打印友好的启动信息
+    print(f"\n{'='*50}")
+    print(f"✅ QueryGPT 服务已启动")
+    print(f"🌐 访问地址: http://localhost:{port}")
+    print(f"📊 API文档: http://localhost:{port}/api/docs")
+    print(f"🛑 停止服务: Ctrl+C")
+    print(f"{'='*50}\n")
     
     app.run(
         host='0.0.0.0',
