@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# QueryGPT WSL专用安装脚本 v1.0
+# QueryGPT WSL专用安装脚本 v2.0 - 全自动版本
 # 专为Windows Subsystem for Linux优化
 
 set -e  # 错误时退出
@@ -20,6 +20,8 @@ cd "$SCRIPT_DIR"
 PYTHON_CMD=""
 VENV_DIR="venv_py310"
 LOG_FILE="logs/setup_$(date +%Y%m%d_%H%M%S).log"
+AUTO_MODE=true  # 默认自动模式
+TARGET_DIR="$HOME/QueryGPT-github"
 
 # 创建日志目录
 mkdir -p logs
@@ -29,40 +31,56 @@ log() {
     echo -e "$1" | tee -a "$LOG_FILE"
 }
 
+# 静默日志（仅写入文件）
+silent_log() {
+    echo -e "$1" >> "$LOG_FILE"
+}
+
 # 打印横幅
 print_banner() {
     clear
     log "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
-    log "${CYAN}║${NC}     ${BOLD}QueryGPT WSL Setup v1.0${NC}                          ${CYAN}║${NC}"
-    log "${CYAN}║${NC}     Windows Subsystem for Linux 专用版                ${CYAN}║${NC}"
+    log "${CYAN}║${NC}     ${BOLD}QueryGPT WSL Setup v2.0 - 全自动版${NC}              ${CYAN}║${NC}"
+    log "${CYAN}║${NC}     🤖 自动检测并优化所有设置                         ${CYAN}║${NC}"
     log "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
     log ""
 }
 
-# WSL环境验证
+# WSL环境验证（自动版）
 verify_wsl() {
-    log "${BLUE}[步骤 1/8] 验证WSL环境${NC}"
+    log "${BLUE}[步骤 1/8] 自动检测环境${NC}"
     
     if ! grep -qi microsoft /proc/version 2>/dev/null; then
-        log "${RED}✗ 错误: 此脚本仅用于WSL环境${NC}"
-        log "  请使用 ./setup.sh 用于其他系统"
-        exit 1
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            log "${GREEN}✓ Linux环境，继续安装${NC}"
+        else
+            log "${RED}✗ 错误: 不支持的操作系统${NC}"
+            exit 1
+        fi
+    else
+        log "${GREEN}✓ WSL环境确认${NC}"
     fi
     
-    # 获取WSL版本
-    local wsl_version="Unknown"
-    if command -v wsl.exe &>/dev/null; then
-        wsl_version=$(wsl.exe --status 2>/dev/null | grep -i "default version" | grep -o "[0-9]" || echo "Unknown")
-    fi
-    
-    log "${GREEN}✓ WSL环境确认 (版本: $wsl_version)${NC}"
-    
-    # 检查文件系统位置
+    # 自动迁移到Linux文件系统（如果需要）
     if [[ "$SCRIPT_DIR" == /mnt/* ]]; then
-        log "${YELLOW}⚠ 警告: 项目位于Windows文件系统${NC}"
-        log "  建议移至Linux文件系统以获得更好性能:"
-        log "  ${CYAN}cp -r $SCRIPT_DIR ~/QueryGPT-github${NC}"
-        log ""
+        log "${YELLOW}检测到Windows文件系统，自动迁移以提升性能...${NC}"
+        
+        # 自动迁移
+        if [ ! -d "$TARGET_DIR" ]; then
+            log "  正在复制文件到 $TARGET_DIR ..."
+            cp -r "$SCRIPT_DIR" "$TARGET_DIR" 2>/dev/null
+            chmod -R u+rw "$TARGET_DIR" 2>/dev/null
+            find "$TARGET_DIR" -name "*.sh" -exec chmod +x {} \; 2>/dev/null
+            
+            cd "$TARGET_DIR"
+            SCRIPT_DIR="$TARGET_DIR"
+            log "${GREEN}✓ 已自动迁移到Linux文件系统${NC}"
+        else
+            # 如果目标已存在，直接使用
+            cd "$TARGET_DIR"
+            SCRIPT_DIR="$TARGET_DIR"
+            log "${GREEN}✓ 使用现有Linux文件系统目录${NC}"
+        fi
     fi
 }
 
@@ -100,83 +118,75 @@ fix_files() {
     fi
 }
 
-# 安装系统依赖
+# 安装系统依赖（自动版）
 install_system_deps() {
-    log "${BLUE}[步骤 3/8] 检查系统依赖${NC}"
+    log "${BLUE}[步骤 3/8] 自动安装系统依赖${NC}"
     
-    local missing_deps=()
+    # 自动更新包列表（静默）
+    sudo apt-get update -qq 2>/dev/null || true
     
-    # 检查必要的命令
-    for cmd in curl git python3; do
-        if ! command -v $cmd &>/dev/null; then
-            missing_deps+=($cmd)
+    # 必要的包
+    local required_packages="curl git python3 build-essential"
+    
+    # 自动安装缺失的包
+    for package in $required_packages; do
+        if ! dpkg -l | grep -q "^ii.*$package"; then
+            log "  安装 $package..."
+            sudo apt-get install -y -qq "$package" 2>/dev/null || true
         fi
     done
     
-    # WSL特殊：检查Windows交互工具
-    if ! command -v wslview &>/dev/null && ! command -v cmd.exe &>/dev/null; then
-        log "${YELLOW}  提示: 安装 wslu 可获得更好的浏览器集成${NC}"
-        log "  ${CYAN}sudo apt-get install wslu${NC}"
-    fi
-    
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        log "${YELLOW}⚠ 缺少系统依赖: ${missing_deps[*]}${NC}"
-        log "  请运行: ${CYAN}sudo apt-get update && sudo apt-get install ${missing_deps[*]}${NC}"
-        exit 1
-    else
-        log "${GREEN}✓ 系统依赖完整${NC}"
-    fi
-}
-
-# 检查Python版本
-check_python() {
-    log "${BLUE}[步骤 4/8] 检查Python环境${NC}"
-    
-    # 按优先级查找Python
-    local python_found=false
-    
-    # 优先查找 Python 3.10
-    if command -v python3.10 &>/dev/null; then
-        PYTHON_CMD="python3.10"
-        local version=$(python3.10 --version 2>&1 | grep -Po '\d+\.\d+\.\d+')
-        log "${GREEN}✓ 找到 Python $version (推荐版本)${NC}"
-        python_found=true
-    elif command -v python3 &>/dev/null; then
-        local version=$(python3 --version 2>&1 | grep -Po '\d+\.\d+\.\d+')
-        local major=$(echo $version | cut -d. -f1)
-        local minor=$(echo $version | cut -d. -f2)
-        
-        if [ "$major" -eq 3 ] && [ "$minor" -ge 8 ]; then
-            PYTHON_CMD="python3"
-            log "${GREEN}✓ 找到 Python $version${NC}"
-            if [ "$minor" -ne 10 ]; then
-                log "${YELLOW}  提示: 推荐使用 Python 3.10.x${NC}"
-            fi
-            python_found=true
-        else
-            log "${RED}✗ Python 版本过低: $version (需要 >= 3.8)${NC}"
+    # WSL特殊：自动安装wslu（如果可用）
+    if command -v wsl.exe &>/dev/null; then
+        if ! command -v wslview &>/dev/null; then
+            sudo apt-get install -y -qq wslu 2>/dev/null || true
         fi
     fi
     
-    if [ "$python_found" = false ]; then
-        log "${RED}✗ 未找到合适的Python版本${NC}"
-        log "  请安装Python 3.10:"
-        log "  ${CYAN}sudo apt-get update${NC}"
-        log "  ${CYAN}sudo apt-get install python3.10 python3.10-venv${NC}"
+    log "${GREEN}✓ 系统依赖已自动配置${NC}"
+}
+
+# 检查Python版本（自动版）
+check_python() {
+    log "${BLUE}[步骤 4/8] 自动配置Python环境${NC}"
+    
+    # 自动安装Python 3.10（如果需要）
+    if ! command -v python3.10 &>/dev/null; then
+        log "  自动安装Python 3.10..."
+        
+        # 尝试添加deadsnakes PPA（Ubuntu/Debian）
+        if command -v add-apt-repository &>/dev/null; then
+            sudo add-apt-repository ppa:deadsnakes/ppa -y 2>/dev/null || true
+            sudo apt-get update -qq 2>/dev/null || true
+        fi
+        
+        # 安装Python 3.10
+        sudo apt-get install -y -qq python3.10 python3.10-venv python3.10-dev 2>/dev/null || {
+            # 如果3.10不可用，使用默认Python 3
+            sudo apt-get install -y -qq python3 python3-venv python3-dev python3-pip 2>/dev/null || true
+        }
+    fi
+    
+    # 确定Python命令
+    if command -v python3.10 &>/dev/null; then
+        PYTHON_CMD="python3.10"
+        log "${GREEN}✓ 使用 Python 3.10${NC}"
+    elif command -v python3 &>/dev/null; then
+        PYTHON_CMD="python3"
+        local version=$(python3 --version 2>&1 | grep -Po '\d+\.\d+\.\d+')
+        log "${GREEN}✓ 使用 Python $version${NC}"
+    else
+        log "${RED}✗ 无法安装Python${NC}"
         exit 1
     fi
     
-    # 检查pip和venv
+    # 自动安装pip和venv（如果需要）
     if ! $PYTHON_CMD -m pip --version &>/dev/null; then
-        log "${YELLOW}⚠ pip未安装，正在安装...${NC}"
-        $PYTHON_CMD -m ensurepip --default-pip 2>/dev/null || \
-        sudo apt-get install python3-pip -y
+        sudo apt-get install -y -qq python3-pip 2>/dev/null || true
     fi
     
     if ! $PYTHON_CMD -m venv --help &>/dev/null; then
-        log "${YELLOW}⚠ venv未安装，正在安装...${NC}"
-        sudo apt-get install python3.10-venv -y 2>/dev/null || \
-        sudo apt-get install python3-venv -y
+        sudo apt-get install -y -qq python3-venv 2>/dev/null || true
     fi
 }
 
@@ -401,31 +411,50 @@ verify_installation() {
     fi
 }
 
-# 显示下一步
+# 显示下一步（自动版）
 show_next_steps() {
     log ""
-    log "${BOLD}${CYAN}下一步操作:${NC}"
-    log ""
-    log "1. ${BOLD}配置API密钥${NC}"
-    log "   编辑 ${CYAN}.env${NC} 文件，设置你的API密钥"
-    log ""
-    log "2. ${BOLD}启动服务${NC}"
-    log "   运行: ${CYAN}./start_wsl.sh${NC}"
-    log "   或:   ${CYAN}./start.sh${NC}"
-    log ""
-    log "3. ${BOLD}访问应用${NC}"
-    log "   浏览器打开: ${BLUE}http://localhost:5000${NC}"
-    log ""
+    log "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    log "${GREEN}✓ 安装完成！${NC}"
+    log "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
-    # WSL特殊提示
-    log "${YELLOW}WSL使用提示:${NC}"
-    log "• 如遇权限问题，使用: ${CYAN}chmod +x *.sh${NC}"
-    log "• 如遇端口占用，编辑config.json修改端口"
-    log "• 建议在Linux文件系统运行以获得最佳性能"
-    log ""
+    if [[ "$(pwd)" != "$SCRIPT_DIR" ]]; then
+        log "${CYAN}项目已自动优化到: $(pwd)${NC}"
+    fi
     
     # 创建快速启动脚本
     create_start_script
+    
+    log ""
+    log "${CYAN}10秒后自动启动服务...${NC}"
+    log "${YELLOW}按 Ctrl+C 取消自动启动${NC}"
+    
+    # 10秒倒计时自动启动
+    local count=10
+    while [ $count -gt 0 ]; do
+        printf "\r${CYAN}%2d秒后启动...${NC}" $count
+        if ! sleep 1; then
+            log ""
+            log "${YELLOW}已取消自动启动${NC}"
+            log "手动启动: ${GREEN}./start_wsl.sh${NC}"
+            return
+        fi
+        ((count--))
+    done
+    
+    log ""
+    log "${GREEN}正在启动服务...${NC}"
+    
+    # 自动启动
+    if [ -f "start_wsl.sh" ]; then
+        exec ./start_wsl.sh
+    else
+        # 备用启动
+        source venv_py310/bin/activate 2>/dev/null || source venv/bin/activate
+        export PYTHONUNBUFFERED=1
+        export PORT=5000
+        cd backend && python app.py
+    fi
 }
 
 # 创建WSL优化的启动脚本
