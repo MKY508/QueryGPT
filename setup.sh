@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# QueryGPT 环境配置脚本 v2.0
-# Environment Setup Script v2.0
-# 仅进行环境配置，不启动服务
+# QueryGPT 环境配置脚本 v3.0 - WSL兼容版
+# Environment Setup Script v3.0 - WSL Compatible
+# 支持 WSL/Linux/macOS 环境
 
 set -e
 
@@ -21,7 +21,52 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 PYTHON_CMD=""
 IS_FIRST_RUN=false
+IS_WSL=false
+IS_DEBUG=false
 BACKUP_SUFFIX=$(date +%Y%m%d_%H%M%S)
+
+# 检测运行环境
+detect_environment() {
+    if grep -qi microsoft /proc/version 2>/dev/null; then
+        IS_WSL=true
+        echo -e "${CYAN}检测到WSL环境 / WSL environment detected${NC}"
+        
+        # WSL路径警告
+        if [[ "$SCRIPT_DIR" == /mnt/* ]]; then
+            echo -e "${YELLOW}⚠ 警告: 项目位于Windows文件系统，建议移至WSL文件系统以提升性能${NC}"
+            echo -e "${YELLOW}  建议: cp -r $SCRIPT_DIR ~/QueryGPT-github${NC}"
+        fi
+    fi
+}
+
+# 修复WSL文件格式
+fix_line_endings() {
+    if [ "$IS_WSL" = true ]; then
+        echo -e "${CYAN}检查文件格式... / Checking file formats...${NC}"
+        
+        # 检查并修复关键文件的行结束符
+        for file in setup.sh start.sh requirements.txt .env .env.example; do
+            if [ -f "$file" ]; then
+                # 检测是否有CRLF
+                if file "$file" 2>/dev/null | grep -q "CRLF"; then
+                    echo -e "${YELLOW}修复 $file 的行结束符...${NC}"
+                    # 使用多种方法尝试转换
+                    if command -v dos2unix &> /dev/null; then
+                        dos2unix "$file" 2>/dev/null
+                    elif command -v sed &> /dev/null; then
+                        sed -i 's/\r$//' "$file"
+                    else
+                        tr -d '\r' < "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+                    fi
+                    echo -e "${GREEN}✓ $file 已修复${NC}"
+                fi
+            fi
+        done
+        
+        # 修复权限
+        chmod +x setup.sh start.sh 2>/dev/null || true
+    fi
+}
 
 # 打印带颜色的消息
 print_message() {
@@ -412,41 +457,37 @@ EOF
     fi
 }
 
-# 查找可用端口 - 跨平台版本
+# 查找可用端口 - WSL/Linux/macOS兼容版本
 find_available_port() {
     local port=5000
     local max_port=5010
     
-    # 检测运行环境
-    local is_wsl=false
-    local is_macos=false
-    if grep -qi microsoft /proc/version 2>/dev/null; then
-        is_wsl=true
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        is_macos=true
-    fi
+    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始查找可用端口...${NC}" >&2
     
     while [ $port -le $max_port ]; do
         local port_available=false
         
-        if [ "$is_macos" = true ]; then
+        if [[ "$OSTYPE" == "darwin"* ]]; then
             # macOS: 使用 lsof
             if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
                 port_available=true
             fi
-        elif [ "$is_wsl" = true ] || [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            # WSL/Linux: 使用 ss 或 netstat
+        elif [ "$IS_WSL" = true ] || [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            # WSL/Linux: 优先使用ss，其次netstat，最后Python
             if command -v ss >/dev/null 2>&1; then
-                if ! ss -tln | grep -q ":$port "; then
+                if ! timeout 2 ss -tln 2>/dev/null | grep -q ":$port "; then
                     port_available=true
                 fi
             elif command -v netstat >/dev/null 2>&1; then
-                if ! netstat -tln 2>/dev/null | grep -q ":$port "; then
+                if ! timeout 2 netstat -tln 2>/dev/null | grep -q ":$port "; then
                     port_available=true
                 fi
+            elif command -v python3 >/dev/null 2>&1; then
+                # Python fallback for WSL
+                python3 -c "import socket; s=socket.socket(); result=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if result != 0 else 1)" 2>/dev/null && port_available=true
             else
-                # 最后尝试直接连接测试
-                if ! (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
+                # 最后的尝试
+                if ! timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; then
                     port_available=true
                 fi
             fi
@@ -458,16 +499,15 @@ find_available_port() {
         fi
         
         if [ "$port_available" = true ]; then
+            [ "$IS_DEBUG" = true ] && echo -e "${GREEN}[DEBUG] 找到可用端口: $port${NC}" >&2
             echo $port
             return 0
         fi
         
-        # 输出到 stderr 而不是 stdout，避免污染返回值
-        print_message "info" "端口 $port 已被占用，尝试下一个... / Port $port occupied, trying next..." >&2
+        [ "$IS_DEBUG" = true ] && echo -e "${YELLOW}[DEBUG] 端口 $port 被占用${NC}" >&2
         port=$((port + 1))
     done
     
-    # 输出到 stderr
     print_message "error" "无法找到可用端口 / No available port found" >&2
     return 1
 }
@@ -597,6 +637,10 @@ main() {
         exit 1
     fi
     
+    # WSL环境检测和修复
+    detect_environment
+    fix_line_endings
+    
     # 完整的设置流程（不启动服务）
     check_first_run
     check_python
@@ -615,6 +659,13 @@ main() {
     print_message "success" "所有依赖已安装 / All dependencies installed"
     print_message "success" "配置文件已生成 / Configuration files created"
     print_message "success" "虚拟环境已就绪 / Virtual environment ready"
+    
+    if [ "$IS_WSL" = true ]; then
+        echo ""
+        print_message "info" "WSL提示: 如遇到性能问题，建议将项目移至Linux文件系统"
+        print_message "info" "WSL Tip: For better performance, move to Linux filesystem"
+    fi
+    
     echo ""
     print_message "info" "请运行以下命令启动服务："
     print_message "info" "Please run the following command to start:"
@@ -626,16 +677,22 @@ main() {
 # 处理命令行参数
 case "${1:-}" in
     --help|-h)
-        echo "QueryGPT Setup - 环境配置脚本"
+        echo "QueryGPT Setup v3.0 - 环境配置脚本 (WSL兼容)"
         echo "用法: ./setup.sh [选项]"
         echo ""
         echo "选项:"
         echo "  无参数        执行环境配置（不启动服务）"
+        echo "  --debug       启用调试模式，显示详细信息"
         echo "  --help, -h    显示帮助信息"
         echo ""
+        echo "支持环境: WSL, Linux, macOS"
         echo "配置完成后，请运行 ./start.sh 启动服务"
         echo ""
         exit 0
+        ;;
+    --debug)
+        IS_DEBUG=true
+        main
         ;;
     *)
         main

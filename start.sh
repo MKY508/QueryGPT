@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# QueryGPT 智能启动脚本 - 统一启动入口
-# Smart Start Script - Unified launch entry point
+# QueryGPT 智能启动脚本 v3.0 - WSL兼容版
+# Smart Start Script v3.0 - WSL Compatible
+# 支持 WSL/Linux/macOS 环境
 
 set -e
 
@@ -10,7 +11,15 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 NC='\033[0m'
+BOLD='\033[1m'
+
+# 全局变量
+IS_WSL=false
+IS_DEBUG=false
+ENV_TYPE="Unknown"
 
 echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║        QueryGPT 智能启动器             ║${NC}"
@@ -20,62 +29,94 @@ echo ""
 # 检测运行环境
 detect_environment() {
     if grep -qi microsoft /proc/version 2>/dev/null; then
-        echo "WSL"
+        IS_WSL=true
+        ENV_TYPE="WSL"
+        echo -e "${CYAN}[INFO] 检测到WSL环境${NC}"
+        
+        # 修复WSL文件权限和格式
+        fix_wsl_issues
     elif [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macOS"
+        ENV_TYPE="macOS"
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        echo "Linux"
+        ENV_TYPE="Linux"
     else
-        echo "Unknown"
+        ENV_TYPE="Unknown"
     fi
+    
+    echo "$ENV_TYPE"
 }
 
-# 查找可用端口的跨平台方法
+# 修复WSL问题
+fix_wsl_issues() {
+    # 修复行结束符
+    for file in setup.sh start.sh; do
+        if [ -f "$file" ] && file "$file" 2>/dev/null | grep -q "CRLF"; then
+            echo -e "${YELLOW}[INFO] 修复 $file 的行结束符...${NC}"
+            if command -v dos2unix &> /dev/null; then
+                dos2unix "$file" 2>/dev/null
+            else
+                sed -i 's/\r$//' "$file" 2>/dev/null || true
+            fi
+        fi
+    done
+    
+    # 确保脚本有执行权限
+    chmod +x setup.sh start.sh 2>/dev/null || true
+}
+
+# 查找可用端口 - WSL优化版
 find_available_port() {
     local port=$1
     local max_port=$2
     local env_type=$3
     
+    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 查找端口 $port-$max_port${NC}" >&2
+    
     while [ $port -le $max_port ]; do
-        # 跨平台端口检测
+        local port_available=false
+        
         if [[ "$env_type" == "WSL" ]] || [[ "$env_type" == "Linux" ]]; then
-            # WSL/Linux: 使用 netstat 或 ss
+            # WSL/Linux: 优先ss，其次netstat，最后Python
             if command -v ss >/dev/null 2>&1; then
-                if ! ss -tln | grep -q ":$port "; then
-                    echo $port
-                    return 0
+                if ! timeout 2 ss -tln 2>/dev/null | grep -q ":$port "; then
+                    port_available=true
                 fi
             elif command -v netstat >/dev/null 2>&1; then
-                if ! netstat -tln 2>/dev/null | grep -q ":$port "; then
-                    echo $port
-                    return 0
+                if ! timeout 2 netstat -tln 2>/dev/null | grep -q ":$port "; then
+                    port_available=true
                 fi
+            elif command -v python3 >/dev/null 2>&1; then
+                # Python备选方案，WSL更可靠
+                python3 -c "import socket; s=socket.socket(); result=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if result != 0 else 1)" 2>/dev/null && port_available=true
             else
-                # 如果都没有，尝试直接连接测试
-                if ! (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
-                    echo $port
-                    return 0
+                # 最后的尝试，加timeout防止挂起
+                if ! timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+                    port_available=true
                 fi
             fi
         elif [[ "$env_type" == "macOS" ]]; then
             # macOS: 使用 lsof
             if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-                echo $port
-                return 0
+                port_available=true
             fi
         else
             # 默认方法
             if ! (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
-                echo $port
-                return 0
+                port_available=true
             fi
         fi
         
-        # 输出信息到 stderr，避免污染函数返回值
-        echo -e "${YELLOW}[INFO]${NC} 端口 $port 已被占用，尝试 $((port+1))..." >&2
+        if [ "$port_available" = true ]; then
+            [ "$IS_DEBUG" = true ] && echo -e "${GREEN}[DEBUG] 端口 $port 可用${NC}" >&2
+            echo $port
+            return 0
+        fi
+        
+        [ "$IS_DEBUG" = true ] && echo -e "${YELLOW}[DEBUG] 端口 $port 被占用${NC}" >&2
         port=$((port + 1))
     done
     
+    echo -e "${RED}[ERROR] 无法找到可用端口${NC}" >&2
     return 1
 }
 
@@ -180,25 +221,38 @@ quick_start() {
         return 1
     }
     
-    # 打开浏览器的函数
+    # 打开浏览器的函数 - WSL优化版
     open_browser() {
         echo -e "${GREEN}➜ 正在打开浏览器...${NC}"
         echo -e "访问: ${BLUE}http://localhost:${PORT}${NC}"
+        
+        if [ "$IS_WSL" = true ]; then
+            # WSL特殊处理：获取Windows访问地址
+            local wsl_ip=$(hostname -I | cut -d' ' -f1)
+            echo -e "WSL访问: ${BLUE}http://${wsl_ip}:${PORT}${NC} (从Windows访问)"
+        fi
+        
         echo -e "停止: ${YELLOW}Ctrl+C${NC}"
         
         if [[ "$env_type" == "macOS" ]]; then
-            open "http://localhost:${PORT}"
+            open "http://localhost:${PORT}" 2>/dev/null &
         elif [[ "$env_type" == "WSL" ]]; then
-            # WSL: 使用 Windows 的浏览器
-            if command -v cmd.exe >/dev/null 2>&1; then
-                cmd.exe /c start "http://localhost:${PORT}" 2>/dev/null
-            elif command -v wslview >/dev/null 2>&1; then
-                wslview "http://localhost:${PORT}"
+            # WSL: 多种方法尝试打开Windows浏览器
+            if command -v wslview >/dev/null 2>&1; then
+                wslview "http://localhost:${PORT}" 2>/dev/null &
+            elif command -v cmd.exe >/dev/null 2>&1; then
+                cmd.exe /c start "http://localhost:${PORT}" 2>/dev/null &
+            elif command -v powershell.exe >/dev/null 2>&1; then
+                powershell.exe -Command "Start-Process 'http://localhost:${PORT}'" 2>/dev/null &
+            elif command -v explorer.exe >/dev/null 2>&1; then
+                explorer.exe "http://localhost:${PORT}" 2>/dev/null &
+            else
+                echo -e "${YELLOW}[INFO] 无法自动打开浏览器，请手动访问上述URL${NC}"
             fi
         elif [[ "$env_type" == "Linux" ]]; then
             # Linux: 尝试 xdg-open
             if command -v xdg-open >/dev/null 2>&1; then
-                xdg-open "http://localhost:${PORT}"
+                xdg-open "http://localhost:${PORT}" 2>/dev/null &
             fi
         fi
     }
