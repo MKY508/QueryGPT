@@ -32,20 +32,19 @@ SCRIPT_DATE="2025-01-04"
 
 echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║        QueryGPT 智能启动器 v${SCRIPT_VERSION}        ║${NC}"
-echo -e "${BLUE}║        ${OS_TYPE:-检测中...}                      ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
 echo ""
 
 # 检测运行环境 - 三层检测系统
 detect_environment() {
-    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始环境检测...${NC}"
+    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始环境检测...${NC}" >&2
     
     # 第一层：检测大类操作系统
     if [[ "$OSTYPE" == "darwin"* ]]; then
         IS_MACOS=true
         IS_LINUX=false
         OS_TYPE="macOS"
-        echo -e "${CYAN}[INFO] 检测到 macOS 环境${NC}"
+        echo -e "${CYAN}[INFO] 检测到 macOS 环境${NC}" >&2
         
     elif [[ "$OSTYPE" == "linux-gnu"* ]] || [ -f /proc/version ]; then
         IS_LINUX=true
@@ -56,17 +55,17 @@ detect_environment() {
             IS_WSL=true
             IS_NATIVE_LINUX=false
             OS_TYPE="WSL"
-            echo -e "${CYAN}[INFO] 检测到 WSL 环境${NC}"
+            echo -e "${CYAN}[INFO] 检测到 WSL 环境${NC}" >&2
             
             # WSL：如果在Windows文件系统，提示用户
             CURRENT_DIR=$(pwd)
             if [[ "$CURRENT_DIR" == /mnt/* ]]; then
-                echo -e "${YELLOW}[警告] 在Windows文件系统运行，性能较差${NC}"
+                echo -e "${YELLOW}[警告] 在Windows文件系统运行，性能较差${NC}" >&2
                 
                 # 检查Linux文件系统是否有安装
                 if [ -d "$HOME/QueryGPT-github" ]; then
-                    echo -e "${GREEN}[提示] 检测到Linux文件系统安装:${NC}"
-                    echo -e "${GREEN}       cd ~/QueryGPT-github && ./start.sh${NC}"
+                    echo -e "${GREEN}[提示] 检测到Linux文件系统安装:${NC}" >&2
+                    echo -e "${GREEN}       cd ~/QueryGPT-github && ./start.sh${NC}" >&2
                     echo ""
                     read -t 3 -p "是否切换到Linux文件系统？[Y/n] " -n 1 -r || REPLY="Y"
                     echo ""
@@ -87,7 +86,7 @@ detect_environment() {
                 OS_TYPE="$NAME"
             fi
             
-            echo -e "${CYAN}[INFO] 检测到纯 Linux 环境: $OS_TYPE${NC}"
+            echo -e "${CYAN}[INFO] 检测到纯 Linux 环境: $OS_TYPE${NC}" >&2
         fi
         
         # Linux环境下（包括WSL和纯Linux）修复文件格式
@@ -99,17 +98,17 @@ detect_environment() {
         chmod +x *.sh 2>/dev/null || true
     else
         OS_TYPE="Unknown"
-        echo -e "${YELLOW}[WARNING] 未知的操作系统类型: $OSTYPE${NC}"
+        echo -e "${YELLOW}[WARNING] 未知的操作系统类型: $OSTYPE${NC}" >&2
     fi
     
     # 调试模式输出
     if [ "$IS_DEBUG" = true ]; then
-        echo -e "${CYAN}[DEBUG] 环境检测结果:${NC}"
-        echo -e "${CYAN}  IS_LINUX=$IS_LINUX${NC}"
-        echo -e "${CYAN}  IS_WSL=$IS_WSL${NC}"
-        echo -e "${CYAN}  IS_MACOS=$IS_MACOS${NC}"
-        echo -e "${CYAN}  IS_NATIVE_LINUX=$IS_NATIVE_LINUX${NC}"
-        echo -e "${CYAN}  OS_TYPE=$OS_TYPE${NC}"
+        echo -e "${CYAN}[DEBUG] 环境检测结果:${NC}" >&2
+        echo -e "${CYAN}  IS_LINUX=$IS_LINUX${NC}" >&2
+        echo -e "${CYAN}  IS_WSL=$IS_WSL${NC}" >&2
+        echo -e "${CYAN}  IS_MACOS=$IS_MACOS${NC}" >&2
+        echo -e "${CYAN}  IS_NATIVE_LINUX=$IS_NATIVE_LINUX${NC}" >&2
+        echo -e "${CYAN}  OS_TYPE=$OS_TYPE${NC}" >&2
     fi
     
     echo "$OS_TYPE"
@@ -121,7 +120,17 @@ find_available_port() {
     local start_port=${1:-5000}
     local max_port=${2:-5100}  # 扩大搜索范围到100个端口
     
-    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 查找可用端口 (环境: $OS_TYPE)...${NC}" >&2
+    # 确定环境类型用于调试输出
+    local env_desc="Unknown"
+    if [ "$IS_MACOS" = true ]; then
+        env_desc="macOS"
+    elif [ "$IS_WSL" = true ]; then
+        env_desc="WSL"
+    elif [ "$IS_NATIVE_LINUX" = true ]; then
+        env_desc="Linux"
+    fi
+    
+    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 查找可用端口 (环境: $env_desc)...${NC}" >&2
     
     # 静默模式，只在找到端口时输出
     local port=$start_port
@@ -184,6 +193,32 @@ find_available_port() {
 quick_start() {
     local env_type=$1
     
+    # 根据env_type参数设置全局变量（修复环境检测问题）
+    case "$env_type" in
+        "macOS")
+            IS_MACOS=true
+            IS_LINUX=false
+            IS_WSL=false
+            IS_NATIVE_LINUX=false
+            ;;
+        "WSL")
+            IS_WSL=true
+            IS_LINUX=true
+            IS_MACOS=false
+            IS_NATIVE_LINUX=false
+            ;;
+        *Linux*|Ubuntu*|Debian*|CentOS*)
+            IS_NATIVE_LINUX=true
+            IS_LINUX=true
+            IS_WSL=false
+            IS_MACOS=false
+            ;;
+        *)
+            echo -e "${RED}[ERROR] 未知的环境类型: $env_type${NC}"
+            exit 1
+            ;;
+    esac
+    
     echo -e "${GREEN}✓ 检测到已安装环境${NC}"
     echo -e "${BLUE}[INFO]${NC} 运行环境: $env_type"
     echo -e "${BLUE}[INFO]${NC} 版本: ${SCRIPT_VERSION} (${SCRIPT_DATE})"
@@ -217,9 +252,11 @@ quick_start() {
         exit 1
     fi
     
-    # 验证激活是否成功
-    echo -e "${CYAN}[DEBUG] Python路径: $(which python)${NC}"
-    echo -e "${CYAN}[DEBUG] VIRTUAL_ENV: $VIRTUAL_ENV${NC}"
+    # 验证激活是否成功（仅在调试模式下显示）
+    if [ "$IS_DEBUG" = true ]; then
+        echo -e "${CYAN}[DEBUG] Python路径: $(which python)${NC}"
+        echo -e "${CYAN}[DEBUG] VIRTUAL_ENV: $VIRTUAL_ENV${NC}"
+    fi
     
     # 清除代理环境变量
     unset http_proxy
