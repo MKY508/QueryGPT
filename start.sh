@@ -563,16 +563,22 @@ quick_start() {
     if [ "$IS_WSL" = true ]; then
         echo -e "${CYAN}[INFO] WSL环境启动${NC}"
         
-        # 等待服务函数移到前面定义
-        wait_for_service
-        open_browser
-        
         echo -e "${GREEN}启动服务...${NC}"
         echo -e "${YELLOW}按 Ctrl+C 停止服务${NC}"
         
-        # 直接前台运行（WSL最稳定的方式）
-        cd backend
-        exec python app.py
+        # WSL环境：后台启动Flask，然后等待服务可用
+        cd backend && python app.py &
+        FLASK_PID=$!
+        
+        # 等待服务可用
+        if wait_for_service; then
+            open_browser
+        else
+            echo -e "${YELLOW}请手动访问: http://localhost:${PORT}${NC}"
+        fi
+        
+        # 等待Flask进程（前台等待，使得Ctrl+C可以正常工作）
+        wait $FLASK_PID
     elif [ "$IS_NATIVE_LINUX" = true ]; then
         echo -e "${CYAN}[INFO] 纯Linux环境启动${NC}"
         
