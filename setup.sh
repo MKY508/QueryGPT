@@ -21,40 +21,93 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 PYTHON_CMD=""
 IS_FIRST_RUN=false
-IS_WSL=false
 IS_DEBUG=false
 BACKUP_SUFFIX=$(date +%Y%m%d_%H%M%S)
 
-# 检测运行环境
+# 三层环境检测变量
+IS_LINUX=false       # Linux大类（包括WSL和纯Linux）
+IS_WSL=false        # WSL子类
+IS_MACOS=false      # macOS
+IS_NATIVE_LINUX=false  # 纯Linux（非WSL）
+OS_TYPE="Unknown"   # 操作系统类型描述
+
+# 版本信息
+SCRIPT_VERSION="3.1.0"
+SCRIPT_DATE="2025-01-04"
+
+# 检测运行环境 - 三层检测系统
 detect_environment() {
-    if grep -qi microsoft /proc/version 2>/dev/null; then
-        IS_WSL=true
-        echo -e "${CYAN}检测到WSL环境 / WSL environment detected${NC}"
+    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始环境检测...${NC}"
+    
+    # 第一层：检测大类操作系统
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        IS_MACOS=true
+        IS_LINUX=false
+        OS_TYPE="macOS"
+        echo -e "${CYAN}检测到 macOS 环境 / macOS environment detected${NC}"
         
-        # WSL自动迁移到Linux文件系统
-        if [[ "$SCRIPT_DIR" == /mnt/* ]]; then
-            echo -e "${YELLOW}检测到Windows文件系统，自动迁移以提升性能...${NC}"
-            TARGET_DIR="$HOME/QueryGPT-github"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]] || [ -f /proc/version ]; then
+        IS_LINUX=true
+        IS_MACOS=false
+        
+        # 第二层：检测是否为WSL
+        if grep -qi microsoft /proc/version 2>/dev/null; then
+            IS_WSL=true
+            IS_NATIVE_LINUX=false
+            OS_TYPE="WSL"
+            echo -e "${CYAN}检测到 WSL 环境 / WSL environment detected${NC}"
             
-            if [ ! -d "$TARGET_DIR" ]; then
-                cp -r "$SCRIPT_DIR" "$TARGET_DIR" 2>/dev/null
+            # WSL自动迁移到Linux文件系统
+            if [[ "$SCRIPT_DIR" == /mnt/* ]]; then
+                echo -e "${YELLOW}检测到Windows文件系统，自动迁移以提升性能...${NC}"
+                TARGET_DIR="$HOME/QueryGPT-github"
+                
+                if [ ! -d "$TARGET_DIR" ]; then
+                    cp -r "$SCRIPT_DIR" "$TARGET_DIR" 2>/dev/null
+                fi
+                
+                cd "$TARGET_DIR"
+                SCRIPT_DIR="$TARGET_DIR"
+                echo -e "${GREEN}✓ 已迁移到Linux文件系统: $TARGET_DIR${NC}"
+                echo ""
+            fi
+        else
+            IS_WSL=false
+            IS_NATIVE_LINUX=true
+            OS_TYPE="Native Linux"
+            
+            # 检测具体的Linux发行版
+            if [ -f /etc/os-release ]; then
+                . /etc/os-release
+                OS_TYPE="$NAME"
             fi
             
-            cd "$TARGET_DIR"
-            SCRIPT_DIR="$TARGET_DIR"
-            echo -e "${GREEN}✓ 已迁移到Linux文件系统: $TARGET_DIR${NC}"
-            echo ""
+            echo -e "${CYAN}检测到纯 Linux 环境 / Native Linux detected: $OS_TYPE${NC}"
         fi
+    else
+        OS_TYPE="Unknown"
+        echo -e "${YELLOW}未知的操作系统类型 / Unknown OS type: $OSTYPE${NC}"
+    fi
+    
+    # 输出详细的环境信息（调试模式）
+    if [ "$IS_DEBUG" = true ]; then
+        echo -e "${CYAN}[DEBUG] 环境检测结果:${NC}"
+        echo -e "${CYAN}  IS_LINUX=$IS_LINUX${NC}"
+        echo -e "${CYAN}  IS_WSL=$IS_WSL${NC}"
+        echo -e "${CYAN}  IS_MACOS=$IS_MACOS${NC}"
+        echo -e "${CYAN}  IS_NATIVE_LINUX=$IS_NATIVE_LINUX${NC}"
+        echo -e "${CYAN}  OS_TYPE=$OS_TYPE${NC}"
     fi
 }
 
-# 修复WSL文件格式
+# 修复文件格式 - 适用于所有Linux环境
 fix_line_endings() {
-    if [ "$IS_WSL" = true ]; then
+    # Linux环境下（包括WSL和纯Linux）都需要检查文件格式
+    if [ "$IS_LINUX" = true ] || [ "$IS_WSL" = true ]; then
         echo -e "${CYAN}检查文件格式... / Checking file formats...${NC}"
         
         # 检查并修复关键文件的行结束符
-        for file in setup.sh start.sh requirements.txt .env .env.example; do
+        for file in setup.sh start.sh requirements.txt .env .env.example diagnostic.sh; do
             if [ -f "$file" ]; then
                 # 检测是否有CRLF
                 if file "$file" 2>/dev/null | grep -q "CRLF"; then
@@ -72,8 +125,8 @@ fix_line_endings() {
             fi
         done
         
-        # 修复权限
-        chmod +x setup.sh start.sh 2>/dev/null || true
+        # 修复权限 - 所有脚本文件
+        chmod +x *.sh 2>/dev/null || true
     fi
 }
 
@@ -95,8 +148,9 @@ print_message() {
 print_banner() {
     clear
     echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║${NC}     ${BOLD}QueryGPT Setup v2.0${NC}                              ${CYAN}║${NC}"
-    echo -e "${CYAN}║${NC}     环境配置脚本 / Environment Setup Only             ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}     ${BOLD}QueryGPT Setup v${SCRIPT_VERSION}${NC}                              ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}     环境配置脚本 / Environment Setup                  ${CYAN}║${NC}"
+    echo -e "${CYAN}║${NC}     ${OS_TYPE} | $(date +%Y-%m-%d)                       ${CYAN}║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
     echo ""
 }
@@ -466,42 +520,51 @@ EOF
     fi
 }
 
-# 查找可用端口 - WSL/Linux/macOS兼容版本
+# 查找可用端口 - 全平台兼容版本
 find_available_port() {
     local port=5000
     local max_port=5010
     
-    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始查找可用端口...${NC}" >&2
+    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始查找可用端口 (环境: $OS_TYPE)...${NC}" >&2
     
     while [ $port -le $max_port ]; do
         local port_available=false
         
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS: 使用 lsof
-            if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        # 优先使用Python方法（最可靠，跨平台）
+        if command -v python3 >/dev/null 2>&1; then
+            if python3 -c "import socket; s=socket.socket(); result=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if result != 0 else 1)" 2>/dev/null; then
                 port_available=true
+                [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 使用Python方法检测端口 $port${NC}" >&2
             fi
-        elif [ "$IS_WSL" = true ] || [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            # WSL/Linux: 优先使用ss，其次netstat，最后Python
+        # macOS专用方法
+        elif [ "$IS_MACOS" = true ]; then
+            if command -v lsof >/dev/null 2>&1; then
+                if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+                    port_available=true
+                    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 使用lsof方法检测端口 $port${NC}" >&2
+                fi
+            fi
+        # Linux通用方法（包括WSL和纯Linux）
+        elif [ "$IS_LINUX" = true ]; then
             if command -v ss >/dev/null 2>&1; then
                 if ! timeout 2 ss -tln 2>/dev/null | grep -q ":$port "; then
                     port_available=true
+                    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 使用ss方法检测端口 $port${NC}" >&2
                 fi
             elif command -v netstat >/dev/null 2>&1; then
                 if ! timeout 2 netstat -tln 2>/dev/null | grep -q ":$port "; then
                     port_available=true
+                    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 使用netstat方法检测端口 $port${NC}" >&2
                 fi
-            elif command -v python3 >/dev/null 2>&1; then
-                # Python fallback for WSL
-                python3 -c "import socket; s=socket.socket(); result=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if result != 0 else 1)" 2>/dev/null && port_available=true
             else
-                # 最后的尝试
+                # 最后的尝试 - bash内建方法
                 if ! timeout 1 bash -c "echo > /dev/tcp/127.0.0.1/$port" 2>/dev/null; then
                     port_available=true
+                    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 使用bash方法检测端口 $port${NC}" >&2
                 fi
             fi
         else
-            # 默认方法
+            # 未知系统的默认方法
             if ! (echo > /dev/tcp/127.0.0.1/$port) >/dev/null 2>&1; then
                 port_available=true
             fi
@@ -614,14 +677,14 @@ start_server() {
     cd backend && python app.py
 }
 
-# 清理函数
+# 清理函数 - 只在中断时调用
 cleanup() {
     echo ""
-    print_message "info" "服务已停止 / Service stopped"
+    print_message "warning" "安装被中断 / Setup interrupted"
     if [ -n "$VIRTUAL_ENV" ]; then
         deactivate 2>/dev/null
     fi
-    exit 0
+    exit 1
 }
 
 # 错误处理
@@ -632,9 +695,9 @@ error_handler() {
     exit 1
 }
 
-# 设置信号处理
+# 设置信号处理 - 修复：只在中断时执行cleanup，不在正常退出时执行
 trap 'error_handler $LINENO' ERR
-trap cleanup INT TERM EXIT
+trap cleanup INT TERM
 
 # 主函数
 main() {
@@ -669,10 +732,17 @@ main() {
     print_message "success" "配置文件已生成 / Configuration files created"
     print_message "success" "虚拟环境已就绪 / Virtual environment ready"
     
+    # 环境特定提示
     if [ "$IS_WSL" = true ]; then
         echo ""
         print_message "info" "WSL提示: 如遇到性能问题，建议将项目移至Linux文件系统"
         print_message "info" "WSL Tip: For better performance, move to Linux filesystem"
+    elif [ "$IS_NATIVE_LINUX" = true ]; then
+        echo ""
+        print_message "success" "纯Linux环境已优化 / Native Linux environment optimized"
+    elif [ "$IS_MACOS" = true ]; then
+        echo ""
+        print_message "info" "macOS环境已配置 / macOS environment configured"
     fi
     
     echo ""
@@ -686,18 +756,42 @@ main() {
 # 处理命令行参数
 case "${1:-}" in
     --help|-h)
-        echo "QueryGPT Setup v3.0 - 环境配置脚本 (WSL兼容)"
+        echo "QueryGPT Setup v${SCRIPT_VERSION} - 环境配置脚本 (全平台兼容)"
         echo "用法: ./setup.sh [选项]"
         echo ""
         echo "选项:"
-        echo "  无参数        执行环境配置（不启动服务）"
-        echo "  --debug       启用调试模式，显示详细信息"
-        echo "  --help, -h    显示帮助信息"
+        echo "  无参数              执行环境配置（不启动服务）"
+        echo "  --debug             启用调试模式，显示详细信息"
+        echo "  --fix-line-endings  修复所有脚本文件的行结束符"
+        echo "  --diagnose          运行环境诊断工具"
+        echo "  --version           显示版本信息"
+        echo "  --help, -h          显示帮助信息"
         echo ""
-        echo "支持环境: WSL, Linux, macOS"
+        echo "支持环境: WSL, Ubuntu, Debian, CentOS, macOS 等"
         echo "配置完成后，请运行 ./start.sh 启动服务"
         echo ""
         exit 0
+        ;;
+    --version)
+        echo "QueryGPT Setup"
+        echo "版本: ${SCRIPT_VERSION}"
+        echo "日期: ${SCRIPT_DATE}"
+        exit 0
+        ;;
+    --fix-line-endings)
+        detect_environment
+        fix_line_endings
+        echo -e "${GREEN}✓ 文件格式修复完成${NC}"
+        exit 0
+        ;;
+    --diagnose)
+        if [ -f "diagnostic.sh" ]; then
+            chmod +x diagnostic.sh
+            exec ./diagnostic.sh
+        else
+            echo -e "${RED}诊断工具不存在，请确保 diagnostic.sh 文件存在${NC}"
+            exit 1
+        fi
         ;;
     --debug)
         IS_DEBUG=true
