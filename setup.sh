@@ -33,7 +33,7 @@ OS_TYPE="Unknown"   # 操作系统类型描述
 
 # 版本信息
 SCRIPT_VERSION="3.1.0"
-SCRIPT_DATE="2025-01-04"
+SCRIPT_DATE="2025-09-04"
 
 # 检测运行环境 - 三层检测系统
 detect_environment() {
