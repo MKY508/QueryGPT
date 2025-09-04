@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# QueryGPT 环境配置脚本 v3.0 - WSL兼容版
-# Environment Setup Script v3.0 - WSL Compatible
+# QueryGPT 环境配置脚本 v3.1 - 增强虚拟环境兼容性
+# Environment Setup Script v3.1 - Enhanced Virtual Environment Compatibility
 # 支持 WSL/Linux/macOS 环境
+# 修复: Ubuntu/Debian python3-venv缺失问题
+# Fixed: Ubuntu/Debian python3-venv missing issue
+
+SCRIPT_VERSION="3.1"
 
 set -e
 
@@ -378,12 +382,122 @@ check_python() {
     echo ""
 }
 
+# 检测并安装虚拟环境工具
+ensure_venv_capability() {
+    debug_log "检测虚拟环境创建能力..."
+    
+    # 方法1: 检查python3 -m venv是否可用
+    if $PYTHON_CMD -m venv --help &>/dev/null; then
+        debug_log "venv模块可用"
+        return 0
+    fi
+    
+    warning_log "venv模块不可用，尝试安装..."
+    print_message "warning" "venv模块不可用，正在安装... / venv module not available, installing..."
+    
+    # 方法2: 对于Ubuntu/Debian，尝试安装python3-venv
+    if [ "$IS_NATIVE_LINUX" = true ] || [ "$IS_WSL" = true ]; then
+        if command -v apt-get &> /dev/null; then
+            info_log "尝试安装 python3-venv 包..."
+            print_message "info" "安装 python3-venv... / Installing python3-venv..."
+            
+            # 检查是否需要sudo
+            if [ "$EUID" -ne 0 ]; then
+                if command -v sudo &> /dev/null; then
+                    sudo apt-get update && sudo apt-get install -y python3-venv python3-pip
+                else
+                    echo -e "${YELLOW}需要root权限安装python3-venv，请运行：${NC}"
+                    echo "  sudo apt-get update && sudo apt-get install -y python3-venv python3-pip"
+                    echo -e "${YELLOW}或者手动安装virtualenv：${NC}"
+                    echo "  pip install virtualenv"
+                    return 1
+                fi
+            else
+                apt-get update && apt-get install -y python3-venv python3-pip
+            fi
+            
+            # 再次检查venv是否可用
+            if $PYTHON_CMD -m venv --help &>/dev/null; then
+                success_log "python3-venv 安装成功"
+                return 0
+            fi
+        fi
+    fi
+    
+    # 方法3: 尝试使用pip安装virtualenv作为备选
+    info_log "尝试安装 virtualenv 作为备选..."
+    print_message "info" "安装 virtualenv... / Installing virtualenv..."
+    
+    if command -v pip3 &> /dev/null; then
+        pip3 install --user virtualenv
+    elif command -v pip &> /dev/null; then
+        pip install --user virtualenv
+    else
+        error_log "无法安装虚拟环境工具，请手动安装"
+        echo -e "${RED}无法自动安装虚拟环境工具${NC}"
+        echo -e "${YELLOW}请尝试以下方法之一：${NC}"
+        echo "1. Ubuntu/Debian: sudo apt-get install python3-venv"
+        echo "2. CentOS/RHEL: sudo yum install python3-virtualenv"
+        echo "3. 使用pip: pip install virtualenv"
+        return 1
+    fi
+    
+    # 检查virtualenv是否安装成功
+    if command -v virtualenv &> /dev/null || $PYTHON_CMD -m virtualenv --help &>/dev/null; then
+        success_log "virtualenv 安装成功"
+        return 0
+    fi
+    
+    return 1
+}
+
+# 创建虚拟环境（支持多种方法）
+create_venv_with_fallback() {
+    local venv_dir="$1"
+    debug_log "尝试创建虚拟环境: $venv_dir"
+    
+    # 方法1: 使用venv模块
+    if $PYTHON_CMD -m venv --help &>/dev/null; then
+        debug_log "使用venv模块创建虚拟环境"
+        $PYTHON_CMD -m venv "$venv_dir"
+        if [ -f "$venv_dir/bin/activate" ]; then
+            return 0
+        fi
+    fi
+    
+    # 方法2: 使用virtualenv命令
+    if command -v virtualenv &> /dev/null; then
+        debug_log "使用virtualenv命令创建虚拟环境"
+        virtualenv -p $PYTHON_CMD "$venv_dir"
+        if [ -f "$venv_dir/bin/activate" ]; then
+            return 0
+        fi
+    fi
+    
+    # 方法3: 使用python -m virtualenv
+    if $PYTHON_CMD -m virtualenv --help &>/dev/null; then
+        debug_log "使用python -m virtualenv创建虚拟环境"
+        $PYTHON_CMD -m virtualenv "$venv_dir"
+        if [ -f "$venv_dir/bin/activate" ]; then
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
 # 设置虚拟环境
 setup_venv() {
     debug_log "开始设置虚拟环境..."
     print_message "header" "配置虚拟环境 / Configuring Virtual Environment"
     
     local venv_dir="venv_py310"
+    
+    # 确保有创建虚拟环境的能力
+    if ! ensure_venv_capability; then
+        error_handler $LINENO "Cannot setup virtual environment capability" 1
+        exit 1
+    fi
     
     if [ -d "$venv_dir" ]; then
         if [ -f "$venv_dir/bin/activate" ]; then
@@ -394,14 +508,21 @@ setup_venv() {
             print_message "warning" "虚拟环境损坏，重新创建... / Virtual environment corrupted, recreating..."
             debug_log "删除损坏的虚拟环境: $venv_dir"
             rm -rf "$venv_dir"
-            debug_log "执行命令: $PYTHON_CMD -m venv $venv_dir"
-            $PYTHON_CMD -m venv "$venv_dir"
+            
+            if ! create_venv_with_fallback "$venv_dir"; then
+                error_handler $LINENO "Failed to create virtual environment" 1
+                exit 1
+            fi
         fi
     else
         info_log "创建虚拟环境... / Creating virtual environment..."
         print_message "info" "创建虚拟环境... / Creating virtual environment..."
-        debug_log "执行命令: $PYTHON_CMD -m venv $venv_dir"
-        $PYTHON_CMD -m venv "$venv_dir"
+        
+        if ! create_venv_with_fallback "$venv_dir"; then
+            error_handler $LINENO "Failed to create virtual environment" 1
+            exit 1
+        fi
+        
         success_log "虚拟环境创建成功 / Virtual environment created"
         print_message "success" "虚拟环境创建成功 / Virtual environment created"
     fi
