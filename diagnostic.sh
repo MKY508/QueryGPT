@@ -18,7 +18,7 @@ BOLD='\033[1m'
 
 # 版本信息
 SCRIPT_VERSION="1.0.0"
-SCRIPT_DATE="2025-01-04"
+SCRIPT_DATE="2025-09-04"
 
 # 环境变量初始化
 IS_LINUX=false
