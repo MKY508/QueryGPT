@@ -166,19 +166,20 @@ wsl
 
 ### 极简安装
 
+#### 🍎 macOS / Linux 用户
 ```bash
 # 1. 克隆项目
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 2. 一键安装和启动
+# 2. 运行脚本
 ./setup.sh   # 自动安装所有依赖（2-5分钟）
 ./start.sh   # 启动服务
 ```
 
 就这么简单！✨ 
 
-### Windows WSL 完整流程
+#### 🪟 Windows WSL 用户
 ```bash
 # 步骤1：进入WSL（在PowerShell中）
 wsl
@@ -191,11 +192,12 @@ cd QueryGPT
 # 步骤3：运行脚本（在WSL中）
 ./setup.sh   # 自动处理所有依赖
 ./start.sh   # 启动服务
-
-# 访问：在浏览器打开 http://localhost:5000
 ```
 
 > **性能优化**：WSL中的脚本会自动检测并从Windows文件系统(/mnt/)迁移到Linux文件系统(~/)，提升10倍性能
+
+### 访问服务
+打开浏览器访问：`http://localhost:5000`
 
 ## 💡 使用示例
 
