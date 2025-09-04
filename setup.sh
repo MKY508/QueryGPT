@@ -23,6 +23,9 @@ PYTHON_CMD=""
 IS_FIRST_RUN=false
 IS_DEBUG=false
 BACKUP_SUFFIX=$(date +%Y%m%d_%H%M%S)
+LOG_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+ERROR_LOG="logs/setup_error_${LOG_TIMESTAMP}.log"
+DEBUG_LOG="logs/setup_debug_${LOG_TIMESTAMP}.log"
 
 # 三层环境检测变量
 IS_LINUX=false       # Linux大类（包括WSL和纯Linux）
@@ -31,20 +34,162 @@ IS_MACOS=false      # macOS
 IS_NATIVE_LINUX=false  # 纯Linux（非WSL）
 OS_TYPE="Unknown"   # 操作系统类型描述
 
+# 错误处理函数
+error_handler() {
+    local line_num=$1
+    local last_command="${2:-unknown}"
+    local error_code="${3:-1}"
+    local function_name="${FUNCNAME[1]:-main}"
+    
+    echo "" >&2
+    echo -e "${RED}═══════════════ 错误报告 ═══════════════${NC}" >&2
+    echo -e "${RED}脚本:${NC} $(basename $0)" >&2
+    echo -e "${RED}位置:${NC} 第 $line_num 行" >&2
+    echo -e "${RED}函数:${NC} $function_name" >&2
+    echo -e "${RED}命令:${NC} $last_command" >&2
+    echo -e "${RED}错误码:${NC} $error_code" >&2
+    echo -e "${RED}时间:${NC} $(date '+%Y-%m-%d %H:%M:%S')" >&2
+    echo -e "${RED}═══════════════════════════════════════${NC}" >&2
+    
+    # 确保日志目录存在
+    mkdir -p logs
+    
+    # 保存到错误日志
+    {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 错误发生"
+        echo "脚本: $(basename $0)"
+        echo "位置: 第 $line_num 行"
+        echo "函数: $function_name"
+        echo "命令: $last_command"
+        echo "错误码: $error_code"
+        echo "当前目录: $(pwd)"
+        echo "环境信息: $OS_TYPE"
+        echo "Python命令: $PYTHON_CMD"
+        echo "虚拟环境: ${VIRTUAL_ENV:-未激活}"
+        echo "---"
+    } >> "$ERROR_LOG"
+    
+    echo -e "${YELLOW}错误日志已保存: $ERROR_LOG${NC}" >&2
+    echo -e "${YELLOW}如需技术支持，请提供此日志文件${NC}" >&2
+    
+    # 清理并退出
+    cleanup_on_error
+}
+
+# 调试日志函数
+debug_log() {
+    if [ "$IS_DEBUG" = true ]; then
+        local message="$1"
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        echo -e "${CYAN}[DEBUG $timestamp] $message${NC}" >&2
+        
+        # 同时记录到调试日志
+        mkdir -p logs
+        echo "[$timestamp] $message" >> "$DEBUG_LOG"
+    fi
+}
+
+# 信息日志函数
+info_log() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${BLUE}[INFO] $message${NC}"
+    
+    # 记录到调试日志
+    if [ "$IS_DEBUG" = true ]; then
+        mkdir -p logs
+        echo "[$timestamp] INFO: $message" >> "$DEBUG_LOG"
+    fi
+}
+
+# 警告日志函数
+warning_log() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[WARNING] $message${NC}" >&2
+    
+    # 记录到错误日志
+    mkdir -p logs
+    echo "[$timestamp] WARNING: $message" >> "$ERROR_LOG"
+}
+
+# 成功日志函数
+success_log() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[SUCCESS] $message${NC}"
+    
+    if [ "$IS_DEBUG" = true ]; then
+        mkdir -p logs
+        echo "[$timestamp] SUCCESS: $message" >> "$DEBUG_LOG"
+    fi
+}
+
+# 错误时的清理函数
+cleanup_on_error() {
+    debug_log "执行错误清理..."
+    
+    if [ -n "$VIRTUAL_ENV" ]; then
+        debug_log "退出虚拟环境: $VIRTUAL_ENV"
+        deactivate 2>/dev/null || true
+    fi
+    
+    # 记录最终状态到错误日志
+    {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 错误清理完成"
+        echo "最终目录: $(pwd)"
+        echo "剩余进程: $(jobs -p | wc -l)"
+        echo "=== 清理结束 ==="
+        echo ""
+    } >> "$ERROR_LOG"
+}
+
+# 正常退出清理函数
+cleanup_normal() {
+    debug_log "执行正常清理..."
+    
+    # 只在调试模式记录正常退出
+    if [ "$IS_DEBUG" = true ]; then
+        {
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 脚本正常完成"
+            echo "最终目录: $(pwd)"
+            echo "=== 正常结束 ==="
+        } >> "$DEBUG_LOG"
+    fi
+}
+
+# 中断处理函数
+interrupt_handler() {
+    echo "" >&2
+    echo -e "${YELLOW}[INFO] 用户中断了安装过程${NC}" >&2
+    
+    # 记录中断信息
+    mkdir -p logs
+    {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 用户中断安装"
+        echo "中断位置: ${BASH_LINENO[0]}"
+        echo "当前函数: ${FUNCNAME[1]:-main}"
+    } >> "$ERROR_LOG"
+    
+    cleanup_on_error
+    exit 1
+}
+
 # 版本信息
 SCRIPT_VERSION="3.1.0"
 SCRIPT_DATE="2025-09-04"
 
 # 检测运行环境 - 三层检测系统
 detect_environment() {
-    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始环境检测...${NC}"
+    debug_log "开始环境检测..."
+    info_log "正在检测运行环境..."
     
     # 第一层：检测大类操作系统
     if [[ "$OSTYPE" == "darwin"* ]]; then
         IS_MACOS=true
         IS_LINUX=false
         OS_TYPE="macOS"
-        echo -e "${CYAN}检测到 macOS 环境 / macOS environment detected${NC}"
+        info_log "检测到 macOS 环境 / macOS environment detected"
         
     elif [[ "$OSTYPE" == "linux-gnu"* ]] || [ -f /proc/version ]; then
         IS_LINUX=true
@@ -55,7 +200,7 @@ detect_environment() {
             IS_WSL=true
             IS_NATIVE_LINUX=false
             OS_TYPE="WSL"
-            echo -e "${CYAN}检测到 WSL 环境 / WSL environment detected${NC}"
+            info_log "检测到 WSL 环境 / WSL environment detected"
             
             # WSL自动迁移到Linux文件系统
             if [[ "$SCRIPT_DIR" == /mnt/* ]]; then
@@ -82,36 +227,30 @@ detect_environment() {
                 OS_TYPE="$NAME"
             fi
             
-            echo -e "${CYAN}检测到纯 Linux 环境 / Native Linux detected: $OS_TYPE${NC}"
+            info_log "检测到纯 Linux 环境 / Native Linux detected: $OS_TYPE"
         fi
     else
         OS_TYPE="Unknown"
-        echo -e "${YELLOW}未知的操作系统类型 / Unknown OS type: $OSTYPE${NC}"
+        warning_log "未知的操作系统类型 / Unknown OS type: $OSTYPE"
     fi
     
     # 输出详细的环境信息（调试模式）
-    if [ "$IS_DEBUG" = true ]; then
-        echo -e "${CYAN}[DEBUG] 环境检测结果:${NC}"
-        echo -e "${CYAN}  IS_LINUX=$IS_LINUX${NC}"
-        echo -e "${CYAN}  IS_WSL=$IS_WSL${NC}"
-        echo -e "${CYAN}  IS_MACOS=$IS_MACOS${NC}"
-        echo -e "${CYAN}  IS_NATIVE_LINUX=$IS_NATIVE_LINUX${NC}"
-        echo -e "${CYAN}  OS_TYPE=$OS_TYPE${NC}"
-    fi
+    debug_log "环境检测结果: IS_LINUX=$IS_LINUX, IS_WSL=$IS_WSL, IS_MACOS=$IS_MACOS, IS_NATIVE_LINUX=$IS_NATIVE_LINUX, OS_TYPE=$OS_TYPE"
 }
 
 # 修复文件格式 - 适用于所有Linux环境
 fix_line_endings() {
+    debug_log "开始修复文件格式..."
     # Linux环境下（包括WSL和纯Linux）都需要检查文件格式
     if [ "$IS_LINUX" = true ] || [ "$IS_WSL" = true ]; then
-        echo -e "${CYAN}检查文件格式... / Checking file formats...${NC}"
+        info_log "检查文件格式... / Checking file formats..."
         
         # 检查并修复关键文件的行结束符
         for file in setup.sh start.sh requirements.txt .env .env.example diagnostic.sh; do
             if [ -f "$file" ]; then
                 # 检测是否有CRLF
                 if file "$file" 2>/dev/null | grep -q "CRLF"; then
-                    echo -e "${YELLOW}修复 $file 的行结束符...${NC}"
+                    warning_log "修复 $file 的行结束符..."
                     # 使用多种方法尝试转换
                     if command -v dos2unix &> /dev/null; then
                         dos2unix "$file" 2>/dev/null
@@ -120,7 +259,7 @@ fix_line_endings() {
                     else
                         tr -d '\r' < "$file" > "$file.tmp" && mv "$file.tmp" "$file"
                     fi
-                    echo -e "${GREEN}✓ $file 已修复${NC}"
+                    success_log "$file 已修复"
                 fi
             fi
         done
@@ -175,6 +314,7 @@ show_progress() {
 
 # 检查是否首次运行
 check_first_run() {
+    debug_log "检查是否首次运行..."
     print_message "header" "检查运行状态 / Checking Run Status"
     
     local indicators=0
@@ -196,8 +336,10 @@ check_first_run() {
     
     if [ $indicators -ge 2 ]; then
         IS_FIRST_RUN=true
+        info_log "检测到首次运行，将执行完整初始化 / First run detected, performing full initialization"
         print_message "info" "检测到首次运行，将执行完整初始化 / First run detected, performing full initialization"
     else
+        info_log "检测到现有安装 / Existing installation detected"
         print_message "success" "检测到现有安装 / Existing installation detected"
     fi
     echo ""
@@ -205,12 +347,14 @@ check_first_run() {
 
 # 检查Python版本
 check_python() {
+    debug_log "开始检查Python环境..."
     print_message "header" "检查 Python 环境 / Checking Python Environment"
     
     # 优先检查 python3.10
     if command -v python3.10 &> /dev/null; then
         PYTHON_CMD="python3.10"
         local version=$(python3.10 -V 2>&1 | grep -Po '\d+\.\d+\.\d+')
+        success_log "找到 Python 3.10: $version"
         print_message "success" "找到 Python 3.10: $version"
     elif command -v python3 &> /dev/null; then
         local version=$(python3 -V 2>&1 | grep -Po '\d+\.\d+\.\d+')
@@ -219,53 +363,78 @@ check_python() {
         
         if [ "$major" -eq 3 ] && [ "$minor" -eq 10 ]; then
             PYTHON_CMD="python3"
+            success_log "找到 Python $version"
             print_message "success" "找到 Python $version"
         else
+            warning_log "Python 版本不匹配: $version (推荐 3.10.x)"
             print_message "warning" "Python 版本不匹配: $version (推荐 3.10.x)"
             PYTHON_CMD="python3"
         fi
     else
-        print_message "error" "未找到 Python 3"
+        error_handler $LINENO "Python 3 not found" 1
         exit 1
     fi
+    debug_log "Python检查完成: $PYTHON_CMD"
     echo ""
 }
 
 # 设置虚拟环境
 setup_venv() {
+    debug_log "开始设置虚拟环境..."
     print_message "header" "配置虚拟环境 / Configuring Virtual Environment"
     
     local venv_dir="venv_py310"
     
     if [ -d "$venv_dir" ]; then
         if [ -f "$venv_dir/bin/activate" ]; then
+            info_log "使用现有虚拟环境 / Using existing virtual environment"
             print_message "info" "使用现有虚拟环境 / Using existing virtual environment"
         else
+            warning_log "虚拟环境损坏，重新创建... / Virtual environment corrupted, recreating..."
             print_message "warning" "虚拟环境损坏，重新创建... / Virtual environment corrupted, recreating..."
+            debug_log "删除损坏的虚拟环境: $venv_dir"
             rm -rf "$venv_dir"
+            debug_log "执行命令: $PYTHON_CMD -m venv $venv_dir"
             $PYTHON_CMD -m venv "$venv_dir"
         fi
     else
+        info_log "创建虚拟环境... / Creating virtual environment..."
         print_message "info" "创建虚拟环境... / Creating virtual environment..."
+        debug_log "执行命令: $PYTHON_CMD -m venv $venv_dir"
         $PYTHON_CMD -m venv "$venv_dir"
+        success_log "虚拟环境创建成功 / Virtual environment created"
         print_message "success" "虚拟环境创建成功 / Virtual environment created"
     fi
     
     # 激活虚拟环境
+    debug_log "激活虚拟环境: $venv_dir/bin/activate"
     source "$venv_dir/bin/activate"
     
+    # 验证激活成功
+    if [ -z "$VIRTUAL_ENV" ]; then
+        error_handler $LINENO "Failed to activate virtual environment" 1
+        exit 1
+    fi
+    
+    debug_log "虚拟环境激活成功: $VIRTUAL_ENV"
+    
     # 升级pip
+    info_log "升级 pip... / Upgrading pip..."
     print_message "info" "升级 pip... / Upgrading pip..."
+    debug_log "执行命令: pip install --upgrade pip --quiet"
     pip install --upgrade pip --quiet
+    success_log "pip 已升级 / pip upgraded"
     print_message "success" "pip 已升级 / pip upgraded"
     echo ""
 }
 
 # 安装依赖
 install_dependencies() {
+    debug_log "开始安装依赖..."
     print_message "header" "管理项目依赖 / Managing Dependencies"
     
     if [ ! -f "requirements.txt" ]; then
+        warning_log "未找到 requirements.txt，创建默认依赖 / Creating default requirements.txt"
         print_message "warning" "未找到 requirements.txt，创建默认依赖 / Creating default requirements.txt"
         cat > requirements.txt << 'EOF'
 Flask==2.3.3
@@ -291,12 +460,16 @@ EOF
     fi
     
     if [ "$need_install" = true ] || [ "$IS_FIRST_RUN" = true ]; then
+        info_log "安装依赖包... / Installing dependencies..."
         print_message "info" "安装依赖包... / Installing dependencies..."
+        warning_log "这可能需要几分钟，请耐心等待... / This may take a few minutes, please be patient..."
         print_message "warning" "这可能需要几分钟，请耐心等待... / This may take a few minutes, please be patient..."
         
         # 特别处理 OpenInterpreter
         if grep -q "open-interpreter" requirements.txt; then
+            warning_log "安装 OpenInterpreter 0.4.3 (较大，需要时间)... / Installing OpenInterpreter 0.4.3 (large, takes time)..."
             print_message "warning" "安装 OpenInterpreter 0.4.3 (较大，需要时间)... / Installing OpenInterpreter 0.4.3 (large, takes time)..."
+            debug_log "开始OpenInterpreter安装进程..."
             echo "正在下载和安装，请稍候... / Downloading and installing, please wait..."
             
             # 不使用quiet，显示进度
@@ -306,11 +479,14 @@ EOF
                     echo "  $line"
                 fi
             done
+            success_log "OpenInterpreter 安装完成 / OpenInterpreter installed"
             print_message "success" "OpenInterpreter 安装完成 / OpenInterpreter installed"
         fi
         
         # 安装其他依赖
+        info_log "安装其他依赖包... / Installing other dependencies..."
         print_message "info" "安装其他依赖包... / Installing other dependencies..."
+        debug_log "执行 pip install -r requirements.txt"
         echo "进度 / Progress:"
         
         # 显示简化的进度
@@ -327,10 +503,13 @@ EOF
         done
         
         echo ""
+        success_log "所有依赖安装完成！/ All dependencies installed!"
         print_message "success" "所有依赖安装完成！/ All dependencies installed!"
     else
+        info_log "依赖已是最新 / Dependencies up to date"
         print_message "success" "依赖已是最新 / Dependencies up to date"
     fi
+    debug_log "依赖安装阶段完成"
     echo ""
 }
 
@@ -525,7 +704,7 @@ find_available_port() {
     local port=5000
     local max_port=5010
     
-    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始查找可用端口 (环境: $OS_TYPE)...${NC}" >&2
+    debug_log "开始查找可用端口 (环境: $OS_TYPE)..."
     
     while [ $port -le $max_port ]; do
         local port_available=false
@@ -534,7 +713,7 @@ find_available_port() {
         if command -v python3 >/dev/null 2>&1; then
             if python3 -c "import socket; s=socket.socket(); result=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if result != 0 else 1)" 2>/dev/null; then
                 port_available=true
-                [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 使用Python方法检测端口 $port${NC}" >&2
+                debug_log "使用Python方法检测端口 $port 可用"
             fi
         # macOS专用方法
         elif [ "$IS_MACOS" = true ]; then
@@ -571,16 +750,16 @@ find_available_port() {
         fi
         
         if [ "$port_available" = true ]; then
-            [ "$IS_DEBUG" = true ] && echo -e "${GREEN}[DEBUG] 找到可用端口: $port${NC}" >&2
+            debug_log "找到可用端口: $port"
             echo $port
             return 0
         fi
         
-        [ "$IS_DEBUG" = true ] && echo -e "${YELLOW}[DEBUG] 端口 $port 被占用${NC}" >&2
+        debug_log "端口 $port 被占用"
         port=$((port + 1))
     done
     
-    print_message "error" "无法找到可用端口 / No available port found" >&2
+    error_handler $LINENO "No available port found" 1
     return 1
 }
 
@@ -677,43 +856,43 @@ start_server() {
     cd backend && python app.py
 }
 
-# 清理函数 - 只在中断时调用
-cleanup() {
-    echo ""
-    print_message "warning" "安装被中断 / Setup interrupted"
-    if [ -n "$VIRTUAL_ENV" ]; then
-        deactivate 2>/dev/null
-    fi
-    exit 1
-}
-
-# 错误处理
-error_handler() {
-    local line_no=$1
-    print_message "error" "脚本在第 $line_no 行出错 / Script failed at line $line_no"
-    cleanup
-    exit 1
-}
-
-# 设置信号处理 - 修复：只在中断时执行cleanup，不在正常退出时执行
-trap 'error_handler $LINENO' ERR
-trap cleanup INT TERM
+# 设置信号处理 - 修复：不在EXIT时执行cleanup
+trap 'error_handler $LINENO "$BASH_COMMAND" $?' ERR
+trap interrupt_handler INT TERM
 
 # 主函数
 main() {
+    # 初始化日志系统
+    mkdir -p logs
+    
+    if [ "$IS_DEBUG" = true ]; then
+        debug_log "=== 调试模式已启用 ==="
+        debug_log "日志文件: $DEBUG_LOG"
+        debug_log "错误日志: $ERROR_LOG"
+        # 将所有调试输出重定向到日志
+        exec 2> >(tee -a "$DEBUG_LOG" >&2)
+        set -x  # 显示执行的命令
+    fi
+    
+    debug_log "进入main函数"
+    info_log "QueryGPT Setup v${SCRIPT_VERSION} 开始运行"
+    
     print_banner
     
     # 检查是否在项目根目录
     if [ ! -f "backend/app.py" ]; then
-        print_message "error" "请在项目根目录运行此脚本 / Please run from project root"
+        error_handler $LINENO "Not in project root directory - backend/app.py not found" 1
         exit 1
     fi
+    debug_log "项目根目录检查通过"
     
-    # WSL环境检测和修复
+    # 环境检测和修复
+    debug_log "开始环境检测和修复阶段"
     detect_environment
     fix_line_endings
     
     # 完整的设置流程（不启动服务）
+    debug_log "开始主设置流程"
     check_first_run
     check_python
     setup_venv
@@ -723,13 +902,17 @@ main() {
     health_check
     
     # 显示完成信息
+    success_log "环境配置完成！Environment setup completed!"
     echo ""
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}✓ 环境配置完成！${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
+    success_log "所有依赖已安装 / All dependencies installed"
     print_message "success" "所有依赖已安装 / All dependencies installed"
+    success_log "配置文件已生成 / Configuration files created"
     print_message "success" "配置文件已生成 / Configuration files created"
+    success_log "虚拟环境已就绪 / Virtual environment ready"
     print_message "success" "虚拟环境已就绪 / Virtual environment ready"
     
     # 环境特定提示
@@ -746,14 +929,24 @@ main() {
     fi
     
     echo ""
+    info_log "请运行以下命令启动服务: ./start.sh"
     print_message "info" "请运行以下命令启动服务："
     print_message "info" "Please run the following command to start:"
     echo ""
     echo -e "    ${CYAN}./start.sh${NC}"
     echo ""
+    
+    # 清理和退出
+    debug_log "setup.sh 正常完成"
+    cleanup_normal
 }
 
-# 处理命令行参数
+# 处理命令行参数 - 添加调试模式检测
+if [ "$1" = "--debug" ] || [ "$DEBUG" = "true" ]; then
+    IS_DEBUG=true
+    echo -e "${YELLOW}[INFO] 调试模式已启用 - Debug mode enabled${NC}"
+fi
+
 case "${1:-}" in
     --help|-h)
         echo "QueryGPT Setup v${SCRIPT_VERSION} - 环境配置脚本 (全平台兼容)"
@@ -761,7 +954,7 @@ case "${1:-}" in
         echo ""
         echo "选项:"
         echo "  无参数              执行环境配置（不启动服务）"
-        echo "  --debug             启用调试模式，显示详细信息"
+        echo "  --debug             启用调试模式，详细日志保存到 logs/setup_debug.log"
         echo "  --fix-line-endings  修复所有脚本文件的行结束符"
         echo "  --diagnose          运行环境诊断工具"
         echo "  --version           显示版本信息"
@@ -769,6 +962,8 @@ case "${1:-}" in
         echo ""
         echo "支持环境: WSL, Ubuntu, Debian, CentOS, macOS 等"
         echo "配置完成后，请运行 ./start.sh 启动服务"
+        echo "错误日志位置: logs/setup_error_*.log"
+        echo "调试日志位置: logs/setup_debug_*.log (仅调试模式)"
         echo ""
         exit 0
         ;;
@@ -781,6 +976,7 @@ case "${1:-}" in
     --fix-line-endings)
         detect_environment
         fix_line_endings
+        success_log "文件格式修复完成"
         echo -e "${GREEN}✓ 文件格式修复完成${NC}"
         exit 0
         ;;

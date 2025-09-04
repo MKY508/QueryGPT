@@ -18,6 +18,9 @@ BOLD='\033[1m'
 
 # 全局变量
 IS_DEBUG=false
+LOG_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+ERROR_LOG="logs/start_error_${LOG_TIMESTAMP}.log"
+DEBUG_LOG="logs/start_debug_${LOG_TIMESTAMP}.log"
 
 # 三层环境检测变量
 IS_LINUX=false       # Linux大类（包括WSL和纯Linux）
@@ -30,6 +33,156 @@ OS_TYPE="Unknown"   # 操作系统类型描述
 SCRIPT_VERSION="3.1.0"
 SCRIPT_DATE="2025-09-04"
 
+# 错误处理函数
+error_handler() {
+    local line_num=$1
+    local last_command="${2:-unknown}"
+    local error_code="${3:-1}"
+    local function_name="${FUNCNAME[1]:-main}"
+    
+    echo "" >&2
+    echo -e "${RED}═══════════════ 错误报告 ═══════════════${NC}" >&2
+    echo -e "${RED}脚本:${NC} $(basename $0)" >&2
+    echo -e "${RED}位置:${NC} 第 $line_num 行" >&2
+    echo -e "${RED}函数:${NC} $function_name" >&2
+    echo -e "${RED}命令:${NC} $last_command" >&2
+    echo -e "${RED}错误码:${NC} $error_code" >&2
+    echo -e "${RED}时间:${NC} $(date '+%Y-%m-%d %H:%M:%S')" >&2
+    echo -e "${RED}═══════════════════════════════════════${NC}" >&2
+    
+    # 确保日志目录存在
+    mkdir -p logs
+    
+    # 保存到错误日志
+    {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 错误发生"
+        echo "脚本: $(basename $0)"
+        echo "位置: 第 $line_num 行"
+        echo "函数: $function_name"
+        echo "命令: $last_command"
+        echo "错误码: $error_code"
+        echo "当前目录: $(pwd)"
+        echo "环境信息: $OS_TYPE"
+        echo "虚拟环境: ${VIRTUAL_ENV:-未激活}"
+        echo "---"
+    } >> "$ERROR_LOG"
+    
+    echo -e "${YELLOW}错误日志已保存: $ERROR_LOG${NC}" >&2
+    echo -e "${YELLOW}如需技术支持，请提供此日志文件${NC}" >&2
+    
+    # 清理并退出
+    cleanup_on_error
+}
+
+# 调试日志函数
+debug_log() {
+    if [ "$IS_DEBUG" = true ]; then
+        local message="$1"
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        echo -e "${CYAN}[DEBUG $timestamp] $message${NC}" >&2
+        
+        # 同时记录到调试日志
+        mkdir -p logs
+        echo "[$timestamp] $message" >> "$DEBUG_LOG"
+    fi
+}
+
+# 信息日志函数
+info_log() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${BLUE}[INFO] $message${NC}"
+    
+    # 记录到调试日志
+    if [ "$IS_DEBUG" = true ]; then
+        mkdir -p logs
+        echo "[$timestamp] INFO: $message" >> "$DEBUG_LOG"
+    fi
+}
+
+# 警告日志函数
+warning_log() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${YELLOW}[WARNING] $message${NC}" >&2
+    
+    # 记录到错误日志
+    mkdir -p logs
+    echo "[$timestamp] WARNING: $message" >> "$ERROR_LOG"
+}
+
+# 成功日志函数
+success_log() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${GREEN}[SUCCESS] $message${NC}"
+    
+    if [ "$IS_DEBUG" = true ]; then
+        mkdir -p logs
+        echo "[$timestamp] SUCCESS: $message" >> "$DEBUG_LOG"
+    fi
+}
+
+# 错误时的清理函数
+cleanup_on_error() {
+    debug_log "执行错误清理..."
+    
+    if [ -n "$VIRTUAL_ENV" ]; then
+        debug_log "退出虚拟环境: $VIRTUAL_ENV"
+        deactivate 2>/dev/null || true
+    fi
+    
+    # 停止后台进程
+    if [ -n "$FLASK_PID" ]; then
+        debug_log "停止Flask进程: $FLASK_PID"
+        kill $FLASK_PID 2>/dev/null || true
+    fi
+    
+    # 记录最终状态到错误日志
+    {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 错误清理完成"
+        echo "最终目录: $(pwd)"
+        echo "剩余进程: $(jobs -p | wc -l)"
+        echo "=== 清理结束 ==="
+        echo ""
+    } >> "$ERROR_LOG"
+}
+
+# 正常退出清理函数
+cleanup_normal() {
+    debug_log "执行正常清理..."
+    
+    # 只在调试模式记录正常退出
+    if [ "$IS_DEBUG" = true ]; then
+        {
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] 脚本正常完成"
+            echo "最终目录: $(pwd)"
+            echo "=== 正常结束 ==="
+        } >> "$DEBUG_LOG"
+    fi
+}
+
+# 中断处理函数
+interrupt_handler() {
+    echo "" >&2
+    echo -e "${YELLOW}[INFO] 用户中断了服务启动${NC}" >&2
+    
+    # 记录中断信息
+    mkdir -p logs
+    {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 用户中断服务启动"
+        echo "中断位置: ${BASH_LINENO[0]}"
+        echo "当前函数: ${FUNCNAME[1]:-main}"
+    } >> "$ERROR_LOG"
+    
+    cleanup_on_error
+    exit 1
+}
+
+# 设置信号处理 - 不在EXIT时执行cleanup
+trap 'error_handler $LINENO "$BASH_COMMAND" $?' ERR
+trap interrupt_handler INT TERM
+
 echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║        QueryGPT 智能启动器 v${SCRIPT_VERSION}        ║${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
@@ -37,14 +190,15 @@ echo ""
 
 # 检测运行环境 - 三层检测系统
 detect_environment() {
-    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 开始环境检测...${NC}" >&2
+    debug_log "开始环境检测..."
+    info_log "正在检测运行环境..."
     
     # 第一层：检测大类操作系统
     if [[ "$OSTYPE" == "darwin"* ]]; then
         IS_MACOS=true
         IS_LINUX=false
         OS_TYPE="macOS"
-        echo -e "${CYAN}[INFO] 检测到 macOS 环境${NC}" >&2
+        info_log "检测到 macOS 环境"
         
     elif [[ "$OSTYPE" == "linux-gnu"* ]] || [ -f /proc/version ]; then
         IS_LINUX=true
@@ -55,7 +209,7 @@ detect_environment() {
             IS_WSL=true
             IS_NATIVE_LINUX=false
             OS_TYPE="WSL"
-            echo -e "${CYAN}[INFO] 检测到 WSL 环境${NC}" >&2
+            info_log "检测到 WSL 环境"
             
             # WSL：如果在Windows文件系统，提示用户
             CURRENT_DIR=$(pwd)
@@ -86,7 +240,7 @@ detect_environment() {
                 OS_TYPE="$NAME"
             fi
             
-            echo -e "${CYAN}[INFO] 检测到纯 Linux 环境: $OS_TYPE${NC}" >&2
+            info_log "检测到纯 Linux 环境: $OS_TYPE"
         fi
         
         # Linux环境下（包括WSL和纯Linux）修复文件格式
@@ -98,18 +252,11 @@ detect_environment() {
         chmod +x *.sh 2>/dev/null || true
     else
         OS_TYPE="Unknown"
-        echo -e "${YELLOW}[WARNING] 未知的操作系统类型: $OSTYPE${NC}" >&2
+        warning_log "未知的操作系统类型: $OSTYPE"
     fi
     
     # 调试模式输出
-    if [ "$IS_DEBUG" = true ]; then
-        echo -e "${CYAN}[DEBUG] 环境检测结果:${NC}" >&2
-        echo -e "${CYAN}  IS_LINUX=$IS_LINUX${NC}" >&2
-        echo -e "${CYAN}  IS_WSL=$IS_WSL${NC}" >&2
-        echo -e "${CYAN}  IS_MACOS=$IS_MACOS${NC}" >&2
-        echo -e "${CYAN}  IS_NATIVE_LINUX=$IS_NATIVE_LINUX${NC}" >&2
-        echo -e "${CYAN}  OS_TYPE=$OS_TYPE${NC}" >&2
-    fi
+    debug_log "环境检测结果: IS_LINUX=$IS_LINUX, IS_WSL=$IS_WSL, IS_MACOS=$IS_MACOS, IS_NATIVE_LINUX=$IS_NATIVE_LINUX, OS_TYPE=$OS_TYPE"
     
     echo "$OS_TYPE"
 }
@@ -130,7 +277,7 @@ find_available_port() {
         env_desc="Linux"
     fi
     
-    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] 查找可用端口 (环境: $env_desc)...${NC}" >&2
+    debug_log "查找可用端口 (环境: $env_desc)..."
     
     # 静默模式，只在找到端口时输出
     local port=$start_port
@@ -142,14 +289,14 @@ find_available_port() {
         if command -v python3 >/dev/null 2>&1; then
             if python3 -c "import socket; s=socket.socket(); r=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if r!=0 else 1)" 2>/dev/null; then
                 port_available=true
-                [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] Python方法检测端口 $port 可用${NC}" >&2
+                debug_log "Python方法检测端口 $port 可用"
             fi
         # macOS专用方法
         elif [ "$IS_MACOS" = true ]; then
             if command -v lsof >/dev/null 2>&1; then
                 if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
                     port_available=true
-                    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] lsof方法检测端口 $port 可用${NC}" >&2
+                    debug_log "lsof方法检测端口 $port 可用"
                 fi
             fi
         # Linux通用方法（包括WSL和纯Linux）
@@ -157,29 +304,29 @@ find_available_port() {
             if command -v ss >/dev/null 2>&1; then
                 if ! timeout 1 ss -tln 2>/dev/null | grep -q ":$port "; then
                     port_available=true
-                    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] ss方法检测端口 $port 可用${NC}" >&2
+                    debug_log "ss方法检测端口 $port 可用"
                 fi
             elif command -v netstat >/dev/null 2>&1; then
                 if ! timeout 1 netstat -tln 2>/dev/null | grep -q ":$port "; then
                     port_available=true
-                    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] netstat方法检测端口 $port 可用${NC}" >&2
+                    debug_log "netstat方法检测端口 $port 可用"
                 fi
             else
                 # 使用/dev/tcp测试
                 if ! timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
                     port_available=true
-                    [ "$IS_DEBUG" = true ] && echo -e "${CYAN}[DEBUG] bash方法检测端口 $port 可用${NC}" >&2
+                    debug_log "bash方法检测端口 $port 可用"
                 fi
             fi
         fi
         
         if [ "$port_available" = true ]; then
-            [ "$IS_DEBUG" = true ] && echo -e "${GREEN}[DEBUG] 找到可用端口: $port${NC}" >&2
+            debug_log "找到可用端口: $port"
             echo $port
             return 0
         fi
         
-        [ "$IS_DEBUG" = true ] && echo -e "${YELLOW}[DEBUG] 端口 $port 被占用${NC}" >&2
+        debug_log "端口 $port 被占用"
         port=$((port + 1))
     done
     
@@ -214,13 +361,16 @@ quick_start() {
             IS_MACOS=false
             ;;
         *)
-            echo -e "${RED}[ERROR] 未知的环境类型: $env_type${NC}"
+            error_handler $LINENO "Unknown environment type: $env_type" 1
             exit 1
             ;;
     esac
     
+    success_log "检测到已安装环境"
     echo -e "${GREEN}✓ 检测到已安装环境${NC}"
+    info_log "运行环境: $env_type"
     echo -e "${BLUE}[INFO]${NC} 运行环境: $env_type"
+    info_log "版本: ${SCRIPT_VERSION} (${SCRIPT_DATE})"
     echo -e "${BLUE}[INFO]${NC} 版本: ${SCRIPT_VERSION} (${SCRIPT_DATE})"
     
     # 查找虚拟环境（优先当前目录，其次home目录）
@@ -228,11 +378,15 @@ quick_start() {
     
     # 检查当前目录
     if [ -d "venv_py310" ]; then
+        info_log "使用当前目录虚拟环境: venv_py310"
         echo -e "${BLUE}[INFO]${NC} 使用当前目录虚拟环境..."
+        debug_log "激活虚拟环境: venv_py310/bin/activate"
         source venv_py310/bin/activate
         VENV_FOUND=true
     elif [ -d "venv" ]; then
+        info_log "使用当前目录虚拟环境: venv"
         echo -e "${BLUE}[INFO]${NC} 使用当前目录虚拟环境..."
+        debug_log "激活虚拟环境: venv/bin/activate"
         source venv/bin/activate
         VENV_FOUND=true
     # 检查home目录（WSL情况）
@@ -247,16 +401,22 @@ quick_start() {
     fi
     
     if [ "$VENV_FOUND" = false ]; then
+        warning_log "未找到虚拟环境"
         echo -e "${YELLOW}[WARNING]${NC} 未找到虚拟环境"
         echo "         请先运行: ./setup.sh"
+        error_handler $LINENO "Virtual environment not found" 1
         exit 1
     fi
     
-    # 验证激活是否成功（仅在调试模式下显示）
-    if [ "$IS_DEBUG" = true ]; then
-        echo -e "${CYAN}[DEBUG] Python路径: $(which python)${NC}"
-        echo -e "${CYAN}[DEBUG] VIRTUAL_ENV: $VIRTUAL_ENV${NC}"
+    # 验证激活是否成功
+    if [ -z "$VIRTUAL_ENV" ]; then
+        error_handler $LINENO "Failed to activate virtual environment" 1
+        exit 1
     fi
+    
+    debug_log "Python路径: $(which python)"
+    debug_log "VIRTUAL_ENV: $VIRTUAL_ENV"
+    success_log "虚拟环境激活成功: $VIRTUAL_ENV"
     
     # 清除代理环境变量
     unset http_proxy
@@ -265,14 +425,19 @@ quick_start() {
     unset HTTPS_PROXY
     
     # 自动查找可用端口（静默且快速）
+    info_log "自动查找可用端口..."
     echo -e "${BLUE}[INFO]${NC} 自动查找可用端口..."
+    debug_log "开始查找端口 5000-5100"
     PORT=$(find_available_port 5000 5100)  # 使用新的三层检测系统
     
     # 总是能找到端口（最坏情况使用随机高位端口）
+    debug_log "获得端口: $PORT"
     
     # 导出端口环境变量
     export PORT
+    success_log "使用端口: $PORT"
     echo -e "${GREEN}[SUCCESS]${NC} 使用端口: $PORT"
+    debug_log "导出 PORT=$PORT"
     
     # 创建必要目录
     mkdir -p output cache config logs
@@ -448,11 +613,29 @@ quick_start() {
 
 # 主函数
 main() {
+    # 初始化日志系统
+    mkdir -p logs
+    
+    if [ "$IS_DEBUG" = true ]; then
+        debug_log "=== 调试模式已启用 ==="
+        debug_log "日志文件: $DEBUG_LOG"
+        debug_log "错误日志: $ERROR_LOG"
+        # 将所有调试输出重定向到日志
+        exec 2> >(tee -a "$DEBUG_LOG" >&2)
+        set -x  # 显示执行的命令
+    fi
+    
+    debug_log "进入main函数"
+    info_log "QueryGPT Start v${SCRIPT_VERSION} 开始运行"
+    
     # 检测运行环境
+    debug_log "开始检测运行环境"
     local env_type=$(detect_environment)
     
     # 检测是否首次运行（没有虚拟环境）
+    debug_log "检查虚拟环境是否存在"
     if [ ! -d "venv_py310" ] && [ ! -d "venv" ]; then
+        warning_log "首次运行检测 - 未找到虚拟环境"
         echo -e "${YELLOW}⚠ 首次运行检测${NC}"
         echo ""
         
@@ -462,10 +645,13 @@ main() {
         
         # 输出环境信息
         if [ "$IS_WSL" = true ]; then
+            success_log "Windows WSL 环境检测成功"
             echo -e "${GREEN}✓ Windows WSL 环境${NC}"
         elif [ "$IS_NATIVE_LINUX" = true ]; then
+            success_log "纯 Linux 环境检测成功 ($OS_TYPE)"
             echo -e "${GREEN}✓ 纯 Linux 环境 ($OS_TYPE)${NC}"
         elif [ "$IS_MACOS" = true ]; then
+            success_log "macOS 环境检测成功"
             echo -e "${GREEN}✓ macOS 环境${NC}"
             
             # WSL 自动修复
@@ -492,22 +678,35 @@ main() {
         
         # 根据系统选择安装脚本
         if [ "$is_arm" = true ] && [ -f "setup_arm.sh" ]; then
+            info_log "执行 ARM 安装脚本..."
             echo -e "${GREEN}➜ 执行 ARM 安装脚本...${NC}"
+            debug_log "转移到 setup_arm.sh"
+            cleanup_normal
             exec ./setup_arm.sh
         elif [ -f "setup.sh" ]; then
+            info_log "执行标准安装脚本..."
             echo -e "${GREEN}➜ 执行标准安装脚本...${NC}"
+            debug_log "转移到 setup.sh"
+            cleanup_normal
             exec ./setup.sh
         else
-            echo -e "${RED}错误：找不到安装脚本${NC}"
+            error_handler $LINENO "Setup script not found" 1
             exit 1
         fi
     else
         # 环境已存在，执行快速启动
+        debug_log "环境已存在，执行快速启动"
         quick_start "$env_type"
+        cleanup_normal
     fi
 }
 
-# 处理命令行参数
+# 处理命令行参数 - 添加调试模式检测
+if [ "$1" = "--debug" ] || [ "$DEBUG" = "true" ]; then
+    IS_DEBUG=true
+    echo -e "${YELLOW}[INFO] 调试模式已启用 - Debug mode enabled${NC}"
+fi
+
 case "${1:-}" in
     --help|-h)
         echo "QueryGPT Start v${SCRIPT_VERSION} - 智能启动脚本"
@@ -515,12 +714,14 @@ case "${1:-}" in
         echo ""
         echo "选项:"
         echo "  无参数        自动检测并启动服务"
-        echo "  --debug       启用调试模式"
+        echo "  --debug       启用调试模式，详细日志保存到 logs/start_debug.log"
         echo "  --diagnose    运行环境诊断"
         echo "  --version     显示版本信息"
         echo "  --help, -h    显示帮助信息"
         echo ""
         echo "支持环境: WSL, Ubuntu, Debian, CentOS, macOS 等"
+        echo "错误日志位置: logs/start_error_*.log"
+        echo "调试日志位置: logs/start_debug_*.log (仅调试模式)"
         echo ""
         exit 0
         ;;
@@ -536,10 +737,13 @@ case "${1:-}" in
         ;;
     --diagnose)
         if [ -f "diagnostic.sh" ]; then
+            info_log "启动诊断工具"
             chmod +x diagnostic.sh
+            cleanup_normal
             exec ./diagnostic.sh
         else
             echo -e "${RED}诊断工具不存在，请确保 diagnostic.sh 文件存在${NC}"
+            error_handler $LINENO "diagnostic.sh not found" 1
             exit 1
         fi
         ;;
