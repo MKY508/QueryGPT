@@ -31,6 +31,8 @@
   
 </div>
 
+> 🪟 **Windows 用户提醒**：本项目必须在 **WSL (Windows Subsystem for Linux)** 中运行，不支持PowerShell或CMD。请查看[安装说明](#-windows-用户必读)。
+
 <br/>
 
 ---
@@ -104,7 +106,9 @@
 
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
 - MySQL 协议兼容的数据库（详见下方支持列表）
-- 支持系统：Linux、macOS、**Windows (WSL)**
+- 支持系统：Linux、macOS、**Windows (必须通过WSL)**
+
+> ⚠️ **Windows用户重要提示**：本项目使用bash脚本，**必须在WSL (Windows Subsystem for Linux) 中运行**，不支持在PowerShell或CMD中直接运行。
 
 <br/>
 
@@ -124,30 +128,74 @@
 
 ## 🚀 快速开始
 
-### 极简安装（支持 Windows WSL）
+### 🖥️ Windows 用户必读
+
+<details>
+<summary><b>⚠️ Windows用户请先安装WSL（点击展开）</b></summary>
+
+#### 安装WSL（如果未安装）
+```powershell
+# 在PowerShell（管理员权限）中运行
+wsl --install
+
+# 重启电脑后，设置Ubuntu用户名和密码
+```
+
+#### 进入WSL环境
+```powershell
+# 在PowerShell或CMD中输入
+wsl
+# 或直接打开"Ubuntu"应用
+```
+
+#### ❌ 错误方式
+```powershell
+# 不要在PowerShell中直接运行
+.\setup.sh   # 这会失败！
+```
+
+#### ✅ 正确方式
+```bash
+# 必须先进入WSL
+wsl
+# 然后在WSL中运行脚本
+./setup.sh
+```
+
+</details>
+
+### 极简安装
 
 ```bash
 # 1. 克隆项目
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 2. 一键安装和启动（Windows用户在WSL中运行）
+# 2. 一键安装和启动
 ./setup.sh   # 自动安装所有依赖（2-5分钟）
 ./start.sh   # 启动服务
 ```
 
 就这么简单！✨ 
 
-### Windows WSL 用户特别说明
+### Windows WSL 完整流程
 ```bash
-# 在WSL终端中运行（不是PowerShell）
-wsl              # 进入WSL环境
-cd /mnt/d/QueryGPT  # 或你的项目路径
-./setup.sh       # 会自动优化到 ~/QueryGPT-github
-./start.sh       # 启动服务
+# 步骤1：进入WSL（在PowerShell中）
+wsl
+
+# 步骤2：克隆项目（在WSL中）
+cd ~
+git clone https://github.com/MKY508/QueryGPT.git
+cd QueryGPT
+
+# 步骤3：运行脚本（在WSL中）
+./setup.sh   # 自动处理所有依赖
+./start.sh   # 启动服务
+
+# 访问：在浏览器打开 http://localhost:5000
 ```
 
-> **自动优化**：检测到WSL时，自动从Windows文件系统迁移到Linux文件系统以获得最佳性能
+> **性能优化**：WSL中的脚本会自动检测并从Windows文件系统(/mnt/)迁移到Linux文件系统(~/)，提升10倍性能
 
 ## 💡 使用示例
 
@@ -213,10 +261,28 @@ DB_NAME=          # 留空支持跨库查询
 
 ## 🔧 快速故障排除
 
+### Windows/WSL 常见问题
+
 | 问题 | 解决方案 |
 |------|---------|
+| **bash: ./setup.sh: No such file or directory** | 您在PowerShell中，请先输入 `wsl` 进入WSL环境 |
+| **'.' 不是内部或外部命令** | 同上，必须在WSL中运行，不能在CMD/PowerShell |
+| **Permission denied** | 运行 `chmod +x setup.sh start.sh` 添加执行权限 |
 | **WSL中进程立即停止** | 脚本已自动处理，使用前台运行模式 |
+| **python3: command not found** | WSL中运行 `sudo apt update && sudo apt install python3` |
+
+### Linux/Ubuntu 常见问题
+
+| 问题 | 解决方案 |
+|------|---------|
+| **No module named 'venv'** | 运行 `sudo apt install python3-venv` 或使用v3.1版setup.sh自动修复 |
 | **pip安装超时** | 自动配置国内镜像源（阿里云/清华/中科大） |
+| **virtualenv: command not found** | 运行 `pip install virtualenv` |
+
+### 通用问题
+
+| 问题 | 解决方案 |
+|------|---------|
 | **端口被占用** | 自动扫描5000-5100找到可用端口 |
 | **找不到backend目录** | 运行 `cd ~/QueryGPT-github && ./start.sh` |
 | **虚拟环境不存在** | 运行 `./setup.sh` 重新安装 |
@@ -224,12 +290,13 @@ DB_NAME=          # 留空支持跨库查询
 
 ## 最新更新
 
-### 2025-09-04 - v3.1.0 多平台环境增强
+### 2025-09-04 - v3.1.0 虚拟环境兼容性修复
+- **虚拟环境智能创建**: 解决Ubuntu/Debian缺少python3-venv问题
+- **三层回退机制**: venv → 自动安装python3-venv → virtualenv备选
+- **Windows WSL文档**: 增强README说明，明确必须在WSL中运行
 - **环境检测优化**: 修复macOS和纯Linux环境检测问题
-- **三层检测系统**: 实施更精准的操作系统识别机制  
 - **诊断工具新增**: 添加diagnostic.sh用于环境问题排查
-- **调试模式增强**: --debug模式提供详细日志输出
-- **代码清理**: 移除过期测试文件，保持项目整洁
+- **代码深度清理**: 删除45KB无用代码，提升项目可维护性
 
 ### 2025-09-03 - Windows WSL 完美支持
 - **WSL自动优化**: 自动检测WSL环境并迁移到Linux文件系统，性能提升10倍
