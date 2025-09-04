@@ -320,17 +320,17 @@ check_first_run() {
     local indicators=0
     
     if [ ! -d "venv_py310" ] && [ ! -d "venv" ]; then
-        ((indicators++))
+        indicators=$((indicators + 1))
         print_message "info" "未检测到虚拟环境 / No virtual environment detected"
     fi
     
     if [ ! -f ".env" ]; then
-        ((indicators++))
+        indicators=$((indicators + 1))
         print_message "info" "未检测到配置文件 / No configuration file detected"
     fi
     
     if [ ! -d "logs" ] || [ ! -d "cache" ]; then
-        ((indicators++))
+        indicators=$((indicators + 1))
         print_message "info" "未检测到必要目录 / Required directories not detected"
     fi
     
@@ -523,7 +523,7 @@ create_directories() {
     for dir in "${dirs[@]}"; do
         if [ ! -d "$dir" ]; then
             mkdir -p "$dir"
-            ((created++))
+            created=$((created + 1))
             print_message "success" "创建目录 / Created: $dir"
         fi
     done
@@ -772,7 +772,7 @@ health_check() {
     
     # 检查虚拟环境
     if [ -d "venv_py310" ] || [ -d "venv" ]; then
-        ((score++))
+        score=$((score + 1))
         print_message "success" "虚拟环境 / Virtual environment: OK"
     else
         print_message "error" "虚拟环境 / Virtual environment: Missing"
@@ -780,7 +780,7 @@ health_check() {
     
     # 检查配置文件
     if [ -f ".env" ]; then
-        ((score++))
+        score=$((score + 1))
         print_message "success" "配置文件 / Configuration: OK"
     else
         print_message "error" "配置文件 / Configuration: Missing"
@@ -788,7 +788,7 @@ health_check() {
     
     # 检查目录
     if [ -d "logs" ] && [ -d "cache" ] && [ -d "output" ]; then
-        ((score++))
+        score=$((score + 1))
         print_message "success" "目录结构 / Directory structure: OK"
     else
         print_message "warning" "目录结构 / Directory structure: Incomplete"
@@ -796,7 +796,7 @@ health_check() {
     
     # 检查依赖
     if pip show flask &> /dev/null; then
-        ((score++))
+        score=$((score + 1))
         print_message "success" "核心依赖 / Core dependencies: OK"
     else
         print_message "error" "核心依赖 / Core dependencies: Missing"
@@ -804,7 +804,7 @@ health_check() {
     
     # 检查端口
     if find_available_port &> /dev/null; then
-        ((score++))
+        score=$((score + 1))
         print_message "success" "端口可用 / Port available: OK"
     fi
     
