@@ -91,7 +91,7 @@ debug_log() {
 info_log() {
     local message="$1"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${BLUE}[INFO] $message${NC}"
+    echo -e "${BLUE}[INFO] $message${NC}" >&2
     
     # 记录到调试日志
     if [ "$IS_DEBUG" = true ]; then
@@ -115,7 +115,7 @@ warning_log() {
 success_log() {
     local message="$1"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo -e "${GREEN}[SUCCESS] $message${NC}"
+    echo -e "${GREEN}[SUCCESS] $message${NC}" >&2
     
     if [ "$IS_DEBUG" = true ]; then
         mkdir -p logs
