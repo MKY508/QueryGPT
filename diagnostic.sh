@@ -4,7 +4,8 @@
 # System Environment Diagnostic Tool v1.0
 # 用于准确识别和诊断运行环境
 
-set -e
+# 不使用 set -e，改用错误处理器
+# set -e  # 已移除，使用trap ERR替代
 
 # 颜色定义
 RED='\033[0;31m'
@@ -29,6 +30,51 @@ IS_NATIVE_LINUX=false
 LINUX_DISTRO=""
 KERNEL_VERSION=""
 ARCH_TYPE=""
+
+# 调试模式
+DEBUG_MODE=false
+if [ "$1" = "--debug" ] || [ "$DEBUG" = "true" ]; then
+    DEBUG_MODE=true
+    echo -e "${YELLOW}[调试模式已启用]${NC}" >&2
+    # 启用命令追踪
+    set -x
+    PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+fi
+
+# 错误处理函数
+error_handler() {
+    local line_num=$1
+    local last_command="${2:-unknown}"
+    local error_code="${3:-1}"
+    
+    echo "" >&2
+    echo -e "${RED}════════════════ 错误报告 ═══════════════${NC}" >&2
+    echo -e "${RED}错误位置:${NC} 第 $line_num 行" >&2
+    echo -e "${RED}失败命令:${NC} $last_command" >&2
+    echo -e "${RED}错误代码:${NC} $error_code" >&2
+    echo -e "${RED}调用堆栈:${NC}" >&2
+    local frame=0
+    while caller $frame >&2; do
+        frame=$((frame + 1))
+    done
+    echo -e "${RED}═══════════════════════════════════════════${NC}" >&2
+    
+    # 保存到日志文件
+    mkdir -p logs
+    {
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] 诊断工具错误"
+        echo "位置: 第 $line_num 行"
+        echo "命令: $last_command"
+        echo "代码: $error_code"
+        echo "---"
+    } >> logs/diagnostic_error.log 2>/dev/null
+    
+    echo -e "${YELLOW}错误日志已保存到: logs/diagnostic_error.log${NC}" >&2
+    exit 1
+}
+
+# 设置错误陷阱
+trap 'error_handler $LINENO "$BASH_COMMAND" $?' ERR
 
 # 打印分隔线
 print_separator() {
@@ -160,23 +206,25 @@ detect_network_tools() {
     # 检测端口检测工具
     local tools_found=0
     
+    [ "$DEBUG_MODE" = true ] && echo -e "${CYAN}[DEBUG] 开始检测网络工具...${NC}" >&2
+    
     if command -v lsof &> /dev/null; then
         echo -e "  ${GREEN}✓${NC} lsof: 已安装"
-        ((tools_found++))
+        tools_found=$((tools_found + 1))
     else
         echo -e "  ${YELLOW}⚠${NC} lsof: 未安装"
     fi
     
     if command -v ss &> /dev/null; then
         echo -e "  ${GREEN}✓${NC} ss: 已安装"
-        ((tools_found++))
+        tools_found=$((tools_found + 1))
     else
         echo -e "  ${YELLOW}⚠${NC} ss: 未安装"
     fi
     
     if command -v netstat &> /dev/null; then
         echo -e "  ${GREEN}✓${NC} netstat: 已安装"
-        ((tools_found++))
+        tools_found=$((tools_found + 1))
     else
         echo -e "  ${YELLOW}⚠${NC} netstat: 未安装"
     fi
@@ -249,7 +297,7 @@ test_port_detection() {
     if command -v python3 &> /dev/null; then
         if python3 -c "import socket; s=socket.socket(); r=s.connect_ex(('127.0.0.1',$test_port)); s.close(); exit(0 if r!=0 else 1)" 2>/dev/null; then
             echo -e "  ${GREEN}✓${NC} Python socket 方法: 可用"
-            ((methods_working++))
+            methods_working=$((methods_working + 1))
         else
             echo -e "  ${YELLOW}⚠${NC} Python socket 方法: 端口 $test_port 可能被占用"
         fi
@@ -259,7 +307,7 @@ test_port_detection() {
     if [ "$IS_LINUX" = true ] && command -v ss &> /dev/null; then
         if ! ss -tln 2>/dev/null | grep -q ":$test_port "; then
             echo -e "  ${GREEN}✓${NC} ss 命令方法: 可用"
-            ((methods_working++))
+            methods_working=$((methods_working + 1))
         else
             echo -e "  ${YELLOW}⚠${NC} ss 命令方法: 端口 $test_port 可能被占用"
         fi
@@ -269,7 +317,7 @@ test_port_detection() {
     if command -v lsof &> /dev/null; then
         if ! lsof -Pi :$test_port -sTCP:LISTEN -t >/dev/null 2>&1; then
             echo -e "  ${GREEN}✓${NC} lsof 命令方法: 可用"
-            ((methods_working++))
+            methods_working=$((methods_working + 1))
         else
             echo -e "  ${YELLOW}⚠${NC} lsof 命令方法: 端口 $test_port 可能被占用"
         fi
