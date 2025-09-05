@@ -125,12 +125,9 @@ class ConfigLoader:
             "not-needed"                                 # 默认值（用于本地模型）
         )
         
+        # 统一走 OpenAI 兼容路径（可被 OPENAI_BASE_URL 覆盖）
         api_base = (
-            os.getenv("OPENAI_BASE_URL") or              # 标准命名
-            os.getenv("OPENAI_API_BASE") or              # OpenAI SDK标准
-            os.getenv("API_BASE_URL") or                 # 旧命名（向后兼容）
-            os.getenv("LLM_BASE_URL") or                 # 备选命名
-            "http://localhost:11434/v1"                  # 默认Ollama地址
+            os.getenv("OPENAI_BASE_URL") or 'https://api.openai.com/v1'
         )
         
         # 获取默认模型并标准化
@@ -148,9 +145,10 @@ class ConfigLoader:
                 if model_id:
                     models[model_id] = {
                         "api_key": model.get('api_key', api_key),
-                        "base_url": model.get('api_base', api_base),
+                        # 强制统一为 OpenAI 兼容地址
+                        "base_url": api_base,
                         "model_name": model.get('model_name', model_id),
-                        "status": model.get('status', 'active')
+                        "status": model.get('status', 'inactive')
                     }
             # 设置默认模型为第一个active的模型
             active_models = [m for m in models_config if m.get('status') == 'active']

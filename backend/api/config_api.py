@@ -25,16 +25,24 @@ def handle_models():
             try:
                 simple_models = ConfigLoader.get_available_models()
                 if isinstance(simple_models, list) and simple_models:
+                    current = api_config.get("default_model")
                     if all(isinstance(x, str) for x in simple_models):
                         models = [
-                            {"id": m, "name": m, "type": "custom", "api_base": api_base, "status": "active"}
+                            {"id": m, "name": m, "type": "custom", "api_base": api_base,
+                             "status": ("active" if m == current else "inactive")}
                             for m in simple_models
                         ]
                     elif all(isinstance(x, dict) for x in simple_models):
-                        models = simple_models
+                        # 对象列表：确保只有 current 处于 active
+                        models = []
+                        for md in simple_models:
+                            mid = md.get('id') or md.get('name')
+                            md = {**md}
+                            md['status'] = 'active' if mid == current else md.get('status', 'inactive')
+                            models.append(md)
                     else:
                         models = []
-                    return jsonify({"models": models, "current": api_config.get("default_model")})
+                    return jsonify({"models": models, "current": current})
             except Exception:
                 pass
 
@@ -48,22 +56,29 @@ def handle_models():
                     else:
                         models = []
             else:
-                models = [
-                    {"id": "gpt-4o", "name": "GPT-4o", "type": "OpenAI", "api_base": api_base, "status": "active"},
-                    {"id": "claude-sonnet-4", "name": "Claude Sonnet 4", "type": "Anthropic", "api_base": api_base, "status": "active"},
-                    {"id": "deepseek-r1", "name": "DeepSeek R1", "type": "DeepSeek", "api_base": api_base, "status": "active"},
-                    {"id": "qwen-flagship", "name": "Qwen 旗舰模型", "type": "Qwen", "api_base": api_base, "status": "active"}
+                current = api_config.get("default_model") or "gpt-4o"
+                seed = [
+                    {"id": "gpt-4o", "name": "GPT-4o", "type": "OpenAI"},
+                    {"id": "claude-sonnet-4", "name": "Claude Sonnet 4", "type": "Anthropic"},
+                    {"id": "deepseek-r1", "name": "DeepSeek R1", "type": "DeepSeek"},
+                    {"id": "qwen-flagship", "name": "Qwen 旗舰模型", "type": "Qwen"}
                 ]
-            # 标准化ID并自动补全状态（使用模块级 ConfigLoader，避免局部遮蔽）
+                models = [
+                    {**m, "api_base": api_base, "status": ("active" if m["id"] == current else "inactive")}
+                    for m in seed
+                ]
+            # 标准化ID并补全字段（不自动置为 active，默认 inactive）
             try:
                 normalized = []
                 for m in models:
                     mid = ConfigLoader.normalize_model_id(m.get('id', ''))
-                    status = m.get('status') or ('active' if api_config.get('api_key') else 'inactive')
+                    status = m.get('status', 'inactive')
                     normalized.append({
                         **m,
                         'id': mid,
-                        'status': status
+                        'status': status,
+                        # 统一 api_base 为全局配置（OpenAI 兼容路径）
+                        'api_base': api_config.get('api_base')
                     })
                 models = normalized
             except Exception:
@@ -77,12 +92,43 @@ def handle_models():
         try:
             data = request.json
             os.makedirs(os.path.dirname(models_file), exist_ok=True)
-            if isinstance(data, list):
-                models_data = {"models": data}
-            elif isinstance(data, dict) and 'models' in data:
-                models_data = data
+            if isinstance(data, dict) and 'models' in data:
+                raw_models = data['models']
+            elif isinstance(data, list):
+                raw_models = data
             else:
-                models_data = {"models": data if isinstance(data, list) else [data]}
+                raw_models = data if isinstance(data, list) else [data]
+
+            # 规范化保存：补齐 status，统一 api_base
+            api_config = ConfigLoader.get_api_config()
+            save_models = []
+            for m in (raw_models or []):
+                try:
+                    normalized = {
+                        **m,
+                        'id': m.get('id') or m.get('name'),
+                        'status': m.get('status', 'inactive'),
+                        'api_base': api_config.get('api_base'),
+                    }
+                    save_models.append(normalized)
+                except Exception:
+                    save_models.append(m)
+            # 只允许单一 active：若多于1个，则保留 current（或第一个）active，其余全部置为 inactive
+            # 若没有 active，则将 current（或默认模型）置为 active
+            current = (isinstance(data, dict) and data.get('current')) or api_config.get('default_model')
+            actives = [m for m in save_models if m.get('status') == 'active']
+            if len(actives) > 1:
+                for m in save_models:
+                    m['status'] = 'active' if (m.get('id') == current) else 'inactive'
+            elif len(actives) == 0 and save_models:
+                for m in save_models:
+                    if m.get('id') == current:
+                        m['status'] = 'active'
+                        break
+                else:
+                    save_models[0]['status'] = 'active'
+
+            models_data = {"models": save_models}
             with open(models_file, 'w', encoding='utf-8') as f:
                 json.dump(models_data, f, indent=2, ensure_ascii=False)
             return jsonify({"success": True})
