@@ -214,6 +214,8 @@ print(result['result']['content'])
 - **Festplatte**: 2GB freier Speicherplatz
 - **Datenbank**: MySQL 5.7+ oder MariaDB 10.3+
 
+> Windows: Bitte innerhalb von WSL ausführen (keine Ausführung über PowerShell/CMD).
+
 ### Empfohlene Anforderungen
 - **RAM**: 8GB oder mehr
 - **CPU**: 4 Kerne oder mehr
@@ -254,6 +256,10 @@ Das System erkennt automatisch die Sprache Ihrer Abfrage und antwortet in dersel
 ## 📄 Lizenz
 
 Dieses Projekt ist unter der MIT-Lizenz lizenziert - siehe die [LICENSE](../LICENSE) Datei für Details.
+
+## 🆕 Neueste Updates
+
+- 2025-09-05 – Startzeit optimiert: Automatisches Modell‑Testing beim ersten Aufruf entfernt, weniger Initial‑Requests und keine unbeabsichtigten Statusänderungen.
 
 Die MIT-Lizenz ist eine freizügige Open-Source-Lizenz, die es Ihnen erlaubt:
 - Das Projekt kommerziell zu nutzen

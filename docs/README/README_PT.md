@@ -150,6 +150,8 @@ O serviço será executado em http://localhost:5000 por padrão
 
 > **Nota**: Se a porta 5000 estiver ocupada (por exemplo, AirPlay no macOS), o sistema selecionará automaticamente a próxima porta disponível (5001-5010) e exibirá a porta real usada na inicialização.
 
+> Windows: Execute no WSL (não execute scripts pelo PowerShell/CMD).
+
 ## ⚙️ Configuração
 
 ### Configuração Básica
@@ -280,6 +282,10 @@ Contribuições são bem-vindas! Por favor, sinta-se à vontade para submeter Pu
 ## 📄 Licença
 
 Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 🆕 Atualizações recentes
+
+- 2025-09-05 – Otimização de inicialização: Removido o teste automático de modelos na primeira visita para reduzir requisições iniciais e evitar alterações de estado indesejadas.
 
 ## 🙏 Agradecimentos
 

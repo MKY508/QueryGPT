@@ -92,6 +92,8 @@
 - Python 3.10.x (Required, OpenInterpreter 0.4.3 dependency)
 - MySQL or compatible database
 
+> Windows: Run inside WSL (do not run scripts from PowerShell/CMD).
+
 <br/>
 
 ## 📊 Product Comparison
@@ -233,6 +235,10 @@ Issues and Pull Requests are welcome!
 ## 📄 License
 
 MIT License - see [LICENSE](../LICENSE) for details
+
+## 🆕 Latest Updates
+
+- 2025-09-05 – Startup speed optimization: removed first-visit model auto test to reduce initial requests and avoid unintended state changes.
 
 ## 🙏 Acknowledgments
 
