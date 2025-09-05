@@ -31,7 +31,7 @@
   
 </div>
 
-> 🪟 **Windows 用户提醒**：本项目必须在 **WSL (Windows Subsystem for Linux)** 中运行，不支持PowerShell或CMD。请查看[安装说明](#-windows-用户必读)。
+> 🪟 Windows 用户：请在 **WSL (Windows Subsystem for Linux)** 中运行（不支持 PowerShell/CMD）。快速步骤见下方“极简安装 → Windows WSL 用户”。
 
 <br/>
 
@@ -128,41 +128,11 @@
 
 ## 🚀 快速开始
 
-### 🖥️ Windows 用户必读
+### 🖥️ Windows / WSL 提示
 
-<details>
-<summary><b>⚠️ Windows用户请先安装WSL（点击展开）</b></summary>
-
-#### 安装WSL（如果未安装）
-```powershell
-# 在PowerShell（管理员权限）中运行
-wsl --install
-
-# 重启电脑后，设置Ubuntu用户名和密码
-```
-
-#### 进入WSL环境
-```powershell
-# 在PowerShell或CMD中输入
-wsl
-# 或直接打开"Ubuntu"应用
-```
-
-#### ❌ 错误方式
-```powershell
-# 不要在PowerShell中直接运行
-.\setup.sh   # 这会失败！
-```
-
-#### ✅ 正确方式
-```bash
-# 必须先进入WSL
-wsl
-# 然后在WSL中运行脚本
-./setup.sh
-```
-
-</details>
+- 仅支持在 WSL 的 Linux 环境中运行；不要在 PowerShell/CMD 里执行脚本。
+- 如未安装 WSL：以管理员 PowerShell 执行 `wsl --install`，重启后打开 “Ubuntu”。
+- 详细步骤请直接参考下方“极简安装 → Windows WSL 用户”。
 
 ### 极简安装
 
@@ -299,6 +269,7 @@ DB_NAME=          # 留空支持跨库查询
 - **环境检测优化**: 修复macOS和纯Linux环境检测问题
 - **诊断工具新增**: 添加diagnostic.sh用于环境问题排查
 - **代码深度清理**: 删除45KB无用代码，提升项目可维护性
+- **启动速度优化**: 移除首次进入模型页的自动批量测试，减少无必要请求并避免状态误写，缩短首屏加载时间
 
 ### 2025-09-03 - Windows WSL 完美支持
 - **WSL自动优化**: 自动检测WSL环境并迁移到Linux文件系统，性能提升10倍
