@@ -75,6 +75,8 @@
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
 - MySQL 或兼容数据库
 
+> Windows：请在 WSL 中运行（不要在 PowerShell/CMD 下直接执行脚本）。
+
 ## 📊 产品对比
 
 | 对比维度 | **QueryGPT** | Vanna AI | DB-GPT | TableGPT | Text2SQL.AI |
@@ -234,6 +236,10 @@ GET /api/health
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
 
+## 🆕 最新更新
+
+- 2025-09-05 – 启动速度优化：移除首次进入模型页的自动批量测试，减少不必要请求并避免状态误写。
+
 ## 👨‍💻 作者
 
 - **作者**: Mao Kaiyue
@@ -261,4 +267,3 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 提交 Pull Request
-

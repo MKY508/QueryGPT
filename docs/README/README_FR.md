@@ -161,6 +161,8 @@ Content-Type: application/json
 - **Stockage** : 2 GB d'espace libre
 - **OS** : Linux, macOS, Windows
 
+> Windows : exécuter dans WSL (ne pas lancer les scripts depuis PowerShell/CMD).
+
 ### Base de données
 - MySQL 5.7+ ou MariaDB
 - PostgreSQL 12+ (support partiel)
@@ -223,6 +225,10 @@ Les contributions sont les bienvenues ! N'hésitez pas à :
 ## 📄 Licence
 
 Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
+
+## 🆕 Dernières mises à jour
+
+- 2025-09-05 – Optimisation du démarrage : suppression du test automatique des modèles lors de la première visite pour réduire les requêtes initiales et éviter des changements d’état indésirables.
 
 ## 👨‍💻 Auteur
 
