@@ -465,7 +465,7 @@ body {
 }
 
 .stop-button {
-    padding: 10px 20px;
+    padding: 8px 16px;
     background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
     color: white;
     border: none;
@@ -477,7 +477,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
+    height: 38px;
     animation: pulse 1.5s infinite;
 }
 
@@ -986,37 +987,7 @@ body {
     border-radius: 4px;
 }
 
-/* 停止按钮样式 - 复用发送按钮的样式，只改变颜色 */
-.stop-button {
-    padding: 10px 20px;
-    background: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: all 0.2s;
-    width: auto;
-    min-width: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.stop-button:hover {
-    background: #c82333;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
-
-.stop-button:active {
-    transform: translateY(0);
-}
-
-.stop-button i {
-    margin-right: 4px;
-}
+/* 停止按钮悬停效果（保留动画） */
 
 /* 导航分隔线 */
 .nav-divider {
