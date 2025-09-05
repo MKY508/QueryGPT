@@ -215,10 +215,35 @@ class DataAnalysisPlatform {
         const stopButton = document.getElementById('stop-button');
         const messageInput = document.getElementById('message-input');
         
-        sendButton.addEventListener('click', () => this.sendMessage());
+        // 检查元素是否存在
+        if (!sendButton || !stopButton) {
+            console.error('按钮元素未找到:', { sendButton: !!sendButton, stopButton: !!stopButton });
+        }
+        
+        if (sendButton) {
+            sendButton.addEventListener('click', () => this.sendMessage());
+        }
         
         // 停止按钮事件
-        stopButton.addEventListener('click', () => this.stopQuery());
+        if (stopButton) {
+            console.log('绑定停止按钮事件');
+            // 移除旧的事件监听器
+            stopButton.replaceWith(stopButton.cloneNode(true));
+            const newStopButton = document.getElementById('stop-button');
+            newStopButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('停止按钮被点击, 当前状态:', {
+                    isProcessing: this.isProcessing,
+                    conversationId: this.currentConversationId,
+                    display: newStopButton.style.display
+                });
+                if (this.isProcessing) {
+                    this.stopQuery();
+                } else {
+                    console.warn('当前没有正在执行的查询');
+                }
+            });
+        }
         
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && e.ctrlKey) {
@@ -492,8 +517,19 @@ class DataAnalysisPlatform {
         document.getElementById('send-button').disabled = true;
         
         // 显示停止按钮，隐藏发送按钮
-        document.getElementById('send-button').style.display = 'none';
-        document.getElementById('stop-button').style.display = 'flex';
+        const sendBtn = document.getElementById('send-button');
+        const stopBtn = document.getElementById('stop-button');
+        if (sendBtn) {
+            sendBtn.style.display = 'none';
+            sendBtn.style.visibility = 'hidden';
+        }
+        if (stopBtn) {
+            stopBtn.style.display = 'flex';
+            stopBtn.style.visibility = 'visible';
+            stopBtn.style.opacity = '1';
+            stopBtn.removeAttribute('hidden');
+            console.log('停止按钮已显示', stopBtn.style.display, stopBtn.style.visibility);
+        }
 
         // 添加用户消息到界面
         this.addMessage('user', message);
@@ -584,8 +620,18 @@ class DataAnalysisPlatform {
             document.getElementById('send-button').disabled = false;
             
             // 恢复按钮状态
-            document.getElementById('stop-button').style.display = 'none';
-            document.getElementById('send-button').style.display = 'flex';
+            const stopBtn = document.getElementById('stop-button');
+            const sendBtn = document.getElementById('send-button');
+            if (stopBtn) {
+                stopBtn.style.display = 'none';
+                stopBtn.style.visibility = 'hidden';
+                stopBtn.style.opacity = '0';
+            }
+            if (sendBtn) {
+                sendBtn.style.display = 'flex';
+                sendBtn.style.visibility = 'visible';
+                sendBtn.style.opacity = '1';
+            }
             
             messageInput.focus();
         }
@@ -595,7 +641,8 @@ class DataAnalysisPlatform {
      * 停止查询
      */
     async stopQuery() {
-        this.showNotification(window.i18nManager.t('common.stopping'), 'info');
+        console.log('开始停止查询, conversationId:', this.currentConversationId);
+        this.showNotification(window.i18nManager.t('common.stopping') || '正在停止...', 'info');
         
         // 发送停止请求到后端
         if (this.currentConversationId) {
@@ -611,8 +658,12 @@ class DataAnalysisPlatform {
                 });
                 
                 const data = await response.json();
+                console.log('停止请求响应:', data);
                 if (data.success) {
-                    console.log('停止请求已发送');
+                    console.log('停止请求成功');
+                    this.showNotification('查询已停止', 'success');
+                } else {
+                    console.warn('停止请求失败:', data.error);
                 }
             } catch (error) {
                 console.error('发送停止请求失败:', error);

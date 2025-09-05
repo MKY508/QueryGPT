@@ -1,0 +1,70 @@
+/* 停止按钮修复样式 - 确保高优先级 */
+.stop-button {
+    padding: 8px 16px !important;
+    background: linear-gradient(135deg, #f56565 0%, #c53030 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    transition: all 0.3s ease !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    height: 38px !important;
+    animation: pulse 1.5s infinite !important;
+    position: relative !important;
+    z-index: 1000 !important;
+}
+
+/* 当停止按钮显示时的样式 */
+.stop-button[style*="display: flex"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* 停止按钮图标 */
+.stop-button i {
+    color: white !important;
+    font-size: 16px !important;
+}
+
+/* 脉冲动画 */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(245, 101, 101, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(245, 101, 101, 0);
+    }
+}
+
+/* 悬停效果 */
+.stop-button:hover {
+    transform: scale(1.05) !important;
+    background: linear-gradient(135deg, #fc4444 0%, #a02020 100%) !important;
+}
+
+/* 确保按钮容器正确显示 */
+.chat-input {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+/* 发送按钮隐藏时 */
+.send-button[style*="display: none"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* 调试样式 - 临时添加边框以确认按钮位置 */
+.stop-button.debug {
+    border: 2px solid yellow !important;
+}
