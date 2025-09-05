@@ -435,7 +435,7 @@ class SettingsManager {
         
         // 获取默认配置
         const defaultApiKey = this.config?.api_key || '';
-        const defaultApiBase = this.config?.api_base || 'http://localhost:11434/v1';
+        const defaultApiBase = this.config?.api_base || 'https://api.openai.com/v1';
         
         if (modelId) {
             // 编辑模式
@@ -444,7 +444,8 @@ class SettingsManager {
                 title.textContent = '编辑模型';
                 document.getElementById('model-name').value = model.name;
                 document.getElementById('model-id').value = model.id;
-                document.getElementById('model-type').value = model.type.toLowerCase();
+                document.getElementById('model-type').value = 'openai';
+                document.getElementById('model-type').disabled = true;
                 document.getElementById('model-api-base').value = model.api_base || defaultApiBase;
                 // 使用模型的API密钥，如果没有则使用默认的
                 document.getElementById('model-api-key').value = model.api_key || defaultApiKey;
@@ -458,6 +459,7 @@ class SettingsManager {
             document.getElementById('model-name').value = '';
             document.getElementById('model-id').value = '';
             document.getElementById('model-type').value = 'openai';
+            document.getElementById('model-type').disabled = true;
             document.getElementById('model-api-base').value = defaultApiBase;
             document.getElementById('model-api-key').value = defaultApiKey;
             document.getElementById('model-max-tokens').value = '4096';
@@ -484,7 +486,8 @@ class SettingsManager {
         const modelData = {
             name: document.getElementById('model-name').value.trim(),
             id: document.getElementById('model-id').value.trim(),
-            type: document.getElementById('model-type').value,
+            // 强制使用 OpenAI 接口类型
+            type: 'openai',
             api_base: document.getElementById('model-api-base').value.trim(),
             api_key: document.getElementById('model-api-key').value.trim(),
             max_tokens: parseInt(document.getElementById('model-max-tokens').value),
