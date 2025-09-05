@@ -277,7 +277,7 @@ DB_NAME=          # 留空支持跨库查询
 
 | 问题 | 解决方案 |
 |------|---------|
-| **No module named 'venv'** | 运行 `sudo apt install python3-venv` 或使用v3.1版setup.sh自动修复 |
+| **No module named 'venv'** | 运行 `sudo apt install python3-venv` 或使用v1.2版setup.sh自动修复 |
 | **pip安装超时** | 自动配置国内镜像源（阿里云/清华/中科大） |
 | **virtualenv: command not found** | 运行 `pip install virtualenv` |
 
@@ -292,7 +292,7 @@ DB_NAME=          # 留空支持跨库查询
 
 ## 最新更新
 
-### 2025-09-04 - v3.1.0 虚拟环境兼容性修复
+### 2025-09-05 - v1.2 正式版本发布
 - **虚拟环境智能创建**: 解决Ubuntu/Debian缺少python3-venv问题
 - **三层回退机制**: venv → 自动安装python3-venv → virtualenv备选
 - **Windows WSL文档**: 增强README说明，明确必须在WSL中运行
@@ -308,7 +308,7 @@ DB_NAME=          # 留空支持跨库查询
 - **极简脚本**: 精简为仅setup.sh和start.sh两个脚本，自动处理所有环境差异
 - **零配置体验**: WSL用户无需任何额外配置，自动检测并优化
 
-### 2025-08-28 - v1.1-beta 系统优化升级
+### 2025-08-28 - v1.1 系统优化升级
 - **智能路由增强**: 优化查询分类逻辑，简单查询直接SQL执行，复杂分析完整功能支持
 - **进程管理修复**: 解决停止按钮点击后后台进程继续运行的问题，实现完整进程树管理
 - **新手引导优化**: 修复引导重复显示问题，增加版本控制和会话检查机制

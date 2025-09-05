@@ -1278,33 +1278,48 @@ def stop_query():
         data = request.json
         conversation_id = data.get('conversation_id')
         
+        logger.info(f"收到停止查询请求: conversation_id={conversation_id}")
+        
         if not conversation_id:
+            logger.warning("停止查询请求缺少会话ID")
             return jsonify({"error": "需要提供会话ID"}), 400
         
         # 检查是否有正在执行的查询（线程安全）
         query_found = False
         with active_queries_lock:
+            logger.info(f"当前活动查询: {list(active_queries.keys())}")
             if conversation_id in active_queries:
                 query_info = active_queries[conversation_id]
                 query_info['should_stop'] = True
                 query_found = True
+                logger.info(f"已设置停止标志: {conversation_id}")
             
             # 如果有interpreter实例，尝试停止它
             if interpreter_manager:
+                logger.info(f"调用interpreter_manager.stop_query: {conversation_id}")
                 interpreter_manager.stop_query(conversation_id)
         
         if query_found:
-            logger.info(f"停止查询请求: {conversation_id}")
+            logger.info(f"停止查询请求处理成功: {conversation_id}")
             return jsonify({
                 "success": True,
                 "message": "查询停止请求已发送",
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
+                "debug": {
+                    "query_found": query_found,
+                    "active_queries_count": len(active_queries)
+                }
             })
         else:
+            logger.warning(f"未找到正在执行的查询: {conversation_id}")
             return jsonify({
                 "success": False,
                 "message": "没有找到正在执行的查询",
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
+                "debug": {
+                    "conversation_id": conversation_id,
+                    "active_queries": list(active_queries.keys())
+                }
             })
             
     except Exception as e:
