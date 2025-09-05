@@ -14,6 +14,8 @@
 - **数据库**: Apache Doris或MySQL兼容数据库
 - **浏览器**: Chrome/Firefox/Safari最新版本
 
+> Windows 提示：请在 WSL (Windows Subsystem for Linux) 中运行本项目；不要在 PowerShell/CMD 中直接执行脚本。
+
 ## 部署方式
 
 ### 1. 本地开发部署

@@ -2,6 +2,8 @@
 
 ## 1. Installation / 安装相关问题
 
+> Windows Tip / Windows 提示：请在 WSL (Windows Subsystem for Linux) 中运行本项目；不要在 PowerShell/CMD 中直接执行脚本。
+
 ### Q: What are the system requirements for QueryGPT? / QueryGPT的系统要求是什么？
 **A:** 
 - Python 3.8+ (Python 3.10 recommended for OpenInterpreter integration)
@@ -22,7 +24,7 @@
 ### Q: How do I install dependencies? / 如何安装依赖？
 **A:**
 ```bash
-# Create virtual environment
+# Create virtual environment (use WSL on Windows)
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
@@ -32,7 +34,7 @@ pip install -r requirements.txt
 
 **解答：**
 ```bash
-# 创建虚拟环境
+# 创建虚拟环境（Windows 请在 WSL 中操作）
 python -m venv venv
 source venv/bin/activate  # Windows系统: venv\Scripts\activate
 
@@ -47,12 +49,12 @@ pip install -r requirements.txt
 ### Q: Installation fails with permission errors / 安装时出现权限错误
 **A:** 
 - On Linux/Mac: Use `sudo` for system-wide installation or use virtual environment (recommended)
-- On Windows: Run command prompt as Administrator or use virtual environment
+- On Windows: Prefer WSL; otherwise run command prompt as Administrator or use virtual environment
 - Always prefer virtual environment to avoid system conflicts
 
 **解答：**
 - Linux/Mac系统：使用`sudo`进行系统级安装或使用虚拟环境（推荐）
-- Windows系统：以管理员身份运行命令提示符或使用虚拟环境
+- Windows系统：优先在 WSL 中运行；否则以管理员身份运行命令提示符或使用虚拟环境
 - 始终建议使用虚拟环境以避免系统冲突
 
 ## 2. Configuration / 配置相关问题
