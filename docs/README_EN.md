@@ -175,16 +175,7 @@ python backend/app.py
 
 Visit `http://localhost:5000` to start using!
 
-## 🐳 Docker Deployment
-
-```bash
-# Using docker-compose (recommended)
-docker-compose up -d
-
-# Or run separately
-docker build -t querygpt .
-docker run -p 5000:5000 --env-file .env querygpt
-```
+<!-- Docker deployment is currently not maintained for this project. -->
 
 ## 💡 Usage Examples
 
