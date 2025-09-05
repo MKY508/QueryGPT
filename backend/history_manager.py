@@ -12,6 +12,9 @@ from pathlib import Path
 import hashlib
 import re
 
+DATABASE_PATH = "backend/data/history.db"
+
+
 class HistoryManager:
     """
     对话历史管理器
@@ -31,15 +34,15 @@ class HistoryManager:
         >>> manager.add_message(conversation_id, "user", "查询本月销售")
     """
     
-    def __init__(self, db_path: str = "backend/data/history.db"):
+    def __init__(self, db_path: str = None):
         """
         初始化历史管理器。
         
         Args:
             db_path: 数据库文件路径，默认为 backend/data/history.db
         """
-        self.db_path = db_path
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        self.db_path = db_path or DATABASE_PATH
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_database()
         
     def _init_database(self):
@@ -156,7 +159,7 @@ class HistoryManager:
     
     def add_message(self, conversation_id: str, message_type: str, 
                    content: str, context: Optional[Dict] = None,
-                   execution_details: Optional[Dict] = None) -> str:
+                   execution_details: Optional[Dict] = None, **kwargs) -> str:
         """
         添加消息到对话
         
@@ -272,6 +275,41 @@ class HistoryManager:
             
             conversation = cursor.fetchone()
             if not conversation:
+                # 兼容旧数据：如果没有会话记录但存在消息，则返回最小结构
+                cursor.execute(
+                    "SELECT * FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC",
+                    (conversation_id,)
+                )
+                legacy_messages = cursor.fetchall()
+                if legacy_messages:
+                    result = {
+                        "conversation_id": conversation_id,
+                        "metadata": {
+                            "title": f"对话 {conversation_id[:8]}",
+                            "created_at": None,
+                            "updated_at": None,
+                            "model": None,
+                            "database": None,
+                            "total_tokens": 0,
+                            "query_count": len(legacy_messages),
+                            "is_favorite": False,
+                            "tags": []
+                        },
+                        "messages": []
+                    }
+                    for msg in legacy_messages:
+                        message_data = {
+                            "id": msg["id"],
+                            "type": msg["type"],
+                            "content": msg["content"],
+                            "timestamp": msg["timestamp"]
+                        }
+                        if msg["context"]:
+                            message_data["context"] = json.loads(msg["context"])
+                        if msg["execution_details"]:
+                            message_data["execution"] = json.loads(msg["execution_details"])
+                        result["messages"].append(message_data)
+                    return result
                 return None
             
             # 获取消息历史

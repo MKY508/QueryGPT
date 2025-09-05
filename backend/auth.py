@@ -105,6 +105,10 @@ class SimpleAuth:
         for token in expired_tokens:
             del self.valid_tokens[token]
 
+    # 兼容测试：提供 is_enabled 方法
+    def is_enabled(self) -> bool:
+        return bool(self.api_secret)
+
 # 创建全局认证实例
 auth_manager = SimpleAuth()
 
@@ -113,7 +117,7 @@ def require_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # 如果未配置认证，直接通过
-        if not auth_manager.api_secret:
+        if not auth_manager.is_enabled():
             return f(*args, **kwargs)
         
         # 从请求头获取令牌
@@ -142,7 +146,7 @@ def optional_auth(f):
     def decorated_function(*args, **kwargs):
         # 如果提供了令牌，验证它
         auth_header = request.headers.get('Authorization')
-        if auth_header and auth_manager.api_secret:
+        if auth_header and auth_manager.is_enabled():
             parts = auth_header.split()
             if len(parts) == 2 and parts[0] == 'Bearer':
                 token = parts[1]
