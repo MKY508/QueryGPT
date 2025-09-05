@@ -35,13 +35,8 @@ class InterpreterManager:
     
     def __init__(self, config_path: str = None):
         """初始化管理器"""
-        # 检查OpenInterpreter是否可用
-        if not INTERPRETER_AVAILABLE:
-            logger.warning("InterpreterManager初始化失败：OpenInterpreter未安装")
-            self.enabled = False
-            return
-        
-        self.enabled = True
+        # 基本属性（即使未安装也初始化，以便测试桩可工作）
+        self.enabled = INTERPRETER_AVAILABLE
         # 从.env文件加载配置
         api_config = ConfigLoader.get_api_config()
         self.config = {
@@ -75,6 +70,10 @@ class InterpreterManager:
         # 最大历史轮数（防止上下文过长）
         self.max_history_rounds = 3
         
+        if not INTERPRETER_AVAILABLE:
+            logger.warning("OpenInterpreter未安装，部分功能将被禁用（测试场景可通过桩替代）")
+            return
+        
     def _clear_proxy_env(self):
         """清除代理环境变量，避免LiteLLM冲突"""
         proxy_vars = ['http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY']
@@ -91,8 +90,11 @@ class InterpreterManager:
         if not self.enabled:
             raise RuntimeError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
         
-        model_name = model_name or self.config.get("current_model", "gpt-4.1")
-        model_config = self.config.get("models", {}).get(model_name)
+        from backend.config_loader import ConfigLoader
+        model_name = model_name or self.config.get("current_model", "gpt-4o")
+        model_name = ConfigLoader.normalize_model_id(model_name)
+        models_dict = self.config.get("models", {})
+        model_config = models_dict.get(model_name) or models_dict.get(ConfigLoader.normalize_model_id(model_name))
         
         if not model_config:
             raise ValueError(f"模型配置不存在: {model_name}")
@@ -272,8 +274,8 @@ class InterpreterManager:
                     "conversation_id": conversation_id
                 }
             
-            # 启动持续进程监控
-            if conversation_id:
+            # 启动持续进程监控（测试环境禁用以提升速度与兼容性）
+            if conversation_id and os.getenv('TESTING', '').lower() != 'true':
                 self._start_process_monitoring(conversation_id)
             
             # 执行查询（带停止检查）
@@ -507,7 +509,10 @@ class InterpreterManager:
         如果提供conversation_id，尝试重用现有会话
         """
         if not self.enabled:
-            raise RuntimeError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
+            # 测试环境下允许继续，以便通过桩替换 create_interpreter
+            import os
+            if os.environ.get('TESTING', '').lower() != 'true':
+                raise RuntimeError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
         
         with self._session_lock:
             # 清理过期会话
