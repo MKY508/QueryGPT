@@ -139,14 +139,23 @@ class ConfigLoader:
             return ConfigLoader._api_config_cache
         if models_config:
             # 使用models.json中的配置
+            placeholder_keys = {
+                '', 'not-needed', 'not_needed', 'notneeded',
+                'your-openai-api-key-here', 'your-anthropic-api-key-here',
+                'your-custom-api-key-here', 'your-api-key-here'
+            }
             for model in models_config:
                 model_id_raw = model.get('id', model.get('name', ''))
                 model_id = ConfigLoader.normalize_model_id(model_id_raw)
                 if model_id:
+                    # 选择 per-model api_base（若未提供则回退到全局 OPENAI_BASE_URL）
+                    per_base = model.get('api_base') or model.get('base_url') or api_base
+                    # 选择 api_key：若为占位符或空，则回退到环境变量
+                    per_key = (model.get('api_key') or '').strip()
+                    key_to_use = per_key if per_key not in placeholder_keys else api_key
                     models[model_id] = {
-                        "api_key": model.get('api_key', api_key),
-                        # 强制统一为 OpenAI 兼容地址
-                        "base_url": api_base,
+                        "api_key": key_to_use,
+                        "base_url": per_base,
                         "model_name": model.get('model_name', model_id),
                         "status": model.get('status', 'inactive')
                     }
