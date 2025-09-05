@@ -40,7 +40,8 @@ class RateLimiter:
         Returns:
             是否允许请求
         """
-        current_time = time.time()
+        # 使用monotonic避免系统时间回拨影响
+        current_time = time.monotonic()
         
         # 检查是否在黑名单中
         if identifier in self.blacklist:
@@ -132,7 +133,7 @@ def rate_limit(limiter=None, max_requests=None, window_seconds=None):
             if not rate_limiter.is_allowed(client_id):
                 remaining_time = 0
                 if client_id in rate_limiter.blacklist:
-                    remaining_time = int(rate_limiter.blacklist[client_id] - time.time())
+                    remaining_time = int(rate_limiter.blacklist[client_id] - time.monotonic())
                 
                 return jsonify({
                     'error': '请求过于频繁，请稍后再试',
