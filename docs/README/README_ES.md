@@ -327,20 +327,7 @@ Añade modelos personalizados en `config/models.json`:
 }
 ```
 
-### Despliegue con Docker
-
-```bash
-# Construir imagen
-docker build -t querygpt .
-
-# Ejecutar contenedor
-docker run -d \
-  -p 5000:5000 \
-  -v $(pwd)/config:/app/config \
-  -v $(pwd)/logs:/app/logs \
-  --env-file .env \
-  querygpt
-```
+<!-- Despliegue con Docker no está mantenido actualmente. -->
 
 ### Configuración de Producción
 
