@@ -96,10 +96,10 @@ class SettingsManager {
         });
         document.getElementById(`${tabName}-settings`).classList.add('active');
         
-        // 如果切换到模型管理页面，执行首次批量测试
-        if (tabName === 'models' && !this.hasTestedModels) {
-            this.testAllModelsOnFirstVisit();
-        }
+        // 移除首次进入自动批量测试，避免错误修改状态
+        // if (tabName === 'models' && !this.hasTestedModels) {
+        //     this.testAllModelsOnFirstVisit();
+        // }
     }
 
     /**
@@ -444,8 +444,8 @@ class SettingsManager {
                 title.textContent = '编辑模型';
                 document.getElementById('model-name').value = model.name;
                 document.getElementById('model-id').value = model.id;
-                document.getElementById('model-type').value = 'openai';
-                document.getElementById('model-type').disabled = true;
+                document.getElementById('model-type').value = (model.type || 'openai');
+                document.getElementById('model-type').disabled = true; // 当前仅保留展示与保存原类型
                 document.getElementById('model-api-base').value = model.api_base || defaultApiBase;
                 // 使用模型的API密钥，如果没有则使用默认的
                 document.getElementById('model-api-key').value = model.api_key || defaultApiKey;
@@ -486,8 +486,8 @@ class SettingsManager {
         const modelData = {
             name: document.getElementById('model-name').value.trim(),
             id: document.getElementById('model-id').value.trim(),
-            // 强制使用 OpenAI 接口类型
-            type: 'openai',
+            // 保留/使用当前表单中的类型（编辑时为原类型）
+            type: document.getElementById('model-type').value.trim(),
             api_base: document.getElementById('model-api-base').value.trim(),
             api_key: document.getElementById('model-api-key').value.trim(),
             max_tokens: parseInt(document.getElementById('model-max-tokens').value),
