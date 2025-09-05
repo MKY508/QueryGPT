@@ -28,8 +28,10 @@ class LLMService:
         self.api_key = api_config.get('api_key')
         self.api_base = api_config.get('api_base', 'https://api.openai.com/v1')
         
-        # 设置模型
-        self.model_name = model_name or api_config.get('default_model', 'gpt-4.1')
+        # 设置模型（默认标准化为 gpt-4o）
+        from backend.config_loader import ConfigLoader
+        self.model_name = model_name or api_config.get('default_model', 'gpt-4o')
+        self.model_name = ConfigLoader.normalize_model_id(self.model_name)
         
         # 统计信息
         self.stats = {
