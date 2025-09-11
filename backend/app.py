@@ -66,15 +66,24 @@ except ImportError:
     print("Flasgger not installed. Run: pip install flasgger")
 except Exception as e:
     print(f"Failed to initialize Swagger: {e}")
-# 限制CORS来源以提高安全性
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:*", "http://127.0.0.1:*"]}})
+# 限制CORS来源以提高安全性（从环境/配置读取允许的来源）
+try:
+    from backend.config_loader import ConfigLoader
+    allowed_origins = ConfigLoader.get_config().get('security', {}).get('allowed_origins', []) or [
+        'http://localhost:3000', 'http://127.0.0.1:3000'
+    ]
+except Exception:
+    allowed_origins = ['http://localhost:3000', 'http://127.0.0.1:3000']
+CORS(app, resources={r"/api/*": {"origins": allowed_origins}})
 
 @app.after_request
 def _ensure_cors_headers(resp):
-    """确保测试环境下也返回基础CORS响应头。"""
+    """确保测试环境下也返回基础CORS响应头（遵循白名单）。"""
     try:
         if request.path.startswith('/api/'):
-            resp.headers.setdefault('Access-Control-Allow-Origin', '*')
+            origin = request.headers.get('Origin')
+            if origin and any(origin.startswith(o.rstrip('*')) for o in allowed_origins):
+                resp.headers.setdefault('Access-Control-Allow-Origin', origin)
             resp.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE')
             resp.headers.setdefault('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     except Exception:
@@ -99,36 +108,15 @@ def _get_stop_status(conversation_id):
         return active_queries.get(conversation_id, {}).get('should_stop', False)
 
 def sync_config_files():
-    """同步配置文件，确保.env是唯一的数据库配置来源"""
-    try:
-        # 从.env读取最新的数据库配置
-        db_config = ConfigLoader.get_database_config()
-        
-        # 更新config.json中的数据库配置（如果文件存在）
-        config_json_path = os.path.join(PROJECT_ROOT, 'config', 'config.json')
-        if os.path.exists(config_json_path):
-            try:
-                with open(config_json_path, 'r', encoding='utf-8') as f:
-                    config_data = json.load(f)
-                
-                # 更新或添加数据库配置
-                config_data['database'] = db_config
-                
-                # 写回文件
-                with open(config_json_path, 'w', encoding='utf-8') as f:
-                    json.dump(config_data, f, indent=2, ensure_ascii=False)
-                    
-                logger.info("已同步config.json与.env中的数据库配置")
-            except Exception as e:
-                logger.warning(f"同步config.json失败: {e}")
-    except Exception as e:
-        logger.warning(f"同步配置文件失败: {e}")
+    """不再写回敏感信息到config.json，保持.env为唯一来源。"""
+    # 为兼容旧逻辑保留空实现，避免写入包含密码的数据库配置到版本库
+    return
 
 def init_managers():
     """初始化各个管理器"""
     global interpreter_manager, database_manager, history_manager, smart_router, sql_executor
     
-    # 首先同步配置文件
+    # 不写入任何敏感配置文件，直接基于.env初始化
     sync_config_files()
     
     try:
@@ -391,13 +379,14 @@ def debug_onboarding():
     """新手引导调试页面"""
     return send_from_directory(TEMPLATE_DIR, 'debug_onboarding.html')
 
-@app.route('/config/<path:filename>')
-def serve_config(filename):
-    """服务配置文件"""
-    import os
+@app.route('/config/onboarding_config.json')
+def serve_onboarding_config():
+    """仅安全地公开新手引导配置，避免泄露其他配置文件。"""
     config_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
-    if os.path.exists(os.path.join(config_dir, filename)):
-        return send_from_directory(config_dir, filename)
+    safe_file = 'onboarding_config.json'
+    path = os.path.join(config_dir, safe_file)
+    if os.path.exists(path):
+        return send_from_directory(config_dir, safe_file)
     return jsonify({"error": "配置文件不存在"}), 404
 
 @app.route('/api/health', methods=['GET'])
