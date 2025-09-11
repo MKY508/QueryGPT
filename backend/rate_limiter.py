@@ -82,8 +82,8 @@ class RateLimiter:
             return request.remote_addr or '127.0.0.1'
     
     def cleanup(self):
-        """清理过期的数据"""
-        current_time = time.time()
+        """清理过期的数据（使用 monotonic 与 is_allowed 一致）"""
+        current_time = time.monotonic()
         window_start = current_time - self.window_seconds
         
         # 清理请求历史
@@ -95,10 +95,7 @@ class RateLimiter:
                 del self.requests[identifier]
         
         # 清理过期的黑名单
-        expired_bans = [
-            ip for ip, ban_end in self.blacklist.items()
-            if current_time >= ban_end
-        ]
+        expired_bans = [ip for ip, ban_end in self.blacklist.items() if current_time >= ban_end]
         for ip in expired_bans:
             del self.blacklist[ip]
 
