@@ -617,8 +617,9 @@ class InterpreterManager:
         
         summary_parts = []
         
-        # 提取最近的对话（最多3轮）
-        recent_messages = conversation_history[-6:]  # 3轮 = 6条消息（用户+助手）
+        # 提取最近的对话（最多 N 轮，按 max_history_rounds 控制，默认3）
+        rounds = max(1, int(getattr(self, 'max_history_rounds', 3) or 3))
+        recent_messages = conversation_history[-2*rounds:]  # N轮 = 2N条消息（用户+助手）
         
         # 查找已探索的数据库和表
         explored_dbs = set()

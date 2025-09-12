@@ -288,7 +288,8 @@ class DatabaseManager:
             # 测试1：基础连接
             logger.info(f"测试连接到 {test_result['host']}:{test_result['port']}")
             result = self.execute_query("SELECT 1 as test")
-            if len(result) > 0:
+            # 统一按照 execute_query 的标准返回结构判断
+            if isinstance(result, dict) and result.get("row_count", 0) >= 1:
                 test_result["connected"] = True
                 test_result["test_queries"].append({
                     "query": "SELECT 1",
@@ -340,13 +341,33 @@ class DatabaseManager:
             # 测试4：检查版本信息
             if test_result["connected"]:
                 try:
-                    version_result = self.execute_query("SELECT VERSION() as version")
-                    if version_result:
-                        test_result["version"] = version_result[0].get("version", "Unknown")
+                    if self.driver == 'sqlite':
+                        rows = self._execute_raw_query("SELECT sqlite_version() as version")
+                    else:
+                        rows = self._execute_raw_query("SELECT VERSION() as version")
+                    version_value = None
+                    if rows:
+                        first = rows[0]
+                        if isinstance(first, dict):
+                            version_value = first.get('version')
+                        else:
+                            # sqlite3.Row 或元组
+                            try:
+                                version_value = first[0]
+                            except Exception:
+                                version_value = None
+                    if version_value:
+                        test_result["version"] = str(version_value)
                         test_result["test_queries"].append({
                             "query": "SELECT VERSION()",
                             "success": True,
                             "message": f"数据库版本: {test_result['version']}"
+                        })
+                    else:
+                        test_result["test_queries"].append({
+                            "query": "SELECT VERSION()",
+                            "success": False,
+                            "message": "未获取到版本"
                         })
                 except Exception as e:
                     test_result["test_queries"].append({

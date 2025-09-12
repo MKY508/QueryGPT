@@ -55,6 +55,14 @@ app = Flask(__name__,
             template_folder=TEMPLATE_DIR,
             static_url_path='/static')
 
+# 初始化日志（文件轮转、第三方库降噪）
+try:
+    from backend.log_config import setup_logging, setup_request_logging
+    setup_logging(app_name="querygpt", log_dir=os.path.join(PROJECT_ROOT, 'logs'))
+    setup_request_logging()
+except Exception as _e:
+    logger.warning(f"日志系统初始化失败: {_e}")
+
 # 初始化Swagger文档（可选）
 try:
     # 修复导入路径，确保从 backend 包加载
@@ -253,7 +261,8 @@ def chat_stream():
                 yield _sse_format('progress', { 'stage': 'start', 'message': '开始处理请求…', 'conversation_id': conv_id })
 
                 # 路由阶段
-                route_info = {'route_type': 'AI_ANALYSIS', 'confidence': 0}
+                # 规范化路由类型为小写，保持与后端枚举一致
+                route_info = {'route_type': 'ai_analysis', 'confidence': 0}
                 config_path = os.path.join(os.path.dirname(__file__), 'config', 'config.json')
                 smart_enabled = False
                 try:
@@ -276,7 +285,7 @@ def chat_stream():
                     }
                     try:
                         classification = smart_router.ai_classifier.classify(user_query, smart_router._prepare_routing_context(router_ctx)) if smart_router.ai_classifier else {}
-                        route_type = classification.get('route', 'ai_analysis')
+                        route_type = str(classification.get('route', 'ai_analysis')).lower()
                         route_info['route_type'] = route_type
                         route_info['confidence'] = classification.get('confidence', 0)
                         yield _sse_format('progress', { 'stage': 'route', 'message': f"执行路径：{route_type}", 'route': route_info })
@@ -306,7 +315,7 @@ def chat_stream():
                         pass
 
                 # 友好阶段提示
-                if route_info['route_type'] == 'direct_sql':
+                if route_info.get('route_type') == 'direct_sql':
                     yield _sse_format('progress', { 'stage': 'execute', 'message': '正在执行数据库查询…' })
                 else:
                     yield _sse_format('progress', { 'stage': 'analyze', 'message': '正在分析数据与生成图表…' })
