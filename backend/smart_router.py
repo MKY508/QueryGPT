@@ -255,7 +255,34 @@ class SmartRouter:
         context['restrict_visualization'] = True  # 禁止生成图表
         context['suggested_sql'] = classification.get('suggested_sql', '')
         
-        # 调用interpreter_manager执行，但会使用限制性prompt
+        # 优先走确定性的 DirectSQLExecutor，避免LLM生成非只读SQL
+        if self.sql_executor:
+            try:
+                suggested_sql = classification.get('suggested_sql') or ''
+                sql = suggested_sql.strip()
+                if not sql:
+                    # 简单的自然语言转SQL（规则模板）
+                    try:
+                        from backend.sql_executor import NaturalLanguageToSQL
+                        converter = NaturalLanguageToSQL()
+                        sql = converter.convert(query) or ''
+                    except Exception:
+                        sql = ''
+                if sql:
+                    exec_res = self.sql_executor.execute(sql)
+                    if exec_res.get('success'):
+                        # 格式化为统一的聊天结果结构（文本描述 + 可选表格摘要）
+                        formatted = self._format_sql_result(exec_res, sql)
+                        formatted["routing_info"] = {
+                            "route_type": "DIRECT_SQL",
+                            "confidence": classification.get('confidence', 0),
+                            "reason": classification.get('reason', '简单SQL查询')
+                        }
+                        return formatted
+            except Exception as _e:
+                logger.warning(f"DirectSQLExecutor 执行失败，回退到解释器: {_e}")
+
+        # 回退：调用 interpreter_manager 执行（限制性 prompt）
         if self.interpreter_manager:
             result = self.interpreter_manager.execute_query(
                 query=query,
