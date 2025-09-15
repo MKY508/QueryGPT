@@ -68,6 +68,16 @@
 
 ## 🌟 Key Features
 
+### Intelligent Routing System 🆕
+- **AI Query Classification**: Uses LLM to intelligently determine query intent and automatically select optimal execution path
+- **Four Execution Modes**:
+  - `DIRECT_SQL`: Simple queries directly convert to SQL, millisecond-level response
+  - `SIMPLE_ANALYSIS`: SQL + lightweight data processing, completed in seconds
+  - `COMPLEX_ANALYSIS`: Complete Agent process for deep analysis
+  - `VISUALIZATION`: Automatic generation of interactive charts
+- **Performance Boost**: Simple query response speed improved by 80%+, complex queries maintain full capability
+- **Flexible Configuration**: Each mode has independent prompts, can be fine-tuned for business needs
+
 ### Agent Core Capabilities
 - **Autonomous Data Exploration**: Agent proactively understands data structure and explores relationships
 - **Multi-round Reasoning**: Like an analyst, investigates deeply when issues arise
@@ -81,18 +91,22 @@
 - **Smart Visualization**: Automatically selects best chart type based on data characteristics
 
 ### System Features
+- **Intelligent Routing System**: 🆕 AI automatically determines query type and selects optimal execution path (Beta)
+- **Onboarding System**: 🆕 Interactive bubble tips to help new users get started quickly
 - **Multi-model Support**: Switch freely between GPT-5, Claude, Gemini, Ollama local models
 - **Flexible Deployment**: Supports cloud API or Ollama local deployment, data never leaves premises
 - **History Records**: Saves analysis process, supports backtracking and sharing
 - **Data Security**: Read-only permissions, SQL injection protection, sensitive data masking
 - **Flexible Export**: Supports Excel, PDF, HTML and other formats
+- **Custom Prompts**: Frontend visual editing of query prompts, supports import/export configuration
 
-## 📦 Technical Requirements
+## 📦 Environment Requirements
 
 - Python 3.10.x (Required, OpenInterpreter 0.4.3 dependency)
-- MySQL or compatible database
+- MySQL protocol compatible database (see support list below)
+- Supported systems: Linux, macOS, **Windows (must use WSL)**
 
-> Windows: Run inside WSL (do not run scripts from PowerShell/CMD).
+> ⚠️ **Important notice for Windows users**: This project uses bash scripts and **must run in WSL (Windows Subsystem for Linux)**, not supported in PowerShell or CMD.
 
 <br/>
 
@@ -119,63 +133,46 @@
 
 ## 🚀 Quick Start
 
-### Environment Requirements
+### 🖥️ Windows / WSL Tips
+
+- Only supported in WSL Linux environment; do not execute scripts in PowerShell/CMD.
+- If WSL not installed: Run `wsl --install` in Administrator PowerShell, restart and open "Ubuntu".
+- For detailed steps, see "Simple Installation → Windows WSL Users" below.
+
+### Simple Installation
+
+#### 🍎 macOS / Linux Users
 ```bash
-# Python 3.10.x (Required)
-python --version  # Should show 3.10.x
-
-# MySQL or compatible database
-mysql --version
-```
-
-### Installation Steps
-
-#### 1. Clone the Project
-```bash
+# 1. Clone project
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
+
+# 2. Run scripts
+./setup.sh   # Auto-install all dependencies (2-5 minutes)
+./start.sh   # Start services
 ```
 
-#### 2. Install Dependencies
+That's it! ✨
+
+#### 🪟 Windows WSL Users
 ```bash
-# Create virtual environment (recommended)
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows
+# Step 1: Enter WSL (in PowerShell)
+wsl
 
-# Install dependencies
-pip install -r requirements.txt
+# Step 2: Clone project (in WSL)
+cd ~
+git clone https://github.com/MKY508/QueryGPT.git
+cd QueryGPT
+
+# Step 3: Run scripts (in WSL)
+./setup.sh   # Auto-handle all dependencies
+./start.sh   # Start services
 ```
 
-#### 3. Configure System
+> **Performance optimization**: WSL scripts auto-detect and migrate from Windows filesystem (/mnt/) to Linux filesystem (~/), improving performance by 10x
 
-Create `.env` file:
-```bash
-# LLM API Configuration (choose one)
-OPENAI_API_KEY=your_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1  # Or other compatible API
-
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=your_username
-DB_PASSWORD=your_password
-DB_NAME=your_database  # Optional, leave empty for cross-database queries
-```
-
-#### 4. Start System
-```bash
-# Start the system
-./start.sh
-
-# Or manual start
-python backend/app.py
-```
-
-Visit `http://localhost:5000` to start using!
-
-<!-- Docker deployment is currently not maintained for this project. -->
+### Access Service
+Open browser and visit: `http://localhost:5000`
 
 ## 💡 Usage Examples
 
@@ -197,19 +194,39 @@ Visit `http://localhost:5000` to start using!
 
 ## 🔧 Configuration
 
-### Supported Models (Choose a powerful model for best results)
+### Supported Models
 - **OpenAI**: GPT-5, GPT-4.1 (economical)
 - **Anthropic**: Claude 4 Opus, Sonnet (highest rated, most intelligent, frequent tool use)
 - **Google**: Gemini 2.5 Pro (may have litellm compatibility issues)
-- **Domestic Models**: Qwen, DeepSeek (including thinking models, but not recommended)
-- **Local Models**: via Ollama - Llama, Mistral, Qwen etc. (baseline: qwen2.5 7b+, otherwise insufficient for agent processes)
+- **Domestic Models**: Qwen, DeepSeek, GLM-4, Baichuan, etc.
+- **Local Models**: via Ollama - Llama, Mistral, Qwen etc. (recommended qwen2.5 7b+, ensure code capability)
+- **Recommended**: Claude 4 series, GPT-4, DeepSeek V3 and other powerful foundation models to ensure Agent execution success rate
 
 ### Database Support
-- MySQL 5.7+
-- MariaDB 10.3+
-- TiDB
-- OceanBase
-- Other MySQL protocol compatible databases
+
+The system uses standard MySQL protocol and supports the following databases:
+
+#### ✅ Fully Compatible
+- **Apache Doris** / **StarRocks** - OLAP analytical databases (recommended for big data analysis)
+- **MySQL 5.7+** / **MariaDB 10.3+** - Traditional relational databases
+- **TiDB** - Distributed NewSQL database
+- **OceanBase** - Distributed database (MySQL mode)
+- **PolarDB** - Alibaba Cloud-native database
+
+#### ⚠️ Notes
+- This system uses **read-only queries** (SELECT, SHOW, DESCRIBE)
+- Does not depend on stored procedures, triggers, foreign keys and other features
+- Supports cross-database queries (leave database name empty in configuration)
+
+#### 🔧 Connection Configuration
+```bash
+# .env configuration example
+DB_HOST=localhost
+DB_PORT=9030      # Doris/StarRocks: 9030, MySQL: 3306, TiDB: 4000
+DB_USER=root
+DB_PASSWORD=your_password
+DB_NAME=          # Leave empty for cross-database query support
+```
 
 ## 📚 Documentation
 
@@ -219,6 +236,35 @@ Visit `http://localhost:5000` to start using!
 - [FAQ](FAQ.md)
 - [Configuration Guide](CONFIGURATION.md)
 
+## 🔧 Quick Troubleshooting
+
+### Windows/WSL Common Issues
+
+| Problem | Solution |
+|---------|----------|
+| **bash: ./setup.sh: No such file or directory** | You're in PowerShell, please enter `wsl` first to enter WSL environment |
+| **'.' is not recognized as an internal or external command** | Same as above, must run in WSL, not CMD/PowerShell |
+| **Permission denied** | Run `chmod +x setup.sh start.sh` to add execute permissions |
+| **Process stops immediately in WSL** | Script auto-handles this, uses foreground mode |
+| **python3: command not found** | Run `sudo apt update && sudo apt install python3` in WSL |
+
+### Linux/Ubuntu Common Issues
+
+| Problem | Solution |
+|---------|----------|
+| **No module named 'venv'** | Run `sudo apt install python3-venv` or use v1.2 setup.sh for auto-fix |
+| **pip install timeout** | Auto-configured domestic mirror sources (Alibaba/Tsinghua/USTC) |
+| **virtualenv: command not found** | Run `pip install virtualenv` |
+
+### General Issues
+
+| Problem | Solution |
+|---------|----------|
+| **Port occupied** | Auto-scan ports 5000-5100 to find available port |
+| **backend directory not found** | Run `cd ~/QueryGPT-github && ./start.sh` |
+| **Virtual environment doesn't exist** | Run `./setup.sh` to reinstall |
+| **Environment detection issues** | Run `./diagnostic.sh` for detailed environment info |
+
 ## 🤝 Contributing
 
 Issues and Pull Requests are welcome!
@@ -227,9 +273,56 @@ Issues and Pull Requests are welcome!
 
 MIT License - see [LICENSE](../LICENSE) for details
 
-## 🆕 Latest Updates
+## Latest Updates
 
-- 2025-09-05 – Startup speed optimization: removed first-visit model auto test to reduce initial requests and avoid unintended state changes.
+### 2025-09-05 - v1.2 Official Release
+- **Smart Virtual Environment Creation**: Resolved Ubuntu/Debian missing python3-venv issue
+- **Three-tier Fallback Mechanism**: venv → auto-install python3-venv → virtualenv backup
+- **Windows WSL Documentation**: Enhanced README with clear WSL requirement explanation
+- **Environment Detection Optimization**: Fixed macOS and pure Linux environment detection issues
+- **New Diagnostic Tools**: Added diagnostic.sh for environment troubleshooting
+- **Deep Code Cleanup**: Removed 45KB unused code, improved project maintainability
+- **Startup Speed Optimization**: Removed auto-batch testing on first model page visit, reducing unnecessary requests and avoiding state corruption, shortening initial load time
+
+### 2025-09-03 - Perfect Windows WSL Support
+- **WSL Auto-optimization**: Auto-detect WSL environment and migrate to Linux filesystem, 10x performance boost
+- **Smart Path Handling**: Auto-handle differences between Windows paths (/mnt/*) and Linux paths (~/)
+- **Process Management Fix**: Solved WSL background process immediate stop issue, using foreground mode
+- **Network Issue Resolution**: Auto-configure domestic mirror sources (Alibaba/Tsinghua/USTC), solve pip timeout
+- **Minimal Scripts**: Simplified to only setup.sh and start.sh, auto-handle all environment differences
+- **Zero-config Experience**: WSL users need no additional configuration, auto-detect and optimize
+
+### 2025-08-28 - v1.1 System Optimization Upgrade
+- **Enhanced Intelligent Routing**: Optimized query classification logic, simple queries direct SQL execution, complex analysis full feature support
+- **Process Management Fix**: Resolved stop button click continuing background processes, complete process tree management
+- **Onboarding Optimization**: Fixed repeated guidance display, added version control and session check mechanism
+- **Prompt Customization**: Support different routing modes using independent system prompts, optimized query effects
+- **Configuration Service**: Added configuration file routing support, fixed frontend-backend configuration mapping inconsistency
+
+### 2025-08-28 - Onboarding System
+- **Interactive Guidance**: First visit auto-shows system features, bubble tips guide operations
+- **Smart Positioning**: Auto-detect element positions, ensure bubbles accurately point to targets
+- **Flexible Configuration**: Control guidance behavior through config files, easily disable
+- **Progress Tracking**: Display guidance progress, support forward, backward, skip operations
+- **User-friendly**: History optimization, removed redundant model display, fixed conversation counting
+
+> Configuration file: `config/onboarding_config.json` - Set `enabled: false` to disable guidance
+
+### 2025-08-25 - AI Intelligent Routing System Launch (Beta)
+- **Smart Classification**: AI auto-identifies query types (direct SQL, simple analysis, complex analysis, visualization)
+- **Performance Optimization**: Simple queries direct SQL execution, 80%+ response speed improvement
+- **Independent Configuration**: Each routing type equipped with dedicated Prompt, precise behavior control
+- **Flexible Control**: One-click enable/disable intelligent routing in basic settings
+- **Complete Monitoring**: Real-time routing distribution statistics, optimize system performance
+
+> Enter `Settings` → `Basic Settings` → `Intelligent Routing` to enable Beta feature!
+
+### 2025-08-24 - Custom Prompt Feature
+- **Visual Editing**: Directly edit AI query prompts in settings page
+- **Configuration Management**: Support save, restore defaults, import/export configuration
+- **Flexible Customization**: Adjust exploration strategies, table selection rules, field mapping based on business needs
+- **Multi-language Support**: Complete Chinese-English i18n support
+- **Real-time Effect**: Changes apply immediately to query process
 
 ## 🙏 Acknowledgments
 
@@ -241,6 +334,7 @@ MIT License - see [LICENSE](../LICENSE) for details
 
 - GitHub Issues: [Submit Issues](https://github.com/MKY508/QueryGPT/issues)
 - Email: mky369258@gmail.com
+- This is the author's first work. For any questions or possible improvements, feel free to submit issues or PRs, and I'll do my best to make adjustments
 
 ## ⭐ Star History
 
