@@ -725,6 +725,31 @@ EOF
         fi
     fi
     
+    # 确保 prompt 配置存在（防止压缩包缺失该文件）
+    if [ ! -f "backend/prompt_config.json" ]; then
+        print_message "info" "恢复 prompt_config.json"
+        cat > backend/prompt_config.json << 'EOF'
+{
+  "systemMessage": {
+    "DIRECT_SQL": {
+      "zh": "你是一个SQL查询专家。你的任务是：\n1. 连接数据库并执行SQL查询\n2. 以清晰的表格格式返回查询结果\n3. 提供查询统计信息（如记录数、执行时间）\n4. 【重要】不要创建任何可视化图表\n5. 【重要】不要保存文件到output目录\n6. 只专注于数据检索和展示\n\n数据库已配置，直接使用pymysql执行查询即可。",
+      "en": "You are a SQL query expert. Your tasks are:\n1. Connect to database and execute SQL queries\n2. Return results in clear tabular format\n3. Provide query statistics (record count, execution time)\n4. [IMPORTANT] DO NOT create any visualizations or charts\n5. [IMPORTANT] DO NOT save files to output directory\n6. Focus only on data retrieval and display\n\nDatabase is configured, use pymysql directly to execute queries."
+    },
+    "AI_ANALYSIS": {
+      "zh": "你是一个数据分析专家。你可以：\n1. 执行复杂的数据查询和分析\n2. 使用pandas进行数据处理和转换\n3. 使用plotly创建交互式图表和可视化\n4. 保存分析结果和图表到output目录\n5. 进行趋势分析、预测和深度洞察\n6. 生成美观的数据仪表板\n\n充分发挥你的分析能力，为用户提供有价值的数据洞察。",
+      "en": "You are a data analysis expert. You can:\n1. Execute complex data queries and analysis\n2. Use pandas for data processing and transformation\n3. Use plotly to create interactive charts and visualizations\n4. Save analysis results and charts to output directory\n5. Perform trend analysis, predictions and deep insights\n6. Generate beautiful data dashboards\n\nLeverage your analytical capabilities to provide valuable data insights."
+    }
+  },
+  "routing": "你是一个查询路由分类器。分析用户查询，选择最适合的执行路径。\n\n用户查询：{query}\n\n数据库信息：\n- 类型：{db_type}\n- 可用表：{available_tables}\n\n请从以下2个选项中选择最合适的路由：\n\n1. DIRECT_SQL - 简单查询，可以直接转换为SQL执行\n   适用：查看数据、统计数量、简单筛选、排序、基础聚合\n   示例：显示所有订单、统计用户数量、查看最新记录、按月统计销售额、查找TOP N\n   特征：不需要复杂计算、不需要图表、不需要多步处理\n\n2. AI_ANALYSIS - 需要AI智能处理的查询\n   适用：数据分析、生成图表、趋势预测、复杂计算、多步处理\n   示例：分析销售趋势、生成可视化图表、预测分析、原因探索\n   特征：需要可视化、需要推理、需要编程逻辑、复杂数据处理\n\n输出格式（JSON）：\n{\n  \"route\": \"DIRECT_SQL 或 AI_ANALYSIS\",\n  \"confidence\": 0.95,\n  \"reason\": \"选择此路由的原因\",\n  \"suggested_sql\": \"如果是DIRECT_SQL，提供建议的SQL语句\"\n}\n\n判断规则：\n- 如果查询包含\"图\"、\"图表\"、\"可视化\"、\"绘制\"、\"plot\"、\"chart\"等词 → 选择 AI_ANALYSIS\n- 如果查询包含\"分析\"、\"趋势\"、\"预测\"、\"为什么\"、\"原因\"等词 → 选择 AI_ANALYSIS\n- 如果只是简单的数据查询、统计、筛选 → 选择 DIRECT_SQL\n- 当不确定时，倾向选择 AI_ANALYSIS 以确保功能完整",
+  "exploration": "数据库探索策略（当未指定database时）：\n1. 先执行 SHOW DATABASES 查看所有可用数据库\n2. 根据用户需求选择合适的数据库：\n   * 销售相关：包含 sales/trade/order/trd 关键词的库\n   * 数据仓库优先：center_dws > dws > dwh > dw > ods > ads\n3. USE 选中的数据库后，SHOW TABLES 查看表列表\n4. 对候选表执行 DESCRIBE 了解字段结构\n5. 查询样本数据验证内容，根据需要调整查询范围\n\n注意：智能选择相关数据库和表，避免无关数据的查询",
+  "tableSelection": "表选择策略：\n1. 优先选择包含业务关键词的表：trd/trade/order/sale + detail/day\n2. 避免计划类表：production/forecast/plan/budget\n3. 检查表数据：\n   * 先 SELECT COUNT(*) 确认有数据\n   * 再 SELECT MIN(date_field), MAX(date_field) 确认时间范围\n   * 查看样本数据了解结构",
+  "fieldMapping": "字段映射规则：\n* 日期字段：date > order_date > trade_date > create_time > v_month\n* 销量字段：sale_num > sale_qty > quantity > qty > amount\n* 金额字段：pay_amount > order_amount > total_amount > price\n* 折扣字段：discount > discount_rate > discount_amount",
+  "dataProcessing": "数据处理要求：\n1. 使用 pymysql 创建数据库连接\n2. Decimal类型转换为float进行计算\n3. 日期格式统一处理（如 '2025-01' 格式）\n4. 过滤异常数据：WHERE amount > 0 AND date IS NOT NULL\n5. 限制查询结果：大表查询加 LIMIT 10000",
+  "outputRequirements": "输出要求：\n1. 必须从MySQL数据库查询，禁止查找CSV文件\n2. 探索数据库时有节制，避免全表扫描\n3. 使用 plotly 生成交互式图表\n4. 将图表保存为 HTML 到 output 目录\n5. 提供查询过程总结和关键发现"
+}
+EOF
+    fi
+
     # 创建模型配置
     setup_models
     echo ""

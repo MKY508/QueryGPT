@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 from backend.ai_router import AIRoutingClassifier, RouteType
 from backend.llm_service import llm_manager
 from backend.sql_executor import DirectSQLExecutor
+from backend.config_loader import ConfigLoader
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,12 @@ class SmartRouter:
         
         # 加载保存的routing prompt
         custom_prompt = self._load_routing_prompt()
+
+        # 读取特性开关，避免缺省配置触发异常
+        try:
+            self.feature_flags = ConfigLoader.get_config().get('features', {})
+        except Exception:
+            self.feature_flags = {}
         
         # 初始化AI分类器并进行健康检查
         self.llm_available = False
