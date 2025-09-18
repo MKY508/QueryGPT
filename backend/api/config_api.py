@@ -1,3 +1,4 @@
+from backend.config_loader import ConfigLoader
 import os
 import json
 import logging
@@ -216,6 +217,7 @@ def handle_config():
     """获取或保存配置（Blueprint版本）"""
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(PROJECT_ROOT, 'config', 'config.json')
+    env_path = os.path.join(PROJECT_ROOT, '.env')
 
     if request.method == 'GET':
         try:
@@ -269,8 +271,67 @@ def handle_config():
     else:
         try:
             config = request.json or {}
-            # 写入 .env 和 config.json 的逻辑保留在 app 版本，此处可轻量实现或透传
-            # 为安全起见，这里仅保存 UI 相关设置到 config.json
+
+            env_updates = {}
+            if 'api_key' in config:
+                api_key_value = str(config['api_key'])
+                for key in ('OPENAI_API_KEY', 'API_KEY', 'LLM_API_KEY'):
+                    env_updates[key] = api_key_value
+
+            if 'api_base' in config:
+                api_base_value = str(config['api_base'])
+                for key in ('OPENAI_BASE_URL', 'OPENAI_API_BASE', 'API_BASE_URL', 'LLM_BASE_URL'):
+                    env_updates[key] = api_base_value
+
+            if 'default_model' in config:
+                env_updates['DEFAULT_MODEL'] = str(config['default_model'])
+
+            db_cfg = config.get('database') or {}
+            if isinstance(db_cfg, dict) and db_cfg:
+                host = db_cfg.get('host')
+                if host == 'localhost':
+                    host = '127.0.0.1'
+                if host:
+                    env_updates['DB_HOST'] = str(host)
+                if db_cfg.get('port') is not None:
+                    env_updates['DB_PORT'] = str(db_cfg.get('port'))
+                if db_cfg.get('user') is not None:
+                    env_updates['DB_USER'] = str(db_cfg.get('user'))
+                if db_cfg.get('password') is not None:
+                    env_updates['DB_PASSWORD'] = str(db_cfg.get('password'))
+                if db_cfg.get('database') is not None:
+                    env_updates['DB_DATABASE'] = str(db_cfg.get('database', ''))
+
+            if env_updates:
+                env_lines = []
+                if os.path.exists(env_path):
+                    with open(env_path, 'r', encoding='utf-8') as f:
+                        env_lines = f.readlines()
+                seen_keys = set()
+                new_lines = []
+                for line in env_lines:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith('#') or '=' not in stripped:
+                        new_lines.append(line)
+                        continue
+                    key, _ = stripped.split('=', 1)
+                    if key in env_updates:
+                        new_lines.append(f"{key}={env_updates[key]}\n")
+                        seen_keys.add(key)
+                    else:
+                        new_lines.append(line)
+                for key, value in env_updates.items():
+                    if key not in seen_keys:
+                        new_lines.append(f"{key}={value}\n")
+                with open(env_path, 'w', encoding='utf-8') as f:
+                    f.writelines(new_lines)
+                try:
+                    ConfigLoader._env_loaded = False
+                    ConfigLoader._api_config_cache = None
+                    ConfigLoader._models_mtime = None
+                except Exception:
+                    pass
+
             ui_keys = ['interface_language', 'interface_theme', 'auto_run_code', 'show_thinking', 'context_rounds', 'default_view_mode', 'features']
             to_save = {k: v for k, v in config.items() if k in ui_keys}
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
@@ -285,6 +346,13 @@ def handle_config():
             existing.update(to_save)
             with open(config_path, 'w', encoding='utf-8') as f:
                 json.dump(existing, f, indent=2, ensure_ascii=False)
+
+            try:
+                ConfigLoader._env_loaded = False
+                ConfigLoader._api_config_cache = None
+            except Exception:
+                pass
+
             return jsonify({"success": True})
         except Exception as e:
             logger.error(f"保存配置失败: {e}")
