@@ -1,3 +1,4 @@
+from backend.config_loader import ConfigLoader
 """
 AI驱动的智能查询路由系统
 完全使用AI进行查询分类和路由决策
