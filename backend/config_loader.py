@@ -2,11 +2,14 @@
 配置加载模块 - 统一从.env文件读取配置
 """
 import os
+import json
 import logging
 from typing import Dict, Any
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+CONFIG_PATH = Path(__file__).parent.parent / 'config' / 'config.json'
 
 class ConfigLoader:
     """统一的配置加载器，优先使用.env文件"""
@@ -58,28 +61,76 @@ class ConfigLoader:
         ConfigLoader._env_loaded = True
     
     @staticmethod
+    def _load_config_file() -> Dict[str, Any]:
+        """读取 config.json，若不存在则返回空字典"""
+        if CONFIG_PATH.exists():
+            try:
+                with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+            except Exception as exc:
+                logger.warning(f"读取配置文件失败 ({CONFIG_PATH}): {exc}")
+        return {}
+    
+    @staticmethod
     def get_database_config() -> Dict[str, Any]:
-        """获取数据库配置"""
+        """获取数据库配置；优先 .env，其次 config.json，最后回退默认值"""
         ConfigLoader.load_env()
         
-        # 不要提供默认值，强制从环境变量读取
-        db_host = os.getenv("DB_HOST")
-        db_port = os.getenv("DB_PORT")
-        db_user = os.getenv("DB_USER")
-        db_password = os.getenv("DB_PASSWORD", "")  # 允许空密码
-        
-        # 验证必需的配置（密码可以为空字符串）
-        if not db_host or not db_port or not db_user:
-            raise ValueError(
-                "数据库配置不完整，请确保.env文件包含：DB_HOST, DB_PORT, DB_USER"
-            )
-        
+        defaults = {
+            "host": "127.0.0.1",
+            "port": 3306,
+            "user": "root",
+            "password": "",
+            "database": ""
+        }
+        file_config = ConfigLoader._load_config_file().get('database', {})
+        env_host = os.getenv("DB_HOST")
+        env_port = os.getenv("DB_PORT")
+        env_user = os.getenv("DB_USER")
+        env_password = os.getenv("DB_PASSWORD")
+        env_database = os.getenv("DB_DATABASE")
+
+        host = env_host or file_config.get('host') or defaults['host']
+        port_raw = env_port or file_config.get('port') or defaults['port']
+        user = env_user or file_config.get('user') or defaults['user']
+        password = env_password if env_password is not None else file_config.get('password', defaults['password'])
+        database = env_database if env_database is not None else file_config.get('database', defaults['database'])
+
+        if isinstance(host, str):
+            host = host.strip() or defaults['host']
+        else:
+            host = defaults['host']
+
+        if host in {'localhost', '::1'}:
+            host = '127.0.0.1'
+
+        try:
+            port = int(port_raw)
+        except (TypeError, ValueError):
+            logger.warning(f"DB_PORT 值无效 ({port_raw})，使用默认 {defaults['port']}")
+            port = defaults['port']
+
+        configured = any([
+            env_host,
+            env_port,
+            env_user,
+            env_password,
+            env_database,
+            bool(file_config)
+        ])
+
+        if not configured:
+            logger.info("未检测到数据库配置，使用占位默认值")
+
         return {
-            "host": db_host,
-            "port": int(db_port),
-            "user": db_user,
-            "password": db_password if db_password else "",  # 确保密码至少是空字符串
-            "database": os.getenv("DB_DATABASE", "")
+            "host": host,
+            "port": port,
+            "user": user or defaults['user'],
+            "password": password or "",
+            "database": database or "",
+            "configured": configured
         }
     
     # 简单缓存以避免每次磁盘IO读取models.json
@@ -119,15 +170,18 @@ class ConfigLoader:
         
         # 从环境变量获取默认的API配置
         api_key = (
-            os.getenv("OPENAI_API_KEY") or               # 标准OpenAI命名
-            os.getenv("API_KEY") or                      # 旧命名（向后兼容）
-            os.getenv("LLM_API_KEY") or                  # 备选命名
-            "not-needed"                                 # 默认值（用于本地模型）
+            os.getenv("OPENAI_API_KEY") or
+            os.getenv("API_KEY") or
+            os.getenv("LLM_API_KEY") or
+            "not-needed"
         )
-        
-        # 统一走 OpenAI 兼容路径（可被 OPENAI_BASE_URL 覆盖）
+
         api_base = (
-            os.getenv("OPENAI_BASE_URL") or 'https://api.openai.com/v1'
+            os.getenv("OPENAI_BASE_URL") or
+            os.getenv("OPENAI_API_BASE") or
+            os.getenv("API_BASE_URL") or
+            os.getenv("LLM_BASE_URL") or
+            'http://localhost:11434/v1'
         )
         
         # 获取默认模型并标准化
@@ -195,7 +249,7 @@ class ConfigLoader:
             "api_key": api_key,
             "api_base": api_base,
             "default_model": default_model,
-            "current_model": default_model,  # 添加 current_model 字段
+            "current_model": default_model,
             "models": models
         }
         # 写入缓存

@@ -349,7 +349,10 @@ class SettingsManager {
         try {
             // 从后端获取模型列表
             const response = await api.getModels();
-            this.models = response.models || [];
+            this.models = (response.models || []).map(model => ({
+                ...model,
+                status: model.status || 'pending'
+            }));
             this.renderModelsList();
         } catch (error) {
             console.error('加载模型列表失败:', error);
@@ -388,6 +391,19 @@ class SettingsManager {
         }
     }
 
+    formatModelType(rawType) {
+        if (!rawType) return 'Unknown';
+        const typeMap = {
+            openai: 'OpenAI',
+            anthropic: 'Anthropic',
+            deepseek: 'DeepSeek',
+            qwen: 'Qwen',
+            custom: '自定义'
+        };
+        const key = String(rawType).toLowerCase();
+        return typeMap[key] || rawType;
+    }
+
     /**
      * 渲染模型列表
      */
@@ -397,15 +413,39 @@ class SettingsManager {
 
         let html = '';
         this.models.forEach(model => {
-            const statusClass = model.status === 'active' ? 'active' : 
-                               model.status === 'testing' ? 'testing' : 'inactive';
-            const statusText = model.status === 'active' ? '可用' : 
-                              model.status === 'testing' ? '测试中' : '不可用';
+            let statusClass = 'inactive';
+            let statusText = '不可用';
+            switch (model.status) {
+                case 'active':
+                    statusClass = 'active';
+                    statusText = '可用';
+                    break;
+                case 'testing':
+                    statusClass = 'testing';
+                    statusText = '测试中';
+                    break;
+                case 'pending':
+                    statusClass = 'testing';
+                    statusText = '待测试';
+                    break;
+                case 'error':
+                    statusClass = 'inactive';
+                    statusText = '配置错误';
+                    break;
+                default:
+                    statusClass = 'inactive';
+                    statusText = '不可用';
+            }
+            if (!model.status) {
+                statusClass = 'testing';
+                statusText = '待测试';
+            }
+            const typeLabel = this.formatModelType(model.type);
 
             html += `
                 <tr>
                     <td>${model.name || '未命名'}</td>
-                    <td>${model.type || 'Unknown'}</td>
+                    <td>${typeLabel}</td>
                     <td>${model.api_base || 'N/A'}</td>
                     <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                     <td>
@@ -486,13 +526,14 @@ class SettingsManager {
         const modelData = {
             name: document.getElementById('model-name').value.trim(),
             id: document.getElementById('model-id').value.trim(),
-            // 保留/使用当前表单中的类型（编辑时为原类型）
             type: document.getElementById('model-type').value.trim(),
             api_base: document.getElementById('model-api-base').value.trim(),
             api_key: document.getElementById('model-api-key').value.trim(),
-            max_tokens: parseInt(document.getElementById('model-max-tokens').value),
+            max_tokens: parseInt(document.getElementById('model-max-tokens').value, 10),
             temperature: parseFloat(document.getElementById('model-temperature').value)
         };
+
+        const editingId = this.currentEditingModel;
 
         // 验证必填字段
         if (!modelData.name || !modelData.id || !modelData.api_base || !modelData.api_key) {
@@ -500,15 +541,19 @@ class SettingsManager {
             return;
         }
 
+        modelData.type = (modelData.type || 'custom').toLowerCase();
+
         try {
-            if (this.currentEditingModel) {
+            if (editingId) {
                 // 更新现有模型
-                const index = this.models.findIndex(m => m.id === this.currentEditingModel);
+                const index = this.models.findIndex(m => m.id === editingId);
                 if (index !== -1) {
+                    modelData.status = this.models[index].status || modelData.status || 'pending';
                     this.models[index] = { ...this.models[index], ...modelData };
                 }
             } else {
-                // 添加新模型，不设置状态
+                // 添加新模型，标记待测试状态
+                modelData.status = 'pending';
                 this.models.push(modelData);
             }
 
@@ -518,7 +563,6 @@ class SettingsManager {
             // 如果是当前选中的模型，更新全局API配置
             const currentModel = document.getElementById('current-model')?.value;
             if (modelData.id === currentModel || this.models.length === 1) {
-                // 保存API配置到.env文件
                 await api.saveConfig({
                     api_key: modelData.api_key,
                     api_base: modelData.api_base,
@@ -532,6 +576,8 @@ class SettingsManager {
             
             // 更新模型选择器（包含通知主应用）
             await this.updateModelSelectors();
+
+            this.testModel(modelData.id);
         } catch (error) {
             app.showNotification('保存模型失败', 'error');
         }
@@ -751,6 +797,18 @@ class SettingsManager {
             database: document.getElementById('db-name').value
         };
 
+        config.host = (config.host || '').trim();
+        if (!config.host) {
+            config.host = '127.0.0.1';
+        }
+        if (config.host.toLowerCase() === 'localhost') {
+            config.host = '127.0.0.1';
+        }
+        config.port = parseInt(config.port, 10) || 3306;
+
+        document.getElementById('db-host').value = config.host;
+        document.getElementById('db-port').value = String(config.port);
+
         app.showNotification(window.i18nManager.t('common.testingDatabase'), 'info');
 
         try {
@@ -791,8 +849,29 @@ class SettingsManager {
             database: document.getElementById('db-name').value
         };
 
+        config.host = (config.host || '').trim();
+        if (!config.host) {
+            config.host = '127.0.0.1';
+        }
+        if (config.host.toLowerCase() === 'localhost') {
+            config.host = '127.0.0.1';
+        }
+        config.port = parseInt(config.port, 10) || 3306;
+
+        document.getElementById('db-host').value = config.host;
+        document.getElementById('db-port').value = String(config.port);
+
         try {
             await api.saveDatabaseConfig(config);
+            this.config = this.config || {};
+            this.config.database = {
+                ...config,
+                configured: true
+            };
+            if (window.app) {
+                window.app.config = window.app.config || {};
+                window.app.config.database = this.config.database;
+            }
             app.showNotification('数据库配置已保存', 'success');
         } catch (error) {
             app.showNotification('保存配置失败', 'error');
@@ -865,6 +944,35 @@ class SettingsManager {
                     if (window.app) {
                         window.app.contextRounds = this.config.context_rounds;
                         console.log('更新 app.contextRounds 为:', this.config.context_rounds);
+                    }
+                }
+
+                if (this.config.database) {
+                    const dbConfig = this.config.database;
+                    const applyValue = (id, value, fallback = '') => {
+                        const input = document.getElementById(id);
+                        if (!input) return;
+                        const finalValue = value !== undefined && value !== null && value !== ''
+                            ? value
+                            : fallback;
+                        if (finalValue !== undefined && finalValue !== null) {
+                            input.value = String(finalValue);
+                        }
+                    };
+                    const normalizedHost = dbConfig.host === 'localhost' ? '127.0.0.1' : (dbConfig.host || '127.0.0.1');
+                    applyValue('db-host', normalizedHost, '127.0.0.1');
+                    applyValue('db-port', dbConfig.port, '3306');
+                    applyValue('db-user', dbConfig.user, '');
+                    applyValue('db-password', dbConfig.password, '');
+                    applyValue('db-name', dbConfig.database, '');
+
+                    if (window.app) {
+                        window.app.config = window.app.config || {};
+                        window.app.config.database = {
+                            ...dbConfig,
+                            host: normalizedHost,
+                            configured: dbConfig.configured !== undefined ? dbConfig.configured : true
+                        };
                     }
                 }
             }
@@ -1562,7 +1670,8 @@ window.settingsManager = new SettingsManager();
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOM加载完成，初始化SettingsManager');
-    await settingsManager.init();  // 先初始化，设置事件监听器
-    settingsManager.loadSettings();  // 然后加载设置
+    const manager = window.settingsManager;
+    await manager.init();  // 先初始化，设置事件监听器
+    await manager.loadSettings();  // 然后加载设置
     console.log('SettingsManager 完全初始化完成');
 });
