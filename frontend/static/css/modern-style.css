@@ -38,10 +38,12 @@ body {
    =========================== */
 .container {
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
+  height: auto;
   background: var(--color-bg-primary);
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: hidden;
 }
 
 /* ===========================
@@ -305,12 +307,14 @@ body {
   background: var(--color-bg-primary);
   position: relative;
   overflow: hidden;
+  min-height: 0;
 }
 
 .tab-content {
   display: none;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .tab-content.active {

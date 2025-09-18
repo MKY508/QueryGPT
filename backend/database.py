@@ -26,6 +26,9 @@ class DatabaseManager:
         self.cache_enabled: bool = True
         self._cache: Dict[str, Dict[str, Any]] = {}
 
+        self.driver = 'mysql'
+        self.is_configured = True
+
         # Driver 选择优先级（测试/开发友好）：
         # 1) 若提供 DATABASE_URL=sqlite:// 则优先 SQLite（无论是否测试）
         # 2) 测试模式且未显式配置 MySQL（无 DB_HOST/DB_USER）时，默认 SQLite 内存库
@@ -39,15 +42,12 @@ class DatabaseManager:
         pymysql_patched = getattr(pymysql.connect, '__module__', '').startswith('unittest.mock')
         if testing and pymysql_patched:
             self.driver = 'mysql'
-            # 构造一个最小 MySQL 配置（避免读取 .env 失败）：使用默认 localhost
-            self.config = {
-                "host": os.getenv("DB_HOST", "localhost"),
-                "port": int(os.getenv("DB_PORT", "19130")),
-                "user": os.getenv("DB_USER", "root"),
-                "password": os.getenv("DB_PASSWORD", ""),
-                "database": os.getenv("DB_DATABASE", "")
-            }
-            logger.info("测试环境检测到pymysql已打桩，走MySQL模拟路径")
+            self.config = ConfigLoader.get_database_config()
+            self.is_configured = self.config.get('configured', True)
+            if not self.is_configured:
+                logger.warning("测试环境未提供数据库配置，MySQL功能被禁用")
+            else:
+                logger.info("测试环境检测到pymysql已打桩，走MySQL模拟路径")
         elif db_url_lower.startswith('sqlite://'):
             self.driver = 'sqlite'
             # 内存或文件路径
@@ -68,14 +68,21 @@ class DatabaseManager:
             self._sqlite_main_conn.row_factory = sqlite3.Row
             logger.info("测试模式下默认启用内存SQLite数据库")
             self.config = {"driver": "sqlite", "database": 'sqlite:///:memory:'}
+            self.is_configured = True
         else:
             self.driver = 'mysql'
-            # 从.env文件加载 MySQL 配置
             self.config = ConfigLoader.get_database_config()
-            if not self.config.get('database'):
-                logger.info(f"数据库配置: {self.config['host'][:3]}***:{self.config['port']} - 模式: 跨库查询")
+            self.is_configured = self.config.get('configured', True)
+            if not self.is_configured:
+                logger.warning("数据库配置缺失，DatabaseManager 暂停运行，待配置完成后重新初始化")
             else:
-                logger.info(f"数据库配置: {self.config['host'][:3]}***:{self.config['port']} - 数据库已配置")
+                host = self.config.get('host')
+                if host in {'localhost', '::1'}:
+                    self.config['host'] = '127.0.0.1'
+                if not self.config.get('database'):
+                    logger.info(f"数据库配置: {self.config['host'][:3]}***:{self.config['port']} - 模式: 跨库查询")
+                else:
+                    logger.info(f"数据库配置: {self.config['host'][:3]}***:{self.config['port']} - 数据库已配置")
         
     
     class _ConnectionWrapper:
@@ -114,8 +121,8 @@ class DatabaseManager:
         while attempts < 3:
             try:
                 conn = pymysql.connect(
-                    host=self.config.get("host", "localhost"),
-                    port=self.config.get("port", 19130),
+                    host=self.config.get("host", "127.0.0.1"),
+                    port=self.config.get("port", 3306),
                     user=self.config.get("user", "root"),
                     password=self.config.get("password", ""),
                     database=self.config.get("database", ""),
@@ -137,6 +144,8 @@ class DatabaseManager:
     @contextmanager
     def connection(self):
         """上下文形式获取连接（内部使用）。"""
+        if not getattr(self, 'is_configured', True):
+            raise RuntimeError("数据库未配置")
         if self.driver == 'sqlite':
             conn = self._sqlite_main_conn
             try:
@@ -155,6 +164,8 @@ class DatabaseManager:
 
     def get_connection(self):
         """返回一个可直接使用或作为上下文管理器使用的连接包装对象。"""
+        if not getattr(self, 'is_configured', True):
+            raise RuntimeError("数据库未配置")
         if self.driver == 'sqlite':
             # 测试场景下：若单测显式打桩了 pymysql.connect（模拟重试等），
             # 则走 MySQL 连接路径以满足单测预期（不触网，因已被 mock）。

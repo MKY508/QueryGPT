@@ -126,6 +126,11 @@
 
 /* 小屏幕 (<768px) - 滑出式侧边栏 */
 @media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
     /* 移动端侧边栏 */
     .sidebar {
         position: fixed;
@@ -148,6 +153,8 @@
     .main-content {
         margin-left: 0;
         width: 100%;
+        overflow-y: auto;
+        min-height: 100vh;
     }
     
     /* 优化的菜单按钮 - 与UI主题一致 */

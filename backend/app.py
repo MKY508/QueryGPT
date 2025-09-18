@@ -120,42 +120,82 @@ def sync_config_files():
     # 为兼容旧逻辑保留空实现，避免写入包含密码的数据库配置到版本库
     return
 
-def init_managers():
-    """初始化各个管理器"""
+
+def ensure_history_manager(force_reload: bool = False) -> bool:
+    """确保 history_manager 已初始化，必要时重试。"""
+    global history_manager
+    if history_manager is None or force_reload:
+        try:
+            init_managers(force_reload=force_reload)
+        except Exception as exc:
+            logger.error(f"初始化 history_manager 失败: {exc}")
+    return history_manager is not None
+
+
+def ensure_database_manager(force_reload: bool = False) -> bool:
+    """确保 database_manager 已准备好（且已配置）。"""
+    global database_manager
+    db_ready = database_manager is not None and getattr(database_manager, 'is_configured', True)
+    if not db_ready:
+        try:
+            init_managers(force_reload=force_reload or database_manager is None)
+        except Exception as exc:
+            logger.error(f"初始化 database_manager 失败: {exc}")
+        db_ready = database_manager is not None and getattr(database_manager, 'is_configured', True)
+    return db_ready
+
+
+def init_managers(force_reload: bool = False):
+    """初始化各个管理器，数据库未配置时自动降级"""
     global interpreter_manager, database_manager, history_manager, smart_router, sql_executor
-    
-    # 不写入任何敏感配置文件，直接基于.env初始化
+
     sync_config_files()
-    
+
+    # 初始化数据库管理器（允许缺失配置）
     try:
-        # 初始化基础管理器
-        database_manager = DatabaseManager()
+        db_manager = DatabaseManager()
+        if not getattr(db_manager, 'is_configured', True):
+            logger.warning("数据库配置缺失，禁用数据库相关功能")
+            db_manager = None
+    except RuntimeError as exc:
+        logger.warning(f"数据库未配置: {exc}")
+        db_manager = None
+    except Exception as exc:
+        logger.error(f"数据库管理器初始化失败: {exc}")
+        db_manager = None
+    database_manager = db_manager
+
+    # 初始化解释器
+    try:
         interpreter_manager = InterpreterManager()
-        
-        # 初始化SQL执行器
-        sql_executor = DirectSQLExecutor(database_manager)
-        
-        # 初始化智能路由器
+    except Exception as exc:
+        logger.error(f"InterpreterManager 初始化失败: {exc}")
+        interpreter_manager = None
+
+    # SQL 执行器可在数据库缺失时提供友好错误
+    sql_executor = DirectSQLExecutor(database_manager)
+
+    # 初始化智能路由器，必要时回退
+    try:
         smart_router = SmartRouter(database_manager, interpreter_manager)
-        
-        # 验证智能路由配置
-        if smart_router and smart_router.ai_classifier:
-            if smart_router.ai_classifier.llm_service:
-                logger.info("智能路由已启用，AI分类器正常")
-            else:
-                logger.warning("智能路由已启用，但LLM服务不可用，将使用基于规则的路由")
-        else:
-            logger.warning("智能路由初始化失败，将回退到默认路由")
-        
-        # 确保data目录存在
-        os.makedirs('backend/data', exist_ok=True)
-        history_manager = HistoryManager()
-        
-        logger.info("所有管理器初始化成功")
-    except Exception as e:
-        logger.error(f"管理器初始化失败: {e}")
-        import traceback
-        traceback.print_exc()
+    except Exception as exc:
+        logger.warning(f"智能路由器初始化失败，将使用默认路由: {exc}")
+        smart_router = None
+
+    # 历史记录管理器
+    if force_reload or history_manager is None:
+        try:
+            history_manager = HistoryManager()
+        except Exception as exc:
+            logger.error(f"历史记录管理器初始化失败: {exc}")
+            history_manager = None
+
+    logger.info(
+        "管理器初始化完成: database=%s, interpreter=%s, smart_router=%s",
+        bool(database_manager),
+        bool(interpreter_manager),
+        bool(smart_router)
+    )
 
 
 _BOOTSTRAP_DONE = False
@@ -544,6 +584,9 @@ def chat():
         user_query = data.get('query') or data.get('message') or ''
         from backend.config_loader import ConfigLoader
         model_name = ConfigLoader.normalize_model_id(data.get('model')) if data.get('model') else None
+
+        if not ensure_history_manager() and data.get('use_history', True):
+            logger.warning("历史记录未启用，聊天记录将不会被保存")
         use_database = data.get('use_database', True)
         conversation_id = data.get('conversation_id')  # 获取会话ID
         context_rounds = data.get('context_rounds', 3)  # 获取上下文轮数，默认3
@@ -661,30 +704,30 @@ def chat():
         # 准备上下文
         context = {}
         
-        if use_database and database_manager:
-            # 方案二：简化传递，让 OpenInterpreter 自主工作
-            # 直接传递用户的原始查询
-            full_query = user_query
-            
-            # 从配置加载数据库连接信息
-            from backend.config_loader import ConfigLoader
-            db_config = ConfigLoader.get_database_config()
-            
-            # 将连接信息放在 context 中
-            context['connection_info'] = {
-                'host': db_config['host'],
-                'port': db_config['port'],
-                'user': db_config['user'],
-                'password': db_config['password'],
-                'database': db_config.get('database', '')
-            }
-            
-            # 可选：获取数据库列表供参考
-            try:
-                db_list = database_manager.get_database_list()
-                context['available_databases'] = db_list
-            except Exception as e:
-                logger.warning(f"获取数据库列表失败，但继续执行: {e}")
+        if use_database:
+            if not ensure_database_manager():
+                logger.warning("请求使用数据库，但未检测到有效配置，自动降级为非数据库模式")
+                use_database = False
+                full_query = user_query
+            else:
+                full_query = user_query
+
+                from backend.config_loader import ConfigLoader
+                db_config = ConfigLoader.get_database_config()
+
+                context['connection_info'] = {
+                    'host': db_config['host'],
+                    'port': db_config['port'],
+                    'user': db_config['user'],
+                    'password': db_config['password'],
+                    'database': db_config.get('database', '')
+                }
+
+                try:
+                    db_list = database_manager.get_database_list()
+                    context['available_databases'] = db_list
+                except Exception as e:
+                    logger.warning(f"获取数据库列表失败，但继续执行: {e}")
         else:
             full_query = user_query
         
@@ -862,8 +905,8 @@ app.register_blueprint(config_bp)
 def get_schema():
     """获取数据库结构"""
     try:
-        if not database_manager:
-            return jsonify({"error": "数据库未配置"}), 400
+        if not ensure_database_manager():
+            return jsonify({"error": "数据库未配置"}), 503
             
         schema = database_manager.get_database_schema()
         return jsonify({
@@ -878,12 +921,12 @@ def get_schema():
 def test_connection():
     """测试数据库连接"""
     try:
-        if not database_manager:
+        if not ensure_database_manager():
             return jsonify({
                 "connected": False,
                 "error": "数据库未配置",
                 "test_queries": []
-            })
+            }), 503
             
         test_result = database_manager.test_connection()
         test_result["timestamp"] = datetime.now().isoformat()
@@ -1109,7 +1152,7 @@ def handle_config():
                 json.dump(config, f, indent=2, ensure_ascii=False)
             
             # 重新初始化管理器以使用新配置
-            init_managers()
+            init_managers(force_reload=True)
             
             return jsonify({"success": True, "message": "配置已保存"})
         except Exception as e:
@@ -1299,6 +1342,9 @@ def save_database_config():
         global database_manager
         from backend.database import DatabaseManager
         database_manager = DatabaseManager()
+        if not getattr(database_manager, 'is_configured', True):
+            logger.warning("数据库配置保存后仍不可用，请检查 .env")
+            database_manager = None
         
         return jsonify({
             "success": True,
@@ -1374,8 +1420,8 @@ def execute_sql():
         if not sql_query:
             return jsonify({"error": "SQL查询不能为空"}), 400
             
-        if not database_manager:
-            return jsonify({"error": "数据库未配置"}), 400
+        if not ensure_database_manager():
+            return jsonify({"error": "数据库未配置"}), 503
         
         # SQL只读验证 - 仅允许SELECT/SHOW/DESCRIBE/EXPLAIN
         READONLY_SQL = re.compile(r"^\s*(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN)\b", re.I)
@@ -1412,8 +1458,8 @@ def query_sql_alias():
         if not sql_query:
             return jsonify({"error": "SQL查询不能为空"}), 400
 
-        if not database_manager:
-            return jsonify({"error": "数据库未配置"}), 400
+        if not ensure_database_manager():
+            return jsonify({"error": "数据库未配置"}), 503
 
         READONLY_SQL = re.compile(r"^\s*(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN)\b", re.I)
         if not READONLY_SQL.match(sql_query or ''):
@@ -1447,6 +1493,9 @@ def query_sql_alias():
 def get_conversations():
     """获取对话历史列表"""
     try:
+        if not ensure_history_manager():
+            return jsonify({"success": False, "conversations": [], "error": "历史记录未启用"}), 503
+
         # 获取查询参数
         query = request.args.get('q', '')
         limit = int(request.args.get('limit', 50))
@@ -1476,6 +1525,9 @@ def list_conversations_compat():
 def get_conversation_detail(conversation_id):
     """获取单个对话的详细信息"""
     try:
+        if not ensure_history_manager():
+            return jsonify({"error": "历史记录未启用"}), 503
+
         conversation = history_manager.get_conversation_history(conversation_id)
         if not conversation:
             return jsonify({"error": "对话不存在"}), 404
@@ -1492,6 +1544,9 @@ def get_conversation_detail(conversation_id):
 @app.route('/api/history/<conversation_id>', methods=['GET'])
 def get_conversation_detail_compat(conversation_id):
     try:
+        if not ensure_history_manager():
+            return jsonify({"error": "历史记录未启用"}), 503
+
         conv = history_manager.get_conversation_history(conversation_id)
         if not conv:
             return jsonify({"error": "对话不存在"}), 404
@@ -1510,6 +1565,9 @@ def get_conversation_detail_compat(conversation_id):
 def toggle_favorite_conversation(conversation_id):
     """切换收藏状态"""
     try:
+        if not ensure_history_manager():
+            return jsonify({"error": "历史记录未启用"}), 503
+
         is_favorite = history_manager.toggle_favorite(conversation_id)
         return jsonify({
             "success": True,
@@ -1523,6 +1581,9 @@ def toggle_favorite_conversation(conversation_id):
 def delete_conversation_api(conversation_id):
     """删除对话"""
     try:
+        if not ensure_history_manager():
+            return jsonify({"success": False, "error": "历史记录未启用"}), 503
+
         # 验证对话是否存在
         conversation = history_manager.get_conversation_history(conversation_id)
         if not conversation:
@@ -1563,6 +1624,9 @@ def delete_conversation_api(conversation_id):
 def get_history_statistics():
     """获取历史统计信息"""
     try:
+        if not ensure_history_manager():
+            return jsonify({"error": "历史记录未启用"}), 503
+
         stats = history_manager.get_statistics()
         return jsonify({
             "success": True,
@@ -1576,6 +1640,9 @@ def get_history_statistics():
 def cleanup_history():
     """清理旧历史记录"""
     try:
+        if not ensure_history_manager():
+            return jsonify({"error": "历史记录未启用"}), 503
+
         data = request.json or {}
         days = data.get('days', 90)
         history_manager.cleanup_old_conversations(days)
@@ -1591,6 +1658,9 @@ def cleanup_history():
 def replay_conversation(conversation_id):
     """复现对话"""
     try:
+        if not ensure_history_manager():
+            return jsonify({"error": "历史记录未启用"}), 503
+
         # 获取对话历史
         conversation = history_manager.get_conversation_history(conversation_id)
         if not conversation:

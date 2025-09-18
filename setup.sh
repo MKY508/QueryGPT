@@ -668,7 +668,7 @@ API_BASE_URL=https://api.openai.com/v1/
 DEFAULT_MODEL=gpt-4
 
 # 数据库配置
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_password
@@ -706,7 +706,7 @@ API_BASE_URL=https://api.vveai.com/v1/
 DEFAULT_MODEL=gpt-4.1
 
 # 数据库配置
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
