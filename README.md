@@ -31,7 +31,7 @@
   
 </div>
 
-> 🪟 Windows 用户：请在 **WSL (Windows Subsystem for Linux)** 中运行（不支持 PowerShell/CMD）。快速步骤见下方“极简安装 → Windows WSL 用户”。
+>简单上手的智能agent
 
 <br/>
 
@@ -40,10 +40,10 @@
 ## ✨ 核心优势
 
 **智能 Agent 全自动分析**
-- **自主探索**：遇到问题会主动查看表结构、样本数据，无需人工干预
-- **多轮验证**：发现异常会自动重新检查，确保结果准确可靠
+- **自主探索**：遇到问题会主动查看表结构、样本数据，无需强数据治理和语义层
+- **多轮验证**：发现异常会自动重新检查，自动pip下载需要的额外的库，确保结果准确可靠
 - **复杂分析**：不只是 SQL，能执行 Python 做统计分析、机器学习、数据可视化
-- **推理可见**：实时展示 Agent 的分析过程，让AI决策透明化
+- **推理可见**：展示 Agent 的分析过程，让AI决策透明化
 
 ## 📸 系统截图
 
@@ -51,13 +51,13 @@
   <tr>
     <td align="center">
       <img src="docs/images/agent-thinking.png" width="100%" alt="QueryGPT Interface"/>
-      <b>实时 AI 思考过程</b>
+      <b>AI 思考进程</b>
     </td>
   </tr>
   <tr>
     <td align="center">
       <img src="docs/images/data-visualization.png" width="100%" alt="Data Visualization"/>
-      <b>交互式数据可视化</b>
+      <b>交互式数据可视化展示</b>
     </td>
   </tr>
   <tr>
@@ -70,37 +70,35 @@
 
 ## 🌟 功能特性
 
-### 智能路由系统 🆕
+### 智能路由系统(待优化)
 - **AI 查询分类**: 使用 LLM 智能判断查询意图，自动选择最优执行路径
-- **四种执行模式**:
-  - `DIRECT_SQL`: 简单查询直接转 SQL，毫秒级响应
-  - `SIMPLE_ANALYSIS`: SQL + 轻量数据处理，秒级完成
-  - `COMPLEX_ANALYSIS`: 完整 Agent 流程，深度分析
-  - `VISUALIZATION`: 自动生成交互式图表
+- **三种执行模式**:
+  - `DIRECT_SQL`: 简单查询直接转 SQL
+  - `SIMPLE_ANALYSIS`: SQL + 轻量数据处理
+  - `COMPLEX_ANALYSIS`: 完整 Agent 流程，深度分析(默认)
 - **性能提升**: 简单查询响应速度提升 80%+，复杂查询保持原有能力
 - **灵活配置**: 每种模式独立 Prompt，可根据业务需求精准调优
 
 ### Agent 核心能力
 - **自主数据探索**: Agent 会主动了解数据结构、探索数据关系
 - **多轮推理迭代**: 像分析师一样，发现问题会深入调查
-- **Chain-of-Thought**: 实时展示 Agent 思考过程，可随时介入纠正
+- **Chain-of-Thought**: 展示 Agent 思考过程，可再次提问介入纠正
 - **上下文记忆**: 理解对话历史，支持连续多轮分析
 
 ### 数据分析能力
-- **SQL + Python**: 不局限于 SQL，能执行复杂 Python 数据处理
-- **统计分析**: 自动进行相关性分析、趋势预测、异常检测
+- **SQL + Python**: 不局限于 SQL，能执行复杂 Python 数据处理，以保证数据可靠性
+- **统计分析**: 可进行相关性分析、趋势预测、数据异常检测
 - **中文业务术语**: 原生理解环比、同比、留存、复购等概念
-- **智能可视化**: 根据数据特征自动选择最佳图表类型
+- **智能可视化**: 根据数据特征自动选择最佳图表类型(可指定)
 
 ### 系统特性
-- **智能路由系统**: 🆕 AI 自动判断查询类型，选择最优执行路径（Beta）
-- **新手引导系统**: 🆕 交互式气泡提示，帮助新用户快速上手
+- **新手引导系统**: 交互式气泡提示，帮助新用户快速上手
 - **多模型支持**: GPT-5、Claude、Gemini、Ollama 本地模型随意切换
-- **灵活部署**: 支持云端 API 或 Ollama 本地部署，数据永不出门
+- **灵活部署**: 支持云端 API 或 Ollama 本地部署，数据可不出门，符合合规要求
 - **历史记录**: 保存分析过程，支持回溯和分享
-- **数据安全**: 只读权限、SQL 注入防护、敏感数据脱敏
+- **数据安全**: 只读权限prompt、SQL 注入正则防护、敏感数据脱敏，确保万无一失
 - **灵活导出**: 支持 Excel、PDF、HTML 等多种格式
-- **Prompt 自定义**: 前端可视化编辑查询提示词，支持导入导出配置
+- **Prompt 自定义**: 前端可视化编辑查询提示词，自定义要求
 
 ## 📦 环境要求
 
@@ -127,12 +125,6 @@
 | **扩展能力** | **✅ 无限扩展** | ❌ | ❌ | ❌ | ❌ |
 
 ## 🚀 快速开始
-
-### 🖥️ Windows / WSL 提示
-
-- 仅支持在 WSL 的 Linux 环境中运行；不要在 PowerShell/CMD 里执行脚本。
-- 如未安装 WSL：以管理员 PowerShell 执行 `wsl --install`，重启后打开 “Ubuntu”。
-- 详细步骤请直接参考下方“极简安装 → Windows WSL 用户”。
 
 ### 极简安装
 
@@ -164,10 +156,8 @@ cd QueryGPT
 ./start.sh   # 启动服务
 ```
 
-> **性能优化**：WSL中的脚本会自动检测并从Windows文件系统(/mnt/)迁移到Linux文件系统(~/)，提升10倍性能
-
 ### 访问服务
-打开浏览器访问：`http://localhost:5000`
+自动打开浏览器访问：`http://localhost:500x`
 
 ## 💡 使用示例
 
@@ -182,16 +172,16 @@ cd QueryGPT
 - "找出异常的订单数据"
 - "分析客户购买行为模式"
 
-### 复杂任务(时间长,注意token花费,可能需要分布进行)
+### 复杂任务(时间长,注意token花费,可能需要多步进行)
 - "生成月度销售报告，包含环比、同比和趋势图"
 - "分析客户流失原因并给出建议"
 - "构建 RFM 客户分层模型"
 
 ## 🔧 配置说明
 
-### 支持的模型
+### 支持的模型(原生openai格式的api最好)
 - **OpenAI**: GPT-5, GPT-4.1(经济)
-- **Anthropic**: Claude 4 Opus, Sonnet(评分最高,最智能的模型,调用工具频繁)
+- **Anthropic**: Claude 4 Opus, Sonnet(评分最高,最智能的模型,**推荐**)
 - **Google**: Gemini 2.5pro(litellm可能兼容性有点问题)
 - **国产模型**: Qwen、DeepSeek、GLM-4、百川等
 - **本地模型**: 通过 Ollama 支持 Llama, Mistral, Qwen 等（推荐 qwen2.5 7b以上，确保代码能力）
@@ -208,28 +198,8 @@ cd QueryGPT
 - **OceanBase** - 分布式数据库（MySQL 模式）
 - **PolarDB** - 阿里云原生数据库
 
-#### ⚠️ 需要注意
-- 本系统使用**只读查询**（SELECT、SHOW、DESCRIBE）
-- 不依赖存储过程、触发器、外键等特性
 - 支持跨库查询（配置时不指定数据库名即可）
 
-#### 🔧 连接配置
-```bash
-# .env 配置示例
-DB_HOST=localhost
-DB_PORT=9030      # Doris/StarRocks: 9030, MySQL: 3306, TiDB: 4000
-DB_USER=root
-DB_PASSWORD=your_password
-DB_NAME=          # 留空支持跨库查询
-```
-
-## 📚 文档
-
-- [完整文档](docs/)
-- [API 文档](docs/API.md)
-- [部署指南](docs/DEPLOYMENT.md)
-- [常见问题](docs/FAQ.md)
-- [配置说明](docs/CONFIGURATION.md)
 
 ## 🔧 快速故障排除
 
@@ -241,26 +211,31 @@ DB_NAME=          # 留空支持跨库查询
 | **'.' 不是内部或外部命令** | 同上，必须在WSL中运行，不能在CMD/PowerShell |
 | **Permission denied** | 运行 `chmod +x setup.sh start.sh` 添加执行权限 |
 | **WSL中进程立即停止** | 脚本已自动处理，使用前台运行模式 |
-| **python3: command not found** | WSL中运行 `sudo apt update && sudo apt install python3` |
+| **模块库确实** | 没有进入python虚拟环境(一般来说脚本会自动进入,但是有些系统受兼容性影响虚拟环境有问题,可以尝试自己创建) |
 
 ### Linux/Ubuntu 常见问题
 
 | 问题 | 解决方案 |
 |------|---------|
-| **No module named 'venv'** | 运行 `sudo apt install python3-venv` 或使用v1.2版setup.sh自动修复 |
-| **pip安装超时** | 自动配置国内镜像源（阿里云/清华/中科大） |
+| **No module named 'venv'** | 运行 `sudo apt install python3-venv` 或使用setup.sh自动修复 |
+| **pip安装超时** | 脚本setup会自动配置国内镜像源（阿里云/清华/中科大） |
 | **virtualenv: command not found** | 运行 `pip install virtualenv` |
 
 ### 通用问题
 
 | 问题 | 解决方案 |
 |------|---------|
-| **端口被占用** | 自动扫描5000-5100找到可用端口 |
 | **找不到backend目录** | 运行 `cd ~/QueryGPT-github && ./start.sh` |
-| **虚拟环境不存在** | 运行 `./setup.sh` 重新安装 |
-| **环境检测问题** | 运行 `./diagnostic.sh` 查看详细环境信息 |
+| **环境检测问题** | 运行 `./diagnostic.sh` 查看详细环境信息,反馈邮箱 |
 
 ## 最新更新
+### 2025-09-024 - 小版本修改
+- **支持更多api类型**: 国内外和本地多api
+- **速度提升**: 异步处理,后端加速进行,删除不必要的检测
+- **停止按钮优化**: 可以不妨碍历史记录生成
+- **新建模型处理**: 可以支持使用更多的模型
+- **人性化处理**: 一些默认配置更符合用户使用
+- **历史记录优化**: 过滤掉没有实际意义的打断的查询对话
 
 ### 2025-09-05 - v1.2 正式版本发布
 - **虚拟环境智能创建**: 解决Ubuntu/Debian缺少python3-venv问题
@@ -329,8 +304,8 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 - GitHub Issues: [提交问题](https://github.com/MKY508/QueryGPT/issues) 
 - Email: mky369258@gmail.com
-- 这是作者第一个作品,有任何疑问或者可能需要的改动,都可以提交issue或者pr,我会尽可能进行调整
-
+- 这是作者第一个项目作品,有任何疑问或者可能需要的改动,都可以提交issue或者pr,我会尽可能进行调整
+- 如果觉得有用，请给个 ⭐ Star 支持一下！这对作者的研究生复试很重要(也许)
 ## ⭐ Star History
 
 <div align="center">
