@@ -271,6 +271,11 @@
                         <div class="settings-card">
                             <div class="card-header">
                                 <h3><i class="fas fa-brain"></i> <span data-i18n="models.title">模型管理</span></h3>
+                                <div class="card-actions">
+                                    <button type="button" class="btn-primary" id="add-model-btn">
+                                        <i class="fas fa-plus"></i> 新建模型
+                                    </button>
+                                </div>
                             </div>
                             
                             <!-- 模型列表表格 -->
@@ -286,40 +291,6 @@
                                         </tr>
                                     </thead>
                                     <tbody id="models-list">
-                                        <tr>
-                                            <td>GPT-4.1</td>
-                                            <td>OpenAI</td>
-                                            <td>http://localhost:11434/v1</td>
-                                            <td><span class="status-badge active">可用</span></td>
-                                            <td>
-                                                <button class="btn-icon" title="编辑" onclick="app.editModel('gpt-4.1')">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="btn-icon" title="测试" onclick="app.testModel('gpt-4.1')">
-                                                    <i class="fas fa-plug"></i>
-                                                </button>
-                                                <button class="btn-icon danger" title="删除" onclick="app.deleteModel('gpt-4.1')">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>Claude Sonnet 4</td>
-                                            <td>Anthropic</td>
-                                            <td>http://localhost:11434/v1</td>
-                                            <td><span class="status-badge active">可用</span></td>
-                                            <td>
-                                                <button class="btn-icon" title="编辑" onclick="app.editModel('claude-sonnet-4')">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="btn-icon" title="测试" onclick="app.testModel('claude-sonnet-4')">
-                                                    <i class="fas fa-plug"></i>
-                                                </button>
-                                                <button class="btn-icon danger" title="删除" onclick="app.deleteModel('claude-sonnet-4')">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
                                     </tbody>
                                 </table>
                             </div>

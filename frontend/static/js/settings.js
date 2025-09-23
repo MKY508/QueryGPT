@@ -514,7 +514,9 @@ class SettingsManager {
                     type: 'openai',
                     api_base: 'https://api.openai.com/v1',
                     model_name: 'gpt-4o',
-                    status: 'active'
+                    status: 'active',
+                    last_test_status: 'success',
+                    last_tested_at: new Date().toISOString()
                 }),
                 this.prepareModelRecord({
                     id: 'qwen-plus',
@@ -522,7 +524,7 @@ class SettingsManager {
                     type: 'qwen',
                     api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
                     model_name: 'qwen-plus',
-                    status: 'inactive'
+                    status: 'pending'
                 }),
                 this.prepareModelRecord({
                     id: 'ollama-llama3',
@@ -531,7 +533,7 @@ class SettingsManager {
                     api_base: 'http://localhost:11434',
                     model_name: 'llama3:latest',
                     litellm_model: 'ollama/llama3:latest',
-                    status: 'inactive'
+                    status: 'pending'
                 })
             ];
             this.renderModelsList();
@@ -579,6 +581,12 @@ class SettingsManager {
         }
         record.requires_api_key = record.requires_api_key ?? preset.requiresApiKey ?? true;
         record.requires_api_base = record.requires_api_base ?? preset.requiresApiBase ?? true;
+        record.last_tested_at = record.last_tested_at || raw?.last_tested_at || raw?.lastTestedAt || null;
+        record.last_test_status = record.last_test_status || raw?.last_test_status || raw?.lastTestStatus || (record.status === 'active' ? 'success' : '');
+        record.last_test_error = record.last_test_error || raw?.last_test_error || raw?.lastTestError || '';
+        if (record.status === 'inactive' && !record.last_tested_at && !record.last_test_status) {
+            record.status = 'pending';
+        }
         return record;
     }
 
@@ -633,52 +641,98 @@ class SettingsManager {
         const tbody = document.getElementById('models-list');
         if (!tbody) return;
 
+        const escapeHtml = (value) => {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        };
+        const escapeAttr = (value) => {
+            if (value === null || value === undefined) return '';
+            return String(value).replace(/'/g, "\\'");
+        };
+
+        if (!this.models || this.models.length === 0) {
+            tbody.innerHTML = `
+                <tr class="models-empty-row">
+                    <td colspan="5" class="models-empty-message">
+                        暂未配置模型，点击右上角“新建模型”按钮开始。
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
         let html = '';
         this.models.forEach(model => {
+            const hasTestHistory = Boolean(model.last_tested_at || model.last_test_status);
             let statusClass = 'inactive';
             let statusText = '不可用';
-            switch (model.status) {
-                case 'active':
-                    statusClass = 'active';
-                    statusText = '可用';
-                    break;
-                case 'testing':
-                    statusClass = 'testing';
-                    statusText = '测试中';
-                    break;
-                case 'pending':
-                    statusClass = 'testing';
-                    statusText = '待测试';
-                    break;
-                case 'error':
-                    statusClass = 'inactive';
-                    statusText = '配置错误';
-                    break;
-                default:
-                    statusClass = 'inactive';
-                    statusText = '不可用';
-            }
-            if (!model.status) {
+
+            if (model.status === 'active') {
+                statusClass = 'active';
+                statusText = '可用';
+            } else if (model.status === 'testing') {
                 statusClass = 'testing';
-                statusText = '待测试';
+                statusText = '测试中';
+            } else if (model.status === 'pending' || (!hasTestHistory && model.status !== 'active')) {
+                statusClass = 'testing';
+                statusText = '未测试';
+            } else if (model.status === 'error') {
+                statusClass = 'inactive';
+                statusText = '配置错误';
+            } else if (model.status === 'inactive' && hasTestHistory) {
+                statusClass = 'inactive';
+                statusText = '连接失败';
+            } else if (!hasTestHistory) {
+                statusClass = 'testing';
+                statusText = '未测试';
             }
+
+            let statusNote = '';
+            if (model.last_tested_at) {
+                try {
+                    const testDate = new Date(model.last_tested_at);
+                    if (!Number.isNaN(testDate.getTime())) {
+                        statusNote = `上次测试：${testDate.toLocaleString()}`;
+                    }
+                } catch (_) {
+                    // 忽略无法解析的时间
+                }
+            } else if (statusText === '未测试') {
+                statusNote = '尚未执行连通性测试';
+            } else if (model.last_test_error && statusText === '连接失败') {
+                statusNote = model.last_test_error;
+            }
+
             const typeLabel = this.formatModelType(model.type);
             const apiBase = model.api_base || model.base_url || '未设置';
+            const safeId = escapeAttr(model.id);
+            const safeName = escapeHtml(model.name || '未命名');
+            const safeType = escapeHtml(typeLabel);
+            const safeApiBase = escapeHtml(apiBase);
+            const statusNoteHtml = statusNote ? `<div class="status-note">${escapeHtml(statusNote)}</div>` : '';
 
             html += `
                 <tr>
-                    <td>${model.name || '未命名'}</td>
-                    <td>${typeLabel}</td>
-                    <td>${apiBase}</td>
-                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    <td>${safeName}</td>
+                    <td>${safeType}</td>
+                    <td>${safeApiBase}</td>
                     <td>
-                        <button class="btn-icon" title="编辑" onclick="window.settingsManager.editModel('${model.id}')">
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                        ${statusNoteHtml}
+                    </td>
+                    <td>
+                        <button class="btn-icon" title="编辑" onclick="window.settingsManager.editModel('${safeId}')">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="btn-icon" title="测试" onclick="window.settingsManager.testModel('${model.id}')">
+                        <button class="btn-icon" title="测试" onclick="window.settingsManager.testModel('${safeId}')">
                             <i class="fas fa-plug"></i>
                         </button>
-                        <button class="btn-icon danger" title="删除" onclick="window.settingsManager.deleteModel('${model.id}')">
+                        <button class="btn-icon danger" title="删除" onclick="window.settingsManager.deleteModel('${safeId}')">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
@@ -809,6 +863,15 @@ class SettingsManager {
             requires_api_key: preset.requiresApiKey ?? true,
             requires_api_base: preset.requiresApiBase ?? true
         };
+        if (editingId && existingModel) {
+            modelData.last_tested_at = existingModel.last_tested_at || null;
+            modelData.last_test_status = existingModel.last_test_status || '';
+            modelData.last_test_error = existingModel.last_test_error || '';
+        } else {
+            modelData.last_tested_at = null;
+            modelData.last_test_status = '';
+            modelData.last_test_error = '';
+        }
         const defaultLitellm = (!providerChanged && existingModel?.litellm_model) ? existingModel.litellm_model : (preset.defaultLitellm || '');
         modelData.litellm_model = defaultLitellm || this.buildLitellmModelId(modelData);
 
@@ -877,6 +940,8 @@ class SettingsManager {
         
         // 更新状态为测试中
         model.status = 'testing';
+        model.last_test_status = 'testing';
+        model.last_test_error = '';
         this.renderModelsList();
 
         try {
@@ -893,14 +958,27 @@ class SettingsManager {
 
             if (result.success) {
                 model.status = 'active';
+                model.last_test_status = 'success';
+                model.last_test_error = '';
                 app.showNotification(`模型 ${model.name} 连接成功！`, 'success');
             } else {
                 model.status = 'inactive';
+                model.last_test_status = 'failed';
+                model.last_test_error = result.message || '';
                 app.showNotification(`模型 ${model.name} 连接失败: ${result.message}`, 'error');
             }
         } catch (error) {
             model.status = 'inactive';
+            model.last_test_status = 'failed';
+            model.last_test_error = error?.message || '连接失败';
             app.showNotification(`模型 ${model.name} 连接失败`, 'error');
+        }
+
+        model.last_tested_at = new Date().toISOString();
+        try {
+            await api.saveModels(this.models);
+        } catch (saveError) {
+            console.warn('保存模型测试结果失败:', saveError);
         }
 
         this.renderModelsList();
@@ -1234,17 +1312,19 @@ class SettingsManager {
                         }
                     };
                     const normalizedHost = dbConfig.host === 'localhost' ? '127.0.0.1' : (dbConfig.host || '127.0.0.1');
+                    const normalizedDbName = dbConfig.configured === false ? '' : (dbConfig.database || '');
                     applyValue('db-host', normalizedHost, '127.0.0.1');
                     applyValue('db-port', dbConfig.port, '3306');
                     applyValue('db-user', dbConfig.user, '');
                     applyValue('db-password', dbConfig.password, '');
-                    applyValue('db-name', dbConfig.database, '');
+                    applyValue('db-name', normalizedDbName, '');
 
                     if (window.app) {
                         window.app.config = window.app.config || {};
                         window.app.config.database = {
                             ...dbConfig,
                             host: normalizedHost,
+                            database: normalizedDbName,
                             configured: dbConfig.configured !== undefined ? dbConfig.configured : true
                         };
                     }

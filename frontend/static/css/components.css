@@ -293,6 +293,20 @@
   margin: 0;
 }
 
+.card-header .card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.card-header .card-actions .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  border-radius: var(--radius-md);
+}
+
 .card-header h3 i {
   color: var(--primary-600);
 }

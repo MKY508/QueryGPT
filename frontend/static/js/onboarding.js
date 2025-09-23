@@ -162,9 +162,6 @@ class OnboardingGuide {
         }
         
         if (shouldShowGuide) {
-            // 标记本会话已显示
-            this.markShownInSession();
-            
             // 使用配置的延迟时间
             const delay = this.config?.auto_start_delay || 1500;
             console.log(`新手引导：将在 ${delay}ms 后启动`);
@@ -282,8 +279,17 @@ class OnboardingGuide {
      * 开始引导
      */
     start() {
+        if (this.isActive) {
+            console.log('新手引导：已在进行中，忽略重复启动');
+            return;
+        }
+
         this.isActive = true;
         this.currentStep = 0;
+
+        if (!this.hasShownInSession()) {
+            this.markShownInSession();
+        }
         
         // 添加半透明遮罩
         this.createOverlay();

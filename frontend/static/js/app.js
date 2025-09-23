@@ -2155,7 +2155,10 @@ class DataAnalysisPlatform {
                 if (dbPort) dbPort.value = config.database.port || '3306';
                 if (dbUser) dbUser.value = config.database.user || '';
                 if (dbPassword) dbPassword.value = config.database.password || '';
-                if (dbName) dbName.value = config.database.database || '';
+                if (dbName) {
+                    const dbNameValue = config.database.configured === false ? '' : (config.database.database || '');
+                    dbName.value = dbNameValue;
+                }
             }
             
             // UI配置
