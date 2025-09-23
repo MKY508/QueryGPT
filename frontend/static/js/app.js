@@ -13,6 +13,7 @@ class DataAnalysisPlatform {
         this.isProcessing = false;
         this.config = {};
         this.abortController = null;  // 用于中断请求
+        this.activeEventSource = null;  // 当前SSE连接
         this.contextRounds = 3;  // 默认保留3轮历史
         this.historyManager = null;  // 历史记录管理器
         this.tipsManager = null;  // Tips提示管理器
@@ -538,12 +539,15 @@ class DataAnalysisPlatform {
         // 显示思考过程
         const thinkingId = this.showThinkingProcess();
 
+        let usedSSE = false;
         try {
-            // 优先尝试 SSE 实时进度
-            let usedSSE = false;
             if (window.EventSource) {
                 try {
-                    api.sendMessageSSE(
+                    if (this.activeEventSource) {
+                        this.activeEventSource.close();
+                        this.activeEventSource = null;
+                    }
+                    const eventSource = api.sendMessageSSE(
                         message,
                         this.currentConversationId,
                         this.currentViewMode,
@@ -556,7 +560,18 @@ class DataAnalysisPlatform {
                                 this.updateProgressStage(thinkingId, tip);
                             } else if (evt.type === 'result') {
                                 const payload = evt.data;
-                                this.currentConversationId = payload.conversation_id || this.currentConversationId;
+                                if (payload?.conversation_id) {
+                                    this.currentConversationId = payload.conversation_id;
+                                    localStorage.setItem('currentConversationId', payload.conversation_id);
+                                }
+                                if (window.HistoryManager && window.HistoryManager.instance) {
+                                    const manager = window.HistoryManager.instance;
+                                    if (typeof manager.markNeedsRefresh === 'function') {
+                                        manager.markNeedsRefresh();
+                                    } else {
+                                        manager.needsRefresh = true;
+                                    }
+                                }
                                 if (payload.success) {
                                     this.handleStreamResponse({ type: 'result', content: payload.result, conversationId: this.currentConversationId }, thinkingId);
                                 } else {
@@ -564,17 +579,34 @@ class DataAnalysisPlatform {
                                 }
                             } else if (evt.type === 'error') {
                                 this.handleStreamResponse({ type: 'error', message: evt.data?.error || '执行失败' }, thinkingId);
+                                if (this.activeEventSource) {
+                                    this.activeEventSource.close();
+                                    this.activeEventSource = null;
+                                }
+                                this.finishProcessing();
+                            } else if (evt.type === 'done') {
+                                if (this.activeEventSource) {
+                                    this.activeEventSource.close();
+                                    this.activeEventSource = null;
+                                }
+                                this.finishProcessing();
                             }
                         }
                     );
+                    this.activeEventSource = eventSource;
                     usedSSE = true;
                 } catch (e) {
+                    console.warn('SSE 初始化失败，回退至普通请求:', e);
+                    if (this.activeEventSource) {
+                        try { this.activeEventSource.close(); } catch (_) {}
+                        this.activeEventSource = null;
+                    }
                     usedSSE = false;
                 }
             }
 
             if (!usedSSE) {
-                // 回退到原有的非SSE流式（模拟）
+                // 回退到原有的非SSE方式
                 this.abortController = new AbortController();
                 const currentModelElement = document.getElementById('current-model');
                 const selectedModel = currentModelElement?.value || this.config?.default_model || 'gpt-5-high';
@@ -592,7 +624,8 @@ class DataAnalysisPlatform {
                         }
                         this.handleStreamResponse(data, thinkingId);
                     },
-                    selectedModel
+                    selectedModel,
+                    this.abortController?.signal
                 );
                 if (response && response.conversation_id) {
                     this.currentConversationId = response.conversation_id;
@@ -613,28 +646,35 @@ class DataAnalysisPlatform {
                 this.hideThinkingProcess(thinkingId);
                 this.addMessage('bot', window.i18nManager?.t('notifications.requestFailed') || '处理请求失败。检查网络连接或稍后重试。');
             }
+            usedSSE = false;
         } finally {
-            this.isProcessing = false;
-            this.abortController = null;
+            if (!usedSSE) {
+                this.finishProcessing();
+            }
+        }
+    }
+
+    finishProcessing() {
+        const messageInput = document.getElementById('message-input');
+        if (messageInput) {
             messageInput.disabled = false;
-            document.getElementById('send-button').disabled = false;
-            
-            // 恢复按钮状态
-            const stopBtn = document.getElementById('stop-button');
-            const sendBtn = document.getElementById('send-button');
-            if (stopBtn) {
-                stopBtn.style.display = 'none';
-                stopBtn.style.visibility = 'hidden';
-                stopBtn.style.opacity = '0';
-            }
-            if (sendBtn) {
-                sendBtn.style.display = 'flex';
-                sendBtn.style.visibility = 'visible';
-                sendBtn.style.opacity = '1';
-            }
-            
             messageInput.focus();
         }
+        const sendBtn = document.getElementById('send-button');
+        if (sendBtn) {
+            sendBtn.disabled = false;
+            sendBtn.style.display = 'flex';
+            sendBtn.style.visibility = 'visible';
+            sendBtn.style.opacity = '1';
+        }
+        const stopBtn = document.getElementById('stop-button');
+        if (stopBtn) {
+            stopBtn.style.display = 'none';
+            stopBtn.style.visibility = 'hidden';
+            stopBtn.style.opacity = '0';
+        }
+        this.isProcessing = false;
+        this.abortController = null;
     }
 
     /**
@@ -671,6 +711,14 @@ class DataAnalysisPlatform {
         }
         
         // 前端也中断请求
+        if (this.activeEventSource) {
+            try {
+                this.activeEventSource.close();
+            } catch (err) {
+                console.debug('关闭EventSource失败:', err);
+            }
+            this.activeEventSource = null;
+        }
         if (this.abortController) {
             this.abortController.abort();
         }
@@ -692,6 +740,8 @@ class DataAnalysisPlatform {
         if (!lastBotMessage || !lastBotMessage.textContent.includes(interruptedText)) {
             this.addMessage('bot', window.i18nManager.t('common.interruptedMessage'));
         }
+
+        this.finishProcessing();
     }
     
     /**

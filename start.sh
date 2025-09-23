@@ -18,6 +18,7 @@ BOLD='\033[1m'
 
 # 全局变量
 IS_DEBUG=false
+PYTHON_BIN=""
 LOG_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 ERROR_LOG="logs/start_error_${LOG_TIMESTAMP}.log"
 DEBUG_LOG="logs/start_debug_${LOG_TIMESTAMP}.log"
@@ -414,7 +415,13 @@ quick_start() {
         exit 1
     fi
     
-    debug_log "Python路径: $(which python)"
+    PYTHON_BIN="$VIRTUAL_ENV/bin/python"
+    if [ ! -x "$PYTHON_BIN" ] && [ -x "$VIRTUAL_ENV/Scripts/python.exe" ]; then
+        PYTHON_BIN="$VIRTUAL_ENV/Scripts/python.exe"
+    fi
+    local python_exec="${PYTHON_BIN:-$(which python)}"
+
+    debug_log "Python路径: $python_exec"
     debug_log "VIRTUAL_ENV: $VIRTUAL_ENV"
     success_log "虚拟环境激活成功: $VIRTUAL_ENV"
     
@@ -440,7 +447,7 @@ quick_start() {
     debug_log "导出 PORT=$PORT"
     
     # 创建必要目录
-    mkdir -p output cache config logs
+    mkdir -p output cache config logs backend/config backend/output
     
     # 检查配置文件
     if [ ! -f ".env" ]; then
@@ -466,6 +473,15 @@ quick_start() {
             echo -e "${YELLOW}[INFO]${NC} 创建 models.json..."
             cp config/models.example.json config/models.json
         fi
+    fi
+
+    if [ -f "config/config.json" ] && [ ! -f "backend/config/config.json" ]; then
+        cp "config/config.json" "backend/config/config.json"
+        debug_log "已复制 config/config.json 到 backend/config"
+    fi
+    if [ -f "config/models.json" ] && [ ! -f "backend/config/models.json" ]; then
+        cp "config/models.json" "backend/config/models.json"
+        debug_log "已复制 config/models.json 到 backend/config"
     fi
     
     echo ""
@@ -567,7 +583,7 @@ quick_start() {
         echo -e "${YELLOW}按 Ctrl+C 停止服务${NC}"
         
         # WSL环境：后台启动Flask，然后等待服务可用
-        cd backend && python app.py &
+        cd backend && "$python_exec" app.py &
         FLASK_PID=$!
         
         # 等待服务可用
@@ -583,7 +599,7 @@ quick_start() {
         echo -e "${CYAN}[INFO] 纯Linux环境启动${NC}"
         
         # 纯Linux环境：可以使用后台模式
-        cd backend && python app.py &
+        cd backend && "$python_exec" app.py &
         FLASK_PID=$!
         
         # 等待服务可用
@@ -599,7 +615,7 @@ quick_start() {
         echo -e "${CYAN}[INFO] macOS环境启动${NC}"
         
         # macOS环境：使用后台模式
-        cd backend && python app.py &
+        cd backend && "$python_exec" app.py &
         FLASK_PID=$!
         
         # 等待服务可用

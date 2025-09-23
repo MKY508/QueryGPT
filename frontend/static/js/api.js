@@ -75,7 +75,7 @@ class API {
      * 流式发送消息（支持实时响应）
      * 注意：当前后端不支持流式响应，改为普通请求
      */
-    async sendMessageStream(message, conversationId = null, viewMode = 'user', onProgress = null, modelName = null) {
+    async sendMessageStream(message, conversationId = null, viewMode = 'user', onProgress = null, modelName = null, abortSignal = null) {
         try {
             // 显示思考状态
             if (onProgress) {
@@ -92,6 +92,7 @@ class API {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: this.headers,
+                signal: abortSignal || undefined,
                 body: JSON.stringify({
                     query: message,  // 注意字段名是query
                     model: currentModel,  // 使用当前选中的模型
@@ -171,6 +172,9 @@ class API {
             language: lang,
             context_rounds: String(ctxRounds)
         });
+        if (conversationId) {
+            params.set('conversation_id', conversationId);
+        }
         const url = `/api/chat/stream?${params.toString()}`;
         const es = new EventSource(url);
         es.addEventListener('progress', (e) => {
