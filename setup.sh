@@ -24,6 +24,8 @@ BOLD='\033[1m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 PYTHON_CMD=""
+PYTHON_BIN=""
+PIP_CMD=""
 IS_FIRST_RUN=false
 IS_DEBUG=false
 BACKUP_SUFFIX=$(date +%Y%m%d_%H%M%S)
@@ -537,13 +539,25 @@ setup_venv() {
         exit 1
     fi
     
+    # 记录虚拟环境中的 python/pip 路径
+    PYTHON_BIN="$VIRTUAL_ENV/bin/python"
+    if [ ! -x "$PYTHON_BIN" ] && [ -x "$VIRTUAL_ENV/Scripts/python.exe" ]; then
+        PYTHON_BIN="$VIRTUAL_ENV/Scripts/python.exe"
+    fi
+    PIP_CMD="$VIRTUAL_ENV/bin/pip"
+    if [ ! -x "$PIP_CMD" ] && [ -x "$VIRTUAL_ENV/Scripts/pip.exe" ]; then
+        PIP_CMD="$VIRTUAL_ENV/Scripts/pip.exe"
+    fi
+
     debug_log "虚拟环境激活成功: $VIRTUAL_ENV"
+    debug_log "Python路径: ${PYTHON_BIN:-unknown}"
+    debug_log "Pip路径: ${PIP_CMD:-unknown}"
     
     # 升级pip
     info_log "升级 pip... / Upgrading pip..."
     print_message "info" "升级 pip... / Upgrading pip..."
-    debug_log "执行命令: pip install --upgrade pip --quiet"
-    pip install --upgrade pip --quiet
+    debug_log "执行命令: ${PIP_CMD:-pip} install --upgrade pip --quiet"
+    ${PIP_CMD:-pip} install --upgrade pip --quiet
     success_log "pip 已升级 / pip upgraded"
     print_message "success" "pip 已升级 / pip upgraded"
     echo ""
@@ -576,7 +590,8 @@ EOF
     # 检查是否需要安装
     local need_install=false
     
-    if ! pip show flask &> /dev/null || ! pip show open-interpreter &> /dev/null; then
+    local pip_check="${PIP_CMD:-pip}"
+    if ! "$pip_check" show flask &> /dev/null || ! "$pip_check" show open-interpreter &> /dev/null; then
         need_install=true
     fi
     
@@ -594,7 +609,7 @@ EOF
             echo "正在下载和安装，请稍候... / Downloading and installing, please wait..."
             
             # 不使用quiet，显示进度
-            pip install "open-interpreter==0.4.3" --progress-bar on 2>&1 | while IFS= read -r line; do
+            "${PIP_CMD:-pip}" install "open-interpreter==0.4.3" --progress-bar on 2>&1 | while IFS= read -r line; do
                 # 只显示关键信息
                 if [[ "$line" == *"Downloading"* ]] || [[ "$line" == *"Installing"* ]] || [[ "$line" == *"Successfully"* ]]; then
                     echo "  $line"
@@ -607,11 +622,11 @@ EOF
         # 安装其他依赖
         info_log "安装其他依赖包... / Installing other dependencies..."
         print_message "info" "安装其他依赖包... / Installing other dependencies..."
-        debug_log "执行 pip install -r requirements.txt"
+        debug_log "执行 ${PIP_CMD:-pip} install -r requirements.txt"
         echo "进度 / Progress:"
         
         # 显示简化的进度
-        pip install -r requirements.txt 2>&1 | while IFS= read -r line; do
+        "${PIP_CMD:-pip}" install -r requirements.txt 2>&1 | while IFS= read -r line; do
             if [[ "$line" == *"Collecting"* ]]; then
                 package=$(echo "$line" | sed 's/Collecting //' | cut -d' ' -f1)
                 echo -n "  📦 安装 / Installing: $package... "
@@ -638,7 +653,7 @@ EOF
 create_directories() {
     print_message "header" "检查目录结构 / Checking Directory Structure"
     
-    local dirs=("logs" "cache" "output" "backend/data" "config" "backup")
+    local dirs=("logs" "cache" "output" "backend/data" "backend/config" "backend/output" "config" "backup")
     local created=0
     
     for dir in "${dirs[@]}"; do
@@ -830,6 +845,12 @@ EOF
         print_message "success" "模型配置已创建 / Model configuration created"
         print_message "info" "默认启用Ollama本地模型，其他模型需配置API密钥"
     fi
+
+    mkdir -p backend/config
+    if [ -f "config/models.json" ] && [ ! -f "backend/config/models.json" ]; then
+        cp "config/models.json" "backend/config/models.json"
+        print_message "info" "已同步模型配置到 backend/config/models.json"
+    fi
     
     # 创建config.json
     if [ ! -f "config/config.json" ]; then
@@ -842,6 +863,11 @@ EOF
   }
 }
 EOF
+    fi
+
+    if [ -f "config/config.json" ] && [ ! -f "backend/config/config.json" ]; then
+        cp "config/config.json" "backend/config/config.json"
+        print_message "info" "已同步配置到 backend/config/config.json"
     fi
 }
 
@@ -941,7 +967,8 @@ health_check() {
     fi
     
     # 检查依赖
-    if pip show flask &> /dev/null; then
+    local pip_check="${PIP_CMD:-pip}"
+    if "$pip_check" show flask &> /dev/null; then
         score=$((score + 1))
         print_message "success" "核心依赖 / Core dependencies: OK"
     else

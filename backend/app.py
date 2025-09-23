@@ -151,6 +151,12 @@ def init_managers(force_reload: bool = False):
 
     sync_config_files()
 
+    if force_reload:
+        try:
+            DatabaseManager.GLOBAL_DISABLED = False
+        except Exception:
+            pass
+
     # 初始化数据库管理器（允许缺失配置）
     try:
         db_manager = DatabaseManager()
@@ -275,17 +281,47 @@ def chat_stream():
         use_database = request.args.get('use_database', 'true').lower() != 'false'
         context_rounds = int(request.args.get('context_rounds', '3') or 3)
         user_language = request.args.get('language', 'zh')
+        requested_conversation_id = request.args.get('conversation_id')
 
         if not user_query:
             return Response(_sse_format('error', {"error": "查询内容不能为空"}), mimetype='text/event-stream')
 
-        # 创建会话ID
-        conv_id = None
+        # 创建或复用会话ID
+        conv_id = requested_conversation_id or None
         if history_manager:
             title = user_query[:50] + ('...' if len(user_query) > 50 else '')
-            conv_id = history_manager.create_conversation(title=title, model=model_name or 'default')
+            existing_conversation = None
+            if conv_id:
+                try:
+                    existing_conversation = history_manager.get_conversation_history(conv_id)
+                except Exception as exc:
+                    logger.warning(f"读取会话 {conv_id} 失败，创建新会话: {exc}")
+                    existing_conversation = None
+            if not conv_id or not existing_conversation:
+                conv_id = history_manager.create_conversation(title=title, model=model_name or 'default')
         else:
-            conv_id = str(uuid_module.uuid4())
+            conv_id = conv_id or str(uuid_module.uuid4())
+
+        # 如果数据库不可用，自动降级
+        if use_database and not ensure_database_manager():
+            logger.warning("请求使用数据库，但当前数据库不可用，自动切换为纯AI模式")
+            use_database = False
+
+        # 保存用户消息到历史
+        if history_manager and conv_id and user_query:
+            try:
+                history_manager.add_message(
+                    conversation_id=conv_id,
+                    message_type="user",
+                    content=user_query,
+                    context={
+                        "model": model_name,
+                        "use_database": use_database,
+                        "context_rounds": context_rounds
+                    }
+                )
+            except Exception as exc:
+                logger.warning(f"保存用户消息到历史失败: {exc}")
 
         # 标记查询开始
         with active_queries_lock:
@@ -369,6 +405,36 @@ def chat_stream():
                     stop_checker=lambda: _get_stop_status(conv_id),
                     language=user_language
                 )
+
+                # 保存助手响应到历史
+                if history_manager and conv_id:
+                    try:
+                        assistant_content = result.get('result', result.get('error', '执行失败'))
+                        execution_details = None
+                        if result.get('success'):
+                            execution_details = {
+                                "sql": result.get('sql'),
+                                "execution_time": result.get('execution_time'),
+                                "rows_affected": result.get('rows_count'),
+                                "visualization": result.get('visualization'),
+                                "model": result.get('model')
+                            }
+                        if isinstance(assistant_content, dict) and 'content' in assistant_content:
+                            content_to_save = json.dumps({"type": "dual_view", "data": assistant_content}, ensure_ascii=False)
+                        elif isinstance(assistant_content, list):
+                            content_to_save = json.dumps({"type": "raw_output", "data": assistant_content}, ensure_ascii=False)
+                        elif not isinstance(assistant_content, str):
+                            content_to_save = json.dumps(assistant_content, ensure_ascii=False)
+                        else:
+                            content_to_save = assistant_content
+                        history_manager.add_message(
+                            conversation_id=conv_id,
+                            message_type="assistant",
+                            content=content_to_save,
+                            execution_details=execution_details
+                        )
+                    except Exception as exc:
+                        logger.warning(f"保存助手消息到历史失败: {exc}")
 
                 # 结果事件（不包含代码，沿用后端汇总）
                 yield _sse_format('result', {
@@ -1341,6 +1407,7 @@ def save_database_config():
         # 重新加载配置
         global database_manager
         from backend.database import DatabaseManager
+        DatabaseManager.GLOBAL_DISABLED = False
         database_manager = DatabaseManager()
         if not getattr(database_manager, 'is_configured', True):
             logger.warning("数据库配置保存后仍不可用，请检查 .env")

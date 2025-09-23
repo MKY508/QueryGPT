@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 class DatabaseManager:
     """数据库管理器，支持 MySQL(Doris) 与 SQLite（通过 DATABASE_URL）。"""
+
+    GLOBAL_DISABLED = False
     
     def __init__(self, config_path: str = None):
         """初始化数据库管理器"""
@@ -28,6 +30,13 @@ class DatabaseManager:
 
         self.driver = 'mysql'
         self.is_configured = True
+        self.last_error: Optional[Exception] = None
+        self.config: Dict[str, Any] = {}
+
+        if DatabaseManager.GLOBAL_DISABLED:
+            self.is_configured = False
+            logger.warning("数据库功能已被标记为禁用（此前连接失败），跳过初始化")
+            return
 
         # Driver 选择优先级（测试/开发友好）：
         # 1) 若提供 DATABASE_URL=sqlite:// 则优先 SQLite（无论是否测试）
@@ -118,6 +127,9 @@ class DatabaseManager:
         # 简单重试机制
         attempts = 0
         last_err = None
+
+        if DatabaseManager.GLOBAL_DISABLED:
+            raise RuntimeError("数据库已禁用")
         while attempts < 3:
             try:
                 conn = pymysql.connect(
@@ -128,9 +140,9 @@ class DatabaseManager:
                     database=self.config.get("database", ""),
                     charset='utf8mb4',
                     cursorclass=pymysql.cursors.DictCursor,
-                    connect_timeout=20,
-                    read_timeout=20,
-                    write_timeout=20,
+                    connect_timeout=5,
+                    read_timeout=5,
+                    write_timeout=5,
                     autocommit=True
                 )
                 return conn
@@ -139,7 +151,10 @@ class DatabaseManager:
                 attempts += 1
                 time.sleep(0.05)
         logger.error(f"数据库连接失败: {last_err}")
-        raise last_err
+        DatabaseManager.GLOBAL_DISABLED = True
+        self.is_configured = False
+        self.last_error = last_err
+        raise RuntimeError("数据库连接失败，已禁用后续自动连接尝试") from last_err
 
     @contextmanager
     def connection(self):
