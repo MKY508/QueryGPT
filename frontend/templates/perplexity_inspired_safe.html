@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryGPT - AI数据分析平台</title>
+    <!-- 使用Tailwind CSS - MIT许可证，安全合规 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/safe-inspired-design.css') }}">
+    <!-- Font Awesome图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <!-- 顶部导航栏 - 原创设计 -->
+    <header class="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-4">
+                    <div class="bg-blue-600 text-white p-2 rounded-lg">
+                        <i class="fas fa-brain text-xl"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-800">QueryGPT</h1>
+                </div>
+                <nav class="hidden md:flex space-x-8">
+                    <a href="#" class="text-gray-600 hover:text-blue-600 transition-colors">分析</a>
+                    <a href="#" class="text-gray-600 hover:text-blue-600 transition-colors">数据</a>
+                    <a href="#" class="text-gray-600 hover:text-blue-600 transition-colors">设置</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区域 -->
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        <!-- 搜索/查询区域 - 灵感来自Perplexity但完全重新设计 -->
+        <div class="mb-8">
+            <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+                <div class="flex items-center space-x-4 mb-4">
+                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
+                        <i class="fas fa-search text-white text-sm"></i>
+                    </div>
+                    <h2 class="text-lg font-semibold text-gray-800">智能数据查询</h2>
+                </div>
+
+                <!-- 查询输入框 -->
+                <div class="relative">
+                    <textarea
+                        id="queryInput"
+                        placeholder="请输入您的数据分析需求，例如：显示过去一个月的销售趋势..."
+                        class="w-full p-4 border-2 border-gray-200 rounded-xl resize-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 min-h-[120px]"
+                        rows="4"
+                    ></textarea>
+
+                    <!-- 发送按钮 -->
+                    <button
+                        id="sendQuery"
+                        class="absolute bottom-4 right-4 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2"
+                    >
+                        <i class="fas fa-paper-plane"></i>
+                        <span class="hidden sm:inline">发送</span>
+                    </button>
+                </div>
+
+                <!-- 快捷查询建议 -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="text-sm text-gray-500">建议查询：</span>
+                    <button class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm hover:bg-gray-200 transition-colors">
+                        销售数据分析
+                    </button>
+                    <button class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm hover:bg-gray-200 transition-colors">
+                        用户行为趋势
+                    </button>
+                    <button class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm hover:bg-gray-200 transition-colors">
+                        财务报表汇总
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果展示区域 -->
+        <div id="resultsContainer" class="space-y-6">
+            <!-- 思考过程展示 - 原创设计 -->
+            <div id="thinkingProcess" class="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hidden">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span class="text-gray-700 font-medium">AI正在分析您的需求...</span>
+                </div>
+                <div id="thinkingSteps" class="space-y-2 text-sm text-gray-600">
+                    <!-- 动态添加思考步骤 -->
+                </div>
+            </div>
+
+            <!-- 结果卡片 -->
+            <div id="resultCard" class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden hidden">
+                <!-- SQL查询展示 -->
+                <div class="p-6 border-b border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-code text-blue-600 mr-2"></i>
+                        生成的SQL查询
+                    </h3>
+                    <div class="bg-gray-50 rounded-lg p-4 overflow-x-auto">
+                        <code id="sqlCode" class="text-sm text-gray-800 font-mono"></code>
+                    </div>
+                </div>
+
+                <!-- 数据可视化区域 -->
+                <div class="p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-chart-bar text-green-600 mr-2"></i>
+                        数据可视化
+                    </h3>
+                    <div id="chartContainer" class="bg-gray-50 rounded-lg p-4 min-h-[300px] flex items-center justify-center">
+                        <span class="text-gray-500">图表将在这里显示</span>
+                    </div>
+                </div>
+
+                <!-- 数据表格 -->
+                <div class="p-6 border-t border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                        <i class="fas fa-table text-purple-600 mr-2"></i>
+                        数据详情
+                    </h3>
+                    <div id="dataTable" class="overflow-x-auto">
+                        <!-- 动态生成表格 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史查询 -->
+        <div class="mt-12">
+            <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+                <i class="fas fa-history text-gray-600 mr-2"></i>
+                最近查询
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- 历史查询卡片 -->
+                <div class="bg-white rounded-lg shadow border border-gray-100 p-4 hover:shadow-lg transition-shadow cursor-pointer">
+                    <h3 class="font-medium text-gray-800 mb-2">销售趋势分析</h3>
+                    <p class="text-sm text-gray-600 mb-3">分析过去3个月的销售数据变化</p>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-500">2小时前</span>
+                        <i class="fas fa-chevron-right text-gray-400"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-gray-200 mt-16">
+        <div class="max-w-6xl mx-auto px-4 py-8">
+            <div class="text-center text-gray-600">
+                <p>&copy; 2024 QueryGPT. 基于开源技术构建的AI数据分析平台</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/safe-inspired-ui.js') }}"></script>
+</body>
+</html>
