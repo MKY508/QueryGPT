@@ -32,6 +32,7 @@ from backend.rate_limiter import rate_limit, strict_limiter, cleanup_rate_limite
 from backend.smart_router import SmartRouter
 from backend.ai_router import RouteType
 from backend.sql_executor import DirectSQLExecutor
+from backend.llm_service import LLMService
 from backend.api.config_api import config_bp
 from backend.cache_manager import CacheManager
 
@@ -235,7 +236,6 @@ def _sse_format(event: str, data: dict) -> str:
 def _generate_progress_plan(user_query: str, route_type: str = 'ai_analysis', language: str = 'zh'):
     """调用LLM生成简短进度标签（每项不超过10字，3-6项）。失败时返回默认。"""
     try:
-        from backend.llm_service import LLMService
         svc = LLMService()
         prompt = (
             "你是数据分析的执行计划助理。请基于用户需求和执行路径，生成一个最多6步的进度标签列表，"
@@ -789,11 +789,15 @@ def chat():
                     'database': db_config.get('database', '')
                 }
 
-                try:
-                    db_list = database_manager.get_database_list()
-                    context['available_databases'] = db_list
-                except Exception as e:
-                    logger.warning(f"获取数据库列表失败，但继续执行: {e}")
+                if (
+                    getattr(database_manager, 'is_configured', False)
+                    and not DatabaseManager.GLOBAL_DISABLED
+                ):
+                    try:
+                        db_list = database_manager.get_database_list()
+                        context['available_databases'] = db_list
+                    except Exception as e:
+                        logger.warning(f"获取数据库列表失败，但继续执行: {e}")
         else:
             full_query = user_query
         
@@ -942,7 +946,13 @@ def chat():
                 resp_payload['response'] = str(result.get('result'))[:2000]
             return jsonify(resp_payload)
         elif result.get('interrupted'):
-            # 查询被中断，返回部分结果
+            # 查询被中断，清理掉仅有的用户消息，避免残留单向记录
+            if history_manager and conversation_id:
+                try:
+                    history_manager.remove_last_message(conversation_id, message_type='user', delete_empty=False)
+                except Exception as cleanup_err:
+                    logger.warning(f"清理中断消息失败: {cleanup_err}")
+            # 返回部分结果
             return jsonify({
                 "success": False,
                 "interrupted": True,
@@ -1018,41 +1028,20 @@ def test_model():
     try:
         data = request.json
         model_id = data.get('model')
-        
-        # 从.env获取默认配置
-        api_config = ConfigLoader.get_api_config()
-        api_key = data.get('api_key', api_config['api_key'])
-        api_base = data.get('api_base', api_config['api_base'])
-        
-        # 使用 OpenAI 客户端测试连接
-        from openai import OpenAI
-        
-        client = OpenAI(
-            api_key=api_key,
-            base_url=api_base
-        )
-        
-        # 尝试简单的补全请求来测试连接
-        try:
-            response = client.chat.completions.create(
-                model=model_id,
-                messages=[{"role": "user", "content": "Hi"}],
-                max_tokens=5,
-                temperature=0
-            )
-            
-            return jsonify({
-                "success": True,
-                "message": f"模型 {model_id} 连接成功",
-                "response": response.choices[0].message.content if response.choices else "OK"
-            })
-        except Exception as api_error:
-            logger.error(f"模型API调用失败: {api_error}")
-            return jsonify({
-                "success": False,
-                "message": f"模型连接失败: {str(api_error)}"
-            })
-            
+        payload = {
+            'model': model_id,
+            'id': data.get('id', model_id),
+            'api_key': data.get('api_key'),
+            'api_base': data.get('api_base'),
+            'provider': data.get('provider') or data.get('type'),
+            'model_name': data.get('model_name'),
+            'litellm_model': data.get('litellm_model')
+        }
+        success, message = LLMService.test_model_connection(payload)
+        return jsonify({
+            "success": success,
+            "message": message
+        })
     except Exception as e:
         logger.error(f"模型测试失败: {e}")
         return jsonify({

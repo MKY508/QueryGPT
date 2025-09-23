@@ -238,13 +238,17 @@ class SmartRouter:
             'tables': []
         }
         
-        # 获取可用表信息
-        if self.database_manager:
+        # 获取可用表信息（仅在数据库已配置且未禁用时）
+        if (
+            self.database_manager
+            and getattr(self.database_manager, 'is_configured', False)
+            and not getattr(self.database_manager.__class__, 'GLOBAL_DISABLED', False)
+        ):
             try:
                 tables = self.database_manager.get_tables()
                 routing_context['tables'] = ', '.join(tables[:20])  # 限制数量
-            except:
-                pass
+            except Exception:
+                logger.debug("加载表信息失败，忽略以避免影响路由")
         
         return routing_context
     

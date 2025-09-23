@@ -274,13 +274,17 @@ class DataAnalysisPlatform {
             // 查找选中模型的配置
             if (window.settingsManager && window.settingsManager.models) {
                 const selectedModel = window.settingsManager.models.find(m => m.id === e.target.value);
-                if (selectedModel && selectedModel.api_key && selectedModel.api_base) {
-                    // 更新API配置到.env
-                    await api.saveConfig({
-                        api_key: selectedModel.api_key,
-                        api_base: selectedModel.api_base,
-                        default_model: selectedModel.id
-                    });
+                if (selectedModel) {
+                    const apiBase = selectedModel.api_base || selectedModel.base_url || '';
+                    const apiKey = selectedModel.api_key === 'not-needed' ? '' : (selectedModel.api_key || '');
+                    if (apiBase) {
+                        // 更新API配置到.env
+                        await api.saveConfig({
+                            api_key: apiKey,
+                            api_base: apiBase,
+                            default_model: selectedModel.id
+                        });
+                    }
                 }
             }
             

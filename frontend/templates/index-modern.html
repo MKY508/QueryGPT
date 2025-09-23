@@ -168,8 +168,9 @@
                             <button id="send-button" class="send-button btn-modern btn-primary-gradient">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
-                            <button id="stop-button" class="stop-button btn-modern btn-danger" style="display: none;">
+                            <button id="stop-button" class="stop-button btn-modern btn-danger" style="display: none;" title="停止查询">
                                 <i class="fas fa-stop"></i>
+                                <span class="btn-text">停止</span>
                             </button>
                         </div>
                     </div>
@@ -546,25 +547,34 @@
                         </div>
                         <div class="form-group">
                             <label>模型类型 <span class="required">*</span></label>
-                            <select id="model-type" disabled>
-                                <option value="openai">OpenAI</option>
+                            <select id="model-type">
+                                <option value="openai">OpenAI (ChatGPT)</option>
+                                <option value="qwen">Qwen (阿里百炼)</option>
+                                <option value="deepseek">DeepSeek</option>
+                                <option value="anthropic">Anthropic Claude</option>
+                                <option value="gemini">Google Gemini</option>
+                                <option value="mistral">Mistral AI</option>
+                                <option value="groq">Groq</option>
+                                <option value="azure">Azure OpenAI</option>
+                                <option value="moonshot">Moonshot (Kimi)</option>
+                                <option value="fireworks">Fireworks AI</option>
+                                <option value="cohere">Cohere</option>
+                                <option value="openrouter">OpenRouter</option>
+                                <option value="perplexity">Perplexity</option>
+                                <option value="bedrock">AWS Bedrock</option>
+                                <option value="ollama">Ollama (本地)</option>
+                                <option value="custom">自定义 / 兼容</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>API地址 <span class="required">*</span></label>
+                            <label>API地址</label>
                             <input type="text" id="model-api-base" placeholder="https://api.openai.com/v1" data-i18n="models.apiBasePlaceholder">
+                            <small id="model-api-base-hint" style="display:block;color:#6c757d;font-size:12px;margin-top:4px;"></small>
                         </div>
                         <div class="form-group">
-                            <label>API密钥 <span class="required">*</span></label>
+                            <label>API密钥</label>
                             <input type="password" id="model-api-key" placeholder="输入API密钥" data-i18n="models.apiKeyPlaceholder">
-                        </div>
-                        <div class="form-group">
-                            <label>最大Token数</label>
-                            <input type="number" id="model-max-tokens" placeholder="4096" value="4096">
-                        </div>
-                        <div class="form-group">
-                            <label>温度参数</label>
-                            <input type="number" id="model-temperature" placeholder="0.7" value="0.7" step="0.1" min="0" max="2">
+                            <small id="model-api-key-hint" style="display:block;color:#6c757d;font-size:12px;margin-top:4px;"></small>
                         </div>
                     </div>
                     <div class="modal-footer">
