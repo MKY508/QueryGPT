@@ -420,6 +420,9 @@ class DatabaseManager:
         """
         获取数据库列表，供OpenInterpreter参考
         """
+        if DatabaseManager.GLOBAL_DISABLED or not getattr(self, 'is_configured', False):
+            logger.debug("数据库未配置或已禁用，跳过数据库列表获取")
+            return []
         try:
             if self.driver == 'sqlite':
                 return []
@@ -445,6 +448,9 @@ class DatabaseManager:
         Returns:
             表名列表
         """
+        if DatabaseManager.GLOBAL_DISABLED or not getattr(self, 'is_configured', False):
+            logger.debug("数据库未配置或已禁用，跳过表列表获取")
+            return []
         try:
             if self.driver == 'sqlite':
                 rows = self._execute_raw_query("SELECT name FROM sqlite_master WHERE type='table'")
@@ -511,6 +517,9 @@ class DatabaseManager:
 
     # 新增：获取表结构（用于SQLite测试）
     def get_table_schema(self, table: str) -> List[Dict[str, Any]]:
+        if DatabaseManager.GLOBAL_DISABLED or not getattr(self, 'is_configured', False):
+            logger.debug("数据库未配置或已禁用，跳过表结构获取")
+            return []
         if self.driver == 'sqlite':
             rows = self._execute_raw_query(f"PRAGMA table_info({table})")
             schema = []

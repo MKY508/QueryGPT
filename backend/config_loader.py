@@ -11,6 +11,110 @@ logger = logging.getLogger(__name__)
 
 CONFIG_PATH = Path(__file__).parent.parent / 'config' / 'config.json'
 
+PLACEHOLDER_KEYS = {
+    '',
+    'not-needed',
+    'not_needed',
+    'notneeded',
+    'your-openai-api-key-here',
+    'your-anthropic-api-key-here',
+    'your-custom-api-key-here',
+    'your-api-key-here'
+}
+
+MODEL_TYPE_PRESETS = {
+    'openai': {
+        'provider': 'openai',
+        'default_base': 'https://api.openai.com/v1',
+        'requires_api_key': True,
+        'requires_api_base': True
+    },
+    'qwen': {
+        'provider': 'dashscope',
+        'default_base': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        'requires_api_key': True,
+        'requires_api_base': True
+    },
+    'dashscope': {
+        'provider': 'dashscope',
+        'default_base': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        'requires_api_key': True,
+        'requires_api_base': True
+    },
+    'deepseek': {
+        'provider': 'deepseek',
+        'default_base': 'https://api.deepseek.com/v1',
+        'requires_api_key': True,
+        'requires_api_base': True
+    },
+    'anthropic': {
+        'provider': 'anthropic',
+        'default_base': 'https://api.anthropic.com/v1',
+        'requires_api_key': True,
+        'requires_api_base': True
+    },
+    'groq': {
+        'provider': 'groq',
+        'default_base': 'https://api.groq.com/openai/v1',
+        'requires_api_key': True,
+        'requires_api_base': True
+    },
+    'azure': {
+        'provider': 'azure',
+        'default_base': '',
+        'requires_api_key': True,
+        'requires_api_base': True
+    },
+    'ollama': {
+        'provider': 'ollama',
+        'default_base': 'http://localhost:11434',
+        'requires_api_key': False,
+        'requires_api_base': True
+    },
+    'moonshot': {
+        'provider': 'moonshot',
+        'default_base': 'https://api.moonshot.cn/v1',
+        'requires_api_key': True,
+        'requires_api_base': True
+    },
+    'custom': {
+        'provider': 'custom',
+        'default_base': '',
+        'requires_api_key': False,
+        'requires_api_base': False
+    }
+}
+
+DEFAULT_MODELS = [
+    {
+        "id": "gpt-4o",
+        "name": "ChatGPT 4o",
+        "type": "openai",
+        "status": "active",
+        "api_base": "https://api.openai.com/v1",
+        "model_name": "gpt-4o"
+    },
+    {
+        "id": "qwen-plus",
+        "name": "Qwen Plus",
+        "type": "qwen",
+        "status": "inactive",
+        "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model_name": "qwen-plus"
+    },
+    {
+        "id": "ollama-llama3",
+        "name": "Ollama Llama3 本地",
+        "type": "ollama",
+        "status": "inactive",
+        "api_base": "http://localhost:11434",
+        "api_key": "not-needed",
+        "model_name": "llama3:latest",
+        "litellm_model": "ollama/llama3:latest",
+        "requires_api_key": False
+    }
+]
+
 class ConfigLoader:
     """统一的配置加载器，优先使用.env文件"""
     _env_loaded = False
@@ -25,10 +129,85 @@ class ConfigLoader:
         mid = model_id.strip().lower()
         mapping = {
             'gpt-4.1': 'gpt-4o',
+            'gpt4.1': 'gpt-4o',
             '4.1': 'gpt-4o',
             '4o': 'gpt-4o',
+            'chatgpt-4o': 'gpt-4o'
         }
         return mapping.get(mid, model_id)
+    
+    @staticmethod
+    def _get_model_preset(model_type: str | None) -> Dict[str, Any]:
+        key = (model_type or 'custom').strip().lower()
+        preset = MODEL_TYPE_PRESETS.get(key)
+        if preset:
+            return dict(preset)
+        return {
+            'provider': key,
+            'default_base': '',
+            'requires_api_key': False,
+            'requires_api_base': False
+        }
+    
+    @staticmethod
+    def build_litellm_model_id(provider: str | None, model_name: str | None) -> str:
+        name = (model_name or '').strip()
+        provider = (provider or '').strip().lower()
+        if not name:
+            return ''
+        if provider in ('', 'openai', 'custom'):
+            return name
+        if '/' in name:
+            return name
+        return f"{provider}/{name}"
+    
+    @classmethod
+    def normalize_model_entry(cls, model: Dict[str, Any], default_api_key: str, fallback_api_base: str) -> Dict[str, Any]:
+        raw = dict(model or {})
+        raw_id = str(raw.get('id') or raw.get('name') or raw.get('model') or '').strip()
+        resolved_id = cls.normalize_model_id(raw_id) or raw_id
+        preset = cls._get_model_preset(raw.get('type') or raw.get('provider'))
+        provider = (raw.get('provider') or preset.get('provider') or 'custom').strip().lower()
+        model_type = (raw.get('type') or provider or 'custom').strip().lower()
+        api_base = raw.get('api_base') or raw.get('base_url') or preset.get('default_base') or fallback_api_base
+        if isinstance(api_base, str):
+            api_base = api_base.strip()
+            if api_base.endswith('/'):
+                api_base = api_base.rstrip('/')
+        api_key = (raw.get('api_key') or '').strip()
+        if not api_key or api_key in PLACEHOLDER_KEYS:
+            api_key = default_api_key
+        status = raw.get('status', 'inactive')
+        name = raw.get('name') or raw_id or resolved_id
+        model_name = raw.get('model_name') or raw.get('deployment_name') or raw.get('model') or raw_id or resolved_id
+        litellm_model = raw.get('litellm_model') or cls.build_litellm_model_id(provider, raw.get('litellm_name') or model_name)
+        requires_api_key = raw.get('requires_api_key', preset.get('requires_api_key', False))
+        requires_api_base = raw.get('requires_api_base', preset.get('requires_api_base', False))
+
+        normalized = {
+            'id': raw_id or resolved_id,
+            'resolved_id': resolved_id,
+            'name': name,
+            'type': model_type,
+            'provider': provider,
+            'status': status,
+            'api_key': api_key,
+            'api_base': api_base,
+            'base_url': api_base,
+            'model_name': model_name,
+            'litellm_model': litellm_model or model_name,
+            'requires_api_key': requires_api_key,
+            'requires_api_base': requires_api_base
+        }
+
+        for key in ('headers', 'extra_headers', 'timeout', 'metadata'):
+            if key in raw and key not in normalized:
+                normalized[key] = raw[key]
+        # 保留 legacy 字段用于兼容（例如 max_tokens 等）
+        for legacy_key in ('max_tokens', 'temperature'):
+            if legacy_key in raw:
+                normalized[legacy_key] = raw[legacy_key]
+        return normalized
     
     @staticmethod
     def load_env():
@@ -141,118 +320,113 @@ class ConfigLoader:
     def get_api_config() -> Dict[str, Any]:
         """获取API配置 - 优先从models.json读取模型配置，其次从环境变量"""
         ConfigLoader.load_env()
-        
-        # 先尝试从 models.json 文件读取模型配置
-        models_config = {}
+
         models_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'models.json')
+        models_entries: list[Any] = []
         try:
             if os.path.exists(models_path):
                 mtime = os.path.getmtime(models_path)
                 if ConfigLoader._api_config_cache is not None and ConfigLoader._models_mtime == mtime:
-                    # 直接基于缓存返回（在函数尾部构建完整dict）
-                    cached = ConfigLoader._api_config_cache
+                    return ConfigLoader._api_config_cache
+                with open(models_path, 'r', encoding='utf-8') as f:
+                    models_data = json.load(f)
+                if isinstance(models_data, dict):
+                    models_entries = models_data.get('models', [])
+                elif isinstance(models_data, list):
+                    models_entries = models_data
                 else:
-                    import json
-                    with open(models_path, 'r', encoding='utf-8') as f:
-                        models_data = json.load(f)
-                    if isinstance(models_data, dict) and 'models' in models_data:
-                        models_config = models_data['models']
-                    elif isinstance(models_data, list):
-                        models_config = models_data
-                    logger.info(f"从models.json加载了 {len(models_config)} 个模型配置")
-                    ConfigLoader._models_mtime = mtime
-                    cached = None
-            else:
-                cached = None
-        except Exception as e:
-            logger.warning(f"读取models.json失败: {e}")
-            cached = None
-        
-        # 从环境变量获取默认的API配置
-        api_key = (
+                    models_entries = []
+                ConfigLoader._models_mtime = mtime
+                logger.info(f"从models.json加载了 {len(models_entries)} 个模型配置")
+        except Exception as exc:
+            logger.warning(f"读取models.json失败: {exc}")
+            models_entries = []
+            ConfigLoader._models_mtime = None
+
+        env_api_key = (
             os.getenv("OPENAI_API_KEY") or
             os.getenv("API_KEY") or
             os.getenv("LLM_API_KEY") or
             "not-needed"
         )
-
-        api_base = (
+        env_api_base = (
             os.getenv("OPENAI_BASE_URL") or
             os.getenv("OPENAI_API_BASE") or
             os.getenv("API_BASE_URL") or
             os.getenv("LLM_BASE_URL") or
             'http://localhost:11434/v1'
         )
-        
-        # 获取默认模型并标准化
-        default_model = ConfigLoader.normalize_model_id(os.getenv("DEFAULT_MODEL", "gpt-4o"))
-        
-        # 构建模型字典：如果有models.json配置就使用，否则使用默认配置
-        models = {}
-        if ConfigLoader._api_config_cache is not None and cached is ConfigLoader._api_config_cache:
-            return ConfigLoader._api_config_cache
-        if models_config:
-            # 使用models.json中的配置
-            placeholder_keys = {
-                '', 'not-needed', 'not_needed', 'notneeded',
-                'your-openai-api-key-here', 'your-anthropic-api-key-here',
-                'your-custom-api-key-here', 'your-api-key-here'
+        default_model_env = ConfigLoader.normalize_model_id(os.getenv("DEFAULT_MODEL", "gpt-4o"))
+
+        if not models_entries:
+            models_entries = list(DEFAULT_MODELS)
+
+        models: Dict[str, Dict[str, Any]] = {}
+        active_candidates: list[str] = []
+        for entry in models_entries:
+            entry_dict = dict(entry) if isinstance(entry, dict) else {'id': str(entry), 'type': 'custom', 'status': 'inactive'}
+            normalized = ConfigLoader.normalize_model_entry(entry_dict, env_api_key, env_api_base)
+            key = normalized.get('resolved_id') or normalized['id']
+            model_payload = {
+                'id': normalized['id'],
+                'name': normalized.get('name', normalized['id']),
+                'api_key': normalized['api_key'],
+                'api_base': normalized['api_base'],
+                'base_url': normalized['api_base'],
+                'model_name': normalized['model_name'],
+                'provider': normalized['provider'],
+                'type': normalized['type'],
+                'status': normalized.get('status', 'inactive'),
+                'litellm_model': normalized.get('litellm_model'),
+                'requires_api_key': normalized.get('requires_api_key'),
+                'requires_api_base': normalized.get('requires_api_base')
             }
-            for model in models_config:
-                model_id_raw = model.get('id', model.get('name', ''))
-                model_id = ConfigLoader.normalize_model_id(model_id_raw)
-                if model_id:
-                    # 选择 per-model api_base（若未提供则回退到全局 OPENAI_BASE_URL）
-                    per_base = model.get('api_base') or model.get('base_url') or api_base
-                    # 选择 api_key：若为占位符或空，则回退到环境变量
-                    per_key = (model.get('api_key') or '').strip()
-                    key_to_use = per_key if per_key not in placeholder_keys else api_key
-                    models[model_id] = {
-                        "api_key": key_to_use,
-                        "base_url": per_base,
-                        "model_name": model.get('model_name', model_id),
-                        "status": model.get('status', 'inactive')
-                    }
-            # 设置默认模型为第一个active的模型
-            active_models = [m for m in models_config if m.get('status') == 'active']
-            if active_models:
-                default_model = ConfigLoader.normalize_model_id(active_models[0].get('id', default_model))
-        else:
-            # 如果没有models.json，使用默认配置
-            models = {
-                "gpt-4o": {
-                    "api_key": api_key,
-                    "base_url": api_base,
-                    "model_name": "gpt-4o"
-                },
-                "claude-sonnet-4": {
-                    "api_key": api_key,
-                    "base_url": api_base,
-                    "model_name": "claude-sonnet-4"
-                },
-                "deepseek-r1": {
-                    "api_key": api_key,
-                    "base_url": api_base,
-                    "model_name": "deepseek-r1"
-                },
-                "qwen-flagship": {
-                    "api_key": api_key,
-                    "base_url": api_base,
-                    "model_name": "qwen-flagship"
-                }
+            for passthrough in ('headers', 'extra_headers', 'timeout', 'metadata', 'max_tokens', 'temperature'):
+                if normalized.get(passthrough) is not None:
+                    model_payload[passthrough] = normalized[passthrough]
+            models[key] = model_payload
+            if normalized.get('status') == 'active':
+                active_candidates.append(key)
+
+        if not models:
+            # 确保至少存在一个默认模型
+            fallback_entry = ConfigLoader.normalize_model_entry(DEFAULT_MODELS[0], env_api_key, env_api_base)
+            key = fallback_entry.get('resolved_id') or fallback_entry['id']
+            models[key] = {
+                'id': fallback_entry['id'],
+                'name': fallback_entry.get('name', fallback_entry['id']),
+                'api_key': fallback_entry['api_key'],
+                'api_base': fallback_entry['api_base'],
+                'base_url': fallback_entry['api_base'],
+                'model_name': fallback_entry['model_name'],
+                'provider': fallback_entry['provider'],
+                'type': fallback_entry['type'],
+                'status': fallback_entry.get('status', 'active'),
+                'litellm_model': fallback_entry.get('litellm_model'),
+                'requires_api_key': fallback_entry.get('requires_api_key'),
+                'requires_api_base': fallback_entry.get('requires_api_base')
             }
-        
-        # 记录实际使用的模型
+
+        default_model = default_model_env
+        if active_candidates:
+            default_model = ConfigLoader.normalize_model_id(active_candidates[0])
+        if default_model not in models and models:
+            default_model = next(iter(models.keys()))
+        default_entry = models.get(default_model, {})
+        resolved_api_key = default_entry.get('api_key') or env_api_key
+        if resolved_api_key in PLACEHOLDER_KEYS:
+            resolved_api_key = ''
+        resolved_api_base = default_entry.get('api_base') or env_api_base
+
         logger.info(f"使用模型配置: default_model={default_model}, 总共 {len(models)} 个模型")
-        
+
         api_conf = {
-            "api_key": api_key,
-            "api_base": api_base,
+            "api_key": resolved_api_key,
+            "api_base": resolved_api_base,
             "default_model": default_model,
             "current_model": default_model,
             "models": models
         }
-        # 写入缓存
         ConfigLoader._api_config_cache = api_conf
         return api_conf
 

@@ -8,6 +8,152 @@ class SettingsManager {
         this.currentEditingModel = null;
         this.config = null;  // 存储配置
         this.hasTestedModels = false;  // 标记是否已经测试过模型
+        this.modelTypePresets = {
+            openai: {
+                label: 'OpenAI',
+                provider: 'openai',
+                defaultBase: 'https://api.openai.com/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'gpt-4o',
+                defaultLitellm: 'gpt-4o'
+            },
+            qwen: {
+                label: 'Qwen (DashScope)',
+                provider: 'dashscope',
+                defaultBase: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'qwen-plus'
+            },
+            dashscope: {
+                label: 'Qwen (DashScope)',
+                provider: 'dashscope',
+                defaultBase: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'qwen-plus'
+            },
+            deepseek: {
+                label: 'DeepSeek',
+                provider: 'deepseek',
+                defaultBase: 'https://api.deepseek.com/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'deepseek-chat'
+            },
+            anthropic: {
+                label: 'Anthropic Claude',
+                provider: 'anthropic',
+                defaultBase: 'https://api.anthropic.com/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'claude-3-5-sonnet-20240620'
+            },
+            groq: {
+                label: 'Groq',
+                provider: 'groq',
+                defaultBase: 'https://api.groq.com/openai/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'llama3-70b-8192'
+            },
+            azure: {
+                label: 'Azure OpenAI',
+                provider: 'azure',
+                defaultBase: '',
+                requiresApiKey: true,
+                requiresApiBase: true
+            },
+            moonshot: {
+                label: 'Moonshot (Kimi)',
+                provider: 'moonshot',
+                defaultBase: 'https://api.moonshot.cn/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'moonshot-v1-8k'
+            },
+            gemini: {
+                label: 'Google Gemini',
+                provider: 'google',
+                defaultBase: 'https://generativelanguage.googleapis.com/v1beta',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'gemini-1.5-pro-latest'
+            },
+            google: {
+                label: 'Google Gemini',
+                provider: 'google',
+                defaultBase: 'https://generativelanguage.googleapis.com/v1beta',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'gemini-1.5-pro-latest'
+            },
+            mistral: {
+                label: 'Mistral AI',
+                provider: 'mistral',
+                defaultBase: 'https://api.mistral.ai/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'mistral-large-latest'
+            },
+            fireworks: {
+                label: 'Fireworks AI',
+                provider: 'fireworks',
+                defaultBase: 'https://api.fireworks.ai/inference/v1',
+                requiresApiKey: true,
+                requiresApiBase: true
+            },
+            cohere: {
+                label: 'Cohere',
+                provider: 'cohere',
+                defaultBase: 'https://api.cohere.ai/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'command-r-plus'
+            },
+            openrouter: {
+                label: 'OpenRouter',
+                provider: 'openrouter',
+                defaultBase: 'https://openrouter.ai/api/v1',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'openrouter/auto',
+                defaultLitellm: 'openrouter/auto'
+            },
+            perplexity: {
+                label: 'Perplexity',
+                provider: 'perplexity',
+                defaultBase: 'https://api.perplexity.ai',
+                requiresApiKey: true,
+                requiresApiBase: true,
+                defaultModel: 'llama-3.1-sonar-small-128k-chat'
+            },
+            bedrock: {
+                label: 'AWS Bedrock',
+                provider: 'bedrock',
+                defaultBase: '',
+                requiresApiKey: true,
+                requiresApiBase: false,
+                defaultModel: 'anthropic.claude-3-sonnet-20240229-v1:0'
+            },
+            ollama: {
+                label: 'Ollama (本地)',
+                provider: 'ollama',
+                defaultBase: 'http://localhost:11434',
+                requiresApiKey: false,
+                requiresApiBase: true,
+                defaultModel: 'llama3:latest',
+                defaultLitellm: 'ollama/llama3:latest'
+            },
+            custom: {
+                label: '自定义 / OpenAI兼容',
+                provider: 'custom',
+                defaultBase: '',
+                requiresApiKey: false,
+                requiresApiBase: false
+            }
+        };
         // 不在构造函数中初始化，等待DOM准备好
     }
 
@@ -122,6 +268,13 @@ class SettingsManager {
                 this.saveModel();
             }
         });
+
+        const modelTypeSelect = document.getElementById('model-type');
+        if (modelTypeSelect) {
+            modelTypeSelect.addEventListener('change', (event) => {
+                this.applyModelTypeHints(event.target.value);
+            });
+        }
 
         // 自动保存基础设置 - 当设置改变时立即保存
         const defaultViewModel = document.getElementById('default-view-mode');
@@ -349,59 +502,128 @@ class SettingsManager {
         try {
             // 从后端获取模型列表
             const response = await api.getModels();
-            this.models = (response.models || []).map(model => ({
-                ...model,
-                status: model.status || 'pending'
-            }));
+            this.models = (response.models || []).map(model => this.prepareModelRecord(model));
             this.renderModelsList();
         } catch (error) {
             console.error('加载模型列表失败:', error);
             // 使用默认模型列表
             this.models = [
-                {
-                    id: 'gpt-4.1',
-                    name: 'GPT-4.1',
-                    type: 'OpenAI',
-                    api_base: 'http://localhost:11434/v1',
+                this.prepareModelRecord({
+                    id: 'gpt-4o',
+                    name: 'ChatGPT 4o',
+                    type: 'openai',
+                    api_base: 'https://api.openai.com/v1',
+                    model_name: 'gpt-4o',
                     status: 'active'
-                },
-                {
-                    id: 'claude-sonnet-4',
-                    name: 'Claude Sonnet 4',
-                    type: 'Anthropic',
-                    api_base: 'http://localhost:11434/v1',
-                    status: 'active'
-                },
-                {
-                    id: 'deepseek-r1',
-                    name: 'DeepSeek R1',
-                    type: 'DeepSeek',
-                    api_base: 'http://localhost:11434/v1',
-                    status: 'active'
-                },
-                {
-                    id: 'qwen-flagship',
-                    name: 'Qwen 旗舰模型',
-                    type: 'Qwen',
-                    api_base: 'http://localhost:11434/v1',
-                    status: 'active'
-                }
+                }),
+                this.prepareModelRecord({
+                    id: 'qwen-plus',
+                    name: 'Qwen Plus',
+                    type: 'qwen',
+                    api_base: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+                    model_name: 'qwen-plus',
+                    status: 'inactive'
+                }),
+                this.prepareModelRecord({
+                    id: 'ollama-llama3',
+                    name: 'Ollama Llama3',
+                    type: 'ollama',
+                    api_base: 'http://localhost:11434',
+                    model_name: 'llama3:latest',
+                    litellm_model: 'ollama/llama3:latest',
+                    status: 'inactive'
+                })
             ];
             this.renderModelsList();
         }
     }
 
+    getModelPreset(type) {
+        const key = (type || 'custom').toLowerCase();
+        return this.modelTypePresets[key] || this.modelTypePresets.custom;
+    }
+
+    buildLitellmModelId(model) {
+        const provider = (model.provider || model.type || '').toLowerCase();
+        const name = model.model_name || model.id || '';
+        if (!name) return '';
+        if (!provider || provider === 'openai' || provider === 'custom') {
+            return name;
+        }
+        if (name.includes('/')) {
+            return name;
+        }
+        return `${provider}/${name}`;
+    }
+
+    prepareModelRecord(raw) {
+        const record = { ...(raw || {}) };
+        record.id = record.id || record.model || record.name || '';
+        record.name = record.name || record.id;
+        const typeKey = (record.type || record.provider || 'custom').toLowerCase();
+        const preset = this.getModelPreset(typeKey);
+        record.type = typeKey;
+        record.provider = record.provider || preset.provider;
+        record.api_base = record.api_base || record.base_url || preset.defaultBase || '';
+        record.base_url = record.api_base;
+        if (!record.api_key) {
+            record.api_key = preset.requiresApiKey === false ? 'not-needed' : '';
+        }
+        record.status = record.status || 'pending';
+        if (!record.model_name) {
+            record.model_name = preset.defaultModel || record.model || record.id;
+        }
+        if (!record.litellm_model) {
+            const litellmSource = { ...record };
+            record.litellm_model = preset.defaultLitellm || this.buildLitellmModelId(litellmSource);
+        }
+        record.requires_api_key = record.requires_api_key ?? preset.requiresApiKey ?? true;
+        record.requires_api_base = record.requires_api_base ?? preset.requiresApiBase ?? true;
+        return record;
+    }
+
+    applyModelTypeHints(type) {
+        const preset = this.getModelPreset(type);
+        const idInput = document.getElementById('model-id');
+        const nameInput = document.getElementById('model-name');
+        const apiBaseInput = document.getElementById('model-api-base');
+        const apiBaseHint = document.getElementById('model-api-base-hint');
+        const apiKeyInput = document.getElementById('model-api-key');
+        const apiKeyHint = document.getElementById('model-api-key-hint');
+        if (idInput) {
+            idInput.placeholder = preset.defaultModel ? `例如: ${preset.defaultModel}` : '例如: my-model-id';
+        }
+        if (nameInput) {
+            nameInput.placeholder = preset.label ? `例如: ${preset.label}` : '请输入模型名称';
+        }
+        if (apiBaseInput) {
+            apiBaseInput.placeholder = preset.defaultBase || 'https://your-endpoint/v1';
+            if (!apiBaseInput.value && preset.defaultBase) {
+                apiBaseInput.value = preset.defaultBase;
+            }
+        }
+        if (apiBaseHint) {
+            if (preset.requiresApiBase === false) {
+                apiBaseHint.textContent = '可选字段；留空将沿用默认兼容地址。';
+            } else if (preset.defaultBase) {
+                apiBaseHint.textContent = `建议基础地址：${preset.defaultBase}`;
+            } else {
+                apiBaseHint.textContent = '必填字段，请填写模型的API基础地址。';
+            }
+        }
+        if (apiKeyInput) {
+            apiKeyInput.placeholder = preset.requiresApiKey ? '输入API密钥' : '无需密钥';
+        }
+        if (apiKeyHint) {
+            const baseText = preset.requiresApiKey ? '必填字段，用于请求鉴权。' : '可选字段，支持免鉴权模型。';
+            apiKeyHint.textContent = preset.defaultModel ? `${baseText} 默认模型：${preset.defaultModel}` : baseText;
+        }
+    }
+
     formatModelType(rawType) {
         if (!rawType) return 'Unknown';
-        const typeMap = {
-            openai: 'OpenAI',
-            anthropic: 'Anthropic',
-            deepseek: 'DeepSeek',
-            qwen: 'Qwen',
-            custom: '自定义'
-        };
-        const key = String(rawType).toLowerCase();
-        return typeMap[key] || rawType;
+        const preset = this.getModelPreset(rawType);
+        return preset.label || rawType;
     }
 
     /**
@@ -441,12 +663,13 @@ class SettingsManager {
                 statusText = '待测试';
             }
             const typeLabel = this.formatModelType(model.type);
+            const apiBase = model.api_base || model.base_url || '未设置';
 
             html += `
                 <tr>
                     <td>${model.name || '未命名'}</td>
                     <td>${typeLabel}</td>
-                    <td>${model.api_base || 'N/A'}</td>
+                    <td>${apiBase}</td>
                     <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                     <td>
                         <button class="btn-icon" title="编辑" onclick="window.settingsManager.editModel('${model.id}')">
@@ -477,34 +700,48 @@ class SettingsManager {
         const defaultApiKey = this.config?.api_key || '';
         const defaultApiBase = this.config?.api_base || 'https://api.openai.com/v1';
         
+        const typeSelect = document.getElementById('model-type');
+        const apiBaseInput = document.getElementById('model-api-base');
+        const apiKeyInput = document.getElementById('model-api-key');
+
         if (modelId) {
             // 编辑模式
             const model = this.models.find(m => m.id === modelId);
             if (model) {
                 title.textContent = '编辑模型';
-                document.getElementById('model-name').value = model.name;
-                document.getElementById('model-id').value = model.id;
-                document.getElementById('model-type').value = (model.type || 'openai');
-                document.getElementById('model-type').disabled = true; // 当前仅保留展示与保存原类型
-                document.getElementById('model-api-base').value = model.api_base || defaultApiBase;
-                // 使用模型的API密钥，如果没有则使用默认的
-                document.getElementById('model-api-key').value = model.api_key || defaultApiKey;
-                document.getElementById('model-max-tokens').value = model.max_tokens || 4096;
-                document.getElementById('model-temperature').value = model.temperature || 0.7;
+                document.getElementById('model-name').value = model.name || '';
+                document.getElementById('model-id').value = model.id || '';
+                const modelType = (model.type || model.provider || 'openai').toLowerCase();
+                if (typeSelect) {
+                    typeSelect.disabled = false;
+                    typeSelect.value = modelType;
+                }
+                if (apiBaseInput) {
+                    apiBaseInput.value = model.api_base || model.base_url || defaultApiBase;
+                }
+                if (apiKeyInput) {
+                    apiKeyInput.value = model.api_key === 'not-needed' ? '' : (model.api_key || defaultApiKey);
+                }
                 this.currentEditingModel = modelId;
+                this.applyModelTypeHints(modelType);
             }
         } else {
             // 添加模式 - 使用默认值
             title.textContent = '添加模型';
             document.getElementById('model-name').value = '';
             document.getElementById('model-id').value = '';
-            document.getElementById('model-type').value = 'openai';
-            document.getElementById('model-type').disabled = true;
-            document.getElementById('model-api-base').value = defaultApiBase;
-            document.getElementById('model-api-key').value = defaultApiKey;
-            document.getElementById('model-max-tokens').value = '4096';
-            document.getElementById('model-temperature').value = '0.7';
+            if (typeSelect) {
+                typeSelect.disabled = false;
+                typeSelect.value = 'openai';
+            }
+            if (apiBaseInput) {
+                apiBaseInput.value = defaultApiBase;
+            }
+            if (apiKeyInput) {
+                apiKeyInput.value = defaultApiKey;
+            }
             this.currentEditingModel = null;
+            this.applyModelTypeHints('openai');
         }
         
         modal.style.display = 'flex';
@@ -523,38 +760,70 @@ class SettingsManager {
      * 保存模型
      */
     async saveModel() {
-        const modelData = {
-            name: document.getElementById('model-name').value.trim(),
-            id: document.getElementById('model-id').value.trim(),
-            type: document.getElementById('model-type').value.trim(),
-            api_base: document.getElementById('model-api-base').value.trim(),
-            api_key: document.getElementById('model-api-key').value.trim(),
-            max_tokens: parseInt(document.getElementById('model-max-tokens').value, 10),
-            temperature: parseFloat(document.getElementById('model-temperature').value)
-        };
+        const name = document.getElementById('model-name').value.trim();
+        const id = document.getElementById('model-id').value.trim();
+        const typeValue = document.getElementById('model-type').value.trim().toLowerCase();
+        const apiBaseInput = document.getElementById('model-api-base').value.trim();
+        const apiKeyInput = document.getElementById('model-api-key').value.trim();
+        const preset = this.getModelPreset(typeValue);
 
-        const editingId = this.currentEditingModel;
-
-        // 验证必填字段
-        if (!modelData.name || !modelData.id || !modelData.api_base || !modelData.api_key) {
-            app.showNotification('请填写所有必填字段', 'error');
+        if (!name || !id) {
+            app.showNotification('请填写模型名称和ID', 'error');
             return;
         }
 
-        modelData.type = (modelData.type || 'custom').toLowerCase();
+        let apiBase = apiBaseInput || '';
+        if (!apiBase && preset.defaultBase) {
+            apiBase = preset.defaultBase;
+        }
+        if (preset.requiresApiBase !== false && !apiBase) {
+            app.showNotification('请填写模型的API地址', 'error');
+            return;
+        }
+
+        let apiKey = apiKeyInput || '';
+        if (preset.requiresApiKey && !apiKey) {
+            app.showNotification('请填写API密钥', 'error');
+            return;
+        }
+        if (!preset.requiresApiKey && !apiKey) {
+            apiKey = 'not-needed';
+        }
+
+        const editingId = this.currentEditingModel;
+        const existingModel = editingId ? this.models.find(m => m.id === editingId) : null;
+        const providerChanged = existingModel && existingModel.provider && existingModel.provider !== preset.provider;
+        let modelName = preset.defaultModel || id;
+        if (!providerChanged && existingModel?.model_name) {
+            modelName = existingModel.model_name;
+        }
+        const modelData = {
+            name,
+            id,
+            type: typeValue,
+            provider: preset.provider,
+            api_base: apiBase,
+            base_url: apiBase,
+            api_key: apiKey,
+            model_name: modelName,
+            requires_api_key: preset.requiresApiKey ?? true,
+            requires_api_base: preset.requiresApiBase ?? true
+        };
+        const defaultLitellm = (!providerChanged && existingModel?.litellm_model) ? existingModel.litellm_model : (preset.defaultLitellm || '');
+        modelData.litellm_model = defaultLitellm || this.buildLitellmModelId(modelData);
 
         try {
             if (editingId) {
                 // 更新现有模型
                 const index = this.models.findIndex(m => m.id === editingId);
                 if (index !== -1) {
-                    modelData.status = this.models[index].status || modelData.status || 'pending';
-                    this.models[index] = { ...this.models[index], ...modelData };
+                    modelData.status = this.models[index].status || 'pending';
+                    this.models[index] = this.prepareModelRecord({ ...this.models[index], ...modelData });
                 }
             } else {
                 // 添加新模型，标记待测试状态
                 modelData.status = 'pending';
-                this.models.push(modelData);
+                this.models.push(this.prepareModelRecord(modelData));
             }
 
             // 保存到后端
@@ -564,7 +833,7 @@ class SettingsManager {
             const currentModel = document.getElementById('current-model')?.value;
             if (modelData.id === currentModel || this.models.length === 1) {
                 await api.saveConfig({
-                    api_key: modelData.api_key,
+                    api_key: modelData.api_key === 'not-needed' ? '' : modelData.api_key,
                     api_base: modelData.api_base,
                     default_model: modelData.id
                 });
@@ -613,8 +882,13 @@ class SettingsManager {
         try {
             const result = await api.testModel({
                 model: model.id,
-                api_key: model.api_key,
-                api_base: model.api_base
+                id: model.id,
+                api_key: model.api_key === 'not-needed' ? '' : model.api_key,
+                api_base: model.api_base || model.base_url,
+                provider: model.provider || model.type,
+                type: model.type,
+                model_name: model.model_name || model.id,
+                litellm_model: model.litellm_model
             });
 
             if (result.success) {

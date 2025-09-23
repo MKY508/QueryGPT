@@ -19,7 +19,7 @@ class SimpleAuth:
         # 从环境变量获取API访问密钥
         self.api_secret = os.getenv('API_ACCESS_SECRET', None)
         if not self.api_secret:
-            logger.warning("API_ACCESS_SECRET未设置，认证功能将被禁用")
+            logger.debug("API_ACCESS_SECRET 未设置，跳过认证模块初始化")
         
         # 存储有效的会话令牌（生产环境应使用Redis）
         self.valid_tokens = {}

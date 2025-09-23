@@ -11,6 +11,9 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 import hashlib
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 DATABASE_PATH = "backend/data/history.db"
 
@@ -207,6 +210,83 @@ class HistoryManager:
             self._extract_query_template(content)
         
         return message_id
+    
+    def remove_last_message(self, conversation_id: str, message_type: Optional[str] = None, delete_empty: bool = True) -> bool:
+        """删除对话中最新的一条消息，可选限定类型。
+
+        Args:
+            conversation_id: 对话ID
+            message_type: 仅删除指定类型的消息（user/assistant）；为None时删除任意类型
+            delete_empty: 若删除后对话没有任何消息，是否同时移除整段对话
+        """
+        if not conversation_id:
+            return False
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                if message_type:
+                    cursor.execute(
+                        """
+                        SELECT id FROM messages
+                        WHERE conversation_id = ? AND type = ?
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                        """,
+                        (conversation_id, message_type)
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        SELECT id, type FROM messages
+                        WHERE conversation_id = ?
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                        """,
+                        (conversation_id,)
+                    )
+                row = cursor.fetchone()
+                if not row:
+                    return False
+
+                message_id = row["id"] if isinstance(row, sqlite3.Row) else row[0]
+                cursor.execute(
+                    "DELETE FROM messages WHERE id = ?",
+                    (message_id,)
+                )
+
+                cursor.execute(
+                    "SELECT COUNT(*) FROM messages WHERE conversation_id = ?",
+                    (conversation_id,)
+                )
+                remaining = cursor.fetchone()[0]
+
+                if remaining == 0 and delete_empty:
+                    cursor.execute(
+                        "DELETE FROM session_states WHERE conversation_id = ?",
+                        (conversation_id,)
+                    )
+                    cursor.execute(
+                        "DELETE FROM conversations WHERE id = ?",
+                        (conversation_id,)
+                    )
+                else:
+                    cursor.execute(
+                        """
+                        UPDATE conversations
+                        SET updated_at = CURRENT_TIMESTAMP,
+                            query_count = ?
+                        WHERE id = ?
+                        """,
+                        (remaining, conversation_id)
+                    )
+
+                conn.commit()
+                return True
+        except Exception as exc:
+            logger.warning(f"删除最新消息失败: {exc}")
+            return False
     
     def _extract_query_template(self, query: str):
         """
@@ -423,6 +503,8 @@ class HistoryManager:
                 params.append(end_date.isoformat())
             
             where_clause = " AND ".join(conditions) if conditions else "1=1"
+            base_clause = f"({where_clause})"
+            where_clause = f"{base_clause} AND c.query_count > 0"
             
             cursor.execute(f"""
                 SELECT c.*, 

@@ -780,14 +780,35 @@ setup_models() {
 {
   "models": [
     {
-      "id": "gpt-4.1",
-      "name": "GPT-4.1",
+      "id": "gpt-4o",
+      "name": "ChatGPT 4o",
       "type": "openai",
-      "api_base": "https://api.openai.com/v1/",
-      "api_key": "your-api-key-here",
-      "max_tokens": 4096,
-      "temperature": 0.7,
+      "provider": "openai",
+      "model_name": "gpt-4o",
+      "api_base": "https://api.openai.com/v1",
+      "api_key": "your-openai-api-key-here",
       "status": "active"
+    },
+    {
+      "id": "qwen-plus",
+      "name": "Qwen Plus",
+      "type": "qwen",
+      "provider": "dashscope",
+      "model_name": "qwen-plus",
+      "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "api_key": "your-dashscope-api-key-here",
+      "status": "inactive"
+    },
+    {
+      "id": "ollama-llama3",
+      "name": "Ollama Llama3",
+      "type": "ollama",
+      "provider": "ollama",
+      "model_name": "llama3:latest",
+      "litellm_model": "ollama/llama3:latest",
+      "api_base": "http://localhost:11434",
+      "api_key": "not-needed",
+      "status": "inactive"
     }
   ]
 }
@@ -800,43 +821,34 @@ EOF
 {
   "models": [
     {
-      "id": "ollama-llama2",
-      "name": "Ollama Llama2 (本地免费)",
-      "type": "ollama",
-      "api_base": "http://localhost:11434/v1",
-      "api_key": "not-needed",
-      "max_tokens": 4096,
-      "temperature": 0.7,
+      "id": "gpt-4o",
+      "name": "ChatGPT 4o",
+      "type": "openai",
+      "provider": "openai",
+      "model_name": "gpt-4o",
+      "api_base": "https://api.openai.com/v1",
+      "api_key": "your-openai-api-key-here",
       "status": "active"
     },
     {
-      "id": "gpt-4",
-      "name": "GPT-4 (需要API密钥)",
-      "type": "openai",
-      "api_base": "https://api.openai.com/v1/",
-      "api_key": "your-openai-api-key-here",
-      "max_tokens": 4096,
-      "temperature": 0.7,
+      "id": "qwen-plus",
+      "name": "Qwen Plus",
+      "type": "qwen",
+      "provider": "dashscope",
+      "model_name": "qwen-plus",
+      "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "api_key": "your-dashscope-api-key-here",
       "status": "inactive"
     },
     {
-      "id": "claude-3",
-      "name": "Claude 3 (需要API密钥)",
-      "type": "anthropic",
-      "api_base": "https://api.anthropic.com/v1",
-      "api_key": "your-anthropic-api-key-here",
-      "max_tokens": 4096,
-      "temperature": 0.7,
-      "status": "inactive"
-    },
-    {
-      "id": "custom-api",
-      "name": "自定义API (配置你的API)",
-      "type": "custom",
-      "api_base": "https://your-api-endpoint.com/v1",
-      "api_key": "your-custom-api-key-here",
-      "max_tokens": 4096,
-      "temperature": 0.7,
+      "id": "ollama-llama3",
+      "name": "Ollama Llama3",
+      "type": "ollama",
+      "provider": "ollama",
+      "model_name": "llama3:latest",
+      "litellm_model": "ollama/llama3:latest",
+      "api_base": "http://localhost:11434",
+      "api_key": "not-needed",
       "status": "inactive"
     }
   ]

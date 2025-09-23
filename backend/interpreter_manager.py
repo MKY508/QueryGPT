@@ -5,8 +5,16 @@ OpenInterpreter Manager Module
 import os
 import json
 import signal
+import warnings
 from typing import Dict, Any, Optional, Set
 import logging
+
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API",
+    category=UserWarning,
+    module="interpreter.core.utils.system_debug_info"
+)
 
 # 尝试导入OpenInterpreter，如果失败则设置标志
 try:

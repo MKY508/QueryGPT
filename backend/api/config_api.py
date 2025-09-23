@@ -1,10 +1,9 @@
-from backend.config_loader import ConfigLoader
+from backend.config_loader import ConfigLoader, DEFAULT_MODELS
 import os
 import json
 import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-from backend.config_loader import ConfigLoader
 
 logger = logging.getLogger(__name__)
 
@@ -20,13 +19,6 @@ def handle_models():
     if request.method == 'GET':
         try:
             api_config = ConfigLoader.get_api_config()
-            # 优先尝试兼容旧测试：若 ConfigLoader 提供了可用模型列表，则基于此返回
-            try:
-                simple_models = ConfigLoader.get_available_models()
-            except Exception:
-                simple_models = []
-
-            # 载入 models.json 内容作为详情映射
             models_from_file = []
             if os.path.exists(models_file):
                 try:
@@ -36,68 +28,25 @@ def handle_models():
                             models_from_file = data['models']
                         elif isinstance(data, list):
                             models_from_file = data
-                except Exception:
+                except Exception as exc:
+                    logger.warning(f"读取 models.json 失败，使用默认模型: {exc}")
                     models_from_file = []
+            if not models_from_file:
+                models_from_file = [dict(item) if isinstance(item, dict) else {'id': str(item)} for item in DEFAULT_MODELS]
 
-            by_id = {}
-            for m in models_from_file:
-                if isinstance(m, dict):
-                    mid = m.get('id') or m.get('name')
-                    if mid:
-                        by_id[mid] = m
+            normalized_models = []
+            for raw_model in models_from_file:
+                entry_dict = dict(raw_model) if isinstance(raw_model, dict) else {'id': str(raw_model)}
+                normalized = ConfigLoader.normalize_model_entry(
+                    entry_dict,
+                    api_config.get('api_key', 'not-needed'),
+                    api_config.get('api_base', '')
+                )
+                normalized.pop('resolved_id', None)
+                normalized_models.append(normalized)
 
-            current = api_config.get('default_model')
-
-            if isinstance(simple_models, list) and simple_models:
-                built = []
-                if all(isinstance(x, str) for x in simple_models):
-                    for mid in simple_models:
-                        det = by_id.get(mid)
-                        if det:
-                            # 保持文件中的定义，必要时补齐状态
-                            st = det.get('status', 'active' if mid == current else 'inactive')
-                            built.append({**det, 'status': st})
-                        else:
-                            built.append({
-                                'id': mid,
-                                'name': mid,
-                                'type': 'custom',
-                                'status': 'active' if mid == current else 'inactive'
-                            })
-                elif all(isinstance(x, dict) for x in simple_models):
-                    for md in simple_models:
-                        mid = md.get('id') or md.get('name')
-                        det = by_id.get(mid, {})
-                        st = 'active' if mid == current else md.get('status', det.get('status', 'inactive'))
-                        built.append({**det, **md, 'status': st})
-                else:
-                    built = []
-
-                return jsonify({"models": built, "current": current})
-
-            # 否则：直接返回文件内容或提供种子列表（保持字段原样）
-            if models_from_file:
-                # 补齐必要的最小字段
-                normalized = []
-                for m in models_from_file:
-                    if not isinstance(m, dict):
-                        normalized.append({"id": str(m), "name": str(m), "type": "custom", "status": "inactive"})
-                    else:
-                        mid = m.get('id') or m.get('name') or ''
-                        name = m.get('name') or mid
-                        typ = m.get('type') or 'custom'
-                        status = m.get('status', m.get('available') and 'active' or 'inactive')
-                        nm = {**m, 'id': mid, 'name': name, 'type': typ, 'status': status}
-                        normalized.append(nm)
-                return jsonify({"models": normalized, "current": current})
-            else:
-                seed = [
-                    {"id": "gpt-4o", "name": "GPT-4o", "type": "openai", "status": "inactive"},
-                    {"id": "claude-sonnet-4", "name": "Claude Sonnet 4", "type": "anthropic", "status": "inactive"},
-                    {"id": "deepseek-r1", "name": "DeepSeek R1", "type": "deepseek", "status": "inactive"},
-                    {"id": "qwen-flagship", "name": "Qwen 旗舰模型", "type": "qwen", "status": "inactive"}
-                ]
-                return jsonify({"models": seed, "current": current})
+            current = api_config.get('current_model') or api_config.get('default_model')
+            return jsonify({"models": normalized_models, "current": current})
         except Exception as e:
             logger.error(f"获取模型列表失败: {e}")
             return jsonify({"error": str(e)}), 500
@@ -124,6 +73,18 @@ def handle_models():
                         nm['id'] = mid
                     if name is not None:
                         nm['name'] = name
+                    base = nm.get('api_base') or nm.get('base_url')
+                    if base:
+                        nm['api_base'] = base
+                        nm['base_url'] = base
+                    provider = nm.get('provider') or nm.get('type')
+                    if provider:
+                        nm['type'] = provider
+                        nm['provider'] = provider
+                    if not nm.get('model_name'):
+                        nm['model_name'] = mid or name
+                    if not nm.get('litellm_model'):
+                        nm['litellm_model'] = ConfigLoader.build_litellm_model_id(nm.get('provider'), nm.get('model_name'))
                     save_models.append(nm)
                 else:
                     save_models.append({"id": str(m), "name": str(m)})

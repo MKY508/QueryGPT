@@ -4,9 +4,18 @@ LLM服务封装
 """
 import logging
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import requests
-from backend.config_loader import ConfigLoader
+from backend.config_loader import ConfigLoader, PLACEHOLDER_KEYS
+
+try:
+    from litellm import completion as litellm_completion
+    from litellm.exceptions import LiteLLMException
+    LITELLM_AVAILABLE = True
+except Exception:  # pragma: no cover - liteLLM 为可选依赖
+    litellm_completion = None
+    LiteLLMException = Exception
+    LITELLM_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +34,31 @@ class LLMService:
         """
         # 加载API配置
         api_config = ConfigLoader.get_api_config()
-        self.api_key = api_config.get('api_key')
-        self.api_base = api_config.get('api_base', 'https://api.openai.com/v1')
-        
-        # 设置模型（默认标准化为 gpt-4o）
-        from backend.config_loader import ConfigLoader
-        self.model_name = model_name or api_config.get('default_model', 'gpt-4o')
-        self.model_name = ConfigLoader.normalize_model_id(self.model_name)
+        self.api_config = api_config
+
+        requested_model = model_name or api_config.get('default_model', 'gpt-4o')
+        self.model_name = ConfigLoader.normalize_model_id(requested_model)
+        self.model_settings = api_config.get('models', {}).get(self.model_name, {})
+        if not self.model_settings and requested_model in api_config.get('models', {}):
+            # 兼容未标准化ID的情况
+            self.model_settings = api_config['models'][requested_model]
+        self.model_settings = dict(self.model_settings) if isinstance(self.model_settings, dict) else {}
+
+        self.model_settings.setdefault('model_name', self.model_settings.get('model_name') or self.model_name)
+        provider = (self.model_settings.get('provider') or self.model_settings.get('type') or 'openai').lower()
+        self.provider = provider
+        self.model_settings['provider'] = provider
+        self.model_settings['type'] = provider
+
+        self.api_key = self._resolve_api_key()
+        self.api_base = self._resolve_api_base()
+        self.timeout = self.model_settings.get('timeout', 15)
+        self.litellm_model = self.model_settings.get('litellm_model') or ConfigLoader.build_litellm_model_id(
+            self.provider,
+            self.model_settings.get('model_name')
+        )
+        if not self.litellm_model:
+            self.litellm_model = self.model_settings.get('model_name') or self.model_name
         
         # 统计信息
         self.stats = {
@@ -41,6 +68,22 @@ class LLMService:
             "total_tokens": 0,
             "total_cost": 0.0
         }
+    
+    def _resolve_api_key(self) -> str:
+        candidate = (self.model_settings.get('api_key') or '').strip()
+        if not candidate or candidate in PLACEHOLDER_KEYS:
+            candidate = (self.api_config.get('api_key') or '').strip()
+        if candidate in PLACEHOLDER_KEYS:
+            return ''
+        return candidate
+    
+    def _resolve_api_base(self) -> str:
+        base = (self.model_settings.get('api_base') or self.model_settings.get('base_url') or '').strip()
+        if not base:
+            base = (self.api_config.get('api_base') or '').strip()
+        if base.endswith('/'):
+            base = base.rstrip('/')
+        return base
     
     def complete(self, prompt: str, temperature: float = 0.1, max_tokens: int = 200) -> Dict[str, Any]:
         """
@@ -55,72 +98,231 @@ class LLMService:
             响应字典，包含生成的内容和使用统计
         """
         self.stats["total_requests"] += 1
-        
+
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a query routing assistant. Analyze queries and determine the best execution path. Always respond in JSON format."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+
         try:
-            # 构建请求
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
-            }
-            
-            data = {
-                "model": self.model_name,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are a query routing assistant. Analyze queries and determine the best execution path. Always respond in JSON format."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "response_format": {"type": "json_object"}  # 请求JSON格式响应
-            }
-            
-            # 发送请求 - 处理URL拼接，避免双斜杠
-            api_url = self.api_base.rstrip('/') + '/chat/completions'
-            response = requests.post(
-                api_url,
-                headers=headers,
-                json=data,
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                raise Exception(f"API请求失败: {response.status_code} - {response.text}")
-            
-            result = response.json()
-            
-            # 提取内容
-            content = result['choices'][0]['message']['content']
-            usage = result.get('usage', {})
-            
-            # 更新统计
+            response_payload = None
+            if LITELLM_AVAILABLE:
+                response_payload = self._complete_via_litellm(messages, temperature, max_tokens)
+
+            if response_payload is None:
+                if self.provider == 'ollama':
+                    response_payload = self._complete_via_ollama(messages, temperature)
+                else:
+                    response_payload = self._complete_via_http(messages, temperature, max_tokens)
+
+            content, usage = self._extract_response_content(response_payload)
+            if not content:
+                raise ValueError("模型未返回内容")
+
             self.stats["successful_requests"] += 1
             self.stats["total_tokens"] += usage.get('total_tokens', 0)
-            
-            # 估算成本（简单估算，实际成本取决于模型）
             self._estimate_cost(usage)
-            
+
             return {
                 "content": content,
                 "usage": usage,
-                "model": self.model_name,
+                "model": self.model_settings.get('model_name', self.model_name),
                 "success": True
             }
-            
+
         except Exception as e:
             logger.error(f"LLM调用失败: {e}")
             self.stats["failed_requests"] += 1
-            
+
             return {
                 "content": "",
                 "error": str(e),
                 "success": False
             }
+    
+    def _complete_via_litellm(self, messages: list[Dict[str, Any]], temperature: float, max_tokens: int):
+        if not LITELLM_AVAILABLE or not self.litellm_model or self.provider == 'ollama':
+            return None
+        try:
+            kwargs: Dict[str, Any] = {
+                "model": self.litellm_model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens
+            }
+            if self.api_key:
+                kwargs["api_key"] = self.api_key
+            if self.api_base:
+                kwargs["api_base"] = self.api_base
+            provider = self._resolve_litellm_provider()
+            if provider:
+                kwargs["custom_llm_provider"] = provider
+            extra_headers = self.model_settings.get('headers') or self.model_settings.get('extra_headers')
+            if isinstance(extra_headers, dict):
+                kwargs["extra_headers"] = extra_headers
+            return litellm_completion(**kwargs)
+        except LiteLLMException as exc:
+            logger.warning(f"LiteLLM调用失败: {exc}")
+            return None
+        except Exception as exc:
+            logger.warning(f"LiteLLM执行异常，降级至HTTP请求: {exc}")
+            return None
+    
+    def _complete_via_http(self, messages: list[Dict[str, Any]], temperature: float, max_tokens: int):
+        if not self.api_base:
+            raise ValueError("未配置API地址")
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        extra_headers = self.model_settings.get('headers') or self.model_settings.get('extra_headers')
+        if isinstance(extra_headers, dict):
+            headers.update(extra_headers)
+        payload = {
+            "model": self.model_settings.get('model_name', self.model_name),
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        if self.provider in ('openai', 'custom', ''):
+            payload["response_format"] = {"type": "json_object"}
+        api_url = self.api_base.rstrip('/') + '/chat/completions'
+        response = requests.post(api_url, headers=headers, json=payload, timeout=self.timeout)
+        if response.status_code >= 400:
+            raise RuntimeError(f"API请求失败: {response.status_code} - {response.text}")
+        return response.json()
+    
+    def _complete_via_ollama(self, messages: list[Dict[str, Any]], temperature: float):
+        base = self.api_base or 'http://localhost:11434'
+        url = base.rstrip('/') + '/api/chat'
+        payload = {
+            "model": self.model_settings.get('model_name', self.model_name),
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature
+            }
+        }
+        response = requests.post(url, json=payload, timeout=self.timeout)
+        if response.status_code >= 400:
+            raise RuntimeError(f"Ollama请求失败: {response.status_code} - {response.text}")
+        data = response.json()
+        if 'choices' not in data:
+            message = data.get('message', {}) or {}
+            content = message.get('content', '')
+            data['choices'] = [{'message': {'content': content}}]
+        if 'usage' not in data:
+            prompt_tokens = data.get('prompt_eval_count') or 0
+            completion_tokens = data.get('eval_count') or 0
+            data['usage'] = {
+                'prompt_tokens': prompt_tokens,
+                'completion_tokens': completion_tokens,
+                'total_tokens': prompt_tokens + completion_tokens
+            }
+        return data
+    
+    def _resolve_litellm_provider(self) -> Optional[str]:
+        provider = self.provider
+        if provider in ('', 'openai', 'custom', 'ollama'):
+            return None
+        provider_map = {
+            'qwen': 'dashscope',
+            'dashscope': 'dashscope',
+            'ali': 'dashscope'
+        }
+        return provider_map.get(provider, provider)
+    
+    def _response_to_dict(self, response: Any) -> Dict[str, Any]:
+        if isinstance(response, dict):
+            return response
+        for attr in ('model_dump', 'dict', 'to_dict'):
+            func = getattr(response, attr, None)
+            if callable(func):
+                try:
+                    data = func()
+                    if isinstance(data, dict):
+                        return data
+                except Exception:
+                    continue
+        if hasattr(response, '__dict__'):
+            return dict(response.__dict__)
+        return {}
+    
+    def _extract_response_content(self, response: Any) -> Tuple[str, Dict[str, Any]]:
+        data = self._response_to_dict(response)
+        choices = data.get('choices') or []
+        content = ''
+        if choices:
+            choice = choices[0]
+            if isinstance(choice, dict):
+                message = choice.get('message', {}) or {}
+                content = message.get('content') or choice.get('text', '')
+            else:
+                message = getattr(choice, 'message', None)
+                if isinstance(message, dict):
+                    content = message.get('content', '')
+                else:
+                    content = getattr(message, 'content', '') or getattr(choice, 'text', '')
+        usage = data.get('usage') or {}
+        if not isinstance(usage, dict) and hasattr(usage, '__dict__'):
+            usage = dict(usage.__dict__)
+        if 'total_tokens' not in usage:
+            usage['total_tokens'] = usage.get('prompt_tokens', 0) + usage.get('completion_tokens', 0)
+        return content, usage
+    
+    def apply_overrides(self, overrides: Dict[str, Any]):
+        if not overrides:
+            return
+        if overrides.get('model'):
+            self.model_name = ConfigLoader.normalize_model_id(overrides['model'])
+        if overrides.get('provider'):
+            self.provider = overrides['provider'].lower()
+            self.model_settings['provider'] = self.provider
+            self.model_settings['type'] = self.provider
+        for key in ('model_name', 'litellm_model'):
+            if overrides.get(key):
+                self.model_settings[key] = overrides[key]
+        if overrides.get('api_key') is not None:
+            candidate = overrides.get('api_key') or ''
+            self.model_settings['api_key'] = candidate
+            self.api_key = '' if candidate in PLACEHOLDER_KEYS else candidate
+        if overrides.get('api_base') is not None:
+            base = (overrides.get('api_base') or '').strip()
+            if base.endswith('/'):
+                base = base.rstrip('/')
+            self.model_settings['api_base'] = base
+            self.model_settings['base_url'] = base
+            self.api_base = base
+        if overrides.get('litellm_model'):
+            self.litellm_model = overrides['litellm_model']
+        # 重新回退缺失字段
+        if not self.api_key:
+            self.api_key = self._resolve_api_key()
+        if not self.api_base:
+            self.api_base = self._resolve_api_base()
+        if not self.litellm_model:
+            self.litellm_model = ConfigLoader.build_litellm_model_id(
+                self.provider,
+                self.model_settings.get('model_name')
+            )
+    
+    @staticmethod
+    def test_model_connection(model_payload: Dict[str, Any]) -> Tuple[bool, str]:
+        try:
+            target_id = model_payload.get('model') or model_payload.get('id')
+            service = LLMService(target_id)
+            service.apply_overrides(model_payload)
+            result = service.complete("ping", temperature=0, max_tokens=8)
+            if result.get('success'):
+                return True, (result.get('content') or 'OK')[:200]
+            return False, result.get('error', '未知错误')
+        except Exception as exc:
+            return False, str(exc)
     
     def complete_simple(self, prompt: str) -> str:
         """
