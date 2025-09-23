@@ -6,7 +6,7 @@
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 import hashlib
@@ -496,11 +496,11 @@ class HistoryManager:
             
             if start_date:
                 conditions.append("c.created_at >= ?")
-                params.append(start_date.isoformat())
+                params.append(self._format_datetime(start_date))
             
             if end_date:
                 conditions.append("c.created_at <= ?")
-                params.append(end_date.isoformat())
+                params.append(self._format_datetime(end_date))
             
             where_clause = " AND ".join(conditions) if conditions else "1=1"
             base_clause = f"({where_clause})"
@@ -533,6 +533,18 @@ class HistoryManager:
                 })
             
             return conversations
+
+    @staticmethod
+    def _format_datetime(value: Optional[datetime]) -> str:
+        if not value:
+            return ""
+        if isinstance(value, datetime):
+            dt = value
+        else:
+            dt = datetime.fromisoformat(str(value))
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc)
+        return dt.strftime('%Y-%m-%d %H:%M:%S')
     
     def get_recent_conversations(self, limit: int = 20) -> List[Dict]:
         """
