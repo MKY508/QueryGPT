@@ -459,9 +459,9 @@ create_venv_with_fallback() {
     debug_log "尝试创建虚拟环境: $venv_dir"
     
     # 方法1: 使用venv模块
-    if $PYTHON_CMD -m venv --help &>/dev/null; then
+    if "$PYTHON_CMD" -m venv --help &>/dev/null; then
         debug_log "使用venv模块创建虚拟环境"
-        $PYTHON_CMD -m venv "$venv_dir"
+        "$PYTHON_CMD" -m venv "$venv_dir"
         if [ -f "$venv_dir/bin/activate" ]; then
             return 0
         fi
@@ -470,16 +470,16 @@ create_venv_with_fallback() {
     # 方法2: 使用virtualenv命令
     if command -v virtualenv &> /dev/null; then
         debug_log "使用virtualenv命令创建虚拟环境"
-        virtualenv -p $PYTHON_CMD "$venv_dir"
+        virtualenv -p "$PYTHON_CMD" "$venv_dir"
         if [ -f "$venv_dir/bin/activate" ]; then
             return 0
         fi
     fi
     
     # 方法3: 使用python -m virtualenv
-    if $PYTHON_CMD -m virtualenv --help &>/dev/null; then
+    if "$PYTHON_CMD" -m virtualenv --help &>/dev/null; then
         debug_log "使用python -m virtualenv创建虚拟环境"
-        $PYTHON_CMD -m virtualenv "$venv_dir"
+        "$PYTHON_CMD" -m virtualenv "$venv_dir"
         if [ -f "$venv_dir/bin/activate" ]; then
             return 0
         fi
@@ -551,13 +551,22 @@ setup_venv() {
 
     debug_log "虚拟环境激活成功: $VIRTUAL_ENV"
     debug_log "Python路径: ${PYTHON_BIN:-unknown}"
+    # 规范化 pip 路径并处理包含空格的情况
+    local pip_exec="$PIP_CMD"
+    if [ -z "$pip_exec" ]; then
+        pip_exec="$(command -v pip 2>/dev/null || true)"
+    fi
+    if [ -z "$pip_exec" ]; then
+        pip_exec="pip"
+    fi
+    PIP_CMD="$pip_exec"
     debug_log "Pip路径: ${PIP_CMD:-unknown}"
     
     # 升级pip
     info_log "升级 pip... / Upgrading pip..."
     print_message "info" "升级 pip... / Upgrading pip..."
-    debug_log "执行命令: ${PIP_CMD:-pip} install --upgrade pip --quiet"
-    ${PIP_CMD:-pip} install --upgrade pip --quiet
+    debug_log "执行命令: ${PIP_CMD} install --upgrade pip --quiet"
+    "$PIP_CMD" install --upgrade pip --quiet
     success_log "pip 已升级 / pip upgraded"
     print_message "success" "pip 已升级 / pip upgraded"
     echo ""
@@ -590,7 +599,13 @@ EOF
     # 检查是否需要安装
     local need_install=false
     
-    local pip_check="${PIP_CMD:-pip}"
+    local pip_check="$PIP_CMD"
+    if [ -z "$pip_check" ]; then
+        pip_check="$(command -v pip 2>/dev/null || true)"
+    fi
+    if [ -z "$pip_check" ]; then
+        pip_check="pip"
+    fi
     if ! "$pip_check" show flask &> /dev/null || ! "$pip_check" show open-interpreter &> /dev/null; then
         need_install=true
     fi
@@ -609,7 +624,7 @@ EOF
             echo "正在下载和安装，请稍候... / Downloading and installing, please wait..."
             
             # 不使用quiet，显示进度
-            "${PIP_CMD:-pip}" install "open-interpreter==0.4.3" --progress-bar on 2>&1 | while IFS= read -r line; do
+            "$pip_check" install "open-interpreter==0.4.3" --progress-bar on 2>&1 | while IFS= read -r line; do
                 # 只显示关键信息
                 if [[ "$line" == *"Downloading"* ]] || [[ "$line" == *"Installing"* ]] || [[ "$line" == *"Successfully"* ]]; then
                     echo "  $line"
@@ -622,11 +637,11 @@ EOF
         # 安装其他依赖
         info_log "安装其他依赖包... / Installing other dependencies..."
         print_message "info" "安装其他依赖包... / Installing other dependencies..."
-        debug_log "执行 ${PIP_CMD:-pip} install -r requirements.txt"
+        debug_log "执行 ${pip_check} install -r requirements.txt"
         echo "进度 / Progress:"
         
         # 显示简化的进度
-        "${PIP_CMD:-pip}" install -r requirements.txt 2>&1 | while IFS= read -r line; do
+        "$pip_check" install -r requirements.txt 2>&1 | while IFS= read -r line; do
             if [[ "$line" == *"Collecting"* ]]; then
                 package=$(echo "$line" | sed 's/Collecting //' | cut -d' ' -f1)
                 echo -n "  📦 安装 / Installing: $package... "
@@ -979,7 +994,13 @@ health_check() {
     fi
     
     # 检查依赖
-    local pip_check="${PIP_CMD:-pip}"
+    local pip_check="$PIP_CMD"
+    if [ -z "$pip_check" ]; then
+        pip_check="$(command -v pip 2>/dev/null || true)"
+    fi
+    if [ -z "$pip_check" ]; then
+        pip_check="pip"
+    fi
     if "$pip_check" show flask &> /dev/null; then
         score=$((score + 1))
         print_message "success" "核心依赖 / Core dependencies: OK"
