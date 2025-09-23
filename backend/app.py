@@ -11,7 +11,7 @@ import threading
 from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from flask import Response
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid as uuid_module
 
 # 添加项目路径
@@ -49,6 +49,67 @@ FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')
 STATIC_DIR = os.path.join(FRONTEND_DIR, 'static')
 TEMPLATE_DIR = os.path.join(FRONTEND_DIR, 'templates')
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'output')  # 统一的输出目录
+
+
+def _parse_date_param(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        if candidate.endswith('Z'):
+            candidate = candidate[:-1] + '+00:00'
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d'):
+            try:
+                parsed = datetime.strptime(candidate, fmt)
+                break
+            except ValueError:
+                parsed = None
+        if parsed is None:
+            return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _parse_conversation_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f'):
+        try:
+            return datetime.strptime(candidate, fmt)
+        except ValueError:
+            continue
+    try:
+        if candidate.endswith('Z'):
+            candidate = candidate[:-1] + '+00:00'
+        parsed = datetime.fromisoformat(candidate)
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+    except ValueError:
+        return None
+
+
+def _conversation_in_range(conversation: dict, start: datetime | None, end: datetime | None) -> bool:
+    if not (start or end):
+        return True
+    timestamp = (conversation.get('updated_at') or
+                 conversation.get('created_at'))
+    parsed = _parse_conversation_timestamp(timestamp)
+    if not parsed:
+        return False
+    if start and parsed < start:
+        return False
+    if end and parsed > end:
+        return False
+    return True
 
 # 初始化Flask应用
 app = Flask(__name__, 
@@ -1556,11 +1617,23 @@ def get_conversations():
         query = request.args.get('q', '')
         limit = int(request.args.get('limit', 50))
         favorites_only = request.args.get('favorites', 'false').lower() == 'true'
+        start_date = _parse_date_param(request.args.get('start_date'))
+        end_date = _parse_date_param(request.args.get('end_date'))
         
         if favorites_only:
             conversations = history_manager.get_favorite_conversations()
-        elif query:
-            conversations = history_manager.search_conversations(query=query, limit=limit)
+            if start_date or end_date:
+                conversations = [
+                    item for item in conversations
+                    if _conversation_in_range(item, start_date, end_date)
+                ]
+        elif query or start_date or end_date:
+            conversations = history_manager.search_conversations(
+                query=query,
+                start_date=start_date,
+                end_date=end_date,
+                limit=limit
+            )
         else:
             conversations = history_manager.get_recent_conversations(limit=limit)
         

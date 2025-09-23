@@ -889,12 +889,15 @@ class HistoryManager {
      * 格式化时间
      */
     formatTime(timestamp) {
-        const date = new Date(timestamp);
+        const date = this.parseTimestamp(timestamp);
+        if (!date || Number.isNaN(date.getTime())) {
+            return timestamp || '';
+        }
+
         const now = new Date();
-        const diff = now - date;
-        
+        const diff = now.getTime() - date.getTime();
         const isZh = window.i18nManager && window.i18nManager.getCurrentLanguage() === 'zh';
-        
+
         if (diff < 60000) {
             return isZh ? '刚刚' : 'Just now';
         } else if (diff < 3600000) {
@@ -906,9 +909,39 @@ class HistoryManager {
         } else if (diff < 604800000) {
             const days = Math.floor(diff / 86400000);
             return isZh ? `${days}天前` : `${days} day${days > 1 ? 's' : ''} ago`;
-        } else {
-            return date.toLocaleDateString(isZh ? 'zh-CN' : 'en-US');
         }
+        return date.toLocaleDateString(isZh ? 'zh-CN' : 'en-US');
+    }
+
+    parseTimestamp(raw) {
+        if (!raw && raw !== 0) {
+            return null;
+        }
+        if (raw instanceof Date) {
+            return raw;
+        }
+        if (typeof raw === 'number') {
+            return new Date(raw);
+        }
+        const str = String(raw).trim();
+        if (!str) {
+            return null;
+        }
+        if (/^\d+$/.test(str)) {
+            return new Date(Number(str));
+        }
+        let normalized = str;
+        if (str.includes(' ')) {
+            normalized = str.replace(' ', 'T');
+        }
+        if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) {
+            normalized += 'Z';
+        }
+        const date = new Date(normalized);
+        if (!Number.isNaN(date.getTime())) {
+            return date;
+        }
+        return new Date(str);
     }
     
     /**

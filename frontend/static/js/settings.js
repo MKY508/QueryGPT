@@ -262,6 +262,13 @@ class SettingsManager {
             });
         }
 
+        const testAllBtn = document.getElementById('test-all-models-btn');
+        if (testAllBtn) {
+            testAllBtn.addEventListener('click', () => {
+                this.testAllModels();
+            });
+        }
+
         // 保存模型按钮 - 使用事件委托确保按钮可用
         document.addEventListener('click', (e) => {
             if (e.target && e.target.id === 'save-model-btn') {
@@ -932,11 +939,55 @@ class SettingsManager {
     /**
      * 测试模型
      */
-    async testModel(modelId) {
+    async testModel(modelId, options = {}) {
         const model = this.models.find(m => m.id === modelId);
-        if (!model) return;
+        if (!model) {
+            return { success: false, message: '模型不存在' };
+        }
 
-        app.showNotification(window.i18nManager.t('common.testingModel'), 'info');
+        const { silent = false } = options;
+        const preset = this.getModelPreset(model.type);
+        const placeholderKeys = new Set([
+            '',
+            'not-needed',
+            'not_needed',
+            'notneeded',
+            'your-openai-api-key-here',
+            'your-api-key-here',
+            'sk-your-********here'
+        ].map(key => key.toLowerCase()));
+        const errors = [];
+        if (preset.requiresApiBase !== false) {
+            const apiBase = model.api_base || model.base_url;
+            if (!apiBase || apiBase.trim().length === 0) {
+                errors.push('未配置API地址');
+            }
+        }
+        if (preset.requiresApiKey !== false) {
+            const key = (model.api_key || '').trim();
+            if (!key || placeholderKeys.has(key.toLowerCase())) {
+                errors.push('未配置有效的API密钥');
+            }
+        }
+        if (errors.length > 0) {
+            model.status = 'pending';
+            model.last_test_status = 'failed';
+            model.last_test_error = errors.join('；');
+            this.renderModelsList();
+            if (!silent) {
+                app.showNotification(`模型 ${model.name} 测试失败：${model.last_test_error}`, 'error');
+            }
+            try {
+                await api.saveModels(this.models);
+            } catch (saveError) {
+                console.warn('保存模型测试结果失败:', saveError);
+            }
+            return { success: false, message: model.last_test_error };
+        }
+
+        if (!silent) {
+            app.showNotification(window.i18nManager.t('common.testingModel'), 'info');
+        }
         
         // 更新状态为测试中
         model.status = 'testing';
@@ -944,8 +995,9 @@ class SettingsManager {
         model.last_test_error = '';
         this.renderModelsList();
 
+        let result;
         try {
-            const result = await api.testModel({
+            result = await api.testModel({
                 model: model.id,
                 id: model.id,
                 api_key: model.api_key === 'not-needed' ? '' : model.api_key,
@@ -960,18 +1012,19 @@ class SettingsManager {
                 model.status = 'active';
                 model.last_test_status = 'success';
                 model.last_test_error = '';
-                app.showNotification(`模型 ${model.name} 连接成功！`, 'success');
             } else {
                 model.status = 'inactive';
                 model.last_test_status = 'failed';
                 model.last_test_error = result.message || '';
-                app.showNotification(`模型 ${model.name} 连接失败: ${result.message}`, 'error');
             }
         } catch (error) {
+            result = {
+                success: false,
+                message: error?.message || '连接失败'
+            };
             model.status = 'inactive';
             model.last_test_status = 'failed';
-            model.last_test_error = error?.message || '连接失败';
-            app.showNotification(`模型 ${model.name} 连接失败`, 'error');
+            model.last_test_error = result.message;
         }
 
         model.last_tested_at = new Date().toISOString();
@@ -982,6 +1035,52 @@ class SettingsManager {
         }
 
         this.renderModelsList();
+
+        if (!silent) {
+            if (result?.success) {
+                app.showNotification(`模型 ${model.name} 连接成功！`, 'success');
+            } else {
+                app.showNotification(`模型 ${model.name} 连接失败: ${model.last_test_error || '未知错误'}`, 'error');
+            }
+        }
+
+        return result || { success: model.status === 'active', message: model.last_test_error };
+    }
+
+    async testAllModels() {
+        if (!this.models || this.models.length === 0) {
+            app.showNotification('没有可测试的模型', 'info');
+            return;
+        }
+
+        const button = document.getElementById('test-all-models-btn');
+        if (button) {
+            button.disabled = true;
+            button.classList.add('is-loading');
+        }
+
+        const results = [];
+        for (const model of this.models) {
+            try {
+                const result = await this.testModel(model.id, { silent: true });
+                results.push({ id: model.id, name: model.name, success: !!result?.success, message: result?.message || model.last_test_error });
+            } catch (error) {
+                results.push({ id: model.id, name: model.name, success: false, message: error?.message || '未知错误' });
+            }
+        }
+
+        if (button) {
+            button.disabled = false;
+            button.classList.remove('is-loading');
+        }
+
+        const failed = results.filter(item => !item.success);
+        if (failed.length === 0) {
+            app.showNotification(`已完成 ${results.length} 个模型的连通性测试`, 'success');
+        } else {
+            const names = failed.map(item => item.name || item.id).join('、');
+            app.showNotification(`测试完成，${failed.length}/${results.length} 个模型失败：${names}`, 'warning');
+        }
     }
 
     /**
