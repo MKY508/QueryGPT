@@ -290,6 +290,11 @@ class OnboardingGuide {
         if (!this.hasShownInSession()) {
             this.markShownInSession();
         }
+
+        if (!this.hasCompletedOnboarding()) {
+            this.markAsCompleted();
+            this.markShownInSession();
+        }
         
         // 添加半透明遮罩
         this.createOverlay();

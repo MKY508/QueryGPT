@@ -296,7 +296,9 @@
 .card-header .card-actions {
   display: flex;
   align-items: center;
-  gap: var(--spacing-3);
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+  margin-left: auto;
 }
 
 .card-header .card-actions .btn-primary,
@@ -304,13 +306,54 @@
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-2);
-  padding: var(--spacing-2) var(--spacing-4);
+  padding: calc(var(--spacing-1) + 2px) var(--spacing-4);
   border-radius: var(--radius-md);
 }
 
 .card-header .card-actions .is-loading {
   opacity: 0.6;
   pointer-events: none;
+}
+
+.models-table .models-actions-header {
+  padding-right: var(--spacing-4);
+  text-align: left;
+}
+
+.models-table .models-actions-header .actions-header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  width: 100%;
+}
+
+.models-table .models-actions-header .actions-header-content span {
+  flex-grow: 1;
+  text-align: left;
+}
+
+.models-table .models-actions-header .btn-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  font-size: 10px;
+  line-height: 1.15;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary-600);
+  border: 1px solid #d5dce8;
+  font-weight: 500;
+}
+
+.models-table .models-actions-header .btn-sm:hover {
+  background: rgba(74, 144, 226, 0.08);
+  border-color: #c5cee0;
+}
+
+.models-table .models-actions-header .btn-sm i {
+  font-size: 10px;
 }
 
 .card-header h3 i {

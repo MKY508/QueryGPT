@@ -1060,18 +1060,20 @@ class SettingsManager {
         }
 
         const results = [];
-        for (const model of this.models) {
-            try {
-                const result = await this.testModel(model.id, { silent: true });
-                results.push({ id: model.id, name: model.name, success: !!result?.success, message: result?.message || model.last_test_error });
-            } catch (error) {
-                results.push({ id: model.id, name: model.name, success: false, message: error?.message || '未知错误' });
+        try {
+            for (const model of this.models) {
+                try {
+                    const result = await this.testModel(model.id, { silent: true });
+                    results.push({ id: model.id, name: model.name, success: !!result?.success, message: result?.message || model.last_test_error });
+                } catch (error) {
+                    results.push({ id: model.id, name: model.name, success: false, message: error?.message || '未知错误' });
+                }
             }
-        }
-
-        if (button) {
-            button.disabled = false;
-            button.classList.remove('is-loading');
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.classList.remove('is-loading');
+            }
         }
 
         const failed = results.filter(item => !item.success);
@@ -1773,7 +1775,7 @@ class SettingsManager {
             aiAnalysis: `你是一个数据分析专家，请智能完成以下任务：
 1. 理解用户的业务需求
 2. 探索相关数据表和字段
-3. 编写并执行必要的代码
+3. 编写并执行必要的代码（缺少依赖时，可使用 pip install 包名 --quiet 安装，避免重复安装）
 4. 智能判断任务类型：
    - 如果需要可视化：使用plotly创建交互式图表并保存为HTML
    - 如果需要分析：进行深度数据分析，提供洞察和建议
