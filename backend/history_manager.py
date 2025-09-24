@@ -196,12 +196,13 @@ class HistoryManager:
             ))
             
             # 更新对话的更新时间和查询计数
+            increment = 1 if message_type == "user" else 0
             cursor.execute("""
                 UPDATE conversations 
                 SET updated_at = CURRENT_TIMESTAMP,
-                    query_count = query_count + 1
+                    query_count = query_count + ?
                 WHERE id = ?
-            """, (conversation_id,))
+            """, (increment, conversation_id))
             
             conn.commit()
         
@@ -257,12 +258,12 @@ class HistoryManager:
                 )
 
                 cursor.execute(
-                    "SELECT COUNT(*) FROM messages WHERE conversation_id = ?",
+                    "SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND type = 'user'",
                     (conversation_id,)
                 )
-                remaining = cursor.fetchone()[0]
+                remaining_user = cursor.fetchone()[0]
 
-                if remaining == 0 and delete_empty:
+                if remaining_user == 0 and delete_empty:
                     cursor.execute(
                         "DELETE FROM session_states WHERE conversation_id = ?",
                         (conversation_id,)
@@ -279,7 +280,7 @@ class HistoryManager:
                             query_count = ?
                         WHERE id = ?
                         """,
-                        (remaining, conversation_id)
+                        (remaining_user, conversation_id)
                     )
 
                 conn.commit()
@@ -371,7 +372,7 @@ class HistoryManager:
                             "model": None,
                             "database": None,
                             "total_tokens": 0,
-                            "query_count": len(legacy_messages),
+                            "query_count": sum(1 for msg in legacy_messages if (msg["type"] if isinstance(msg, sqlite3.Row) else msg[1]) == 'user'),
                             "is_favorite": False,
                             "tags": []
                         },

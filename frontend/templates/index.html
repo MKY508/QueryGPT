@@ -271,9 +271,6 @@
                             <div class="card-header">
                                 <h3><i class="fas fa-brain"></i> <span data-i18n="models.title">模型管理</span></h3>
                                 <div class="card-actions">
-                                    <button type="button" class="btn-secondary" id="test-all-models-btn">
-                                        <i class="fas fa-sync-alt"></i> 一键测试
-                                    </button>
                                     <button type="button" class="btn-primary" id="add-model-btn">
                                         <i class="fas fa-plus"></i> 新建模型
                                     </button>
@@ -289,7 +286,14 @@
                                             <th data-i18n="models.type">类型</th>
                                             <th data-i18n="models.apiAddress">API地址</th>
                                             <th data-i18n="models.status">状态</th>
-                                            <th data-i18n="models.actions">操作</th>
+                                            <th class="models-actions-header">
+                                                <div class="actions-header-content">
+                                                    <span data-i18n="models.actions">操作</span>
+                                                    <button type="button" class="btn-secondary btn-sm" id="test-all-models-btn">
+                                                        <i class="fas fa-sync-alt"></i> 一键测试
+                                                    </button>
+                                                </div>
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody id="models-list">
