@@ -44,6 +44,14 @@ Thumbs.db
 
 # 项目特定
 cache/
+backup/
+data/
+output/
+.serena/
+backend/cache/
+backend/data/
+backend/backend/
+backend/logs/
 backend/output/
 output/*.html
 output/*.png
@@ -138,6 +146,11 @@ backend/quick_assess.py
 frontend/templates/test_guide.html
 
 # 临时文档
+AGENTS.md
+manual_cleanup_guide.md
+UI_UX_IMPLEMENTATION_GUIDE.md
+perplexity_copyright_analysis.md
+SEMANTIC_LAYER_SETUP.md
 AWESOME_*.md
 SUBMISSION_*.md
 CHECKLIST.md
