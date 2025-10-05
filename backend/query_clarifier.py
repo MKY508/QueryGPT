@@ -208,18 +208,20 @@ class SmartQueryProcessor:
         Returns:
             格式化的响应文本
         """
-        if result["status"] == "needs_clarification":
-            response = f"{result['message']}\n\n"
-            
+        status = result.get("status")
+
+        if status == "needs_clarification":
+            response = f"{result.get('message', '')}\n\n"
+
             if result.get("suggestions"):
                 response += "建议查询格式：\n"
                 for i, suggestion in enumerate(result["suggestions"], 1):
                     response += f"  {i}. {suggestion}\n"
-            
+
             return response
-        elif result["status"] == "ready":
+        elif status == "ready":
             # 为正常查询提供标准响应
             return "查询已就绪，正在处理您的请求..."
         else:
             # 处理其他状态
-            return f"查询状态: {result.get('status', '未知')}"
+            return f"查询状态: {status or '未知'}"

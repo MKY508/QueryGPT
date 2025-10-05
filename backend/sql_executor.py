@@ -57,9 +57,16 @@ class SQLSecurityChecker:
             return False, "SQL中不允许包含注释"
         
         # 4. 检查分号（防止多语句执行）
-        if ';' in sql and not sql.strip().endswith(';'):
-            return False, "不允许执行多条SQL语句"
-        
+        stripped_sql = sql.strip()
+        if ';' in stripped_sql:
+            # 允许末尾单个分号，但禁止出现多条语句
+            statements = [stmt.strip() for stmt in stripped_sql.split(';') if stmt.strip()]
+            if len(statements) > 1:
+                return False, "不允许执行多条SQL语句"
+
+            if not stripped_sql.endswith(';'):
+                return False, "不允许执行多条SQL语句"
+
         return True, ""
 
 class DirectSQLExecutor:

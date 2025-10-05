@@ -135,7 +135,7 @@ def sanitize_sql_query(query: str) -> str:
             in_single_quote = not in_single_quote
             cleaned_query.append(query[i])
             i += 1
-        elif query[i] == '"' and not in_double_quote:
+        elif query[i] == '"' and not in_single_quote:
             in_double_quote = not in_double_quote
             cleaned_query.append(query[i])
             i += 1
