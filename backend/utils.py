@@ -1,213 +1,159 @@
 """
-工具函数模块
-提供通用的辅助功能
+工具函数模块 - 统一管理所有辅助函数
+包含：日期解析、SSE格式化、进度计划、限流装饰器
 """
 import json
 import logging
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional, Callable
 from functools import wraps
-from flask import jsonify
-from typing import Any, Dict, Optional, Tuple
+
+from backend.llm_service import LLMService
 
 logger = logging.getLogger(__name__)
 
-def create_response(success: bool = True, 
-                   data: Optional[Dict] = None, 
-                   error: Optional[str] = None, 
-                   status_code: int = 200) -> Tuple[Dict, int]:
-    """
-    创建标准化的API响应
-    
-    Args:
-        success: 操作是否成功
-        data: 响应数据
-        error: 错误信息
-        status_code: HTTP状态码
-        
-    Returns:
-        (响应字典, 状态码)
-    """
-    response = {"success": success}
-    
-    if data is not None:
-        response.update(data)
-    
-    if error is not None:
-        response["error"] = error
-        
-    return jsonify(response), status_code
+# ============ 日期解析工具 ============
 
-def handle_api_errors(func):
-    """
-    API错误处理装饰器
-    自动捕获异常并返回标准错误响应
-    """
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except ValueError as e:
-            logger.warning(f"{func.__name__} - 参数错误: {e}")
-            return create_response(
-                success=False, 
-                error=str(e), 
-                status_code=400
-            )
-        except PermissionError as e:
-            logger.warning(f"{func.__name__} - 权限错误: {e}")
-            return create_response(
-                success=False,
-                error="权限不足",
-                status_code=403
-            )
-        except Exception as e:
-            logger.error(f"{func.__name__} - 未预期错误: {e}", exc_info=True)
-            return create_response(
-                success=False,
-                error="服务器内部错误",
-                status_code=500
-            )
-    return wrapper
-
-def validate_json_request(required_fields: list):
-    """
-    验证JSON请求装饰器
-    检查必需字段是否存在
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            from flask import request
-            
-            if not request.is_json:
-                return create_response(
-                    success=False,
-                    error="请求必须是JSON格式",
-                    status_code=400
-                )
-            
-            data = request.get_json()
-            missing_fields = [
-                field for field in required_fields 
-                if field not in data or data[field] is None
-            ]
-            
-            if missing_fields:
-                return create_response(
-                    success=False,
-                    error=f"缺少必需字段: {', '.join(missing_fields)}",
-                    status_code=400
-                )
-            
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
-
-def sanitize_sql_query(query: str) -> str:
-    """
-    清理SQL查询，防止SQL注入
-    
-    Args:
-        query: 原始SQL查询
-        
-    Returns:
-        清理后的SQL查询
-    """
-    # 移除危险的SQL关键字
-    dangerous_keywords = [
-        'DROP', 'DELETE', 'INSERT', 'UPDATE', 'ALTER', 
-        'CREATE', 'TRUNCATE', 'EXEC', 'EXECUTE'
-    ]
-    
-    query_upper = query.upper()
-    for keyword in dangerous_keywords:
-        if keyword in query_upper:
-            raise ValueError(f"不允许执行{keyword}操作")
-    
-    # 智能移除注释，避免误删字符串字面量中的内容
-    cleaned_query = []
-    in_single_quote = False
-    in_double_quote = False
-    i = 0
-    
-    while i < len(query):
-        # 处理字符串字面量
-        if query[i] == "'" and not in_double_quote:
-            in_single_quote = not in_single_quote
-            cleaned_query.append(query[i])
-            i += 1
-        elif query[i] == '"' and not in_double_quote:
-            in_double_quote = not in_double_quote
-            cleaned_query.append(query[i])
-            i += 1
-        # 只在字符串外移除注释
-        elif not in_single_quote and not in_double_quote:
-            # 检查单行注释 --
-            if i < len(query) - 1 and query[i:i+2] == '--':
-                # 跳过直到行尾
-                while i < len(query) and query[i] != '\n':
-                    i += 1
-                if i < len(query):
-                    cleaned_query.append('\n')  # 保留换行
-                    i += 1
-            # 检查多行注释 /* */
-            elif i < len(query) - 1 and query[i:i+2] == '/*':
-                # 跳过直到 */
-                i += 2
-                while i < len(query) - 1:
-                    if query[i:i+2] == '*/':
-                        i += 2
-                        break
-                    i += 1
-            else:
-                cleaned_query.append(query[i])
-                i += 1
-        else:
-            # 在字符串内，保留所有字符
-            cleaned_query.append(query[i])
-            i += 1
-    
-    return ''.join(cleaned_query).strip()
-
-def format_datetime(dt) -> str:
-    """
-    格式化日期时间为统一格式
-    
-    Args:
-        dt: datetime对象
-        
-    Returns:
-        格式化的日期时间字符串
-    """
-    if dt is None:
+def parse_date_param(value: str | None) -> datetime | None:
+    """解析日期参数（支持多种格式）"""
+    if not value:
         return None
-    return dt.strftime('%Y-%m-%d %H:%M:%S')
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        if candidate.endswith('Z'):
+            candidate = candidate[:-1] + '+00:00'
+        parsed = datetime.fromisoformat(candidate)
+    except ValueError:
+        for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d'):
+            try:
+                parsed = datetime.strptime(candidate, fmt)
+                break
+            except ValueError:
+                parsed = None
+        if parsed is None:
+            return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
 
-def safe_json_dumps(obj: Any, default=str) -> str:
-    """
-    安全的JSON序列化
-    处理datetime等特殊类型
-    
-    Args:
-        obj: 要序列化的对象
-        default: 默认转换函数
-        
-    Returns:
-        JSON字符串
-    """
-    return json.dumps(obj, default=default, ensure_ascii=False)
 
-def get_client_ip():
-    """
-    获取客户端IP地址
-    
-    Returns:
-        IP地址字符串
-    """
-    from flask import request
-    
-    if request.headers.get('X-Forwarded-For'):
-        return request.headers['X-Forwarded-For'].split(',')[0]
-    elif request.headers.get('X-Real-IP'):
-        return request.headers['X-Real-IP']
-    else:
-        return request.remote_addr or '127.0.0.1'
+def parse_conversation_timestamp(value: str | None) -> datetime | None:
+    """解析对话时间戳"""
+    if not value:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f'):
+        try:
+            return datetime.strptime(candidate, fmt)
+        except ValueError:
+            continue
+    try:
+        if candidate.endswith('Z'):
+            candidate = candidate[:-1] + '+00:00'
+        parsed = datetime.fromisoformat(candidate)
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed
+    except ValueError:
+        return None
+
+
+def conversation_in_range(
+    conversation: dict, 
+    start: datetime | None, 
+    end: datetime | None
+) -> bool:
+    """判断对话是否在指定时间范围内"""
+    if not (start or end):
+        return True
+    timestamp = (conversation.get('updated_at') or
+                 conversation.get('created_at'))
+    parsed = parse_conversation_timestamp(timestamp)
+    if not parsed:
+        return False
+    if start and parsed < start:
+        return False
+    if end and parsed > end:
+        return False
+    return True
+
+
+# ============ SSE格式化工具 ============
+
+def sse_format(event: str, data: Dict[str, Any]) -> str:
+    """格式化SSE事件数据"""
+    try:
+        payload = json.dumps(data, ensure_ascii=False)
+    except Exception:
+        payload = json.dumps({"message": str(data)})
+    return f"event: {event}\ndata: {payload}\n\n"
+
+
+# ============ 进度计划生成 ============
+
+def generate_progress_plan(
+    user_query: str, 
+    route_type: str = 'ai_analysis', 
+    language: str = 'zh'
+) -> list[str]:
+    """调用LLM生成简短进度标签（每项不超过10字，3-6项）。失败时返回默认。"""
+    try:
+        svc = LLMService()
+        prompt = (
+            "你是数据分析的执行计划助理。请基于用户需求和执行路径，生成一个最多6步的进度标签列表，"
+            "每个标签不超过10个字，简短、友好，便于展示给非技术用户。"
+            f"\n- 用户需求: {user_query[:200]}"
+            f"\n- 执行路径: {route_type.upper()}"
+            "\n只输出JSON，格式如下：\n{\n  \"labels\": [\"准备\", \"解析需求\", \"查询数据\", \"生成图表\", \"总结输出\"]\n}"
+        )
+        if language == 'en':
+            prompt = (
+                "You are a progress planner. Based on the user request and execution route, generate 3-6 short step labels"
+                ", each no longer than 10 characters, friendly for non-technical users."
+                f"\n- User request: {user_query[:200]}"
+                f"\n- Route: {route_type.upper()}"
+                "\nOutput JSON only in the form:\n{\n  \"labels\": [\"Prepare\", \"Parse\", \"Query\", \"Chart\", \"Summarize\"]\n}"
+            )
+        res = svc.complete(prompt, temperature=0.2, max_tokens=200)
+        if res.get('success'):
+            content = res.get('content', '{}')
+            data = json.loads(content)
+            labels = data.get('labels')
+            if isinstance(labels, list) and 1 <= len(labels) <= 8:
+                return [str(x)[:10] for x in labels]
+        except Exception as e:
+        logger.debug(f"生成进度计划失败: {e}")
+        pass
+    # 默认计划
+    return ['准备', '解析需求', '查询数据', '生成图表', '总结输出'] if language != 'en' else ['Prepare', 'Parse', 'Query', 'Chart', 'Summary']
+
+
+# ============ 限流装饰器 ============
+
+def dynamic_rate_limit(max_requests: int, window_seconds: int):
+    """动态限流装饰器工厂（支持运行时打桩）"""
+    def deco(f: Callable):
+        def wrapper(*args, **kwargs):
+            # 运行时获取最新的 rate_limit（支持单测 monkeypatch）
+            try:
+                from backend import rate_limiter as rl
+                rl_func = rl.rate_limit
+                try:
+                    # 优先按装饰器工厂调用
+                    wrapped = rl_func(max_requests=max_requests, window_seconds=window_seconds)(f)
+                except TypeError:
+                    # 兼容测试桩：rl.rate_limit(f)
+                    wrapped = rl_func(f)
+                return wrapped(*args, **kwargs)
+            except Exception:
+                return f(*args, **kwargs)
+        # 保留元数据
+        try:
+            return wraps(f)(wrapper)
+        except Exception:
+        return wrapper
+    return deco

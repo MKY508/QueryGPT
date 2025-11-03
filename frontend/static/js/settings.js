@@ -162,6 +162,10 @@ class SettingsManager {
      */
     async init() {
         console.log('SettingsManager 初始化开始');
+        
+        // 确保模态框初始状态为关闭
+        this.ensureModalClosed();
+        
         // 先加载配置
         await this.loadConfig();
         this.setupSettingsTabEvents();
@@ -170,6 +174,17 @@ class SettingsManager {
         this.setupSystemEvents();
         this.loadModels();
         console.log('SettingsManager 初始化完成');
+    }
+    
+    /**
+     * 确保模态框处于关闭状态
+     */
+    ensureModalClosed() {
+        const modal = document.getElementById('model-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        this.currentEditingModel = null;
     }
     
     /**
@@ -283,6 +298,9 @@ class SettingsManager {
             });
         }
 
+        // 设置模态框关闭事件
+        this.setupModalCloseEvents();
+
         // 自动保存基础设置 - 当设置改变时立即保存
         const defaultViewModel = document.getElementById('default-view-mode');
         const contextRounds = document.getElementById('context-rounds');
@@ -300,6 +318,29 @@ class SettingsManager {
                 this.saveBasicSettings();
             });
         }
+    }
+    
+    /**
+     * 设置模态框关闭事件（ESC键和点击背景）
+     */
+    setupModalCloseEvents() {
+        const modal = document.getElementById('model-modal');
+        if (!modal) return;
+        
+        // ESC键关闭模态框
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                this.closeModelModal();
+            }
+        });
+        
+        // 点击背景关闭模态框
+        modal.addEventListener('click', (e) => {
+            // 如果点击的是模态框背景（而不是内容区域）
+            if (e.target === modal) {
+                this.closeModelModal();
+            }
+        });
     }
 
     /**
@@ -755,7 +796,16 @@ class SettingsManager {
      */
     openModelModal(modelId = null) {
         const modal = document.getElementById('model-modal');
+        if (!modal) {
+            console.warn('模型模态框元素不存在');
+            return;
+        }
+        
         const title = document.getElementById('model-modal-title');
+        if (!title) {
+            console.warn('模型模态框标题元素不存在');
+            return;
+        }
         
         // 获取默认配置
         const defaultApiKey = this.config?.api_key || '';
@@ -764,33 +814,40 @@ class SettingsManager {
         const typeSelect = document.getElementById('model-type');
         const apiBaseInput = document.getElementById('model-api-base');
         const apiKeyInput = document.getElementById('model-api-key');
+        const nameInput = document.getElementById('model-name');
+        const idInput = document.getElementById('model-id');
 
         if (modelId) {
-            // 编辑模式
+            // 编辑模式 - 确保模型存在
             const model = this.models.find(m => m.id === modelId);
-            if (model) {
-                title.textContent = '编辑模型';
-                document.getElementById('model-name').value = model.name || '';
-                document.getElementById('model-id').value = model.id || '';
-                const modelType = (model.type || model.provider || 'openai').toLowerCase();
-                if (typeSelect) {
-                    typeSelect.disabled = false;
-                    typeSelect.value = modelType;
-                }
-                if (apiBaseInput) {
-                    apiBaseInput.value = model.api_base || model.base_url || defaultApiBase;
-                }
-                if (apiKeyInput) {
-                    apiKeyInput.value = model.api_key === 'not-needed' ? '' : (model.api_key || defaultApiKey);
-                }
-                this.currentEditingModel = modelId;
-                this.applyModelTypeHints(modelType);
+            if (!model) {
+                console.warn(`未找到ID为 ${modelId} 的模型`);
+                app.showNotification(`未找到ID为 ${modelId} 的模型`, 'error');
+                return; // 如果找不到模型，不打开模态框
             }
+            
+            // 找到了模型，填充表单
+            title.textContent = '编辑模型';
+            if (nameInput) nameInput.value = model.name || '';
+            if (idInput) idInput.value = model.id || '';
+            const modelType = (model.type || model.provider || 'openai').toLowerCase();
+            if (typeSelect) {
+                typeSelect.disabled = false;
+                typeSelect.value = modelType;
+            }
+            if (apiBaseInput) {
+                apiBaseInput.value = model.api_base || model.base_url || defaultApiBase;
+            }
+            if (apiKeyInput) {
+                apiKeyInput.value = model.api_key === 'not-needed' ? '' : (model.api_key || defaultApiKey);
+            }
+            this.currentEditingModel = modelId;
+            this.applyModelTypeHints(modelType);
         } else {
             // 添加模式 - 使用默认值
             title.textContent = '添加模型';
-            document.getElementById('model-name').value = '';
-            document.getElementById('model-id').value = '';
+            if (nameInput) nameInput.value = '';
+            if (idInput) idInput.value = '';
             if (typeSelect) {
                 typeSelect.disabled = false;
                 typeSelect.value = 'openai';
@@ -813,8 +870,20 @@ class SettingsManager {
      */
     closeModelModal() {
         const modal = document.getElementById('model-modal');
-        modal.style.display = 'none';
+        if (modal) {
+            modal.style.display = 'none';
+        }
         this.currentEditingModel = null;
+        
+        // 清空表单（可选，但更安全）
+        const nameInput = document.getElementById('model-name');
+        const idInput = document.getElementById('model-id');
+        const apiBaseInput = document.getElementById('model-api-base');
+        const apiKeyInput = document.getElementById('model-api-key');
+        if (nameInput) nameInput.value = '';
+        if (idInput) idInput.value = '';
+        if (apiBaseInput) apiBaseInput.value = '';
+        if (apiKeyInput) apiKeyInput.value = '';
     }
 
     /**
