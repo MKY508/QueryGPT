@@ -125,7 +125,7 @@ def generate_progress_plan(
             labels = data.get('labels')
             if isinstance(labels, list) and 1 <= len(labels) <= 8:
                 return [str(x)[:10] for x in labels]
-        except Exception as e:
+    except Exception as e:
         logger.debug(f"生成进度计划失败: {e}")
         pass
     # 默认计划
@@ -155,5 +155,5 @@ def dynamic_rate_limit(max_requests: int, window_seconds: int):
         try:
             return wraps(f)(wrapper)
         except Exception:
-        return wrapper
+            return wrapper
     return deco
