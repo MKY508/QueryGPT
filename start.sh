@@ -287,8 +287,12 @@ find_available_port() {
         local port_available=false
         
         # 优先使用Python方法（最可靠，跨平台）
-        if command -v python3 >/dev/null 2>&1; then
-            if python3 -c "import socket; s=socket.socket(); r=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if r!=0 else 1)" 2>/dev/null; then
+        local python_for_port="${PYTHON_BIN:-${PYTHON_CMD:-python3}}"
+        if ! command -v "$python_for_port" >/dev/null 2>&1; then
+            python_for_port="python"
+        fi
+        if command -v "$python_for_port" >/dev/null 2>&1; then
+            if "$python_for_port" -c "import socket, sys; s=socket.socket(); r=s.connect_ex(('127.0.0.1', $port)); s.close(); sys.exit(0 if r != 0 else 1)" 2>/dev/null; then
                 port_available=true
                 debug_log "Python方法检测端口 $port 可用"
             fi
@@ -303,20 +307,39 @@ find_available_port() {
         # Linux通用方法（包括WSL和纯Linux）
         elif [ "$IS_LINUX" = true ]; then
             if command -v ss >/dev/null 2>&1; then
-                if ! timeout 1 ss -tln 2>/dev/null | grep -q ":$port "; then
+                local ss_output=""
+                if command -v timeout >/dev/null 2>&1; then
+                    ss_output=$(timeout 1 ss -tln 2>/dev/null || true)
+                else
+                    ss_output=$(ss -tln 2>/dev/null || true)
+                fi
+                if ! echo "$ss_output" | grep -q ":$port "; then
                     port_available=true
                     debug_log "ss方法检测端口 $port 可用"
                 fi
             elif command -v netstat >/dev/null 2>&1; then
-                if ! timeout 1 netstat -tln 2>/dev/null | grep -q ":$port "; then
+                local netstat_output=""
+                if command -v timeout >/dev/null 2>&1; then
+                    netstat_output=$(timeout 1 netstat -tln 2>/dev/null || true)
+                else
+                    netstat_output=$(netstat -tln 2>/dev/null || true)
+                fi
+                if ! echo "$netstat_output" | grep -q ":$port "; then
                     port_available=true
                     debug_log "netstat方法检测端口 $port 可用"
                 fi
             else
                 # 使用/dev/tcp测试
-                if ! timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
-                    port_available=true
-                    debug_log "bash方法检测端口 $port 可用"
+                if command -v timeout >/dev/null 2>&1; then
+                    if ! timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+                        port_available=true
+                        debug_log "bash方法检测端口 $port 可用"
+                    fi
+                else
+                    if ! bash -c "exec 3<>/dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+                        port_available=true
+                        debug_log "bash方法检测端口 $port 可用"
+                    fi
                 fi
             fi
         fi
@@ -335,6 +358,17 @@ find_available_port() {
     local random_port=$((RANDOM % 10000 + 20000))
     echo $random_port
     return 0
+}
+
+resolve_activate_path() {
+    local venv_dir="$1"
+    if [ -f "$venv_dir/bin/activate" ]; then
+        echo "$venv_dir/bin/activate"
+    elif [ -f "$venv_dir/Scripts/activate" ]; then
+        echo "$venv_dir/Scripts/activate"
+    else
+        echo ""
+    fi
 }
 
 # 快速启动函数
@@ -376,30 +410,30 @@ quick_start() {
     
     # 查找虚拟环境（优先当前目录，其次home目录）
     VENV_FOUND=false
-    
-    # 检查当前目录
-    if [ -d "venv_py310" ]; then
-        info_log "使用当前目录虚拟环境: venv_py310"
-        echo -e "${BLUE}[INFO]${NC} 使用当前目录虚拟环境..."
-        debug_log "激活虚拟环境: venv_py310/bin/activate"
-        source venv_py310/bin/activate
-        VENV_FOUND=true
-    elif [ -d "venv" ]; then
-        info_log "使用当前目录虚拟环境: venv"
-        echo -e "${BLUE}[INFO]${NC} 使用当前目录虚拟环境..."
-        debug_log "激活虚拟环境: venv/bin/activate"
-        source venv/bin/activate
-        VENV_FOUND=true
-    # 检查home目录（WSL情况）
-    elif [ -d "$HOME/venv_py310" ]; then
-        echo -e "${BLUE}[INFO]${NC} 使用home目录虚拟环境..."
-        source "$HOME/venv_py310/bin/activate"
-        VENV_FOUND=true
-    elif [ -d "$HOME/venv" ]; then
-        echo -e "${BLUE}[INFO]${NC} 使用home目录虚拟环境..."
-        source "$HOME/venv/bin/activate"
-        VENV_FOUND=true
-    fi
+    local venv_candidates=("venv_py310" "venv" "$HOME/venv_py310" "$HOME/venv")
+
+    for candidate in "${venv_candidates[@]}"; do
+        if [ "$VENV_FOUND" = true ]; then
+            break
+        fi
+        if [ -d "$candidate" ]; then
+            local activate_path
+            activate_path=$(resolve_activate_path "$candidate")
+            if [ -n "$activate_path" ]; then
+                if [[ "$candidate" == "$HOME"* ]]; then
+                    echo -e "${BLUE}[INFO]${NC} 使用home目录虚拟环境..."
+                    info_log "使用home目录虚拟环境: $candidate"
+                else
+                    echo -e "${BLUE}[INFO]${NC} 使用当前目录虚拟环境..."
+                    info_log "使用当前目录虚拟环境: $candidate"
+                fi
+                debug_log "激活虚拟环境: $activate_path"
+                # shellcheck disable=SC1090
+                source "$activate_path"
+                VENV_FOUND=true
+            fi
+        fi
+    done
     
     if [ "$VENV_FOUND" = false ]; then
         warning_log "未找到虚拟环境"
@@ -416,10 +450,17 @@ quick_start() {
     fi
     
     PYTHON_BIN="$VIRTUAL_ENV/bin/python"
-    if [ ! -x "$PYTHON_BIN" ] && [ -x "$VIRTUAL_ENV/Scripts/python.exe" ]; then
-        PYTHON_BIN="$VIRTUAL_ENV/Scripts/python.exe"
+    if [ ! -x "$PYTHON_BIN" ]; then
+        if [ -x "$VIRTUAL_ENV/Scripts/python" ]; then
+            PYTHON_BIN="$VIRTUAL_ENV/Scripts/python"
+        elif [ -x "$VIRTUAL_ENV/Scripts/python.exe" ]; then
+            PYTHON_BIN="$VIRTUAL_ENV/Scripts/python.exe"
+        fi
     fi
-    local python_exec="${PYTHON_BIN:-$(which python)}"
+    local python_exec="$PYTHON_BIN"
+    if [ -z "$python_exec" ]; then
+        python_exec="$(command -v python3 2>/dev/null || command -v python 2>/dev/null)"
+    fi
 
     debug_log "Python路径: $python_exec"
     debug_log "VIRTUAL_ENV: $VIRTUAL_ENV"

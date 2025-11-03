@@ -119,6 +119,15 @@ warning_log() {
     echo "[$timestamp] WARNING: $message" >> "$ERROR_LOG"
 }
 
+# 错误日志函数
+error_log() {
+    local message="$1"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo -e "${RED}[ERROR] $message${NC}" >&2
+    mkdir -p logs
+    echo "[$timestamp] ERROR: $message" >> "$ERROR_LOG"
+}
+
 # 成功日志函数
 success_log() {
     local message="$1"
@@ -291,7 +300,9 @@ print_message() {
 
 # 打印横幅
 print_banner() {
-    clear
+    if [ -t 1 ] && command -v clear >/dev/null 2>&1; then
+        clear || :
+    fi
     echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}║${NC}     ${BOLD}QueryGPT Setup v${SCRIPT_VERSION}${NC}                              ${CYAN}║${NC}"
     echo -e "${CYAN}║${NC}     环境配置脚本 / Environment Setup                  ${CYAN}║${NC}"
@@ -355,32 +366,49 @@ check_first_run() {
 check_python() {
     debug_log "开始检查Python环境..."
     print_message "header" "检查 Python 环境 / Checking Python Environment"
-    
-    # 优先检查 python3.10
-    if command -v python3.10 &> /dev/null; then
-        PYTHON_CMD="python3.10"
-        local version=$(python3.10 -V 2>&1 | grep -Po '\d+\.\d+\.\d+')
-        success_log "找到 Python 3.10: $version"
-        print_message "success" "找到 Python 3.10: $version"
-    elif command -v python3 &> /dev/null; then
-        local version=$(python3 -V 2>&1 | grep -Po '\d+\.\d+\.\d+')
-        local major=$(echo $version | cut -d. -f1)
-        local minor=$(echo $version | cut -d. -f2)
-        
-        if [ "$major" -eq 3 ] && [ "$minor" -eq 10 ]; then
-            PYTHON_CMD="python3"
-            success_log "找到 Python $version"
-            print_message "success" "找到 Python $version"
-        else
-            warning_log "Python 版本不匹配: $version (推荐 3.10.x)"
-            print_message "warning" "Python 版本不匹配: $version (推荐 3.10.x)"
-            PYTHON_CMD="python3"
+
+    local candidates=("python3.10" "python3" "python")
+    local selected=""
+    local version=""
+
+    for candidate in "${candidates[@]}"; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            if version=$("$candidate" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))' 2>/dev/null); then
+                selected="$candidate"
+                break
+            fi
         fi
-    else
+    done
+
+    if [ -z "$selected" ] || [ -z "$version" ]; then
         error_handler $LINENO "Python 3 not found" 1
         exit 1
     fi
-    debug_log "Python检查完成: $PYTHON_CMD"
+
+    PYTHON_CMD="$selected"
+
+    local major="${version%%.*}"
+    local remainder="${version#*.}"
+    local minor="${remainder%%.*}"
+
+    if [ "$major" -ne 3 ]; then
+        error_handler $LINENO "Python 3 is required (detected $version)" 1
+        exit 1
+    fi
+
+    if [ "$minor" = "$major" ]; then
+        minor="0"
+    fi
+
+    if [ "$minor" -eq 10 ]; then
+        success_log "找到 Python $version"
+        print_message "success" "找到 Python $version"
+    else
+        warning_log "Python 版本为 $version (推荐 3.10.x)"
+        print_message "warning" "Python 版本为 $version (推荐 3.10.x)"
+    fi
+
+    debug_log "Python检查完成: $PYTHON_CMD ($version)"
     echo ""
 }
 
@@ -453,6 +481,24 @@ ensure_venv_capability() {
     return 1
 }
 
+# 检查虚拟环境激活脚本是否存在（兼容Windows/Linux）
+venv_has_activate_script() {
+    local venv_dir="$1"
+    [ -f "$venv_dir/bin/activate" ] || [ -f "$venv_dir/Scripts/activate" ]
+}
+
+# 获取虚拟环境激活脚本路径（优先POSIX脚本）
+resolve_activate_script() {
+    local venv_dir="$1"
+    if [ -f "$venv_dir/bin/activate" ]; then
+        echo "$venv_dir/bin/activate"
+    elif [ -f "$venv_dir/Scripts/activate" ]; then
+        echo "$venv_dir/Scripts/activate"
+    else
+        echo ""
+    fi
+}
+
 # 创建虚拟环境（支持多种方法）
 create_venv_with_fallback() {
     local venv_dir="$1"
@@ -462,7 +508,7 @@ create_venv_with_fallback() {
     if "$PYTHON_CMD" -m venv --help &>/dev/null; then
         debug_log "使用venv模块创建虚拟环境"
         "$PYTHON_CMD" -m venv "$venv_dir"
-        if [ -f "$venv_dir/bin/activate" ]; then
+        if venv_has_activate_script "$venv_dir"; then
             return 0
         fi
     fi
@@ -471,7 +517,7 @@ create_venv_with_fallback() {
     if command -v virtualenv &> /dev/null; then
         debug_log "使用virtualenv命令创建虚拟环境"
         virtualenv -p "$PYTHON_CMD" "$venv_dir"
-        if [ -f "$venv_dir/bin/activate" ]; then
+        if venv_has_activate_script "$venv_dir"; then
             return 0
         fi
     fi
@@ -480,7 +526,7 @@ create_venv_with_fallback() {
     if "$PYTHON_CMD" -m virtualenv --help &>/dev/null; then
         debug_log "使用python -m virtualenv创建虚拟环境"
         "$PYTHON_CMD" -m virtualenv "$venv_dir"
-        if [ -f "$venv_dir/bin/activate" ]; then
+        if venv_has_activate_script "$venv_dir"; then
             return 0
         fi
     fi
@@ -502,7 +548,7 @@ setup_venv() {
     fi
     
     if [ -d "$venv_dir" ]; then
-        if [ -f "$venv_dir/bin/activate" ]; then
+        if venv_has_activate_script "$venv_dir"; then
             info_log "使用现有虚拟环境 / Using existing virtual environment"
             print_message "info" "使用现有虚拟环境 / Using existing virtual environment"
         else
@@ -529,9 +575,16 @@ setup_venv() {
         print_message "success" "虚拟环境创建成功 / Virtual environment created"
     fi
     
+    local activate_script="$(resolve_activate_script "$venv_dir")"
+    if [ -z "$activate_script" ]; then
+        error_handler $LINENO "Virtual environment created without activate script" 1
+        exit 1
+    fi
+
     # 激活虚拟环境
-    debug_log "激活虚拟环境: $venv_dir/bin/activate"
-    source "$venv_dir/bin/activate"
+    debug_log "激活虚拟环境: $activate_script"
+    # shellcheck disable=SC1090
+    source "$activate_script"
     
     # 验证激活成功
     if [ -z "$VIRTUAL_ENV" ]; then
@@ -541,12 +594,20 @@ setup_venv() {
     
     # 记录虚拟环境中的 python/pip 路径
     PYTHON_BIN="$VIRTUAL_ENV/bin/python"
-    if [ ! -x "$PYTHON_BIN" ] && [ -x "$VIRTUAL_ENV/Scripts/python.exe" ]; then
-        PYTHON_BIN="$VIRTUAL_ENV/Scripts/python.exe"
+    if [ ! -x "$PYTHON_BIN" ]; then
+        if [ -x "$VIRTUAL_ENV/Scripts/python" ]; then
+            PYTHON_BIN="$VIRTUAL_ENV/Scripts/python"
+        elif [ -x "$VIRTUAL_ENV/Scripts/python.exe" ]; then
+            PYTHON_BIN="$VIRTUAL_ENV/Scripts/python.exe"
+        fi
     fi
     PIP_CMD="$VIRTUAL_ENV/bin/pip"
-    if [ ! -x "$PIP_CMD" ] && [ -x "$VIRTUAL_ENV/Scripts/pip.exe" ]; then
-        PIP_CMD="$VIRTUAL_ENV/Scripts/pip.exe"
+    if [ ! -x "$PIP_CMD" ]; then
+        if [ -x "$VIRTUAL_ENV/Scripts/pip" ]; then
+            PIP_CMD="$VIRTUAL_ENV/Scripts/pip"
+        elif [ -x "$VIRTUAL_ENV/Scripts/pip.exe" ]; then
+            PIP_CMD="$VIRTUAL_ENV/Scripts/pip.exe"
+        fi
     fi
 
     debug_log "虚拟环境激活成功: $VIRTUAL_ENV"
@@ -909,8 +970,12 @@ find_available_port() {
         local port_available=false
         
         # 优先使用Python方法（最可靠，跨平台）
-        if command -v python3 >/dev/null 2>&1; then
-            if python3 -c "import socket; s=socket.socket(); result=s.connect_ex(('127.0.0.1',$port)); s.close(); exit(0 if result != 0 else 1)" 2>/dev/null; then
+        local python_for_port="${PYTHON_CMD:-python3}"
+        if ! command -v "$python_for_port" >/dev/null 2>&1; then
+            python_for_port="python"
+        fi
+        if command -v "$python_for_port" >/dev/null 2>&1; then
+            if "$python_for_port" -c "import socket, sys; s=socket.socket(); result=s.connect_ex(('127.0.0.1', $port)); s.close(); sys.exit(0 if result != 0 else 1)" 2>/dev/null; then
                 port_available=true
                 debug_log "使用Python方法检测端口 $port 可用"
             fi

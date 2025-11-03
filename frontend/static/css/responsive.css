@@ -407,3 +407,98 @@ img {
     flex: 1 1 auto;
     min-width: 0;
 }
+
+/* ============ 浏览器缩放优化策略 ============ */
+
+/* 支持浏览器缩放 - 使用相对单位和百分比 */
+html {
+    font-size: 16px; /* 基准字体大小 */
+}
+
+/* 当浏览器缩放时，确保内容自适应 */
+@media screen and (min-resolution: 2dppx) {
+    html {
+        font-size: 15px; /* 高DPI屏幕微调 */
+    }
+}
+
+/* 支持Ctrl+滚轮缩放时的布局保持 */
+.container {
+    transform-origin: top left;
+    transition: transform 0.1s ease-out;
+}
+
+/* 缩放时的文本可读性 */
+body {
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* 确保所有容器支持缩放 */
+.chat-messages,
+.sidebar,
+.main-content,
+.modal-content {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* 表格在缩放时保持可用 */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+
+/* 按钮和交互元素在缩放时保持可点击区域 */
+button, .btn, a {
+    min-height: 44px; /* iOS推荐最小触摸目标 */
+    min-width: 44px;
+}
+
+/* 输入框在缩放时的优化 */
+input, textarea, select {
+    font-size: 1rem; /* 防止iOS自动缩放 */
+    max-width: 100%;
+}
+
+/* 图表容器缩放支持 */
+.plotly {
+    width: 100% !important;
+    height: auto !important;
+}
+
+/* 代码块缩放支持 */
+pre, code {
+    max-width: 100%;
+    overflow-x: auto;
+    word-wrap: break-word;
+}
+
+/* 响应式图片 */
+img, svg {
+    max-width: 100%;
+    height: auto;
+}
+
+/* 移动端缩放优化 */
+@media (max-width: 768px) {
+    html {
+        font-size: 14px; /* 移动端基准稍小 */
+    }
+    
+    /* 防止移动端双击缩放 */
+    * {
+        touch-action: manipulation;
+    }
+}
+
+/* 打印时禁用缩放相关样式 */
+@media print {
+    * {
+        transform: none !important;
+        zoom: 1 !important;
+    }
+}
