@@ -34,10 +34,7 @@ class SmartRouter:
         custom_prompt = self._load_routing_prompt()
 
         # 读取特性开关，避免缺省配置触发异常
-        try:
-            self.feature_flags = ConfigLoader.get_config().get('features', {})
-        except Exception:
-            self.feature_flags = {}
+        self.feature_flags = self._load_feature_flags()
         
         # 初始化AI分类器并进行健康检查
         self.llm_available = False
@@ -79,6 +76,18 @@ class SmartRouter:
             "rule_based_routes": 0
         }
     
+    def _load_feature_flags(self) -> Dict[str, Any]:
+        """加载最新的功能开关配置"""
+        try:
+            config = ConfigLoader.get_config()
+            features = config.get('features') or {}
+            if not isinstance(features, dict):
+                return {}
+            return features
+        except Exception as exc:
+            logger.debug("加载功能配置失败，使用默认值: %s", exc)
+            return {}
+
     def _test_llm_service(self, llm_service) -> bool:
         """测试LLM服务是否可用"""
         try:
@@ -166,6 +175,14 @@ class SmartRouter:
             执行结果
         """
         start_time = time.time()
+        # 每次路由前刷新功能配置，确保前端修改即时生效
+        self.feature_flags = self._load_feature_flags()
+        feature_flags = self.feature_flags or {}
+
+        # 拷贝上下文，避免修改原始对象
+        context = dict(context or {})
+        language = context.get('language', 'zh') or 'zh'
+        context.setdefault('language', language)
         self.routing_stats["total_queries"] += 1
         
         try:
@@ -219,26 +236,55 @@ class SmartRouter:
                 'route_type': route_type,
                 'confidence': confidence,
                 'reason': classification.get('reason'),
-                'classification_time': classification.get('classification_time', 0)
+                'classification_time': classification.get('classification_time', 0),
+                'plan': classification.get('suggested_plan') or [],
+                'suggested_sql': classification.get('suggested_sql', ''),
+                'method': classification.get('method', 'ai')
             }
+
+            # 将计划、步长等写入上下文，供解释器执行时参考
+            if routing_info['plan']:
+                context['suggested_plan'] = routing_info['plan']
+            if routing_info['suggested_sql'] and route_type == RouteType.SQL_ONLY.value:
+                context.setdefault('suggested_sql', routing_info['suggested_sql'])
+
+            thought_cfg = feature_flags.get('thought_stream') if isinstance(feature_flags.get('thought_stream'), dict) else {}
+            template_key = 'template_en' if language == 'en' else 'template_zh'
+            default_template = 'Step {index}: {summary}' if language == 'en' else '步骤{index}：{summary}'
+            context.setdefault('step_logging_enabled', thought_cfg.get('enabled', True))
+            context.setdefault('step_template', thought_cfg.get(template_key, default_template))
+            context.setdefault('step_min_words', thought_cfg.get('min_words', 3))
+            context['route_type'] = route_type.upper() if isinstance(route_type, str) else route_type
 
             # 路由执行前进行数据库健康检查（仅限需要数据库的路线）
             requires_db = route_type in {RouteType.SQL_ONLY.value, RouteType.ANALYSIS.value}
             use_database = context.get('use_database', True) if isinstance(context, dict) else True
-            if requires_db and use_database:
+            guard_cfg = feature_flags.get('db_guard', {}) if isinstance(feature_flags.get('db_guard', {}), dict) else {}
+            auto_check_db = guard_cfg.get('auto_check', True)
+            warn_on_failure = guard_cfg.get('warn_on_failure', True)
+
+            if requires_db and use_database and auto_check_db:
                 db_check = self._ensure_database_ready(route_type, context or {})
                 if not db_check.get('ok'):
                     self.routing_stats["aborted_queries"] += 1
                     logger.error("数据库健康检查未通过，终止执行: %s", db_check.get('message'))
-                    return {
+                    response_payload = {
                         "success": False,
                         "status": "db_unavailable",
                         "error": db_check.get('message', '数据库不可用'),
                         "db_check": db_check,
                         "routing_info": routing_info,
                         "query_type": route_type,
-                        "requires_user_action": True
+                        "requires_user_action": warn_on_failure,
+                        "forceable": True,
+                        "original_query": query,
+                        "guard_config": guard_cfg,
+                        "classification": classification
                     }
+                    if context:
+                        response_payload['conversation_id'] = context.get('conversation_id')
+                        response_payload['model'] = context.get('model_name')
+                    return response_payload
             
             # 记录路由决策
             logger.info(f"🔄 路由决策: {route_type} (置信度: {confidence:.2f}, 方法: {method})")
@@ -270,6 +316,7 @@ class SmartRouter:
             
             # 添加路由信息到结果
             result['routing_info'] = routing_info
+            result['classification'] = classification
             
             # 计算时间节省（假设完整AI分析需要5秒）
             total_time = time.time() - start_time

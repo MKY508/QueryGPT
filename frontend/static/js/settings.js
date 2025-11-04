@@ -377,6 +377,8 @@ class SettingsManager {
         
         // 智能路由开关
         this.setupSmartRoutingToggle();
+        this.setupDbGuardControls();
+        this.setupThoughtStreamControls();
     }
     
     /**
@@ -418,42 +420,59 @@ class SettingsManager {
         }
     }
     
+    getCurrentFeatures() {
+        if (!this.config) {
+            this.config = {};
+        }
+        if (!this.config.features || typeof this.config.features !== 'object') {
+            this.config.features = {};
+        }
+        return JSON.parse(JSON.stringify(this.config.features));
+    }
+
+    async updateFeatureSection(sectionKey, mergedSection, notifications = {}) {
+        const features = this.getCurrentFeatures();
+        features[sectionKey] = {
+            ...(features[sectionKey] || {}),
+            ...mergedSection
+        };
+
+        try {
+            await api.saveSettings({ features });
+            this.config.features = features;
+            if (notifications.success) {
+                window.showNotification?.(notifications.success, 'success');
+            }
+            return true;
+        } catch (error) {
+            console.error('更新功能配置失败:', error);
+            if (notifications.error) {
+                window.showNotification?.(notifications.error, 'error');
+            }
+            return false;
+        }
+    }
+
     /**
      * 切换智能路由
      */
     async toggleSmartRouting(enabled) {
-        try {
-            // 更新配置
-            const response = await fetch('/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    features: {
-                        smart_routing: {
-                            enabled: enabled
-                        }
-                    }
-                })
-            });
-            
-            if (!response.ok) throw new Error('Failed to update configuration');
-            
-            // 显示提示
-            const message = enabled ? 
-                window.i18nManager?.t('settings.smartRoutingEnabled') || '智能路由已启用' :
-                window.i18nManager?.t('settings.smartRoutingDisabled') || '智能路由已禁用';
-                
-            window.showNotification?.(message, 'success') || alert(message);
-            
-            // 重新加载配置
-            await this.loadConfig();
-            
-        } catch (error) {
-            console.error('Failed to toggle smart routing:', error);
-            window.showNotification?.('切换失败，请重试', 'error') || alert('切换失败');
-            // 恢复开关状态
+        const currentSection = this.getCurrentFeatures().smart_routing || {};
+        const messageEnabled = window.i18nManager?.t('settings.smartRoutingEnabled') || '智能路由已启用';
+        const messageDisabled = window.i18nManager?.t('settings.smartRoutingDisabled') || '智能路由已禁用';
+        const success = await this.updateFeatureSection('smart_routing', {
+            ...currentSection,
+            enabled
+        }, {
+            success: enabled ? messageEnabled : messageDisabled,
+            error: window.i18nManager?.t('settings.smartRoutingToggleFailed') || '切换失败，请重试'
+        });
+
+        if (!success) {
             const toggle = document.getElementById('smart-routing-toggle');
             if (toggle) toggle.checked = !enabled;
+        } else {
+            this.updateSmartRoutingState(enabled);
         }
     }
     
@@ -707,7 +726,7 @@ class SettingsManager {
             tbody.innerHTML = `
                 <tr class="models-empty-row">
                     <td colspan="5" class="models-empty-message">
-                        暂未配置模型，点击右上角“新建模型”按钮开始。
+                        暂未配置模型，点击右上角"新建模型"按钮开始。
                     </td>
                 </tr>
             `;
@@ -1843,12 +1862,12 @@ class SettingsManager {
 
             sqlOnlyPrompt: `你是一个SQL快速核查助手：
 1. 仅执行只读SQL，禁止生成图表或保存文件
-2. 每个操作前输出“步骤说明”，确认所用库表与字段
+2. 每个操作前输出"步骤说明"，确认所用库表与字段
 3. 执行后报告记录数与耗时，对空结果或异常值给出提示
 4. 如信息不足，请先向用户澄清`,
 
             analysisPrompt: `你是一个数据分析助手：
-1. 在每个动作前输出“步骤说明”
+1. 在每个动作前输出"步骤说明"
 2. 使用pandas处理数据，必要时用plotly绘图并保存到output目录
 3. 保证操作安全：数据库只读；安装依赖需获得用户许可
 4. 分析结束后总结发现、局限与建议`,
@@ -1889,7 +1908,7 @@ class SettingsManager {
             dataAnalysis: '进行数据清洗、聚合、对比、趋势与异常分析，确保结果可解释与复现，必要时输出方法与局限说明（中文）。',
             sqlGeneration: '从自然语言与schema生成只读SQL，遵循只读限制（SELECT/SHOW/DESCRIBE/EXPLAIN），避免危险语句与全表扫描。',
             codeReview: '对将要执行的代码进行安全与必要性检查，避免长时/不必要操作，给出简洁优化建议（中文）。',
-            progressPlanner: '将当前执行阶段总结为不超过10字的中文短语，面向非技术用户，如“连接数据库”“查询数据”“生成图表”。'
+            progressPlanner: '将当前执行阶段总结为不超过10字的中文短语，面向非技术用户，如"连接数据库""查询数据""生成图表"。'
         };
     }
     
@@ -2212,6 +2231,161 @@ class SettingsManager {
                 ];
                 map.forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
             }
+        }
+    }
+
+    setupDbGuardControls() {
+        const autoToggle = document.getElementById('db-guard-toggle');
+        const warnToggle = document.getElementById('db-guard-warn-toggle');
+
+        if (!autoToggle) {
+            return;
+        }
+
+        const section = this.getCurrentFeatures().db_guard || {};
+        autoToggle.checked = section.auto_check !== false;
+        if (warnToggle) {
+            warnToggle.checked = section.warn_on_failure !== false;
+        }
+        const statusLabel = document.getElementById('db-guard-status');
+        const updateStatus = (enabled) => {
+            if (!statusLabel) return;
+            statusLabel.textContent = enabled
+                ? (window.i18nManager?.t('settings.toggleOn') || '已启用')
+                : (window.i18nManager?.t('settings.toggleOff') || '已关闭');
+            statusLabel.style.color = enabled ? '#4CAF50' : '#999';
+        };
+        updateStatus(autoToggle.checked);
+
+        autoToggle.addEventListener('change', async (e) => {
+            const current = this.getCurrentFeatures().db_guard || {};
+            const next = {
+                ...current,
+                auto_check: e.target.checked,
+                warn_on_failure: warnToggle ? warnToggle.checked : (current.warn_on_failure !== false)
+            };
+            const success = await this.updateFeatureSection('db_guard', next, {
+                success: e.target.checked
+                    ? (window.i18nManager?.t('settings.dbGuardEnabled') || '数据库守卫已启用')
+                    : (window.i18nManager?.t('settings.dbGuardDisabled') || '数据库守卫已禁用'),
+                error: window.i18nManager?.t('settings.featureUpdateFailed') || '更新失败，请重试'
+            });
+            if (!success) {
+                autoToggle.checked = !e.target.checked;
+            } else {
+                updateStatus(e.target.checked);
+            }
+        });
+
+        if (warnToggle) {
+            warnToggle.addEventListener('change', async (e) => {
+                const current = this.getCurrentFeatures().db_guard || {};
+                const next = {
+                    ...current,
+                    warn_on_failure: e.target.checked
+                };
+                const success = await this.updateFeatureSection('db_guard', next, {
+                    success: e.target.checked
+                        ? (window.i18nManager?.t('settings.dbGuardWarnOn') || '失败时将提醒并允许继续执行')
+                        : (window.i18nManager?.t('settings.dbGuardWarnOff') || '失败时不再自动弹窗提醒'),
+                    error: window.i18nManager?.t('settings.featureUpdateFailed') || '更新失败，请重试'
+                });
+                if (!success) {
+                    warnToggle.checked = !e.target.checked;
+                }
+            });
+        }
+    }
+
+    setupThoughtStreamControls() {
+        const toggle = document.getElementById('thought-stream-toggle');
+        const zhInput = document.getElementById('thought-template-zh');
+        const enInput = document.getElementById('thought-template-en');
+
+        if (!toggle && !zhInput && !enInput) {
+            return;
+        }
+
+        const section = this.getCurrentFeatures().thought_stream || {};
+        if (toggle) {
+            toggle.checked = section.enabled !== false;
+        }
+        if (zhInput) {
+            zhInput.value = section.template_zh || '步骤{index}：{summary}';
+            zhInput.dataset.lastValue = zhInput.value;
+        }
+        if (enInput) {
+            enInput.value = section.template_en || 'Step {index}: {summary}';
+            enInput.dataset.lastValue = enInput.value;
+        }
+        const thoughtStatus = document.getElementById('thought-stream-status');
+        const updateThoughtStatus = (enabled) => {
+            if (!thoughtStatus) return;
+            thoughtStatus.textContent = enabled
+                ? (window.i18nManager?.t('settings.toggleOn') || '已启用')
+                : (window.i18nManager?.t('settings.toggleOff') || '已关闭');
+            thoughtStatus.style.color = enabled ? '#4CAF50' : '#999';
+        };
+        updateThoughtStatus(toggle ? toggle.checked : true);
+
+        if (toggle) {
+            toggle.addEventListener('change', async (e) => {
+                const current = this.getCurrentFeatures().thought_stream || {};
+                const next = {
+                    ...current,
+                    enabled: e.target.checked
+                };
+                const success = await this.updateFeatureSection('thought_stream', next, {
+                    success: e.target.checked
+                        ? (window.i18nManager?.t('settings.thoughtStreamEnabled') || '步骤播报已启用')
+                        : (window.i18nManager?.t('settings.thoughtStreamDisabled') || '步骤播报已关闭'),
+                    error: window.i18nManager?.t('settings.featureUpdateFailed') || '更新失败，请重试'
+                });
+                if (!success) {
+                    toggle.checked = !e.target.checked;
+                } else {
+                    updateThoughtStatus(e.target.checked);
+                }
+            });
+        }
+
+        const handleTemplateChange = async (input, langFlag) => {
+            if (!input) return;
+            const trimmed = input.value && input.value.trim().length ? input.value.trim() : (langFlag === 'zh' ? '步骤{index}：{summary}' : 'Step {index}: {summary}');
+            const current = this.getCurrentFeatures().thought_stream || {};
+            const next = {
+                ...current,
+                [langFlag === 'zh' ? 'template_zh' : 'template_en']: trimmed
+            };
+            const success = await this.updateFeatureSection('thought_stream', next, {
+                success: window.i18nManager?.t('settings.thoughtTemplateSaved') || '模板已保存',
+                error: window.i18nManager?.t('settings.featureUpdateFailed') || '更新失败，请重试'
+            });
+            if (!success) {
+                input.value = input.dataset.lastValue || trimmed;
+            } else {
+                input.dataset.lastValue = trimmed;
+            }
+        };
+
+        if (zhInput) {
+            zhInput.addEventListener('blur', () => handleTemplateChange(zhInput, 'zh'));
+            zhInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleTemplateChange(zhInput, 'zh');
+                }
+            });
+        }
+
+        if (enInput) {
+            enInput.addEventListener('blur', () => handleTemplateChange(enInput, 'en'));
+            enInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleTemplateChange(enInput, 'en');
+                }
+            });
         }
     }
 }

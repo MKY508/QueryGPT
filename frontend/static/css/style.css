@@ -4900,3 +4900,127 @@ input:checked + .slider:before {
 .fa-circle-notch.fa-spin {
     animation: spin 2s linear infinite;
 }
+
+.db-warning-message {
+    background: #fff5f5;
+    border: 1px solid #feb2b2;
+    color: #c53030;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+/* Routing summary cards */
+.routing-summary {
+    background: #f5f8ff;
+    border: 1px solid #dbe4ff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.routing-summary.compact {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+}
+
+.routing-summary-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.routing-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.02em;
+}
+
+.routing-chip.route-qa {
+    background: #8e44ad;
+}
+
+.routing-chip.route-sql_only {
+    background: #1a73e8;
+}
+
+.routing-chip.route-analysis {
+    background: #2e7d32;
+}
+
+.routing-chip.route-aborted {
+    background: #e53935;
+}
+
+.routing-confidence {
+    font-size: 12px;
+    color: #4a5568;
+    background: rgba(74, 85, 104, 0.08);
+    border-radius: 999px;
+    padding: 3px 10px;
+}
+
+.routing-section {
+    margin-top: 10px;
+}
+
+.routing-section-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #4c566a;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.routing-reason {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #2f3542;
+}
+
+.routing-plan {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.routing-plan li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: #2f3542;
+    margin-bottom: 4px;
+}
+
+.routing-plan li .plan-index {
+    font-weight: 600;
+    color: #1a73e8;
+    min-width: 18px;
+}
+
+.routing-plan li:last-child {
+    margin-bottom: 0;
+}
+
+.routing-sql {
+    background: #ffffff;
+    border: 1px dashed #c6d0f5;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.6;
+    max-height: 180px;
+    overflow-x: auto;
+    color: #2f3542;
+}

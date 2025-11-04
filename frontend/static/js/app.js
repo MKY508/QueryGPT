@@ -1001,6 +1001,9 @@ class DataAnalysisPlatform {
      */
     createUserSummary(data) {
         const summaryDiv = document.createElement('div');
+        const routingInfo = data?.routing_info || {};
+        const classification = data?.classification || {};
+        const routingHtml = this.renderRoutingSummary(routingInfo, classification, { showSql: false });
         
         // 分析用户视图数据
         
@@ -1320,7 +1323,7 @@ class DataAnalysisPlatform {
             </div>
         `;
         
-        summaryDiv.innerHTML = summaryHtml;
+        summaryDiv.innerHTML = routingHtml + summaryHtml;
         
         // 不再自动打开图表，避免干扰用户
         
@@ -1334,6 +1337,12 @@ class DataAnalysisPlatform {
         const detailsDiv = document.createElement('div');
         
         let detailsHtml = '<div class="developer-details">';
+        const routingInfo = data?.routing_info || {};
+        const classification = data?.classification || {};
+        const routingHtml = this.renderRoutingSummary(routingInfo, classification, { showSql: true, compact: true });
+        if (routingHtml) {
+            detailsHtml += routingHtml;
+        }
         
         // 查找最终总结（与用户视图共享逻辑）
         let finalSummary = null;
@@ -2992,6 +3001,91 @@ class DataAnalysisPlatform {
      */
     refreshTip() {
         // 极简版本不需要刷新功能
+    }
+
+    renderRoutingSummary(routingInfo = {}, classification = {}, options = {}) {
+        const routeType = (routingInfo.route_type || '').toLowerCase();
+        if (!routeType) {
+            return '';
+        }
+
+        const lang = (localStorage.getItem('language') || 'zh').toLowerCase();
+        const isEnglish = lang.startsWith('en');
+
+        const labelMap = isEnglish ? {
+            qa: 'QA · Polite Decline',
+            sql_only: 'Quick SQL Check',
+            analysis: 'Deep Analysis',
+            aborted: 'Aborted'
+        } : {
+            qa: '礼貌答复（QA）',
+            sql_only: '快速SQL核查',
+            analysis: '深度分析',
+            aborted: '已终止'
+        };
+
+        const label = labelMap[routeType] || (isEnglish ? routeType.toUpperCase() : routeType.toUpperCase());
+        const reason = routingInfo.reason || classification.reason || '';
+        const planSource = Array.isArray(routingInfo.plan) && routingInfo.plan.length
+            ? routingInfo.plan
+            : (Array.isArray(classification.suggested_plan) ? classification.suggested_plan : []);
+        const suggestedSql = options.showSql ? (routingInfo.suggested_sql || classification.suggested_sql || '') : '';
+        const confidenceValue = typeof routingInfo.confidence === 'number' ? Math.round(routingInfo.confidence * 100) : null;
+
+        const reasonLabel = isEnglish ? 'Reason' : '判定依据';
+        const planLabel = isEnglish ? 'Suggested Steps' : '推荐步骤';
+        const sqlLabel = isEnglish ? 'Suggested SQL' : '建议SQL';
+        const confidenceLabel = isEnglish ? 'Confidence' : '置信度';
+
+        const classes = ['routing-summary'];
+        if (options.compact) {
+            classes.push('compact');
+        }
+
+        const sections = [];
+        if (reason) {
+            sections.push(`
+                <div class="routing-section">
+                    <div class="routing-section-label">${reasonLabel}</div>
+                    <div class="routing-reason">${this.escapeHtml(reason)}</div>
+                </div>
+            `);
+        }
+
+        if (planSource && planSource.length) {
+            const items = planSource.map((step, idx) => `
+                <li><span class="plan-index">${idx + 1}.</span><span>${this.escapeHtml(String(step))}</span></li>
+            `).join('');
+            sections.push(`
+                <div class="routing-section">
+                    <div class="routing-section-label">${planLabel}</div>
+                    <ul class="routing-plan">${items}</ul>
+                </div>
+            `);
+        }
+
+        if (suggestedSql) {
+            sections.push(`
+                <div class="routing-section">
+                    <div class="routing-section-label">${sqlLabel}</div>
+                    <pre class="routing-sql"><code>${this.escapeHtml(String(suggestedSql))}</code></pre>
+                </div>
+            `);
+        }
+
+        const confidenceHtml = confidenceValue !== null
+            ? `<span class="routing-confidence">${confidenceLabel}: ${confidenceValue}%</span>`
+            : '';
+
+        return `
+            <div class="${classes.join(' ')}">
+                <div class="routing-summary-header">
+                    <span class="routing-chip route-${routeType}">${label}</span>
+                    ${confidenceHtml}
+                </div>
+                ${sections.join('')}
+            </div>
+        `;
     }
 }
 

@@ -76,6 +76,8 @@
   - `ANALYSIS`: Full agent workflow with Python, visualization, and deep insights
 - **Safety Fallback**: Clear warnings when the database is unavailable or routing fails, with user-controlled continuation
 - **Flexible Configuration**: Each mode has independent prompts editable via the UI for business-specific tuning
+- **Database Guard**: Lightweight connectivity check before execution, surfaces friendly warnings and lets the user decide whether to continue
+- **Step Narration**: Configurable `Step {index}: {summary}` instructions keep every action transparent across QA/SQL/Analysis modes
 
 ### Agent Core Capabilities
 - **Autonomous Data Exploration**: Agent proactively understands data structure and explores relationships
