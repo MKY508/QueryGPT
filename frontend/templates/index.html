@@ -206,6 +206,24 @@
                 </div>
                 
                 <div class="settings-container">
+                    <div class="settings-tabs">
+                        <button type="button" class="settings-tab active" data-settings-tab="basic">
+                            <i class="fas fa-cog"></i>
+                            <span data-i18n="nav.basicSettings">基础设置</span>
+                        </button>
+                        <button type="button" class="settings-tab" data-settings-tab="models">
+                            <i class="fas fa-brain"></i>
+                            <span data-i18n="nav.modelManagement">模型管理</span>
+                        </button>
+                        <button type="button" class="settings-tab" data-settings-tab="database">
+                            <i class="fas fa-database"></i>
+                            <span data-i18n="nav.databaseConfig">数据库配置</span>
+                        </button>
+                        <button type="button" class="settings-tab" data-settings-tab="prompts">
+                            <i class="fas fa-edit"></i>
+                            <span data-i18n="nav.promptSettings">Prompt设置</span>
+                        </button>
+                    </div>
                     
                     <!-- 基础设置标签页 -->
                     <div class="settings-panel active" id="basic-settings">
@@ -247,8 +265,9 @@
                                 <small data-i18n="settings.contextDesc">设置AI记住之前几轮对话的内容，用于错误修正和上下文理解</small>
                             </div>
                             
-                            <!-- 智能路由开关 -->
-                            <div class="form-group">
+                            <div class="settings-toggle-grid">
+                                <div class="form-group toggle-card">
+                                    <div class="toggle-header">
                                 <label>
                                     <span data-i18n="settings.smartRouting">智能路由</span>
                                     <span class="beta-badge">BETA</span>
@@ -259,36 +278,40 @@
                                         <span class="slider round"></span>
                                     </label>
                                     <span class="switch-status" id="routing-status-text" data-i18n="settings.smartRoutingEnabled">已启用</span>
+                                        </div>
                                 </div>
                                 <small data-i18n="settings.smartRoutingDesc">使用AI智能判断查询类型，自动选择最优执行路径，可显著提升简单查询的响应速度</small>
-                            </div>
-                            <div class="form-group">
-                                <label data-i18n="settings.dbGuard">数据库守卫</label>
-                                <div class="switch-container">
-                                    <label class="switch">
-                                        <input type="checkbox" id="db-guard-toggle" checked>
-                                        <span class="slider round"></span>
-                                    </label>
-                                    <span class="switch-status" id="db-guard-status" data-i18n="settings.toggleOn">已启用</span>
                                 </div>
-                                <div>
+                                <div class="form-group toggle-card">
+                                    <div class="toggle-header">
+                                        <label data-i18n="settings.dbGuard">数据库守卫</label>
+                                        <div class="switch-container">
+                                            <label class="switch">
+                                                <input type="checkbox" id="db-guard-toggle" checked>
+                                                <span class="slider round"></span>
+                                            </label>
+                                            <span class="switch-status" id="db-guard-status" data-i18n="settings.toggleOn">已启用</span>
+                                        </div>
+                                    </div>
                                     <label class="checkbox-label">
                                         <input type="checkbox" id="db-guard-warn-toggle" checked>
                                         <span data-i18n="settings.dbGuardWarn">失败时提醒并允许继续执行</span>
                                     </label>
+                                    <small data-i18n="settings.dbGuardDesc">运行前自动测试数据库连接，失败时提醒用户并可选择继续执行。</small>
                                 </div>
-                                <small data-i18n="settings.dbGuardDesc">运行前自动测试数据库连接，失败时提醒用户并可选择继续执行。</small>
-                            </div>
-                            <div class="form-group">
-                                <label data-i18n="settings.thoughtStream">步骤播报</label>
-                                <div class="switch-container">
-                                    <label class="switch">
-                                        <input type="checkbox" id="thought-stream-toggle" checked>
-                                        <span class="slider round"></span>
-                                    </label>
-                                    <span class="switch-status" id="thought-stream-status" data-i18n="settings.toggleOn">已启用</span>
+                                <div class="form-group toggle-card">
+                                    <div class="toggle-header">
+                                        <label data-i18n="settings.thoughtStream">步骤播报</label>
+                                        <div class="switch-container">
+                                            <label class="switch">
+                                                <input type="checkbox" id="thought-stream-toggle" checked>
+                                                <span class="slider round"></span>
+                                            </label>
+                                            <span class="switch-status" id="thought-stream-status" data-i18n="settings.toggleOn">已启用</span>
+                                        </div>
+                                    </div>
+                                    <small data-i18n="settings.thoughtStreamDesc">在执行每个主要动作前输出简短说明，实时展示智能助手的思考过程。</small>
                                 </div>
-                                <small data-i18n="settings.thoughtStreamDesc">在执行每个主要动作前输出简短说明，实时展示智能助手的思考过程。</small>
                             </div>
                             <div class="form-group">
                                 <label data-i18n="settings.thoughtTemplateZh">步骤模板（中文）</label>
@@ -428,28 +451,22 @@
 
 1. QA
    - 适用：闲聊、与数据库无关的问题
-   - 输出：礼貌拒绝并引导用户提供数据库需求
+   - 输出：礼貌拒绝或引导用户提供数据库需求
    - 不执行 SQL 或代码
 
-2. SQL_ONLY
-   - 适用：明确的取数需求、基础聚合、筛选或排序
-   - 要求：生成 SQL、执行前后给出步骤说明；允许必要的库表探索
-   - 不绘图、不安装额外库
-
-3. ANALYSIS
-   - 适用：复杂分析、可视化、趋势研判或需要多步脚本的任务
-   - 允许：执行 Python、生成图表，安装库需先征得用户同意
+2. ANALYSIS
+   - 适用：与数据库相关的取数或数据分析任务（无论简单查询还是多步分析）
+   - 允许：执行 Python、生成图表，必要时经用户确认安装库
 
 如判断输入与数据库无关，应选择 QA。
-如请求不完整但可能涉及数据查询，可倾向 SQL_ONLY，并在 reason 中说明缺失信息。
+如用户请求涉及数据库或需要分析（包含简单取数），请选择 ANALYSIS 并在 reason 中说明判断依据。
 
 输出 JSON（仅此内容）：
 {
-  "route": "QA | SQL_ONLY | ANALYSIS",
+  "route": "QA | ANALYSIS",
   "confidence": 0.0-1.0,
   "reason": "简要说明判断依据",
-  "suggested_plan": ["步骤1", "步骤2"],
-  "suggested_sql": "如为 SQL_ONLY，可提供建议 SQL"
+  "suggested_plan": ["步骤1", "步骤2"]
 }
 
 若无法判定，请将 route 设置为 "ANALYSIS" 并说明原因。</textarea>
@@ -462,20 +479,34 @@
                                             <textarea id="prompt-qa" rows="4" placeholder="设置QA路线的提示词..." class="routing-prompt">你是一个数据库助手。当用户提问与数据库或分析无关时，请礼貌拒绝并引导用户提供需要查询的表、指标或时间范围。</textarea>
                                         </div>
                                         <div class="form-group">
-                                            <label>SQL_ONLY Prompt（快速取数）</label>
-                                            <textarea id="prompt-sql-only" rows="6" placeholder="设置SQL_ONLY路线的提示词..." class="routing-prompt">你是一个SQL快速核查助手：
-1. 仅执行只读SQL，禁止生成图表或保存文件
-2. 每个操作前输出“步骤说明”，确认所用库表与字段
-3. 执行后报告记录数与耗时，对空结果或异常值给出提示
-4. 如信息不足，请先向用户澄清</textarea>
-                                        </div>
-                                        <div class="form-group">
                                             <label>ANALYSIS Prompt（深度分析）</label>
-                                            <textarea id="prompt-analysis" rows="8" placeholder="设置ANALYSIS路线的提示词..." class="routing-prompt">你是一个数据分析助手：
-1. 在每个动作前输出“步骤说明”
-2. 使用pandas处理数据，必要时用plotly绘图并保存到output目录
-3. 保证操作安全：数据库只读；安装依赖需获得用户许可
-4. 分析结束后总结发现、局限与建议</textarea>
+                                            <textarea id="prompt-analysis" rows="12" placeholder="设置ANALYSIS路线的提示词..." class="routing-prompt">你是 QueryGPT 的数据分析助手，负责从只读数据库中探索、取数并生成业务洞察。请遵循以下流程：
+
+【阶段 1：建立连接】
+- 使用提供的 pymysql 参数建立连接（失败时说明 host:port 与报错并结束）。
+- 连接成功后执行 SELECT VERSION() 获取数据库方言。
+
+【阶段 2：数据库探索策略（未指定 database 时）】
+1. cursor.execute("SHOW DATABASES")
+2. 根据业务关键词与优先级筛选库：销售相关优先匹配 sales/trade/order/trd；仓库优先级 center_dws > dws > dwh > dw > ods > ads
+3. cursor.execute(f"USE `{target_db}`")
+4. cursor.execute("SHOW TABLES")
+5. 对候选表执行 DESCRIBE 与 SELECT * LIMIT 10 验证结构与样本
+
+【阶段 3：表选择与字段策略】
+- 优先选择包含 trd/trade/order/sale + detail/day 的表；避免 production/forecast/plan/budget
+- 字段识别：月份 v_month > month > year_month > year_of_month；销量 sale_num > sale_qty > quantity > qty；金额 pay_amount > order_amount > total_amount
+
+【阶段 4：数据处理与分析】
+- Decimal 转 float，统一日期格式，必要时在 SQL 中过滤异常值
+- 编写只读 SQL，使用 pandas 处理；需要可视化时用 plotly 保存到 output/ 目录
+- 操作前可用 print(f"[步骤 {{index}}] {{summary}}") 说明动作，真实发现请用普通文本描述
+- 严禁访问本地 CSV/Excel/SQLite 文件，除非用户明确授权
+
+【阶段 5：输出要求】
+- 说明完成的操作、关键发现、局限与下一步建议
+- 若遇阻断（连接失败、无匹配数据等），说明具体原因并提供排查建议
+- 仅在多次探索仍缺少信息时，礼貌向用户询问补充细节。</textarea>
                                         </div>
                                     </div>
                                 </div>

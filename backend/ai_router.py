@@ -12,10 +12,9 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 class RouteType(Enum):
-    """路由类型（可扩展）"""
-    QA = "qa"                    # 礼貌拒绝/问答
-    SQL_ONLY = "sql_only"        # 快速SQL核查
-    ANALYSIS = "analysis"        # 深度分析
+    """路由类型（简化）"""
+    QA = "qa"                    # 闲聊/拒绝
+    ANALYSIS = "analysis"        # 数据分析
     ABORTED = "aborted"          # 兜底终止
 
 class AIRoutingClassifier:
@@ -40,25 +39,20 @@ class AIRoutingClassifier:
    - 输出：礼貌拒绝或引导用户描述数据库相关需求
    - 不执行 SQL/代码
 
-2. SQL_ONLY
-   - 适用：明确的取数需求（聚合、筛选、排序）
-   - 要求：生成 SQL，按步骤验证结果，可进行必要的库表探索
-   - 不绘图、不安装额外库
-
-3. ANALYSIS
-   - 适用：复杂分析、可视化、趋势研判、需要 Python 脚本的任务
+2. ANALYSIS
+   - 适用：与数据库相关的查询、取数和深度分析任务
    - 允许：执行 Python、生成图表，必要时经用户确认安装库
+   - 当问题仅涉及简单 SQL 时也选择此路线，由分析流程负责执行和总结
 
 如判断输入与数据库无关，应选择 QA。
-如请求不完整但可能需要数据，倾向 SQL_ONLY 并在 reason 中指出缺失信息。
+如请求涉及数据库或数据分析，即使问题简单也请选择 ANALYSIS，并在 reason 中说明原因。
 
 输出 JSON（仅此内容）：
 {
-  "route": "QA | SQL_ONLY | ANALYSIS",
+  "route": "QA | ANALYSIS",
   "confidence": 0.0-1.0,
   "reason": "简要说明判断依据",
-  "suggested_plan": ["步骤1", "步骤2"],
-  "suggested_sql": "如为 SQL_ONLY，可给出建议 SQL"
+  "suggested_plan": ["步骤1", "步骤2"]
 }
 
 若无法判定，请将 route 设置为 "ANALYSIS" 并说明原因。"""
@@ -79,7 +73,6 @@ class AIRoutingClassifier:
             "total_classifications": 0,
             "route_counts": {
                 RouteType.QA.value: 0,
-                RouteType.SQL_ONLY.value: 0,
                 RouteType.ANALYSIS.value: 0,
                 RouteType.ABORTED.value: 0
             },
@@ -222,9 +215,7 @@ class AIRoutingClassifier:
                 # 验证必需字段
                 if 'route' not in result:
                     # 尝试从响应文本中提取路由类型
-                    if 'SQL_ONLY' in response:
-                        result['route'] = 'SQL_ONLY'
-                    elif 'ANALYSIS' in response:
+                    if 'ANALYSIS' in response:
                         result['route'] = 'ANALYSIS'
                     elif 'QA' in response:
                         result['route'] = 'QA'
@@ -235,10 +226,6 @@ class AIRoutingClassifier:
                 route_map = {
                     'QA': RouteType.QA.value,
                     'qa': RouteType.QA.value,
-                    'SQL_ONLY': RouteType.SQL_ONLY.value,
-                    'sql_only': RouteType.SQL_ONLY.value,
-                    'DIRECT_SQL': RouteType.SQL_ONLY.value,
-                    'direct_sql': RouteType.SQL_ONLY.value,
                     'ANALYSIS': RouteType.ANALYSIS.value,
                     'analysis': RouteType.ANALYSIS.value,
                     'AI_ANALYSIS': RouteType.ANALYSIS.value,
@@ -293,15 +280,6 @@ class AIRoutingClassifier:
                 r'仅提供礼貌回复',
                 r'无法回答',
                 r'仅能提供引导'
-            ],
-            RouteType.SQL_ONLY.value: [
-                r'\bsql_only\b',
-                r'\bdirect_sql\b',
-                r'快速.*查询',
-                r'仅执行sql',
-                r'不.*图表',
-                r'一步步.*sql',
-                r'route.*sql'
             ],
             RouteType.ANALYSIS.value: [
                 r'\banalysis\b',
@@ -369,7 +347,7 @@ class AIRoutingClassifier:
             }
         if any(word in query_lower for word in sql_keywords):
             return {
-                'route': RouteType.SQL_ONLY.value,
+                'route': RouteType.ANALYSIS.value, # 即使SQL也归类为分析
                 'confidence': 0.5,
                 'reason': '可能是取数请求（规则匹配）'
             }

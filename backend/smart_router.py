@@ -8,7 +8,6 @@ import time
 from typing import Dict, Any, Optional
 from backend.ai_router import AIRoutingClassifier, RouteType
 from backend.llm_service import llm_manager
-from backend.sql_executor import DirectSQLExecutor
 from backend.config_loader import ConfigLoader
 
 logger = logging.getLogger(__name__)
@@ -60,20 +59,17 @@ class SmartRouter:
             logger.error(f"❌ 初始化AI分类器失败: {e}")
             self.ai_classifier = AIRoutingClassifier(None, custom_prompt)
         
-        # 初始化SQL执行器
-        self.sql_executor = DirectSQLExecutor(database_manager) if database_manager else None
-        
         # 路由统计（简化版）
         self.routing_stats = {
             "total_queries": 0,
             "qa_queries": 0,
-            "sql_only_queries": 0,
             "analysis_queries": 0,
             "aborted_queries": 0,
             "ai_classification_time": 0,
             "total_time_saved": 0.0,
             "fallback_count": 0,
-            "rule_based_routes": 0
+            "rule_based_routes": 0,
+            "forced_queries": 0
         }
     
     def _load_feature_flags(self) -> Dict[str, Any]:
@@ -87,7 +83,7 @@ class SmartRouter:
         except Exception as exc:
             logger.debug("加载功能配置失败，使用默认值: %s", exc)
             return {}
-
+    
     def _test_llm_service(self, llm_service) -> bool:
         """测试LLM服务是否可用"""
         try:
@@ -143,9 +139,9 @@ class SmartRouter:
             }
         if has_simple and not has_visualization and not has_analysis:
             return {
-                'route': RouteType.SQL_ONLY.value,
+                'route': RouteType.ANALYSIS.value,
                 'confidence': 0.6,
-                'reason': '简单数据查询',
+                'reason': '检测到取数需求，交由分析流程处理',
                 'method': 'rule_based'
             }
         # 默认：如果问题以问号结束或明显对话，走QA，否则走分析
@@ -219,10 +215,14 @@ class SmartRouter:
                 method = classification.get('method', 'rule_based')
                 self.routing_stats["rule_based_routes"] += 1
             
+            # 兼容历史配置：将 sql_only 统一归入 ANALYSIS
+            if isinstance(route_type, str) and route_type.lower() == 'sql_only':
+                route_type = RouteType.ANALYSIS.value
+                classification['route'] = route_type
+            
             # 验证路由类型
             valid_routes = {
                 RouteType.QA.value,
-                RouteType.SQL_ONLY.value,
                 RouteType.ANALYSIS.value,
                 RouteType.ABORTED.value
             }
@@ -238,15 +238,12 @@ class SmartRouter:
                 'reason': classification.get('reason'),
                 'classification_time': classification.get('classification_time', 0),
                 'plan': classification.get('suggested_plan') or [],
-                'suggested_sql': classification.get('suggested_sql', ''),
                 'method': classification.get('method', 'ai')
             }
 
             # 将计划、步长等写入上下文，供解释器执行时参考
             if routing_info['plan']:
                 context['suggested_plan'] = routing_info['plan']
-            if routing_info['suggested_sql'] and route_type == RouteType.SQL_ONLY.value:
-                context.setdefault('suggested_sql', routing_info['suggested_sql'])
 
             thought_cfg = feature_flags.get('thought_stream') if isinstance(feature_flags.get('thought_stream'), dict) else {}
             template_key = 'template_en' if language == 'en' else 'template_zh'
@@ -257,17 +254,25 @@ class SmartRouter:
             context['route_type'] = route_type.upper() if isinstance(route_type, str) else route_type
 
             # 路由执行前进行数据库健康检查（仅限需要数据库的路线）
-            requires_db = route_type in {RouteType.SQL_ONLY.value, RouteType.ANALYSIS.value}
+            requires_db = route_type == RouteType.ANALYSIS.value
             use_database = context.get('use_database', True) if isinstance(context, dict) else True
             guard_cfg = feature_flags.get('db_guard', {}) if isinstance(feature_flags.get('db_guard', {}), dict) else {}
             auto_check_db = guard_cfg.get('auto_check', True)
             warn_on_failure = guard_cfg.get('warn_on_failure', True)
 
+            connection_snapshot = self._sanitize_connection_info(context.get('connection_info')) if isinstance(context, dict) else {}
+            if not connection_snapshot:
+                try:
+                    connection_snapshot = self._sanitize_connection_info(ConfigLoader.get_database_config())
+                except Exception:  # pylint: disable=broad-except
+                    connection_snapshot = {}
+
             if requires_db and use_database and auto_check_db:
-                db_check = self._ensure_database_ready(route_type, context or {})
+                db_check = self._ensure_database_ready(route_type, context or {}, connection_snapshot)
                 if not db_check.get('ok'):
                     self.routing_stats["aborted_queries"] += 1
                     logger.error("数据库健康检查未通过，终止执行: %s", db_check.get('message'))
+                    connection_payload = db_check.get('target') or connection_snapshot
                     response_payload = {
                         "success": False,
                         "status": "db_unavailable",
@@ -279,7 +284,13 @@ class SmartRouter:
                         "forceable": True,
                         "original_query": query,
                         "guard_config": guard_cfg,
-                        "classification": classification
+                        "classification": classification,
+                        "connection": connection_payload,
+                        "ui": {
+                            "auto_dismiss_ms": guard_cfg.get('auto_dismiss_ms', 8000),
+                            "emphasis": guard_cfg.get('emphasis', 'low'),
+                            "hint_timeout": guard_cfg.get('hint_timeout', 8)
+                        }
                     }
                     if context:
                         response_payload['conversation_id'] = context.get('conversation_id')
@@ -307,10 +318,7 @@ class SmartRouter:
             if route_type == RouteType.QA.value:
                 result = self._execute_qa_response(query, classification, context)
                 self.routing_stats["qa_queries"] += 1
-            elif route_type == RouteType.SQL_ONLY.value:
-                result = self._execute_sql_only(query, classification, context)
-                self.routing_stats["sql_only_queries"] += 1
-            else:  # ANALYSIS
+            else:  # 统一走 ANALYSIS 流程
                 result = self._execute_ai_analysis(query, context, classification)
                 self.routing_stats["analysis_queries"] += 1
             
@@ -320,9 +328,6 @@ class SmartRouter:
             
             # 计算时间节省（假设完整AI分析需要5秒）
             total_time = time.time() - start_time
-            if route_type == RouteType.SQL_ONLY.value:
-                time_saved = max(0, 5.0 - total_time)
-                self.routing_stats["total_time_saved"] += time_saved
             
             return result
             
@@ -355,50 +360,94 @@ class SmartRouter:
         
         return routing_context
     
-    def _ensure_database_ready(self, route_type: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    @staticmethod
+    def _sanitize_connection_info(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        if not isinstance(raw, dict):
+            return {}
+        allowed_keys = ('host', 'port', 'user', 'database')
+        sanitized = {key: raw.get(key) for key in allowed_keys if raw.get(key) not in (None, '')}
+        return sanitized
+
+    def _ensure_database_ready(
+        self,
+        route_type: str,
+        context: Optional[Dict[str, Any]],
+        connection_snapshot: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """在执行需要数据库的路线前进行健康检查"""
-        force_execute = bool(context.get('force_execute')) if context else False
+        ctx = context if isinstance(context, dict) else {}
+        force_execute = bool(ctx.get('force_execute'))
+
+        target_info = self._sanitize_connection_info(connection_snapshot)
+        ctx_conn = self._sanitize_connection_info(ctx.get('connection_info'))
+        manager_conn = {}
+        if self.database_manager and hasattr(self.database_manager, 'config'):
+            manager_cfg = getattr(self.database_manager, 'config')
+            if isinstance(manager_cfg, dict):
+                manager_conn = self._sanitize_connection_info(manager_cfg)
+
+        for key in ('host', 'port', 'user', 'database'):
+            if key not in target_info or target_info.get(key) in (None, ''):
+                candidate = ctx_conn.get(key)
+                if candidate in (None, ''):
+                    candidate = manager_conn.get(key)
+                if candidate not in (None, ''):
+                    target_info[key] = candidate
+
+        target_info = {k: v for k, v in target_info.items() if v not in (None, '')}
+
+        base_payload = {
+            'checked_at': time.time(),
+            'target': target_info
+        }
+
         if force_execute:
             logger.warning("用户选择忽略数据库连通性检查，继续执行 %s 路线", route_type)
-            return {"ok": True, "message": "force_execute"}
+            self.routing_stats["forced_queries"] += 1
+            return {"ok": True, "message": "force_execute", **base_payload}
 
         if not self.database_manager:
             return {
                 "ok": False,
                 "message": "未检测到数据库管理器配置，请先完成数据库设置",
-                "reason": "manager_missing"
+                "reason": "manager_missing",
+                **base_payload
             }
 
         if not getattr(self.database_manager, 'is_configured', False):
             return {
                 "ok": False,
                 "message": "数据库参数未配置，无法执行数据查询",
-                "reason": "not_configured"
+                "reason": "not_configured",
+                **base_payload
             }
 
         if getattr(self.database_manager.__class__, 'GLOBAL_DISABLED', False):
             return {
                 "ok": False,
                 "message": "数据库此前连接失败已被禁用，请检查配置后重试",
-                "reason": "global_disabled"
+                "reason": "global_disabled",
+                **base_payload
             }
 
         try:
             check = self.database_manager.test_connection()
             if check.get('connected'):
-                return {"ok": True, "message": "connected", "details": check}
+                return {"ok": True, "message": "connected", "details": check, **base_payload}
             return {
                 "ok": False,
                 "message": check.get('error') or "无法连接数据库",
                 "reason": "connection_failed",
-                "details": check
+                "details": check,
+                **base_payload
             }
         except Exception as exc:  # pylint: disable=broad-except
             logger.error("数据库健康检查异常: %s", exc)
             return {
                 "ok": False,
                 "message": str(exc),
-                "reason": "exception"
+                "reason": "exception",
+                **base_payload
             }
 
     def _execute_qa_response(self, query: str, classification: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
@@ -432,60 +481,6 @@ class SmartRouter:
             "query_type": "qa",
             "model": "ai_router",
             "classification": classification
-        }
-
-    def _execute_sql_only(self, query: str, classification: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        执行SQL_ONLY路径 - 以取数与校验为主
-        """
-        logger.info("执行SQL_ONLY路径 - 限制OpenInterpreter只执行SQL相关操作")
-        
-        # 为context添加路由类型标记，让interpreter_manager知道这是简单查询
-        if context is None:
-            context = {}
-        
-        context['route_type'] = 'SQL_ONLY'
-        context['restrict_visualization'] = True  # 禁止生成图表
-        context['suggested_sql'] = classification.get('suggested_sql', '')
-        
-        # 优先走确定性的 DirectSQLExecutor，避免LLM生成非只读SQL
-        if self.sql_executor:
-            try:
-                suggested_sql = classification.get('suggested_sql') or ''
-                sql = suggested_sql.strip()
-                if not sql:
-                    # 简单的自然语言转SQL（规则模板）
-                    try:
-                        from backend.sql_executor import NaturalLanguageToSQL
-                        converter = NaturalLanguageToSQL()
-                        sql = converter.convert(query) or ''
-                    except Exception:
-                        sql = ''
-                if sql:
-                    exec_res = self.sql_executor.execute(sql)
-                    if exec_res.get('success'):
-                        formatted = self._format_sql_result(exec_res, sql)
-                        return formatted
-            except Exception as _e:
-                logger.warning(f"DirectSQLExecutor 执行失败，回退到解释器: {_e}")
-
-        # 回退：调用 interpreter_manager 执行（限制性 prompt）
-        if self.interpreter_manager:
-            result = self.interpreter_manager.execute_query(
-                query=query,
-                context=context,
-                model_name=context.get('model_name'),
-                conversation_id=context.get('conversation_id'),
-                language=context.get('language', 'zh')
-            )
-            result["query_type"] = "sql_only"
-            return result
-        else:
-            logger.error("interpreter_manager未初始化")
-            return {
-                "success": False,
-                "error": "系统未正确初始化",
-                "query_type": "sql_only"
             }
     
     def _execute_ai_analysis(self, query: str, context: Dict[str, Any], classification: Dict[str, Any]) -> Dict[str, Any]:
@@ -526,56 +521,6 @@ class SmartRouter:
                 "success": False,
                 "error": "InterpreterManager未初始化",
                 "query_type": "ai_analysis"
-            }
-    
-    def _format_sql_result(self, exec_result: Dict[str, Any], query: str) -> Dict[str, Any]:
-        """
-        格式化SQL执行结果
-        """
-        if not exec_result.get('success'):
-            return {
-                "success": False,
-                "error": exec_result.get('error', '执行失败')
-            }
-        
-        data_info = exec_result.get('data', {})
-        
-        # 构建响应
-        response_content = []
-        
-        # 添加执行成功消息
-        response_content.append({
-            "type": "text",
-            "content": f"✅ 查询执行成功\n{data_info.get('description', '')}"
-        })
-        
-        # 如果有数据，添加数据展示
-        if data_info.get('type') == 'table' and data_info.get('data'):
-            import pandas as pd
-            df = pd.DataFrame(data_info['data'])
-            
-            # 限制显示行数
-            if len(df) > 20:
-                display_df = df.head(20)
-                response_content.append({
-                    "type": "text",
-                    "content": f"显示前20行（共{len(df)}行）：\n{display_df.to_string(index=False)}"
-                })
-            else:
-                response_content.append({
-                    "type": "text",
-                    "content": f"查询结果：\n{df.to_string(index=False)}"
-                })
-        
-        return {
-            "success": True,
-            "result": {
-                "content": response_content
-            },
-            "query_type": "sql_only",
-            "execution_time": exec_result.get('execution_time', 0),
-            "sql": exec_result.get('sql'),
-            "model": "ai_router"
         }
     
     def get_routing_stats(self) -> Dict[str, Any]:
@@ -593,7 +538,6 @@ class SmartRouter:
             total = stats["total_queries"]
             stats["route_distribution"] = {
                 "qa": (stats["qa_queries"] / total * 100),
-                "sql_only": (stats["sql_only_queries"] / total * 100),
                 "analysis": (stats["analysis_queries"] / total * 100),
                 "aborted": (stats["aborted_queries"] / total * 100)
             }

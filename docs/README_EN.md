@@ -71,9 +71,8 @@
 ### Intelligent Routing System 🆕
 - **AI Query Classification**: Uses LLM to determine query intent and automatically select the optimal path
 - **Three Execution Modes**:
-  - `QA`: Politely decline non-database questions and guide users to describe data needs
-  - `SQL_ONLY`: Read-only SQL execution with step-by-step logging and result validation
-  - `ANALYSIS`: Full agent workflow with Python, visualization, and deep insights
+  - `QA`: Polite reply for chit-chat or unsupported topics
+  - `ANALYSIS`: Unified data retrieval & analysis pipeline (Python, visualization, reporting)
 - **Safety Fallback**: Clear warnings when the database is unavailable or routing fails, with user-controlled continuation
 - **Flexible Configuration**: Each mode has independent prompts editable via the UI for business-specific tuning
 - **Database Guard**: Lightweight connectivity check before execution, surfaces friendly warnings and lets the user decide whether to continue
