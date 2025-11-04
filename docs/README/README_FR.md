@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="../../images/logo.png" width="400" alt="QueryGPT">
+  <img src="../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -15,7 +15,7 @@
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
   [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
   [![OpenInterpreter](https://img.shields.io/badge/OpenInterpreter-0.4.3-green.svg?style=for-the-badge)](https://github.com/OpenInterpreter/open-interpreter)
-  [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=for-the-badge&color=yellow)](https://github.com/MKY508/QueryGPT/stargazers)
+  [![Stars](https://img.shields.io/badge/Stars-MKY508/QueryGPT-yellow.svg?style=for-the-badge&color=yellow)](https://github.com/MKY508/QueryGPT/stargazers)
   
   <br/>
   
@@ -24,237 +24,247 @@
   
 </div>
 
-<br/>
+## ✨ Avantages Principaux
 
----
-
-## ✨ Description du projet
-
-QueryGPT est un système intelligent de requête et d'analyse de données qui révolutionne la façon dont vous interagissez avec vos bases de données. Utilisant la puissance de l'IA et d'OpenInterpreter, il transforme vos questions en langage naturel en analyses complexes, visualisations interactives et insights profonds.
-
-**Pensez comme un analyste de données** - Notre Agent IA ne se contente pas d'exécuter des requêtes SQL simples. Il explore de manière autonome vos données, valide les résultats, effectue des analyses statistiques avancées et génère automatiquement des visualisations pertinentes.
-
-## 🌟 Fonctionnalités principales
-
-### 🤖 Capacités de l'Agent IA
-- **Exploration autonome des données** : L'Agent examine proactivement les structures de tables et les échantillons de données
-- **Validation multi-tours** : Vérifie et revalide les résultats pour garantir leur exactitude
-- **Raisonnement transparent** : Affichage en temps réel du processus de réflexion de l'IA (Chain-of-Thought)
-- **Mémoire contextuelle** : Comprend l'historique des conversations pour une analyse continue
-
-### 📊 Analyse de données avancée
-- **SQL + Python** : Exécution de code Python complexe pour l'analyse statistique et le machine learning
-- **Visualisation intelligente** : Sélection automatique du meilleur type de graphique selon les données
-- **Analyse statistique** : Corrélations, prédictions de tendances, détection d'anomalies
-- **Export flexible** : Support des formats Excel, PDF, HTML et plus
-
-### 🌍 Support multilingue
-- **10 langues supportées** : Français, Anglais, Chinois, Espagnol, Portugais, Russe, Coréen, Allemand et plus
-- **Conversion langage naturel vers SQL** : Posez vos questions dans votre langue maternelle
-- **Compréhension des termes métiers** : Reconnaissance native des concepts commerciaux
-
-### 🔒 Sécurité et déploiement
-- **Sécurité des données** : Permissions en lecture seule, protection contre l'injection SQL
-- **Déploiement flexible** : Cloud ou local avec Ollama, vos données restent privées
-- **Multi-modèles** : Support de GPT-5, Claude, Gemini et modèles locaux Ollama
-
-## 🛠 Stack technique
-
-- **Backend** : Python 3.10+ avec Flask
-- **Moteur d'analyse** : OpenInterpreter 0.4.3
-- **Base de données** : MySQL ou compatible
-- **Frontend** : HTML5, CSS3, JavaScript moderne
-- **Visualisation** : Plotly, Chart.js
-- **IA/LLM** : OpenAI API, Claude, Gemini, Ollama
+**Pense comme un Analyste de Données**
+- **Exploration Autonome** : Examine proactivement les structures de tables et les données d'échantillon lors de problèmes
+- **Validation Multi-tours** : Vérifie à nouveau lorsque des anomalies sont trouvées pour garantir des résultats précis
+- **Analyse Complexe** : Pas seulement SQL, peut exécuter Python pour l'analyse statistique et l'apprentissage automatique
+- **Pensée Visible** : Affichage en temps réel du processus de raisonnement de l'Agent (Chain-of-Thought)
 
 ## 📸 Captures d'écran du Système
 
-<table>
-  <tr>
-    <td width="50%">
-      <strong>🤖 Processus de Pensée de l'Agent Intelligent</strong><br/>
-      <img src="../../images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
-      <p align="center">Visualisation transparente de la chaîne de pensée</p>
-    </td>
-    <td width="50%">
-      <strong>📊 Visualisation des Données</strong><br/>
-      <img src="../../images/data-visualization-en.png" width="100%" alt="Visualisation des Données"/>
-      <p align="center">Génération intelligente de graphiques avec sélection automatique</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <strong>👨‍💻 Vue Développeur</strong><br/>
-      <img src="../../images/developer-view-en.png" width="100%" alt="Vue Développeur"/>
-      <p align="center">Détails d'exécution complets, SQL et code transparents</p>
-    </td>
-    <td width="50%">
-      <strong>🌐 Support Multilingue</strong><br/>
-      <img src="../../images/main-interface.png" width="100%" alt="Interface Principale"/>
-      <p align="center">Support de 10 langues, accessible mondialement</p>
-    </td>
-  </tr>
-</table>
+<img src="../images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
 
-## 🚀 Démarrage rapide
+**Affichage en temps réel du processus de pensée de l'IA, analyse complexe de données à travers des conversations en français.**
 
-### Installation initiale
+---
+
+<img src="../images/data-visualization-en.png" width="100%" alt="Visualisation des Données"/>
+
+**Génération automatique de graphiques interactifs, insights de données en un coup d'œil.**
+
+---
+
+<img src="../images/developer-view-en.png" width="100%" alt="Vue Développeur"/>
+
+**Exécution de code entièrement transparente, supporte SQL et Python comme moteurs doubles.**
+
+## 🌟 Fonctionnalités
+
+### Capacités Principales de l'Agent
+- **Exploration Autonome des Données** : L'Agent comprend proactivement la structure des données et explore les relations
+- **Raisonnement Multi-tours** : Comme un analyste, enquête en profondeur lorsque des problèmes surviennent
+- **Chain-of-Thought** : Affichage en temps réel du processus de pensée de l'Agent, intervention possible à tout moment
+- **Mémoire Contextuelle** : Comprend l'historique des conversations, supporte l'analyse continue multi-tours
+
+### Capacités d'Analyse de Données
+- **SQL + Python** : Pas limité à SQL, peut exécuter un traitement complexe de données en Python
+- **Analyse Statistique** : Analyse automatique de corrélation, prédiction de tendances, détection d'anomalies
+- **Termes Métiers** : Compréhension native de concepts comme YoY, MoM, rétention, rachat
+- **Visualisation Intelligente** : Sélectionne automatiquement le meilleur type de graphique basé sur les caractéristiques des données
+
+### Caractéristiques du Système
+- **Support Multi-modèles** : Changez librement entre GPT-5, Claude, Gemini, modèles locaux Ollama
+- **Déploiement Flexible** : Supporte l'API cloud ou le déploiement local Ollama, les données ne quittent jamais les locaux
+- **Enregistrements d'Historique** : Sauvegarde le processus d'analyse, supporte le suivi et le partage
+- **Sécurité des Données** : Permissions en lecture seule, protection contre l'injection SQL, masquage des données sensibles
+- **Export Flexible** : Supporte les formats Excel, PDF, HTML et autres
+
+## 📦 Exigences Techniques
+
+- Python 3.10.x (requis, dépendance d'OpenInterpreter 0.4.3)
+- MySQL ou base de données compatible
+
+> Windows : Exécutez dans WSL (n'exécutez pas les scripts dans PowerShell/CMD).
+
+## 📊 Comparaison de Produits
+
+| Dimension de Comparaison | **QueryGPT** | Vanna AI | DB-GPT | TableGPT | Text2SQL.AI |
+|-------------------------|:------------:|:--------:|:------:|:--------:|:-----------:|
+| **Coût** | **✅ Gratuit** | ⭕ Version payante | ✅ Gratuit | ❌ Payant | ❌ Payant |
+| **Open Source** | **✅** | ✅ | ✅ | ❌ | ❌ |
+| **Déploiement Local** | **✅** | ✅ | ✅ | ❌ | ❌ |
+| **Exécute du Code Python** | **✅ Environnement complet** | ❌ | ❌ | ❌ | ❌ |
+| **Capacité de Visualisation** | **✅ Programmable** | ⭕ Graphiques prédéfinis | ✅ Graphiques riches | ✅ Graphiques riches | ⭕ Basique |
+| **Compréhension des Termes Métiers** | **✅ Native** | ⭕ Basique | ✅ Bon | ✅ Excellent | ⭕ Basique |
+| **Exploration Autonome de l'Agent** | **✅** | ❌ | ⭕ Basique | ⭕ Basique | ❌ |
+| **Affichage de Pensée en Temps Réel** | **✅** | ❌ | ❌ | ❌ | ❌ |
+| **Capacité d'Extension** | **✅ Extension illimitée** | ❌ | ❌ | ❌ | ❌ |
+
+### Nos Différences Principales
+- **Environnement Python Complet** : Pas de fonctionnalités prédéfinies, mais un véritable environnement d'exécution Python où vous pouvez écrire n'importe quel code
+- **Extensibilité Illimitée** : Besoin de nouvelles fonctionnalités ? Installez simplement de nouvelles bibliothèques, pas besoin d'attendre les mises à jour du produit
+- **Exploration Autonome de l'Agent** : Enquête proactivement lorsqu'il rencontre des problèmes, pas seulement une simple requête unique
+- **Processus de Pensée Transparent** : Voyez en temps réel ce que l'IA pense, peut intervenir et guider à tout moment
+- **Vraiment Gratuit et Open Source** : Licence MIT, aucune barrière de paiement
+
+## 🚀 Démarrage Rapide
+
+### Premier Utilisation
 
 ```bash
 # 1. Cloner le projet
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 2. Exécuter le script de configuration (configure automatiquement l'environnement)
+# 2. Exécuter le script d'installation (configure automatiquement l'environnement)
 ./setup.sh
 
 # 3. Démarrer le service
 ./start.sh
 ```
 
-### Utilisation ultérieure
+### Utilisation Ultérieure
 
 ```bash
-# Démarrage rapide direct
+# Démarrage rapide direct (environnement déjà installé)
 ./start.sh
 ```
 
 Le service s'exécute par défaut sur http://localhost:5000
 
-> **Note** : Si le port 5000 est occupé, le système sélectionnera automatiquement le prochain port disponible (5001-5010).
+> **Note** : Si le port 5000 est occupé (par exemple, AirPlay sur macOS), le système sélectionnera automatiquement le prochain port disponible (5001-5010) et affichera le port réel utilisé au démarrage.
 
-## 💻 Utilisation
+## ⚙️ Instructions de Configuration
 
-### Interface web
+### Configuration de Base
 
-1. **Accédez à l'interface** : Ouvrez votre navigateur sur http://localhost:5000
-2. **Posez vos questions** : Tapez vos requêtes en langage naturel
-3. **Visualisez les résultats** : L'Agent génère automatiquement des graphiques et tableaux
-4. **Explorez l'historique** : Retrouvez et partagez vos analyses précédentes
+1. **Copier le fichier de configuration d'environnement**
+   ```bash
+   cp .env.example .env
+   ```
 
-### Exemples de requêtes
+2. **Modifier le fichier .env pour configurer les éléments suivants**
+   - `OPENAI_API_KEY` : Votre clé API OpenAI
+   - `OPENAI_BASE_URL` : Point de terminaison de l'API (optionnel, utilise par défaut le point de terminaison officiel)
+   - Informations de connexion à la base de données
 
-- "Montre-moi les ventes du mois dernier"
-- "Quelle est la répartition des ventes par catégorie de produit ?"
-- "Identifie les 10 meilleurs clients par chiffre d'affaires"
-- "Génère un graphique de tendance des ventes sur 6 mois"
-- "Analyse la corrélation entre le prix et le volume des ventes"
+### Configuration de la Couche Sémantique (Optionnel)
 
-### API REST
+La couche sémantique améliore la compréhension des termes métiers, aidant le système à mieux comprendre votre langage métier. **Ceci est une configuration optionnelle, ne pas la configurer n'affecte pas les fonctionnalités de base.**
+
+1. **Copier le fichier d'exemple**
+   ```bash
+   cp backend/semantic_layer.json.example backend/semantic_layer.json
+   ```
+
+2. **Modifier la configuration selon vos besoins métiers**
+   
+   La configuration de la couche sémantique contient trois parties :
+   - **Mapping de Base de Données** : Définit la signification métier de la base de données
+   - **Tables Métiers Principales** : Mappe les tables et champs métiers importants
+   - **Index de Recherche Rapide** : Recherche rapide de termes courants
+
+3. **Exemple de Configuration**
+   ```json
+   {
+     "Tables Métiers Principales": {
+       "Gestion des Commandes": {
+         "Chemin de Table": "database.orders",
+         "Mots-clés": ["commande", "vente", "transaction"],
+         "Champs Requis": {
+           "order_id": "Numéro de Commande",
+           "amount": "Montant"
+         }
+       }
+     }
+   }
+   ```
+
+> **Note** : 
+> - Le fichier de couche sémantique contient des informations métiers sensibles et a été ajouté à `.gitignore`, ne sera pas soumis au contrôle de version
+> - Lorsque la couche sémantique n'est pas configurée, le système utilise la configuration par défaut et peut toujours effectuer des requêtes de données normalement
+> - Pour des instructions de configuration détaillées, voir [backend/SEMANTIC_LAYER_SETUP.md](backend/SEMANTIC_LAYER_SETUP.md)
+
+## 📁 Structure du Projet
+
+```
+QueryGPT/
+├── backend/              # Service backend
+│   ├── app.py           # Point d'entrée principal de l'application Flask
+│   ├── database.py      # Gestion de la connexion à la base de données
+│   ├── interpreter_manager.py  # Interpréteur de requêtes
+│   ├── history_manager.py      # Gestion de l'historique
+│   └── config_loader.py        # Chargeur de configuration
+├── frontend/            # Interface frontend
+│   ├── templates/       # Modèles HTML
+│   └── static/          # Ressources statiques
+│       ├── css/         # Fichiers de style
+│       └── js/          # JavaScript
+├── docs/                # Documentation du projet
+├── logs/                # Répertoire des logs
+├── output/              # Fichiers de sortie
+├── requirements.txt     # Dépendances Python
+└── .env.example         # Exemple de configuration
+```
+
+## 🔌 API
+
+### Interface de Requête
 
 ```http
 POST /api/chat
 Content-Type: application/json
 
 {
-  "message": "Votre requête en langage naturel",
-  "model": "default",
-  "stream": false
+  "message": "Consulter le total des ventes de ce mois",
+  "model": "default"
 }
 ```
 
-## ⚙️ Configuration requise
+### Historique
 
-### Système
-- **Python** : 3.10.x (Obligatoire pour OpenInterpreter 0.4.3)
-- **Mémoire** : 4 GB RAM minimum
-- **Stockage** : 2 GB d'espace libre
-- **OS** : Linux, macOS, Windows
+```http
+GET /api/history/conversations    # Obtenir la liste de l'historique
+GET /api/history/conversation/:id # Obtenir les détails
+DELETE /api/history/conversation/:id # Supprimer l'enregistrement
+```
 
-> Windows : exécuter dans WSL (ne pas lancer les scripts depuis PowerShell/CMD).
+### Vérification de Santé
 
-### Base de données
-- MySQL 5.7+ ou MariaDB
-- PostgreSQL 12+ (support partiel)
-- Autres bases SQL compatibles
+```http
+GET /api/health
+```
 
-### Configuration
+## 🔒 Informations de Sécurité
 
-1. **Variables d'environnement** (.env)
-   ```bash
-   OPENAI_API_KEY=votre_clé_api
-   OPENAI_BASE_URL=https://api.openai.com/v1
-   DB_HOST=localhost
-   DB_USER=utilisateur
-   DB_PASSWORD=motdepasse
-   DB_NAME=nom_base
-   ```
-
-2. **Configuration des modèles** (config/models.json)
-   ```json
-   {
-     "models": [
-       {
-         "name": "GPT-4",
-         "id": "gpt-4",
-         "api_base": "https://api.openai.com/v1"
-       }
-     ]
-   }
-   ```
-
-## 📊 Comparaison avec d'autres solutions
-
-| Fonctionnalité | **QueryGPT** | Vanna AI | DB-GPT | TableGPT | Text2SQL.AI |
-|----------------|:------------:|:--------:|:------:|:--------:|:-----------:|
-| **Gratuit et Open Source** | ✅ | Partial | ✅ | ❌ | ❌ |
-| **Support multilingue (10 langues)** | ✅ | ❌ | Partial | Partial | ❌ |
-| **Exécution Python complète** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Visualisation pilotée par IA** | ✅ | Basique | ✅ | ✅ | Basique |
-| **Exploration autonome** | ✅ | ❌ | Partial | Partial | ❌ |
-| **Processus de pensée visible** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Déploiement local** | ✅ | ✅ | ✅ | ❌ | ❌ |
-
-### Nos différenciateurs clés
-
-- **Environnement Python complet** : Pas de limitations, exécutez n'importe quel code d'analyse
-- **Transparence totale** : Voyez exactement ce que l'IA pense et fait
-- **Extensibilité illimitée** : Installez de nouvelles bibliothèques selon vos besoins
-- **Vraiment gratuit** : Licence MIT, aucun paywall caché
-
-## 🤝 Contribution
-
-Les contributions sont les bienvenues ! N'hésitez pas à :
-
-1. Forker le projet
-2. Créer votre branche de fonctionnalité (`git checkout -b feature/NouvelleFonctionnalite`)
-3. Committer vos changements (`git commit -m 'Ajout d'une fonctionnalité'`)
-4. Pousser vers la branche (`git push origin feature/NouvelleFonctionnalite`)
-5. Ouvrir une Pull Request
+- Supporte uniquement les requêtes en lecture seule (SELECT, SHOW, DESCRIBE)
+- Filtre automatiquement les déclarations SQL dangereuses
+- Les utilisateurs de la base de données doivent être configurés avec des permissions en lecture seule
 
 ## 📄 Licence
 
-Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de détails.
+MIT License - Voir le fichier [LICENSE](LICENSE) pour les détails
 
-## 🆕 Dernières mises à jour
+## 🆕 Dernières Mises à Jour
 
-- 2025-09-05 – Optimisation du démarrage : suppression du test automatique des modèles lors de la première visite pour réduire les requêtes initiales et éviter des changements d’état indésirables.
+- 2025-09-05 – Optimisation de la vitesse de démarrage : Suppression du test automatique par lots lors de la première entrée sur la page des modèles, réduisant les requêtes inutiles et évitant l'écriture incorrecte de l'état.
 
 ## 👨‍💻 Auteur
 
 - **Auteur** : Mao Kaiyue
 - **GitHub** : [@MKY508](https://github.com/MKY508)
-- **Créé** : Août 2025
+- **Date de Création** : Août 2025
 
-## 🌟 Support
-
-Si vous trouvez ce projet utile, n'hésitez pas à :
-- ⭐ Mettre une étoile sur GitHub
-- 🐛 Signaler des bugs ou suggérer des améliorations
-- 📖 Contribuer à la documentation
-- 💬 Partager avec votre communauté
-
-## 📚 Documentation supplémentaire
-
-- [Documentation API](docs/API.md)
-- [Guide de configuration](docs/CONFIGURATION.md)
-- [Guide de déploiement](docs/DEPLOYMENT.md)
-- [Configuration de la couche sémantique](backend/SEMANTIC_LAYER_SETUP.md)
-
----
+## ⭐ Star History
 
 <div align="center">
-  <b>QueryGPT - L'intelligence artificielle au service de vos données</b>
-  <br/>
-  <i>Transformez vos questions en insights</i>
+  <a href="https://star-history.com/#MKY508/QueryGPT&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+    </picture>
+  </a>
 </div>
+
+## 🤝 Contribution
+
+Bienvenue pour soumettre des Issues et Pull Requests.
+
+1. Forkez ce projet
+2. Créez une branche de fonctionnalité (`git checkout -b feature/AmazingFeature`)
+3. Committez vos modifications (`git commit -m 'Add some AmazingFeature'`)
+4. Poussez vers la branche (`git push origin feature/AmazingFeature`)
+5. Ouvrez une Pull Request

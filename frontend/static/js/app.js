@@ -18,6 +18,7 @@ class DataAnalysisPlatform {
         this.historyManager = null;  // 历史记录管理器
         this.tipsManager = null;  // Tips提示管理器
         this._devViewEnabledCache = null; // 缓存开发者视图开关
+        this.activeDbWarning = null; // 数据库警告卡片引用
         
         this.init();
     }
@@ -502,14 +503,16 @@ class DataAnalysisPlatform {
     /**
      * 发送消息
      */
-    async sendMessage() {
+    async sendMessage(messageOverride = null, options = {}) {
+        const { forceExecute = false, skipUserMessage = false } = options;
         if (this.isProcessing) {
             this.showNotification(window.i18nManager.t('common.processingRequest'), 'info');
             return;
         }
 
         const messageInput = document.getElementById('message-input');
-        const message = messageInput.value.trim();
+        const rawMessage = messageOverride !== null ? messageOverride : messageInput.value;
+        const message = rawMessage != null ? String(rawMessage).trim() : '';
         
         if (!message) {
             const i18n = window.i18nManager || { t: (key) => key };
@@ -536,16 +539,19 @@ class DataAnalysisPlatform {
             console.log('停止按钮已显示', stopBtn.style.display, stopBtn.style.visibility);
         }
 
-        // 添加用户消息到界面
-        this.addMessage('user', message);
-        messageInput.value = '';
+        // 仅在非重试场景下添加用户消息
+        if (!skipUserMessage) {
+            this.addMessage('user', message);
+            messageInput.value = '';
+        }
 
         // 显示思考过程
         const thinkingId = this.showThinkingProcess();
 
         let usedSSE = false;
         try {
-            if (window.EventSource) {
+            const preferSSE = false; // 暂时禁用SSE以兼容智能路由新特性
+            if (preferSSE && window.EventSource) {
                 try {
                     if (this.activeEventSource) {
                         this.activeEventSource.close();
@@ -596,6 +602,9 @@ class DataAnalysisPlatform {
                                 this.finishProcessing();
                             }
                         }
+                    ,
+                        selectedModel,
+                        { forceExecute }
                     );
                     this.activeEventSource = eventSource;
                     usedSSE = true;
@@ -619,6 +628,10 @@ class DataAnalysisPlatform {
                     this.currentConversationId,
                     this.currentViewMode,
                     (data) => {
+                        if (data.type === 'db_unavailable') {
+                            this.handleDbUnavailable(data.data, message, thinkingId);
+                            return;
+                        }
                         if (data.conversationId) {
                             this.currentConversationId = data.conversationId;
                             localStorage.setItem('currentConversationId', data.conversationId);
@@ -629,8 +642,13 @@ class DataAnalysisPlatform {
                         this.handleStreamResponse(data, thinkingId);
                     },
                     selectedModel,
-                    this.abortController?.signal
+                    this.abortController?.signal,
+                    { forceExecute }
                 );
+                if (response && response.status === 'db_unavailable') {
+                    this.handleDbUnavailable(response, message, thinkingId);
+                    return;
+                }
                 if (response && response.conversation_id) {
                     this.currentConversationId = response.conversation_id;
                     localStorage.setItem('currentConversationId', response.conversation_id);
@@ -837,6 +855,95 @@ class DataAnalysisPlatform {
             this.addMessage('bot', `错误: ${data.message}`);
         } else if (data.type === 'status') {
             this.updateExecutionStatus(data.status);
+        }
+    }
+
+    handleDbUnavailable(payload, originalMessage, thinkingId) {
+        this.hideThinkingProcess(thinkingId);
+        this.finishProcessing();
+
+        const messageInput = document.getElementById('message-input');
+        if (messageInput) {
+            messageInput.disabled = false;
+            messageInput.value = originalMessage || '';
+            messageInput.focus();
+        }
+
+        // 弱提示提醒用户配置数据库
+        this.showNotification(window.i18nManager?.t('warnings.dbUnavailable') || '数据库连接失败，请先完成配置或稍后重试。', 'warning');
+
+        if (this.activeDbWarning && this.activeDbWarning.remove) {
+            this.activeDbWarning.remove();
+        }
+
+        const card = document.createElement('div');
+        card.className = 'db-warning-card';
+
+        const title = document.createElement('h4');
+        title.textContent = window.i18nManager?.t('warnings.dbWarningTitle') || '数据库连接失败';
+        card.appendChild(title);
+
+        const message = document.createElement('p');
+        message.className = 'db-warning-message-text';
+        message.textContent = payload?.error || (window.i18nManager?.t('warnings.dbWarningDesc') || '当前无法连接数据库，相关查询已暂停。');
+        card.appendChild(message);
+
+        const details = payload?.db_check?.details || payload?.db_check || {};
+        const host = details.host || '-';
+        const port = details.port || '-';
+        const user = details.user || '-';
+
+        const meta = document.createElement('div');
+        meta.className = 'db-warning-meta';
+        meta.innerHTML = `目标: <code>${host}:${port}</code> · 用户: <code>${user}</code>`;
+        card.appendChild(meta);
+
+        if (Array.isArray(details?.test_queries) && details.test_queries.length) {
+            const hint = document.createElement('p');
+            hint.className = 'db-warning-hint';
+            const lastTest = details.test_queries.find(q => q.success) || details.test_queries[0];
+            hint.textContent = `${window.i18nManager?.t('warnings.dbHint') || '最近尝试:'} ${lastTest.message}`;
+            card.appendChild(hint);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'db-warning-actions';
+
+        const continueBtn = document.createElement('button');
+        continueBtn.className = 'btn btn-primary';
+        continueBtn.textContent = window.i18nManager?.t('warnings.dbContinue') || '继续执行';
+        continueBtn.addEventListener('click', () => {
+            if (this.activeDbWarning && this.activeDbWarning.remove) {
+                this.activeDbWarning.remove();
+                this.activeDbWarning = null;
+            }
+            const input = document.getElementById('message-input');
+            if (input) {
+                input.value = '';
+            }
+            this.showNotification(window.i18nManager?.t('warnings.dbForce') || '已忽略数据库检查，正在继续执行…', 'info');
+            this.sendMessage(originalMessage, { forceExecute: true, skipUserMessage: true });
+        });
+        actions.appendChild(continueBtn);
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-secondary';
+        cancelBtn.textContent = window.i18nManager?.t('warnings.dbConfigure') || '去配置';
+        cancelBtn.addEventListener('click', () => {
+            if (this.activeDbWarning && this.activeDbWarning.remove) {
+                this.activeDbWarning.remove();
+                this.activeDbWarning = null;
+            }
+            this.switchTab('settings', 'database');
+        });
+        actions.appendChild(cancelBtn);
+
+        card.appendChild(actions);
+
+        const wrapper = this.addMessage('bot', card);
+        if (wrapper) {
+            wrapper.classList.add('db-warning-message');
+            this.activeDbWarning = wrapper;
         }
     }
 

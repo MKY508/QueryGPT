@@ -12,9 +12,11 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 class RouteType(Enum):
-    """路由类型（简化版：2种路由）"""
-    DIRECT_SQL = "direct_sql"        # 直接SQL执行（简单查询）
-    AI_ANALYSIS = "ai_analysis"      # AI处理（包括分析、可视化等所有复杂任务）
+    """路由类型（可扩展）"""
+    QA = "qa"                    # 礼貌拒绝/问答
+    SQL_ONLY = "sql_only"        # 快速SQL核查
+    ANALYSIS = "analysis"        # 深度分析
+    ABORTED = "aborted"          # 兜底终止
 
 class AIRoutingClassifier:
     """
@@ -22,8 +24,8 @@ class AIRoutingClassifier:
     使用LLM判断查询类型并选择最优路径
     """
     
-    # 默认路由分类Prompt（简化版）
-    DEFAULT_ROUTING_PROMPT = """你是一个查询路由分类器。分析用户查询，选择最适合的执行路径。
+    # 默认路由分类Prompt
+    DEFAULT_ROUTING_PROMPT = """你是一个查询路由分类器。分析用户查询，选择最适合的执行路径，并仅输出规范 JSON。
 
 用户查询：{query}
 
@@ -31,31 +33,35 @@ class AIRoutingClassifier:
 - 类型：{db_type}
 - 可用表：{available_tables}
 
-请从以下2个选项中选择最合适的路由：
+请从以下路由中选择其一：
 
-1. DIRECT_SQL - 简单查询，可以直接转换为SQL执行
-   适用：查看数据、统计数量、简单筛选、排序、基础聚合
-   示例：显示所有订单、统计用户数量、查看最新记录、按月统计销售额
-   特征：不需要复杂计算、不需要图表、不需要多步处理
+1. QA
+   - 适用：闲聊、非数据库问题、缺乏业务上下文的提问
+   - 输出：礼貌拒绝或引导用户描述数据库相关需求
+   - 不执行 SQL/代码
 
-2. AI_ANALYSIS - 需要AI智能处理的查询
-   适用：数据分析、生成图表、趋势预测、复杂计算、多步处理
-   示例：分析销售趋势、生成可视化图表、预测分析、原因探索
-   特征：需要可视化、需要推理、需要编程逻辑、复杂数据处理
+2. SQL_ONLY
+   - 适用：明确的取数需求（聚合、筛选、排序）
+   - 要求：生成 SQL，按步骤验证结果，可进行必要的库表探索
+   - 不绘图、不安装额外库
 
-输出格式（JSON）：
+3. ANALYSIS
+   - 适用：复杂分析、可视化、趋势研判、需要 Python 脚本的任务
+   - 允许：执行 Python、生成图表，必要时经用户确认安装库
+
+如判断输入与数据库无关，应选择 QA。
+如请求不完整但可能需要数据，倾向 SQL_ONLY 并在 reason 中指出缺失信息。
+
+输出 JSON（仅此内容）：
 {
-  "route": "DIRECT_SQL 或 AI_ANALYSIS",
-  "confidence": 0.95,
-  "reason": "选择此路由的原因",
-  "suggested_sql": "如果是DIRECT_SQL，提供建议的SQL语句"
+  "route": "QA | SQL_ONLY | ANALYSIS",
+  "confidence": 0.0-1.0,
+  "reason": "简要说明判断依据",
+  "suggested_plan": ["步骤1", "步骤2"],
+  "suggested_sql": "如为 SQL_ONLY，可给出建议 SQL"
 }
 
-判断规则：
-- 如果查询包含"图"、"图表"、"可视化"、"绘制"、"plot"、"chart"等词 → 选择 AI_ANALYSIS
-- 如果查询包含"分析"、"趋势"、"预测"、"为什么"、"原因"等词 → 选择 AI_ANALYSIS  
-- 如果只是简单的数据查询、统计、筛选 → 选择 DIRECT_SQL
-- 当不确定时，倾向选择 AI_ANALYSIS 以确保功能完整"""
+若无法判定，请将 route 设置为 "ANALYSIS" 并说明原因。"""
     
     def __init__(self, llm_service=None, custom_prompt=None):
         """
@@ -72,8 +78,10 @@ class AIRoutingClassifier:
         self.stats = {
             "total_classifications": 0,
             "route_counts": {
-                RouteType.DIRECT_SQL.value: 0,
-                RouteType.AI_ANALYSIS.value: 0
+                RouteType.QA.value: 0,
+                RouteType.SQL_ONLY.value: 0,
+                RouteType.ANALYSIS.value: 0,
+                RouteType.ABORTED.value: 0
             },
             "avg_classification_time": 0,
             "total_tokens_used": 0
@@ -115,8 +123,10 @@ class AIRoutingClassifier:
                 result = self._get_default_route(query)
             
             # 更新统计
-            route_type = result.get('route', RouteType.AI_ANALYSIS.value)
-            self.stats["route_counts"][route_type] = self.stats["route_counts"].get(route_type, 0) + 1
+            route_type = result.get('route', RouteType.ANALYSIS.value)
+            if route_type not in self.stats["route_counts"]:
+                self.stats["route_counts"][route_type] = 0
+            self.stats["route_counts"][route_type] += 1
             
             # 计算平均分类时间
             classification_time = time.time() - start_time
@@ -212,31 +222,51 @@ class AIRoutingClassifier:
                 # 验证必需字段
                 if 'route' not in result:
                     # 尝试从响应文本中提取路由类型
-                    if 'DIRECT_SQL' in response:
-                        result['route'] = 'DIRECT_SQL'
-                    elif 'AI_ANALYSIS' in response:
-                        result['route'] = 'AI_ANALYSIS'
+                    if 'SQL_ONLY' in response:
+                        result['route'] = 'SQL_ONLY'
+                    elif 'ANALYSIS' in response:
+                        result['route'] = 'ANALYSIS'
+                    elif 'QA' in response:
+                        result['route'] = 'QA'
                     else:
                         raise ValueError("响应中缺少route字段")
                 
-                # 规范化路由类型（简化版）
+                # 规范化路由类型
                 route_map = {
-                    'DIRECT_SQL': RouteType.DIRECT_SQL.value,
-                    'AI_ANALYSIS': RouteType.AI_ANALYSIS.value,
-                    'direct_sql': RouteType.DIRECT_SQL.value,
-                    'ai_analysis': RouteType.AI_ANALYSIS.value,
-                    # 兼容旧的路由类型
-                    'SIMPLE_ANALYSIS': RouteType.AI_ANALYSIS.value,
-                    'COMPLEX_ANALYSIS': RouteType.AI_ANALYSIS.value,
-                    'VISUALIZATION': RouteType.AI_ANALYSIS.value,
+                    'QA': RouteType.QA.value,
+                    'qa': RouteType.QA.value,
+                    'SQL_ONLY': RouteType.SQL_ONLY.value,
+                    'sql_only': RouteType.SQL_ONLY.value,
+                    'DIRECT_SQL': RouteType.SQL_ONLY.value,
+                    'direct_sql': RouteType.SQL_ONLY.value,
+                    'ANALYSIS': RouteType.ANALYSIS.value,
+                    'analysis': RouteType.ANALYSIS.value,
+                    'AI_ANALYSIS': RouteType.ANALYSIS.value,
+                    'ai_analysis': RouteType.ANALYSIS.value,
+                    # 兼容历史命名
+                    'SIMPLE_ANALYSIS': RouteType.ANALYSIS.value,
+                    'COMPLEX_ANALYSIS': RouteType.ANALYSIS.value,
+                    'VISUALIZATION': RouteType.ANALYSIS.value,
+                    'ABORTED': RouteType.ABORTED.value,
+                    'aborted': RouteType.ABORTED.value
                 }
                 
-                result['route'] = route_map.get(result['route'], RouteType.AI_ANALYSIS.value)
+                result['route'] = route_map.get(result['route'], RouteType.ANALYSIS.value)
                 result['confidence'] = float(result.get('confidence', 0.8))
                 
                 # 确保有reason字段
                 if 'reason' not in result:
                     result['reason'] = '基于查询内容判断'
+
+                # 规范化建议计划
+                suggested_plan = result.get('suggested_plan')
+                if suggested_plan is None:
+                    result['suggested_plan'] = []
+                elif isinstance(suggested_plan, str):
+                    result['suggested_plan'] = [s.strip() for s in suggested_plan.split('\n') if s.strip()]
+
+                if 'suggested_sql' not in result:
+                    result['suggested_sql'] = ''
                 
                 return result
             else:
@@ -256,28 +286,31 @@ class AIRoutingClassifier:
         
         # 定义简化的匹配模式
         patterns = {
-            RouteType.DIRECT_SQL.value: [
-                r'\bdirect_sql\b', 
-                r'^1\b',
-                r'^\s*1\s*\.', 
-                r'选择.*direct.*sql',
-                r'路由.*1\b',
-                r'简单查询',
-                r'直接.*sql'
+            RouteType.QA.value: [
+                r'\bqa\b',
+                r'\b拒绝\b',
+                r'与数据库无关',
+                r'仅提供礼貌回复',
+                r'无法回答',
+                r'仅能提供引导'
             ],
-            RouteType.AI_ANALYSIS.value: [
+            RouteType.SQL_ONLY.value: [
+                r'\bsql_only\b',
+                r'\bdirect_sql\b',
+                r'快速.*查询',
+                r'仅执行sql',
+                r'不.*图表',
+                r'一步步.*sql',
+                r'route.*sql'
+            ],
+            RouteType.ANALYSIS.value: [
+                r'\banalysis\b',
                 r'\bai_analysis\b',
-                r'^2\b',
-                r'^\s*2\s*\.',
-                r'选择.*ai.*analysis',
-                r'路由.*2\b',
-                # 兼容旧的路由类型
-                r'\bsimple_analysis\b',
-                r'\bcomplex_analysis\b',
-                r'\bvisualization\b',
                 r'需要.*分析',
                 r'需要.*可视化',
-                r'生成.*图表'
+                r'生成.*图表',
+                r'多步.*处理',
+                r'复杂.*任务'
             ]
         }
         
@@ -304,9 +337,9 @@ class AIRoutingClassifier:
                     'reason': f'文本匹配分析（匹配度: {max_score}）'
                 }
         
-        # 默认返回AI分析路由
+        # 默认返回分析路由
         return {
-            'route': RouteType.AI_ANALYSIS.value,
+            'route': RouteType.ANALYSIS.value,
             'confidence': 0.5,
             'reason': '无法确定路由类型，使用默认AI分析'
         }
@@ -317,42 +350,43 @@ class AIRoutingClassifier:
         """
         query_lower = query.lower()
         
-        # 简单的关键词匹配作为后备方案
-        # 检查是否需要AI处理的关键词
         ai_keywords = ['图', '图表', '可视化', 'chart', 'graph', 'plot', 
-                      '分析', '趋势', '预测', '为什么', '原因', 'analyze']
-        
-        # 检查是否是简单SQL查询的关键词
-        sql_keywords = ['select', 'show', '显示', '查看', '列出', '统计', '数量']
-        
+                      '分析', '趋势', '预测', '为什么', '原因', 'analyze', '对比', '可视化']
+        sql_keywords = ['select', 'show', '显示', '查看', '列出', '统计', '数量', 'sum', 'avg']
+        chit_chat_keywords = ['聊', '故事', '笑话', '天气', '股票怎么看', '你是谁', '你好', '谢谢']
+
+        if any(word in query_lower for word in chit_chat_keywords):
+            return {
+                'route': RouteType.QA.value,
+                'confidence': 0.55,
+                'reason': '疑似闲聊/非数据库问题'
+            }
         if any(word in query_lower for word in ai_keywords):
             return {
-                'route': RouteType.AI_ANALYSIS.value,
+                'route': RouteType.ANALYSIS.value,
                 'confidence': 0.6,
                 'reason': '检测到分析/可视化关键词（规则匹配）'
             }
-        elif any(word in query_lower for word in sql_keywords) and \
-             not any(word in query_lower for word in ai_keywords):
+        if any(word in query_lower for word in sql_keywords):
             return {
-                'route': RouteType.DIRECT_SQL.value,
+                'route': RouteType.SQL_ONLY.value,
                 'confidence': 0.5,
-                'reason': '可能是简单查询（规则匹配）'
+                'reason': '可能是取数请求（规则匹配）'
             }
-        else:
-            return {
-                'route': RouteType.AI_ANALYSIS.value,
-                'confidence': 0.4,
-                'reason': '默认使用AI分析（无LLM服务）'
-            }
+        return {
+            'route': RouteType.ANALYSIS.value,
+            'confidence': 0.4,
+            'reason': '默认使用分析路由（无LLM服务）'
+        }
     
     def _get_fallback_route(self, query: str) -> Dict[str, Any]:
         """
         获取失败时的后备路由 - 简化版
         """
         return {
-            'route': RouteType.AI_ANALYSIS.value,
-            'confidence': 0.3,
-            'reason': '分类失败，使用最安全的AI分析路由',
+            'route': RouteType.ABORTED.value,
+            'confidence': 0.0,
+            'reason': '分类失败，已回退至兜底路由',
             'error': True
         }
     

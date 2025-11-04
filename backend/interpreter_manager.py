@@ -164,89 +164,66 @@ class InterpreterManager:
             
             # 根据路由类型和语言设置系统消息
             lang_key = 'en' if language == 'en' else 'zh'
-            route_type = context.get('route_type', 'AI_ANALYSIS') if context else 'AI_ANALYSIS'
-            
-            # 根据路由类型选择不同的系统消息
-            if route_type == 'DIRECT_SQL':
-                # DIRECT_SQL路由：从配置文件读取或使用默认值
-                if prompt_config and 'systemMessage' in prompt_config and 'DIRECT_SQL' in prompt_config['systemMessage']:
-                    direct_sql_config = prompt_config['systemMessage']['DIRECT_SQL']
-                    if lang_key in direct_sql_config:
-                        interpreter.system_message = direct_sql_config[lang_key]
-                    else:
-                        # 默认的DIRECT_SQL prompt
-                        interpreter.system_message = """
-                        你是一个SQL查询助手。你的任务是：
-                        1. 连接数据库并执行SQL查询
-                        2. 以清晰的格式返回查询结果
-                        3. 不要创建任何可视化或图表
-                        4. 不要保存任何文件
-                        5. 只专注于检索和显示数据
-                        """ if lang_key == 'zh' else """
-                        You are a SQL query assistant. Your task is to:
-                        1. Connect to the database and execute SQL queries
-                        2. Return query results in a clear format
-                        3. DO NOT create any visualizations or charts
-                        4. DO NOT save any files
-                        5. Focus only on retrieving and displaying data
-                        """
+            route_type = context.get('route_type', 'ANALYSIS') if context else 'ANALYSIS'
+
+            system_messages = (prompt_config or {}).get('systemMessage', {})
+
+            def _apply_prompt(category: str, default_zh: str, default_en: str, log_suffix: str):
+                config_section = system_messages.get(category, {})
+                if config_section and lang_key in config_section and config_section[lang_key].strip():
+                    interpreter.system_message = config_section[lang_key]
                 else:
-                    # 默认的DIRECT_SQL prompt
-                    if language == 'en':
-                        interpreter.system_message = """
-                        You are a SQL query assistant. Your task is to:
-                        1. Connect to the database and execute SQL queries
-                        2. Return query results in a clear format
-                        3. DO NOT create any visualizations or charts
-                        4. DO NOT save any files
-                        5. Focus only on retrieving and displaying data
-                        IMPORTANT: Please respond in English.
-                        """
-                    else:
-                        interpreter.system_message = """
-                        你是一个SQL查询助手。你的任务是：
-                        1. 连接数据库并执行SQL查询
-                        2. 以清晰的格式返回查询结果
-                        3. 不要创建任何可视化或图表
-                        4. 不要保存任何文件
-                        5. 只专注于检索和显示数据
-                        重要：请用中文回复。
-                        """
-                logger.info(f"使用DIRECT_SQL路由的限制性prompt")
+                    interpreter.system_message = default_zh if lang_key == 'zh' else default_en
+                logger.info(f"使用{category}路由的{log_suffix}")
+
+            if route_type == 'SQL_ONLY':
+                default_zh = """
+                你是一个SQL快速核查助手。遵循以下原则：
+                1. 仅执行只读SQL，不生成图表或保存文件；操作前后输出“步骤说明”
+                2. 执行前确认库表和字段，执行后报告记录数与执行时间
+                3. 对空结果或异常值给出标注与后续建议
+                4. 如关键信息缺失，先向用户澄清再执行
+                """
+                default_en = """
+                You are a SQL verification assistant. Follow these rules:
+                1. Execute read-only SQL only, no charts or files; print a "Step" summary before each action
+                2. Clarify tables/fields before running SQL, report row counts and timing afterward
+                3. Highlight empty or suspicious results and suggest next steps
+                4. Ask users for missing details before executing
+                """
+                _apply_prompt('SQL_ONLY', default_zh, default_en, '限制性prompt')
+            elif route_type == 'QA':
+                default_zh = """
+                你是一个数据库助手。当用户提问与数据库或分析无关时，请礼貌拒绝：
+                - 明确说明你专注于数据库取数与分析
+                - 引导用户提供具体的表名、指标或时间范围
+                - 不编造答案，只提供诚恳建议
+                """
+                default_en = """
+                You are a database assistant. When the query is unrelated to databases or analytics:
+                - Politely explain you focus on database retrieval and analysis only
+                - Guide the user to provide table names, metrics, or time ranges
+                - Do not fabricate answers; offer constructive suggestions
+                """
+                _apply_prompt('QA', default_zh, default_en, '礼貌拒绝prompt')
             else:
-                # AI_ANALYSIS路由：从配置文件读取或使用默认值
-                if prompt_config and 'systemMessage' in prompt_config and 'AI_ANALYSIS' in prompt_config['systemMessage']:
-                    ai_analysis_config = prompt_config['systemMessage']['AI_ANALYSIS']
-                    if lang_key in ai_analysis_config:
-                        interpreter.system_message = ai_analysis_config[lang_key]
-                    else:
-                        # 默认的AI_ANALYSIS prompt
-                        interpreter.system_message = """
-                        你是一个数据分析助手。请帮助用户查询数据库并生成可视化。
-                        使用pandas处理数据，使用plotly创建图表。
-                        将结果保存为HTML文件到output目录。
-                        """ if lang_key == 'zh' else """
-                        You are a data analysis assistant. Help users query databases and generate visualizations.
-                        Use pandas for data processing and plotly for creating charts.
-                        Save results as HTML files to the output directory.
-                        """
-                else:
-                    # 默认的AI_ANALYSIS prompt
-                    if language == 'en':
-                        interpreter.system_message = """
-                        You are a data analysis assistant. Help users query databases and generate visualizations.
-                        Use pandas for data processing and plotly for creating charts.
-                        Save results as HTML files to the output directory.
-                        IMPORTANT: Please respond in English.
-                        """
-                    else:
-                        interpreter.system_message = """
-                        你是一个数据分析助手。请帮助用户查询数据库并生成可视化。
-                        使用pandas处理数据，使用plotly创建图表。
-                        将结果保存为HTML文件到output目录。
-                        重要：请用中文回复。
-                        """
-                logger.info(f"使用AI_ANALYSIS路由的完整功能prompt")
+                default_zh = """
+                你是一个数据分析助手，需遵循以下流程：
+                1. 在每个操作前输出“步骤说明”，说明即将进行的动作
+                2. 使用pandas处理数据，必要时使用plotly绘制图表
+                3. 重要结果保存到output目录，并提示用户文件位置
+                4. 操作保持安全：数据库只读；安装依赖需获得用户许可
+                5. 收尾时总结发现、局限与建议
+                """
+                default_en = """
+                You are a data analysis assistant. Follow these steps:
+                1. Print a "Step" summary before each action to keep the user informed
+                2. Use pandas for data processing and plotly for visualization when helpful
+                3. Save important outputs to the output directory and tell the user the file path
+                4. Maintain safety: read-only database access; request approval before installing packages
+                5. Conclude with findings, limitations, and recommendations
+                """
+                _apply_prompt('ANALYSIS', default_zh, default_en, '分析型prompt')
             
             # 获取会话历史（如果有）
             conversation_history = None

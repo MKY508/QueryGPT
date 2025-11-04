@@ -278,6 +278,7 @@ def chat():
         conversation_id = data.get('conversation_id')
         context_rounds = data.get('context_rounds', 3)
         user_language = data.get('language', 'zh')
+        force_execute = bool(data.get('force_execute'))
         
         # 简易SSE兼容
         if data.get('stream') is True:
@@ -434,9 +435,17 @@ def chat():
                     'use_database': use_database,
                     'context_rounds': context_rounds,
                     'stop_checker': lambda: _get_stop_status(conversation_id),
-                    'connection_info': context.get('connection_info', {})
+                    'connection_info': context.get('connection_info', {}),
+                    'force_execute': force_execute
                 }
                 result = smart_router.route(full_query, router_context)
+                if result.get('status') == 'db_unavailable':
+                    result.update({
+                        "conversation_id": conversation_id,
+                        "model": model_name or "smart_router",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                    return jsonify(result)
                 if 'query_type' in result:
                     logger.info(f"📊 查询类型: {result['query_type']}, 执行时间: {result.get('execution_time', 'N/A')}s")
                 result['smart_routing_used'] = True

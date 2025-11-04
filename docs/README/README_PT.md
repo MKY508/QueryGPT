@@ -1,6 +1,6 @@
 <div align="center">
   
-  <img src="../../images/logo.png" width="400" alt="QueryGPT">
+  <img src="../images/logo.png" width="400" alt="QueryGPT">
   
   <br/>
   
@@ -38,32 +38,21 @@
 
 ## 📸 Capturas de Tela do Sistema
 
-<table>
-  <tr>
-    <td width="50%">
-      <strong>🤖 Processo de Pensamento do Agente Inteligente</strong><br/>
-      <img src="../../images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
-      <p align="center">Visualização transparente da cadeia de pensamento</p>
-    </td>
-    <td width="50%">
-      <strong>📊 Visualização de Dados</strong><br/>
-      <img src="../../images/data-visualization-en.png" width="100%" alt="Visualização de Dados"/>
-      <p align="center">Geração inteligente de gráficos com seleção automática</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <strong>👨‍💻 Visão do Desenvolvedor</strong><br/>
-      <img src="../../images/developer-view-en.png" width="100%" alt="Visão do Desenvolvedor"/>
-      <p align="center">Detalhes completos de execução, SQL e código transparentes</p>
-    </td>
-    <td width="50%">
-      <strong>🌐 Suporte Multilíngue</strong><br/>
-      <img src="../../images/main-interface.png" width="100%" alt="Interface Principal"/>
-      <p align="center">Suporte para 10 idiomas, acessível globalmente</p>
-    </td>
-  </tr>
-</table>
+<img src="../images/agent-thinking-en.png" width="100%" alt="Interface QueryGPT"/>
+
+**Exibição em tempo real do processo de pensamento da IA, análise complexa de dados através de conversas em português.**
+
+---
+
+<img src="../images/data-visualization-en.png" width="100%" alt="Visualização de Dados"/>
+
+**Geração automática de gráficos interativos, insights de dados em um relance.**
+
+---
+
+<img src="../images/developer-view-en.png" width="100%" alt="Visão do Desenvolvedor"/>
+
+**Execução de código totalmente transparente, suportando SQL e Python como motores duplos.**
 
 ## 🌟 Recursos Principais
 
@@ -86,46 +75,37 @@
 - **Segurança de Dados**: Permissões somente leitura, proteção contra injeção SQL, mascaramento de dados sensíveis
 - **Exportação Flexível**: Suporta formatos Excel, PDF, HTML e outros
 
-## 🌍 Suporte a Idiomas
+## 📦 Requisitos Técnicos
 
-O QueryGPT oferece suporte completo para **10 idiomas**, permitindo que usuários de todo o mundo interajam com seus dados em seu idioma nativo:
+- Python 3.10.x (obrigatório, dependência do OpenInterpreter 0.4.3)
+- MySQL ou banco de dados compatível
 
-- 🇨🇳 **Chinês** (Simplificado)
-- 🇬🇧 **Inglês**
-- 🇷🇺 **Russo**
-- 🇪🇸 **Espanhol**
-- 🇫🇷 **Francês**
-- 🇰🇷 **Coreano**
-- 🇩🇪 **Alemão**
-- 🇵🇹 **Português**
-- 🇯🇵 **Japonês**
-- 🇦🇪 **Árabe**
+> Windows: Execute no WSL (não execute scripts no PowerShell/CMD).
 
-## 🛠️ Stack Tecnológico
+## 📊 Comparação de Produtos
 
-### Backend
-- **Python 3.10.x** - Linguagem principal (obrigatório para OpenInterpreter 0.4.3)
-- **Flask** - Framework web
-- **OpenInterpreter 0.4.3** - Motor de execução de código inteligente
-- **PyMySQL** - Conector de banco de dados MySQL
-- **Pandas** - Processamento e análise de dados
-- **Plotly** - Visualização interativa de dados
-- **NumPy** - Computação numérica
+| Dimensão de Comparação | **QueryGPT** | Vanna AI | DB-GPT | TableGPT | Text2SQL.AI |
+|----------------------|:------------:|:--------:|:------:|:--------:|:-----------:|
+| **Custo** | **✅ Gratuito** | ⭕ Versão paga | ✅ Gratuito | ❌ Pago | ❌ Pago |
+| **Código Aberto** | **✅** | ✅ | ✅ | ❌ | ❌ |
+| **Implementação Local** | **✅** | ✅ | ✅ | ❌ | ❌ |
+| **Executa Código Python** | **✅ Ambiente completo** | ❌ | ❌ | ❌ | ❌ |
+| **Capacidade de Visualização** | **✅ Programável** | ⭕ Gráficos predefinidos | ✅ Gráficos ricos | ✅ Gráficos ricos | ⭕ Básico |
+| **Compreensão de Termos de Negócios** | **✅ Nativo** | ⭕ Básico | ✅ Bom | ✅ Excelente | ⭕ Básico |
+| **Exploração Autônoma do Agente** | **✅** | ❌ | ⭕ Básico | ⭕ Básico | ❌ |
+| **Exibição de Pensamento em Tempo Real** | **✅** | ❌ | ❌ | ❌ | ❌ |
+| **Capacidade de Extensão** | **✅ Extensão ilimitada** | ❌ | ❌ | ❌ | ❌ |
 
-### Frontend
-- **HTML5/CSS3** - Interface moderna e responsiva
-- **JavaScript (ES6+)** - Lógica de aplicação
-- **Bootstrap** - Framework de UI
-- **Chart.js/Plotly.js** - Bibliotecas de visualização
-
-### Banco de Dados
-- **MySQL** ou bancos de dados compatíveis
-- **Doris DB** - Suporte para análise OLAP
-- Suporte para múltiplos bancos de dados simultaneamente
+### Nossas Diferenças Principais
+- **Ambiente Python Completo**: Não são recursos predefinidos, mas um ambiente de execução Python real onde você pode escrever qualquer código
+- **Extensibilidade Ilimitada**: Precisa de novos recursos? Basta instalar novas bibliotecas, sem esperar atualizações do produto
+- **Exploração Autônoma do Agente**: Investiga proativamente quando encontra problemas, não é apenas uma consulta única simples
+- **Processo de Pensamento Transparente**: Veja o que a IA está pensando em tempo real, pode intervir e orientar a qualquer momento
+- **Verdadeiramente Gratuito e Open Source**: Licença MIT, sem barreiras de pagamento
 
 ## 🚀 Início Rápido
 
-### Instalação Inicial
+### Primeiro Uso
 
 ```bash
 # 1. Clone o projeto
@@ -139,7 +119,7 @@ cd QueryGPT
 ./start.sh
 ```
 
-### Uso Subsequente
+### Uso Posterior
 
 ```bash
 # Início rápido direto
@@ -168,7 +148,7 @@ O serviço será executado em http://localhost:5000 por padrão
 
 ### Configuração da Camada Semântica (Opcional)
 
-A camada semântica melhora a compreensão de termos de negócios, ajudando o sistema a entender melhor sua linguagem de negócios.
+A camada semântica melhora a compreensão de termos de negócios, ajudando o sistema a entender melhor sua linguagem de negócios. **Esta é uma configuração opcional, não configurá-la não afeta as funcionalidades básicas.**
 
 1. **Copie o arquivo de exemplo**
    ```bash
@@ -176,133 +156,121 @@ A camada semântica melhora a compreensão de termos de negócios, ajudando o si
    ```
 
 2. **Modifique a configuração com base em suas necessidades de negócios**
+   
+   A configuração da camada semântica contém três partes:
+   - **Mapeamento de Banco de Dados**: Define o significado comercial do banco de dados
+   - **Tabelas de Negócios Principais**: Mapeia tabelas e campos de negócios importantes
+   - **Índice de Busca Rápida**: Pesquisa rápida de termos comuns
 
-## 💡 Como Usar
+3. **Exemplo de Configuração**
+   ```json
+   {
+     "Tabelas de Negócios Principais": {
+       "Gestão de Pedidos": {
+         "Caminho da Tabela": "database.orders",
+         "Palavras-chave": ["pedido", "venda", "transação"],
+         "Campos Obrigatórios": {
+           "order_id": "Número do Pedido",
+           "amount": "Valor"
+         }
+       }
+     }
+   }
+   ```
 
-### Exemplos de Consultas
+> **Nota**: 
+> - O arquivo da camada semântica contém informações comerciais sensíveis e foi adicionado ao `.gitignore`, não será enviado ao controle de versão
+> - Quando a camada semântica não está configurada, o sistema usa a configuração padrão e ainda pode realizar consultas de dados normalmente
+> - Para instruções detalhadas de configuração, consulte [backend/SEMANTIC_LAYER_SETUP.md](backend/SEMANTIC_LAYER_SETUP.md)
 
-O QueryGPT entende consultas em linguagem natural. Aqui estão alguns exemplos:
+## 📁 Estrutura do Projeto
 
-#### Consultas Básicas
-- "Mostre todos os produtos"
-- "Quantos clientes temos?"
-- "Liste as vendas de hoje"
+```
+QueryGPT/
+├── backend/              # Serviço backend
+│   ├── app.py           # Entrada principal da aplicação Flask
+│   ├── database.py      # Gerenciamento de conexão de banco de dados
+│   ├── interpreter_manager.py  # Interpretador de consultas
+│   ├── history_manager.py      # Gerenciamento de histórico
+│   └── config_loader.py        # Carregador de configuração
+├── frontend/            # Interface frontend
+│   ├── templates/       # Modelos HTML
+│   └── static/          # Recursos estáticos
+│       ├── css/         # Arquivos de estilo
+│       └── js/          # JavaScript
+├── docs/                # Documentação do projeto
+├── logs/                # Diretório de logs
+├── output/              # Arquivos de saída
+├── requirements.txt     # Dependências Python
+└── .env.example         # Exemplo de configuração
+```
 
-#### Análise de Dados
-- "Mostre a tendência de vendas dos últimos 6 meses"
-- "Compare as vendas deste ano com o ano passado"
-- "Quais são os 10 produtos mais vendidos?"
-- "Analise a distribuição de vendas por região"
+## 🔌 API
 
-#### Visualizações
-- "Crie um gráfico de pizza das vendas por categoria"
-- "Gere um gráfico de linha do crescimento de usuários"
-- "Visualize a distribuição de receita mensal"
+### Interface de Consulta
 
-#### Análise Complexa
-- "Calcule a taxa de retenção de clientes"
-- "Identifique padrões sazonais nas vendas"
-- "Preveja as vendas do próximo trimestre"
-- "Encontre correlações entre preço e volume de vendas"
+```http
+POST /api/chat
+Content-Type: application/json
 
-### Modos de Visualização
+{
+  "message": "Consultar total de vendas deste mês",
+  "model": "default"
+}
+```
 
-1. **Modo Usuário**: Interface simplificada focada em resultados e visualizações
-2. **Modo Desenvolvedor**: Visão completa com SQL gerado, código Python e logs de execução
+### Histórico
 
-### Dicas de Uso
+```http
+GET /api/history/conversations    # Obter lista de histórico
+GET /api/history/conversation/:id # Obter detalhes
+DELETE /api/history/conversation/:id # Excluir registro
+```
 
-- Use linguagem natural - o sistema converte automaticamente para SQL
-- Seja específico sobre o período de tempo desejado
-- Mencione "gráfico" ou "visualização" para gerar gráficos automáticos
-- O sistema mantém contexto de conversas anteriores
-- Você pode fazer perguntas de acompanhamento baseadas em resultados anteriores
+### Verificação de Saúde
 
-## 📋 Requisitos do Sistema
+```http
+GET /api/health
+```
 
-### Hardware Mínimo
-- **CPU**: 2 cores
-- **RAM**: 4 GB
-- **Armazenamento**: 10 GB de espaço livre
+## 🔒 Informações de Segurança
 
-### Hardware Recomendado
-- **CPU**: 4+ cores
-- **RAM**: 8 GB ou mais
-- **Armazenamento**: 20 GB de espaço livre
-- **Rede**: Conexão estável para APIs de IA
-
-### Software
-- **Sistema Operacional**: Linux, macOS, Windows (com WSL)
-- **Python**: 3.10.x (obrigatório, versão específica para OpenInterpreter)
-- **Node.js**: 14+ (para desenvolvimento frontend)
-- **MySQL**: 5.7+ ou MariaDB 10.3+
-
-### Requisitos de API
-- Chave de API OpenAI (ou endpoint compatível)
-- Opcional: API keys para outros modelos (Claude, Gemini, etc.)
-
-## 🔒 Segurança
-
-### Proteção de Dados
-- Permissões somente leitura no banco de dados
-- Proteção contra injeção SQL com validação regex
-- Mascaramento automático de dados sensíveis
-- Credenciais armazenadas em variáveis de ambiente
-
-### Práticas de Segurança
-- Nunca commitar arquivos .env
-- Usar HTTPS em produção
-- Limitar origens CORS
-- Implementar rate limiting para APIs
-
-## 📊 Comparação com Outras Soluções
-
-| Característica | **QueryGPT** | Vanna AI | DB-GPT | TableGPT | Text2SQL.AI |
-|----------------|:------------:|:--------:|:------:|:--------:|:-----------:|
-| **Custo** | **✅ Gratuito** | ⭕ Versão paga | ✅ Gratuito | ❌ Pago | ❌ Pago |
-| **Código Aberto** | **✅** | ✅ | ✅ | ❌ | ❌ |
-| **Implementação Local** | **✅** | ✅ | ✅ | ❌ | ❌ |
-| **Executa Código Python** | **✅ Ambiente completo** | ❌ | ❌ | ❌ | ❌ |
-| **Visualização** | **✅ Programável** | ⭕ Gráficos predefinidos | ✅ Gráficos ricos | ✅ Gráficos ricos | ⭕ Básico |
-| **Multi-idioma** | **✅ 10 idiomas** | ⭕ Limitado | ⭕ Limitado | ⭕ Limitado | ⭕ Limitado |
-| **Exploração Autônoma** | **✅** | ❌ | ⭕ Básico | ⭕ Básico | ❌ |
-| **Pensamento em Tempo Real** | **✅** | ❌ | ❌ | ❌ | ❌ |
-| **Extensibilidade** | **✅ Ilimitada** | ❌ | ❌ | ❌ | ❌ |
-
-## 🤝 Contribuindo
-
-Contribuições são bem-vindas! Por favor, sinta-se à vontade para submeter Pull Requests.
-
-1. Fork o projeto
-2. Crie sua branch de feature (`git checkout -b feature/RecursoIncrivel`)
-3. Commit suas mudanças (`git commit -m 'Adicionar RecursoIncrivel'`)
-4. Push para a branch (`git push origin feature/RecursoIncrivel`)
-5. Abra um Pull Request
+- Suporta apenas consultas somente leitura (SELECT, SHOW, DESCRIBE)
+- Filtra automaticamente declarações SQL perigosas
+- Usuários do banco de dados devem ser configurados com permissões somente leitura
 
 ## 📄 Licença
 
-Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+MIT License - Veja o arquivo [LICENSE](LICENSE) para detalhes
 
-## 🆕 Atualizações recentes
+## 🆕 Atualizações Recentes
 
-- 2025-09-05 – Otimização de inicialização: Removido o teste automático de modelos na primeira visita para reduzir requisições iniciais e evitar alterações de estado indesejadas.
+- 2025-09-05 – Otimização de velocidade de inicialização: Removido teste automático em lote ao entrar na página de modelos pela primeira vez, reduzindo requisições desnecessárias e evitando escrita incorreta de estado.
 
-## 🙏 Agradecimentos
+## 👨‍💻 Autor
 
-- [OpenInterpreter](https://github.com/OpenInterpreter/open-interpreter) - Motor de execução de código inteligente
-- [Flask](https://flask.palletsprojects.com/) - Framework web
-- [Plotly](https://plotly.com/) - Biblioteca de visualização
-- Todos os contribuidores que ajudaram a tornar este projeto melhor
+- **Autor**: Mao Kaiyue
+- **GitHub**: [@MKY508](https://github.com/MKY508)
+- **Data de Criação**: Agosto de 2025
 
-## 📞 Contato e Suporte
-
-- **Issues**: [GitHub Issues](https://github.com/MKY508/QueryGPT/issues)
-- **Discussões**: [GitHub Discussions](https://github.com/MKY508/QueryGPT/discussions)
-- **Autor**: MKY508
-
----
+## ⭐ Star History
 
 <div align="center">
-  <p>Feito com ❤️ para a comunidade de análise de dados</p>
-  <p>⭐ Se este projeto te ajudou, considere dar uma estrela! ⭐</p>
+  <a href="https://star-history.com/#MKY508/QueryGPT&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+    </picture>
+  </a>
 </div>
+
+## 🤝 Contribuição
+
+Bem-vindo para enviar Issues e Pull Requests.
+
+1. Fork este projeto
+2. Crie uma branch de recurso (`git checkout -b feature/AmazingFeature`)
+3. Commit suas alterações (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request

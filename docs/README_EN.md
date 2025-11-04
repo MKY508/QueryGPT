@@ -69,14 +69,13 @@
 ## 🌟 Key Features
 
 ### Intelligent Routing System 🆕
-- **AI Query Classification**: Uses LLM to intelligently determine query intent and automatically select optimal execution path
-- **Four Execution Modes**:
-  - `DIRECT_SQL`: Simple queries directly convert to SQL, millisecond-level response
-  - `SIMPLE_ANALYSIS`: SQL + lightweight data processing, completed in seconds
-  - `COMPLEX_ANALYSIS`: Complete Agent process for deep analysis
-  - `VISUALIZATION`: Automatic generation of interactive charts
-- **Performance Boost**: Simple query response speed improved by 80%+, complex queries maintain full capability
-- **Flexible Configuration**: Each mode has independent prompts, can be fine-tuned for business needs
+- **AI Query Classification**: Uses LLM to determine query intent and automatically select the optimal path
+- **Three Execution Modes**:
+  - `QA`: Politely decline non-database questions and guide users to describe data needs
+  - `SQL_ONLY`: Read-only SQL execution with step-by-step logging and result validation
+  - `ANALYSIS`: Full agent workflow with Python, visualization, and deep insights
+- **Safety Fallback**: Clear warnings when the database is unavailable or routing fails, with user-controlled continuation
+- **Flexible Configuration**: Each mode has independent prompts editable via the UI for business-specific tuning
 
 ### Agent Core Capabilities
 - **Autonomous Data Exploration**: Agent proactively understands data structure and explores relationships
