@@ -1,5 +1,7 @@
 <div align="center">
   
+  <img src="../images/logo.png" width="400" alt="QueryGPT">
+  
   <br/>
   
   <p>
@@ -17,270 +19,224 @@
   
   <br/>
   
-  <h1>QueryGPT</h1>
-  <h3>基於 OpenInterpreter 的智慧數據分析系統</h3>
-  <p><i>用自然語言與您的數據庫對話，支援10種語言的AI驅動數據分析平台</i></p>
+  <h3>基於 OpenInterpreter 的智慧數據分析 Agent</h3>
+  <p><i>用自然語言與資料庫對話</i></p>
   
 </div>
 
-<br/>
-
----
-
 ## ✨ 核心優勢
 
-**像數據分析師一樣思考的 AI Agent**
-
-QueryGPT 不僅僅是一個 SQL 生成工具，而是一個能夠自主思考和探索的智慧數據分析助手：
-
-- **🔍 自主探索能力**：遇到問題會主動查看表結構、樣本數據，像專業分析師一樣深入調查
-- **🔄 多輪推理驗證**：發現異常會重新檢查，通過多輪驗證確保結果準確性
-- **🐍 雙引擎分析**：不僅限於 SQL，能執行 Python 進行統計分析、機器學習等複雜運算
-- **💭 透明思考過程**：實時顯示 AI 的推理過程（Chain-of-Thought），可隨時介入指導
-- **🌐 多語言支援**：原生支援繁體中文、簡體中文、英文等10種語言介面
-
-## 🌟 主要功能特點
-
-### 智慧分析核心
-- **自然語言轉 SQL**：用中文描述需求，自動生成優化的 SQL 查詢語句
-- **上下文理解**：記憶對話歷史，支援連續多輪深度分析
-- **業務術語理解**：原生理解年增率、月增率、留存率、復購率等商業概念
-- **異常檢測**：自動識別數據異常並主動提醒
-
-### 數據視覺化
-- **智慧圖表選擇**：根據數據特徵自動選擇最適合的視覺化方式
-- **互動式圖表**：支援縮放、篩選、導出的動態圖表
-- **多種圖表類型**：長條圖、圓餅圖、折線圖、散點圖、熱力圖等
-- **自訂樣式**：可調整顏色、標籤、圖例等視覺元素
-
-### 系統特性
-- **多模型支援**：靈活切換 GPT-5、Claude、Gemini、Ollama 等模型
-- **本地部署**：支援完全離線部署，數據永不外洩
-- **歷史記錄**：保存所有分析過程，支援回溯和分享
-- **數據安全**：唯讀權限、SQL 注入防護、敏感數據遮罩
-- **靈活匯出**：支援 Excel、PDF、HTML、CSV 等多種格式
-
-## 🛠 技術架構
-
-### 後端技術
-- **Python 3.10+**：核心運行環境（OpenInterpreter 0.4.3 依賴）
-- **Flask**：Web 應用框架
-- **OpenInterpreter**：自主代碼執行引擎
-- **MySQL/PostgreSQL**：數據庫支援
-
-### 前端技術
-- **現代化 UI**：響應式設計，支援深色模式
-- **即時更新**：WebSocket 實時顯示分析進度
-- **多語言 i18n**：10種語言無縫切換
-
-### 安全機制
-- **唯讀查詢**：僅支援 SELECT、SHOW、DESCRIBE 操作
-- **SQL 過濾**：自動攔截危險 SQL 語句
-- **權限隔離**：數據庫用戶配置唯讀權限
-- **加密傳輸**：支援 HTTPS 安全連接
+**像數據分析師一樣思考**
+- **自主探索**：遇到問題會主動查看表結構、樣本數據
+- **多輪驗證**：發現異常會重新檢查，確保結果準確
+- **複雜分析**：不只是 SQL，能執行 Python 做統計分析、機器學習
+- **思考可見**：即時展示 Agent 的推理過程（Chain-of-Thought）
 
 ## 📸 系統截圖
 
-<table>
-  <tr>
-    <td width="50%">
-      <strong>🤖 智慧Agent思考過程</strong><br/>
-      <img src="../../images/agent-thinking-en.png" width="100%" alt="QueryGPT 介面"/>
-      <p align="center">透明的思考鏈展示，理解AI如何分析您的查詢</p>
-    </td>
-    <td width="50%">
-      <strong>📊 數據視覺化</strong><br/>
-      <img src="../../images/data-visualization-en.png" width="100%" alt="數據視覺化"/>
-      <p align="center">智慧圖表生成，自動選擇最佳展示方式</p>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <strong>👨‍💻 開發者視圖</strong><br/>
-      <img src="../../images/developer-view-en.png" width="100%" alt="開發者視圖"/>
-      <p align="center">完整的執行細節，SQL語句和程式碼透明可見</p>
-    </td>
-    <td width="50%">
-      <strong>🌐 多語言支援</strong><br/>
-      <img src="../../images/main-interface.png" width="100%" alt="主介面"/>
-      <p align="center">支援10種語言，全球用戶無障礙使用</p>
-    </td>
-  </tr>
-</table>
+<img src="../images/agent-thinking-en.png" width="100%" alt="QueryGPT 介面"/>
+
+**即時展示 AI 思考過程，中文對話即可完成複雜數據分析。**
+
+---
+
+<img src="../images/data-visualization-en.png" width="100%" alt="數據視覺化"/>
+
+**自動生成互動式圖表，數據洞察一目了然。**
+
+---
+
+<img src="../images/developer-view-en.png" width="100%" alt="開發者視圖"/>
+
+**完全透明的代碼執行，支援 SQL 與 Python 雙引擎。**
+
+## 🌟 功能特性
+
+### Agent 核心能力
+- **自主數據探索**：主動理解數據結構、探索數據關係
+- **多輪推理迭代**：像分析師一樣深入調查
+- **Chain-of-Thought**：即時展示 AI 思考過程，可隨時介入
+- **上下文記憶**：理解對話歷史，支援連續分析
+
+### 數據分析能力
+- **SQL + Python**：不局限於 SQL，支援複雜的 Python 數據處理
+- **統計分析**：自動進行相關性分析、趨勢預測、異常檢測
+- **業務術語理解**：原生理解年增率、月增率、留存率、復購率等
+- **智慧可視化**：自動選擇最佳圖表類型
+
+### 系統特性
+- **多模型支援**：GPT-5、Claude、Gemini、Ollama 等
+- **彈性部署**：支援雲端 API 或本地部署，數據不外流
+- **歷史記錄**：保存分析過程，支援回溯與分享
+- **數據安全**：唯讀權限、SQL 注入防護、敏感數據遮罩
+- **彈性匯出**：支援 Excel、PDF、HTML 等
+
+## 📦 技術要求
+
+- Python 3.10.x（必需，OpenInterpreter 0.4.3 依賴）
+- MySQL 或相容資料庫
+
+> Windows：請在 WSL 中執行（請勿在 PowerShell/CMD 直接執行腳本）。
+
+## 📊 產品對比
+
+| 對比維度 | **QueryGPT** | Vanna AI | DB-GPT | TableGPT | Text2SQL.AI |
+|---------|:------------:|:--------:|:------:|:--------:|:-----------:|
+| **費用** | **✅ 免費** | ⭕ 付費版 | ✅ 免費 | ❌ 收費 | ❌ 收費 |
+| **開源** | **✅** | ✅ | ✅ | ❌ | ❌ |
+| **本地部署** | **✅** | ✅ | ✅ | ❌ | ❌ |
+| **Python 執行** | **✅ 完整環境** | ❌ | ❌ | ❌ | ❌ |
+| **可視化能力** | **✅ 可編程** | ⭕ 預設圖表 | ✅ 豐富圖表 | ✅ 豐富圖表 | ⭕ 基本 |
+| **業務理解** | **✅ 原生** | ⭕ 基本 | ✅ 良好 | ✅ 優秀 | ⭕ 基本 |
+| **Agent 自主探索** | **✅** | ❌ | ⭕ 基本 | ⭕ 基本 | ❌ |
+| **即時思考展示** | **✅** | ❌ | ❌ | ❌ | ❌ |
+| **擴展能力** | **✅ 無限擴展** | ❌ | ❌ | ❌ | ❌ |
+
+### 我們的核心差異
+- **完整 Python 環境**：真正的 Python 執行環境，可自由撰寫任何代碼
+- **無限擴展性**：需要新功能？直接安裝新庫即可
+- **Agent 自主探索**：遇到問題會主動調查，不是單次查詢
+- **思考過程透明**：可即時查看 AI 的思考並介入
+- **真正免費開源**：MIT 授權，無任何付費牆
 
 ## 🚀 快速開始
 
-### 系統要求
-- Python 3.10.x（必需，OpenInterpreter 0.4.3 依賴）
-- MySQL 5.7+ 或 PostgreSQL 12+
-- 4GB+ RAM（建議 8GB）
-- macOS、Linux 或 Windows 10+
-
-> Windows：請在 WSL 中執行（不要在 PowerShell/CMD 直接執行腳本）。
-
-### 安裝步驟
-
-#### 首次使用
+### 首次使用
 
 ```bash
 # 1. 複製專案
 git clone https://github.com/MKY508/QueryGPT.git
 cd QueryGPT
 
-# 2. 執行設置腳本（自動配置環境）
+# 2. 執行安裝腳本（自動配置環境）
 ./setup.sh
 
-# 3. 配置環境變數
-cp .env.example .env
-# 編輯 .env 文件，設置您的 API 金鑰和數據庫連接
-
-# 4. 啟動服務
+# 3. 啟動服務
 ./start.sh
 ```
 
-#### 日常使用
+### 後續使用
 
 ```bash
-# 快速啟動
+# 已安裝環境下快速啟動
 ./start.sh
 ```
 
-服務預設運行在 http://localhost:5000
+服務預設運行於 http://localhost:5000
 
-> **注意**：如果 5000 埠被佔用（如 macOS AirPlay），系統會自動選擇下一個可用埠（5001-5010）
+> **注意**：若 5000 埠被占用（如 macOS AirPlay），系統會自動選擇 5001–5010 可用埠並在啟動時顯示。
 
-## 📝 使用說明
+## ⚙️ 配置說明
 
-### 基本查詢範例
+### 基礎配置
 
-1. **銷售分析**
-   - "顯示本月的總銷售額"
-   - "比較去年同期的銷售成長率"
-   - "找出銷售前10名的產品"
+1. **複製環境設定檔**
+   ```bash
+   cp .env.example .env
+   ```
+2. **編輯 .env 設定以下內容**
+   - `OPENAI_API_KEY`：OpenAI API 金鑰
+   - `OPENAI_BASE_URL`：API 端點（可選）
+   - 資料庫連線資訊
 
-2. **客戶分析**
-   - "分析客戶的地區分布"
-   - "計算客戶的平均消費金額"
-   - "找出VIP客戶的消費模式"
+### 語義層配置（選用）
 
-3. **趨勢預測**
-   - "預測下個月的銷售趨勢"
-   - "分析產品銷售的季節性變化"
-   - "識別異常的銷售數據"
+**用於增強業務術語理解，不配置不影響基礎功能。**
 
-### 進階功能
+1. **複製範本**
+   ```bash
+   cp backend/semantic_layer.json.example backend/semantic_layer.json
+   ```
+2. **依需求修改**（資料庫映射／核心業務表／快速索引）
 
-#### 自訂模型配置
+## 📁 專案結構
 
-在 `config/models.json` 中添加自訂模型：
+```
+QueryGPT/
+├── backend/
+│   ├── app.py
+│   ├── database.py
+│   ├── interpreter_manager.py
+│   ├── history_manager.py
+│   └── config_loader.py
+├── frontend/
+│   ├── templates/
+│   └── static/
+│       ├── css/
+│       └── js/
+├── docs/
+├── logs/
+├── output/
+├── requirements.txt
+└── .env.example
+```
 
-```json
+## 🔌 API 介面
+
+### 查詢介面
+
+```http
+POST /api/chat
+Content-Type: application/json
+
 {
-  "name": "自訂模型",
-  "id": "custom-model",
-  "api_base": "http://localhost:11434/v1",
-  "api_key": "your-key"
+  "message": "查詢本月銷售總額",
+  "model": "default"
 }
 ```
 
-#### 本地模型部署
+### 歷史記錄
 
-使用 Ollama 部署本地模型：
-
-```bash
-# 安裝 Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# 下載模型
-ollama pull qwen2.5
-
-# 配置 QueryGPT 使用本地模型
-# 在 config 中設置 api_base 為 http://localhost:11434/v1
+```http
+GET /api/history/conversations
+GET /api/history/conversation/:id
+DELETE /api/history/conversation/:id
 ```
 
-#### 語義層配置（選用）
+### 健康檢查
 
-語義層幫助系統更好地理解您的業務術語：
-
-```bash
-# 複製範例文件
-cp backend/semantic_layer.json.example backend/semantic_layer.json
-
-# 根據您的業務需求修改配置
+```http
+GET /api/health
 ```
 
-## 📊 產品比較
+## 🔒 安全說明
 
-| 功能對比 | **QueryGPT** | 競品 A | 競品 B | 競品 C |
-|---------|:------------:|:------:|:------:|:------:|
-| **開源免費** | ✅ 完全免費 | ⭕ 有付費版 | ❌ 收費 | ❌ 收費 |
-| **繁體中文** | ✅ 原生支援 | ⭕ 基礎 | ❌ 不支援 | ⭕ 基礎 |
-| **本地部署** | ✅ 支援 | ⭕ 部分 | ❌ | ❌ |
-| **Python執行** | ✅ 完整環境 | ❌ | ❌ | ❌ |
-| **AI自主探索** | ✅ 進階 | ⭕ 基礎 | ❌ | ❌ |
-| **即時思考顯示** | ✅ | ❌ | ❌ | ❌ |
-| **多語言支援** | ✅ 10種 | ⭕ 3種 | ⭕ 2種 | ⭕ 英文 |
-
-## 🔒 安全注意事項
-
-- ✅ 僅支援唯讀查詢操作
-- ✅ 自動過濾危險 SQL 語句
-- ✅ 建議配置專用唯讀數據庫帳戶
-- ✅ 支援敏感數據自動遮罩
-- ✅ 所有操作都有完整審計日誌
-
-## ❓ 常見問題
-
-**Q：如何處理數據庫連接失敗？**  
-A：檢查數據庫服務狀態，確認 .env 文件中的連接參數正確。
-
-**Q：圖表無法顯示？**  
-A：確保 output 目錄有寫入權限，檢查瀏覽器是否封鎖本地文件存取。
-
-**Q：如何提高查詢準確度？**  
-A：配置語義層幫助系統理解業務術語；提供更詳細的查詢描述。
-
-**Q：支援哪些數據庫？**  
-A：目前支援 MySQL、PostgreSQL、MariaDB，未來將支援更多。
-
-## 🤝 貢獻指南
-
-歡迎提交 Issue 和 Pull Request！
-
-1. Fork 本專案
-2. 創建您的功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 開啟一個 Pull Request
+- 僅支援唯讀查詢（SELECT, SHOW, DESCRIBE）
+- 自動過濾危險 SQL 語句
+- 建議將資料庫用戶配置為唯讀
 
 ## 📄 授權條款
 
-本專案採用 MIT 授權條款 - 詳見 [LICENSE](LICENSE) 文件
-
-## 👨‍💻 作者資訊
-
-- **作者**：毛凱岳 (Mao Kaiyue)
-- **GitHub**：[@MKY508](https://github.com/MKY508)
-- **專案創建**：2025年8月
-
-## 🙏 致謝
-
-感謝所有為本專案做出貢獻的開發者和使用者！
-
-特別感謝：
-- OpenInterpreter 團隊提供的核心執行引擎
-- 所有提供反饋和建議的社群成員
-
----
-
-<div align="center">
-  
-  **QueryGPT - 讓數據分析變得簡單而強大**
-  
-  如果您覺得這個專案有幫助，請給我們一個 ⭐ Star！
-  
-</div>
+MIT License - 詳見 [LICENSE](LICENSE)
 
 ## 🆕 最新更新
 
-- 2025-09-05 – 啟動速度優化：移除首次進入模型頁的自動批量測試，減少不必要的請求並避免狀態誤寫。
+- 2025-09-05 – 啟動速度優化：移除首次進入模型頁的自動批量測試，減少不必要請求並避免狀態誤寫。
+
+## 👨‍💻 作者資訊
+
+- **作者**：Mao Kaiyue
+- **GitHub**：[@MKY508](https://github.com/MKY508)
+- **建立時間**：2025年8月
+
+## ⭐ Star History
+
+<div align="center">
+  <a href="https://star-history.com/#MKY508/QueryGPT&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=MKY508/QueryGPT&type=Date" />
+    </picture>
+  </a>
+</div>
+
+## 🤝 貢獻
+
+歡迎提交 Issue 與 Pull Request。
+
+1. Fork 本專案
+2. 建立功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交變更 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送分支 (`git push origin feature/AmazingFeature`)
+5. 建立 Pull Request

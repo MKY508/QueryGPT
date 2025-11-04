@@ -75,7 +75,7 @@ class API {
      * 流式发送消息（支持实时响应）
      * 注意：当前后端不支持流式响应，改为普通请求
      */
-    async sendMessageStream(message, conversationId = null, viewMode = 'user', onProgress = null, modelName = null, abortSignal = null) {
+    async sendMessageStream(message, conversationId = null, viewMode = 'user', onProgress = null, modelName = null, abortSignal = null, extraOptions = {}) {
         try {
             // 显示思考状态
             if (onProgress) {
@@ -99,7 +99,8 @@ class API {
                     use_database: true,
                     conversation_id: conversationId,  // 传递会话ID
                     context_rounds: window.app?.contextRounds || 3,  // 传递上下文轮数
-                    language: localStorage.getItem('language') || 'zh'  // 传递当前界面语言
+                    language: localStorage.getItem('language') || 'zh',  // 传递当前界面语言
+                    force_execute: extraOptions.forceExecute === true
                 })
             });
 
@@ -109,6 +110,15 @@ class API {
             }
 
             const data = await response.json();
+            if (data.status === 'db_unavailable') {
+                if (onProgress) {
+                    onProgress({
+                        type: 'db_unavailable',
+                        data
+                    });
+                }
+                return data;
+            }
             
             // 处理响应
             if (data.success) {
@@ -158,7 +168,7 @@ class API {
     /**
      * 使用 SSE 发送消息，实时接收进度与结果
      */
-    sendMessageSSE(message, conversationId = null, viewMode = 'user', onEvent = null, modelName = null) {
+    sendMessageSSE(message, conversationId = null, viewMode = 'user', onEvent = null, modelName = null, extraOptions = {}) {
         if (!('EventSource' in window)) {
             throw new Error('SSE not supported');
         }
@@ -174,6 +184,9 @@ class API {
         });
         if (conversationId) {
             params.set('conversation_id', conversationId);
+        }
+        if (extraOptions.forceExecute) {
+            params.set('force_execute', 'true');
         }
         const url = `/api/chat/stream?${params.toString()}`;
         const es = new EventSource(url);

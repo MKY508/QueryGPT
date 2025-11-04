@@ -286,6 +286,57 @@ body {
     max-width: calc(100% - 55px);
 }
 
+.db-warning-card {
+    background: #fff4e5;
+    border: 1px solid #f2c291;
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 10px 30px rgba(234, 162, 60, 0.22);
+    color: #6f4214;
+}
+
+.db-warning-card h4 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    color: #c96a0b;
+}
+
+.db-warning-card .db-warning-message-text {
+    margin: 0 0 8px;
+    line-height: 1.6;
+}
+
+.db-warning-meta {
+    font-size: 13px;
+    color: #9b5a12;
+    margin-bottom: 8px;
+}
+
+.db-warning-meta code {
+    background: rgba(255, 255, 255, 0.6);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--font-mono, 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace);
+}
+
+.db-warning-hint {
+    font-size: 13px;
+    margin: 0 0 12px;
+    color: #83530f;
+}
+
+.db-warning-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.db-warning-actions .btn {
+    padding: 6px 16px;
+    min-width: 110px;
+}
+
 .user-message .message-content {
     background: #e3f2fd;
     margin-left: auto;
