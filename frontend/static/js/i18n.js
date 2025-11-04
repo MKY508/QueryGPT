@@ -209,7 +209,7 @@ const i18n = {
             stableVersion: '正式版本',
             updateTime: '更新时间',
             maintaining: '持续维护中',
-            releaseDate: '2025年8月',
+            releaseDate: '2025年11月',
             features: {
                 ai: '智能数据分析',
                 database: '数据库查询',
@@ -619,7 +619,7 @@ const i18n = {
             stableVersion: 'Stable Version',
             updateTime: 'Update Time',
             maintaining: 'Under Maintenance',
-            releaseDate: 'August 2025',
+            releaseDate: 'November 2025',
             features: {
                 ai: 'AI Data Analysis',
                 database: 'Database Query',
@@ -969,7 +969,7 @@ const i18n = {
             stableVersion: 'Стабильная версия',
             updateTime: 'Время обновления',
             maintaining: 'В активной разработке',
-            releaseDate: 'Август 2025',
+            releaseDate: 'Ноябрь 2025',
             features: {
                 ai: 'ИИ анализ данных',
                 database: 'Запросы к БД',
@@ -1312,7 +1312,7 @@ const i18n = {
             stableVersion: '正式版本',
             updateTime: '更新時間',
             maintaining: '持續維護中',
-            releaseDate: '2025年8月',
+            releaseDate: '2025年11月',
             features: {
                 ai: '智慧數據分析',
                 database: '資料庫查詢',
@@ -1657,7 +1657,7 @@ const i18n = {
             stableVersion: 'Versão Estável',
             updateTime: 'Tempo de Atualização',
             maintaining: 'Em Manutenção',
-            releaseDate: 'Agosto de 2025',
+            releaseDate: 'Novembro de 2025',
             features: {
                 ai: 'Análise de Dados com IA',
                 database: 'Consulta de Banco de Dados',
@@ -2001,7 +2001,7 @@ const i18n = {
             stableVersion: 'Versión Estable',
             updateTime: 'Tiempo de Actualización',
             maintaining: 'En Mantenimiento Continuo',
-            releaseDate: 'Agosto 2025',
+            releaseDate: 'Noviembre 2025',
             features: {
                 ai: 'Análisis de Datos con IA',
                 database: 'Consulta de Base de Datos',
@@ -2352,7 +2352,7 @@ const i18n = {
             stableVersion: 'Version Stable',
             updateTime: 'Date de Mise à Jour',
             maintaining: 'En Maintenance Continue',
-            releaseDate: 'Août 2025',
+            releaseDate: 'Novembre 2025',
             features: {
                 ai: 'Analyse de Données IA',
                 database: 'Requêtes Base de Données',
@@ -2681,7 +2681,7 @@ const i18n = {
             stableVersion: '정식 버전',
             updateTime: '업데이트 시간',
             maintaining: '지속적인 유지보수 중',
-            releaseDate: '2025년 8월',
+            releaseDate: '2025년 11월',
             features: {
                 ai: 'AI 데이터 분석',
                 database: '데이터베이스 쿼리',
@@ -3010,7 +3010,7 @@ const i18n = {
             stableVersion: 'Stabile Version',
             updateTime: 'Aktualisierungszeit',
             maintaining: 'In aktiver Wartung',
-            releaseDate: 'August 2025',
+            releaseDate: 'November 2025',
             features: {
                 ai: 'KI-Datenanalyse',
                 database: 'Datenbankabfrage',

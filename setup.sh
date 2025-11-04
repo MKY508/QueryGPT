@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# QueryGPT 环境配置脚本 v1.2 - 正式版本
-# Environment Setup Script v1.2 - Stable Release
+# QueryGPT 环境配置脚本 v1.5 - 正式版本
+# Environment Setup Script v1.5 - Stable Release
 # 支持 WSL/Linux/macOS 环境
 # 修复: Ubuntu/Debian python3-venv缺失问题
 # Fixed: Ubuntu/Debian python3-venv missing issue
 
-SCRIPT_VERSION="1.2"
+SCRIPT_VERSION="1.5"
 
 set -e
 
@@ -191,8 +191,8 @@ interrupt_handler() {
 }
 
 # 版本信息
-SCRIPT_VERSION="1.2"
-SCRIPT_DATE="2025-09-05"
+SCRIPT_VERSION="1.5"
+SCRIPT_DATE="2025-11-04"
 
 # 检测运行环境 - 三层检测系统
 detect_environment() {

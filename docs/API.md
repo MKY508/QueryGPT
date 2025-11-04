@@ -77,7 +77,7 @@
 ```json
 {
     "status": "healthy",
-    "version": "1.2",
+    "version": "1.5",
     "database": "connected",
     "timestamp": "2025-08-21T10:00:00Z"
 }
@@ -357,6 +357,11 @@ curl http://localhost:5000/api/health
 
 ## 版本历史
 
+- v1.5 (2025-11-04): 智能路由与 UX 全面重构
+  - 移除 SQL_ONLY 路径，统一至 QA 与 ANALYSIS 双路由
+  - Prompt 注入 pymysql 连接与探索示例，强化数据库自助探索
+  - SSE 思考播报升级，前端实时展示步骤
+  - 数据库守卫与设置页体验全面优化
 - v1.2 (2025-09-05): 正式版本发布
   - 版本号统一
   - 智能路由系统（Beta）
