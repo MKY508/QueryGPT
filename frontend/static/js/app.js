@@ -19,6 +19,8 @@ class DataAnalysisPlatform {
         this.tipsManager = null;  // Tips提示管理器
         this._devViewEnabledCache = null; // 缓存开发者视图开关
         this.activeDbWarning = null; // 数据库警告卡片引用
+        this.activeThinkingId = null; // 当前思考气泡ID
+        this.interruptNoticeActive = false; // 当前是否已有中断提示
         
         this.init();
     }
@@ -547,6 +549,8 @@ class DataAnalysisPlatform {
 
         // 显示思考过程
         const thinkingId = this.showThinkingProcess();
+        this.activeThinkingId = thinkingId;
+        this.interruptNoticeActive = false;
 
         let usedSSE = false;
         try {
@@ -622,7 +626,7 @@ class DataAnalysisPlatform {
                 // 回退到原有的非SSE方式
                 this.abortController = new AbortController();
                 const currentModelElement = document.getElementById('current-model');
-                const selectedModel = currentModelElement?.value || this.config?.default_model || 'gpt-5-high';
+                const selectedModel = api.resolveModel(currentModelElement?.value || undefined);
                 const response = await api.sendMessageStream(
                     message,
                     this.currentConversationId,
@@ -697,6 +701,7 @@ class DataAnalysisPlatform {
         }
         this.isProcessing = false;
         this.abortController = null;
+        this.activeThinkingId = null;
     }
 
     /**
@@ -704,7 +709,8 @@ class DataAnalysisPlatform {
      */
     async stopQuery() {
         console.log('开始停止查询, conversationId:', this.currentConversationId);
-        this.showNotification(window.i18nManager.t('common.stopping') || '正在停止...', 'info');
+        const i18n = window.i18nManager || { t: key => key };
+        this.showNotification(i18n.t('common.stopping') || '正在停止...', 'info');
         
         // 发送停止请求到后端
         if (this.currentConversationId) {
@@ -745,22 +751,24 @@ class DataAnalysisPlatform {
             this.abortController.abort();
         }
         
-        // 立即隐藏所有思考动画
-        document.querySelectorAll('.thinking-message').forEach(el => {
-            el.style.transition = 'none';
-            el.remove();
+        // 转换所有思考气泡为“已中断”状态
+        const thinkingElements = Array.from(document.querySelectorAll('.thinking-process'));
+        if (!thinkingElements.length && this.activeThinkingId) {
+            const fallbackThinking = document.getElementById(this.activeThinkingId);
+            if (fallbackThinking) {
+                thinkingElements.push(fallbackThinking);
+            }
+        }
+
+        let transformed = false;
+        thinkingElements.forEach(element => {
+            if (this.transformThinkingToInterrupted(element)) {
+                transformed = true;
+            }
         });
-        
-        // 停止所有动画
-        document.querySelectorAll('.thinking-stage').forEach(el => {
-            el.classList.remove('active');
-        });
-        
-        // 添加中断消息，保留已生成的部分内容
-        const lastBotMessage = Array.from(document.querySelectorAll('.message.bot')).pop();
-        const interruptedText = window.i18nManager.t('common.interrupted');
-        if (!lastBotMessage || !lastBotMessage.textContent.includes(interruptedText)) {
-            this.addMessage('bot', window.i18nManager.t('common.interruptedMessage'));
+
+        if (!transformed) {
+            this.addMessage('bot', i18n.t('common.interruptedMessage'));
         }
 
         this.finishProcessing();
@@ -836,36 +844,67 @@ class DataAnalysisPlatform {
     /**
      * 处理流式响应
      */
-    handleStreamResponse(data, thinkingId) {
-        if (data.type === 'thinking') {
-            this.updateThinkingProcess(thinkingId, data.content);
-        } else if (data.type === 'result') {
-            const steps = Array.isArray(data.steps) ? data.steps : [];
+    handleStreamResponse(event, thinkingId) {
+        if (!event) return;
+
+        const i18n = window.i18nManager || { t: key => key };
+        const type = event.type;
+
+        if (type === 'progress_plan') {
+            const labels = Array.isArray(event.data?.labels) ? event.data.labels : [];
+            this.renderProgressPlan(thinkingId, labels);
+            return;
+        }
+
+        if (type === 'progress') {
+            const payload = event.data || {};
+            const convId = payload.conversation_id || payload.conversationId;
+            if (convId) {
+                this.currentConversationId = convId;
+                localStorage.setItem('currentConversationId', convId);
+            }
+            const tipText = payload.message || payload.stage || i18n.t('common.processing') || '处理中...';
+            this.updateProgressStage(thinkingId, tipText);
+            return;
+        }
+
+        if (type === 'thinking') {
+            this.updateThinkingProcess(thinkingId, event.content);
+            return;
+        }
+
+        if (type === 'result') {
+            const steps = Array.isArray(event.steps) ? event.steps : [];
             if (steps.length) {
                 this.playStepSummaries(thinkingId, steps)
                     .catch(err => {
                         console.warn('播放步骤过程失败:', err);
                     })
                     .finally(() => {
-                        this.transformThinkingToResult(thinkingId, data);
+                        this.transformThinkingToResult(thinkingId, event);
                     });
                 return;
             }
-            // 将思考对话框转换为结果对话框，而不是删除它
-            this.transformThinkingToResult(thinkingId, data);
-        } else if (data.type === 'interrupted') {
-            // 查询被中断，立即隐藏思考动画
-            this.hideThinkingProcess(thinkingId);
-            // 如果有部分结果，显示它们
-            if (data.partial_result) {
-                this.processAssistantResponse(data.partial_result, data.model);
+            this.transformThinkingToResult(thinkingId, event);
+            return;
+        }
+
+        if (type === 'interrupted') {
+            this.transformThinkingToInterrupted(this.activeThinkingId || thinkingId);
+            if (event.partial_result) {
+                this.processAssistantResponse(event.partial_result, event.model);
             }
-            // stopQuery会添加中断消息
-        } else if (data.type === 'error') {
+            return;
+        }
+
+        if (type === 'error') {
             this.hideThinkingProcess(thinkingId);
-            this.addMessage('bot', `错误: ${data.message}`);
-        } else if (data.type === 'status') {
-            this.updateExecutionStatus(data.status);
+            this.addMessage('bot', `错误: ${event.message}`);
+            return;
+        }
+
+        if (type === 'status') {
+            this.updateExecutionStatus(event.status);
         }
     }
 
@@ -2006,6 +2045,54 @@ class DataAnalysisPlatform {
     }
 
     /**
+     * 将思考过程转化为“已中断”提示
+     */
+    transformThinkingToInterrupted(target) {
+        const thinking = typeof target === 'string' ? document.getElementById(target) : target;
+        const i18n = window.i18nManager || { t: key => key };
+
+        if (!thinking) {
+            if (!this.interruptNoticeActive) {
+                const message = this.addMessage('bot', i18n.t('common.interruptedMessage'));
+                if (message) {
+                    message.classList.add('interrupted-message');
+                }
+                this.interruptNoticeActive = true;
+            }
+            return false;
+        }
+
+        const wrapper = thinking.closest('.message');
+        const content = wrapper?.querySelector('.message-content');
+
+        if (content) {
+            const textBlock = document.createElement('div');
+            textBlock.className = 'interrupted-text-block';
+            textBlock.innerHTML = `
+                <i class="fas fa-ban"></i>
+                <span>${i18n.t('common.interruptedMessage')}</span>
+            `;
+
+            content.innerHTML = '';
+            content.appendChild(textBlock);
+        } else if (!this.interruptNoticeActive) {
+            const message = this.addMessage('bot', i18n.t('common.interruptedMessage'));
+            if (message) {
+                message.classList.add('interrupted-message');
+            }
+            this.interruptNoticeActive = true;
+        }
+
+        if (wrapper) {
+            wrapper.classList.add('interrupted-message');
+        }
+
+        thinking.remove();
+        this.interruptNoticeActive = true;
+        return true;
+    }
+
+    /**
      * 将思考对话框转换为结果对话框
      */
     transformThinkingToResult(thinkingId, data) {
@@ -2013,6 +2100,7 @@ class DataAnalysisPlatform {
         if (!thinking) {
             // 如果找不到思考对话框，创建新的
             this.addBotResponse(data);
+            this.interruptNoticeActive = false;
             return;
         }
 
@@ -2066,6 +2154,7 @@ class DataAnalysisPlatform {
                     this.addBotResponse(data);
                     thinking.remove();
                 }
+                this.interruptNoticeActive = false;
             }, 800); // 等待所有阶段完成动画
         }, allStages.length * 100);
     }

@@ -11,6 +11,47 @@ class API {
         };
     }
 
+    resolveModel(modelName) {
+        if (modelName) return modelName;
+
+        const select = document.getElementById('current-model');
+        if (select && select.value) {
+            return select.value;
+        }
+
+        const appConfig = window.app?.config || {};
+        if (appConfig.current_model) {
+            return appConfig.current_model;
+        }
+        if (appConfig.default_model) {
+            return appConfig.default_model;
+        }
+
+        const settingsConfig = window.settingsManager?.config || {};
+        if (settingsConfig.default_model) {
+            return settingsConfig.default_model;
+        }
+
+        const stored = localStorage.getItem('default_model');
+        if (stored) {
+            return stored;
+        }
+
+        const models = window.settingsManager?.models || window.app?.availableModels || [];
+        if (Array.isArray(models) && models.length) {
+            const active = models.find(m => m && m.status === 'active' && m.id);
+            if (active?.id) {
+                return active.id;
+            }
+            const firstAvailable = models.find(m => m?.id);
+            if (firstAvailable?.id) {
+                return firstAvailable.id;
+            }
+        }
+
+        return 'default';
+    }
+
     /**
      * 通用请求方法
      */
@@ -54,11 +95,7 @@ class API {
      */
     async sendMessage(message, conversationId = null, viewMode = 'user', modelName = null) {
         // 获取当前选中的模型
-        const currentModel = modelName || 
-                            document.getElementById('current-model')?.value ||
-                            window.app?.config?.default_model || 
-                            localStorage.getItem('default_model') || 
-                            'gpt-5-high';
+        const currentModel = this.resolveModel(modelName);
         
         return this.request('/api/chat', {
             method: 'POST',
@@ -83,11 +120,7 @@ class API {
             }
             
             // 获取当前选中的模型，优先使用传入的参数
-            const currentModel = modelName || 
-                                document.getElementById('current-model')?.value ||
-                                window.app?.config?.default_model || 
-                                localStorage.getItem('default_model') || 
-                                'gpt-5-high';
+            const currentModel = this.resolveModel(modelName);
             
             const response = await fetch('/api/chat', {
                 method: 'POST',
@@ -173,7 +206,7 @@ class API {
         if (!('EventSource' in window)) {
             throw new Error('SSE not supported');
         }
-        const currentModel = modelName || document.getElementById('current-model')?.value || window.app?.config?.default_model || localStorage.getItem('default_model') || 'gpt-5-high';
+        const currentModel = this.resolveModel(modelName);
         const lang = localStorage.getItem('language') || 'zh';
         const ctxRounds = window.app?.contextRounds || 3;
         const params = new URLSearchParams({

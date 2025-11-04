@@ -158,6 +158,46 @@ class SettingsManager {
         // 不在构造函数中初始化，等待DOM准备好
     }
 
+    getPrimaryModelId() {
+        if (Array.isArray(this.models) && this.models.length) {
+            const active = this.models.find(model => model && model.status === 'active' && model.id);
+            if (active?.id) {
+                return active.id;
+            }
+            const fallback = this.models.find(model => model?.id);
+            if (fallback?.id) {
+                return fallback.id;
+            }
+        }
+
+        if (Array.isArray(this.config?.models) && this.config.models.length) {
+            const activeFromConfig = this.config.models.find(model => model && model.status === 'active' && model.id);
+            if (activeFromConfig?.id) {
+                return activeFromConfig.id;
+            }
+            const firstFromConfig = this.config.models.find(model => model?.id);
+            if (firstFromConfig?.id) {
+                return firstFromConfig.id;
+            }
+        }
+
+        if (this.config?.default_model) {
+            return this.config.default_model;
+        }
+
+        const stored = localStorage.getItem('default_model');
+        if (stored) {
+            return stored;
+        }
+
+        const select = document.getElementById('current-model');
+        if (select?.value) {
+            return select.value;
+        }
+
+        return '';
+    }
+
     /**
      * 初始化设置管理器
      */
@@ -617,6 +657,9 @@ class SettingsManager {
             // 从后端获取模型列表
             const response = await api.getModels();
             this.models = (response.models || []).map(model => this.prepareModelRecord(model));
+            if (window.app) {
+                window.app.availableModels = this.models.map(model => ({ ...model }));
+            }
             this.renderModelsList();
         } catch (error) {
             console.error('加载模型列表失败:', error);
@@ -650,6 +693,9 @@ class SettingsManager {
                     status: 'pending'
                 })
             ];
+            if (window.app) {
+                window.app.availableModels = this.models.map(model => ({ ...model }));
+            }
             this.renderModelsList();
         }
     }
@@ -1299,10 +1345,14 @@ class SettingsManager {
         
         // 从现有配置或默认值获取
         const settings = {
-            default_model: defaultModelElement?.value || this.config?.default_model || 'gpt-5',
+            default_model: defaultModelElement?.value || this.getPrimaryModelId(),
             default_view_mode: defaultViewModeElement?.value || this.config?.default_view_mode || 'dual',
             context_rounds: parseInt(contextRoundsElement?.value) || this.config?.context_rounds || 3
         };
+
+        if (!settings.default_model && this.config?.default_model) {
+            settings.default_model = this.config.default_model;
+        }
         
         console.log('要保存的设置:', settings);
 
@@ -1764,38 +1814,40 @@ class SettingsManager {
      * 设置折叠部分的功能
      */
     setupCollapsibleSections() {
-        // 为所有可折叠的标题添加点击事件
         document.querySelectorAll('.collapsible-header').forEach(header => {
+            if (header.dataset.collapsibleBound === 'true') {
+                return;
+            }
+
             const content = header.nextElementSibling;
-            if (content && content.classList.contains('collapsible-content')) {
-                // 默认展开状态
+            if (!content || !content.classList.contains('collapsible-content')) {
+                return;
+            }
+
+            const sectionId = header.closest('.prompt-section')?.id;
+            const savedState = sectionId ? localStorage.getItem(`collapsed_${sectionId}`) : null;
+            const shouldCollapse = savedState ? savedState === 'true' : true;
+
+            if (shouldCollapse) {
+                header.classList.add('collapsed');
+                content.classList.add('collapsed');
+            } else {
                 header.classList.remove('collapsed');
                 content.classList.remove('collapsed');
-                
-                // 添加点击事件
-                header.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    header.classList.toggle('collapsed');
-                    content.classList.toggle('collapsed');
-                    
-                    // 保存折叠状态到localStorage
-                    const sectionId = header.closest('.prompt-section')?.id;
-                    if (sectionId) {
-                        const isCollapsed = header.classList.contains('collapsed');
-                        localStorage.setItem(`collapsed_${sectionId}`, isCollapsed);
-                    }
-                });
-                
-                // 恢复保存的折叠状态
-                const sectionId = header.closest('.prompt-section')?.id;
-                if (sectionId) {
-                    const savedState = localStorage.getItem(`collapsed_${sectionId}`);
-                    if (savedState === 'true') {
-                        header.classList.add('collapsed');
-                        content.classList.add('collapsed');
-                    }
-                }
             }
+
+            header.addEventListener('click', (event) => {
+                event.preventDefault();
+                header.classList.toggle('collapsed');
+                content.classList.toggle('collapsed');
+
+                if (sectionId) {
+                    const isCollapsed = header.classList.contains('collapsed');
+                    localStorage.setItem(`collapsed_${sectionId}`, isCollapsed);
+                }
+            });
+
+            header.dataset.collapsibleBound = 'true';
         });
     }
     
