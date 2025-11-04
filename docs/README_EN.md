@@ -252,7 +252,7 @@ DB_NAME=          # Leave empty for cross-database query support
 
 | Problem | Solution |
 |---------|----------|
-| **No module named 'venv'** | Run `sudo apt install python3-venv` or use v1.2 setup.sh for auto-fix |
+| **No module named 'venv'** | Run `sudo apt install python3-venv` or use v1.5 setup.sh for auto-fix |
 | **pip install timeout** | Auto-configured domestic mirror sources (Alibaba/Tsinghua/USTC) |
 | **virtualenv: command not found** | Run `pip install virtualenv` |
 
@@ -274,6 +274,22 @@ Issues and Pull Requests are welcome!
 MIT License - see [LICENSE](../LICENSE) for details
 
 ## Latest Updates
+
+### 2025-11-04 - v1.5 Intelligent Routing & UX Overhaul
+- **Simplified Routing**: Removed SQL_ONLY path, unified into QA (polite decline) and ANALYSIS (data analysis)
+- **Prompt Overhaul**:
+  - Rebuilt ANALYSIS system prompts with five-stage workflow (connect → explore → table selection → data processing → output)
+  - Injected executable pymysql examples, preventing raw SQL or local file access
+  - Synced frontend settings, prompt_config.json, setup.sh to ensure consistent defaults
+- **Database Guard Enhancements**:
+  - Reused thinking bubble for connection warnings, no extra chat messages
+  - Added dynamic 8→0 countdown with cleanup on continue/configure
+  - Improved warning card details (target, timestamp, suggested next steps)
+- **Thought Stream Visualization**:
+  - Backend extracts `[步骤 x]` logs, frontend streams them step-by-step like ChatGPT
+  - User view auto-cleans step prefixes; developer view keeps full log
+  - Removed redundant "thinking" placeholder—now starts at “Understanding request” then real steps
+- **Settings Page Fixes**: Restored tab switching for Models/Database/Prompt panels
 
 ### 2025-09-05 - v1.2 Official Release
 - **Smart Virtual Environment Creation**: Resolved Ubuntu/Debian missing python3-venv issue

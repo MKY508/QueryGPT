@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# QueryGPT 智能启动脚本 v1.2 - 正式版本
-# Smart Start Script v1.2 - Stable Release
+# QueryGPT 智能启动脚本 v1.5 - 正式版本
+# Smart Start Script v1.5 - Stable Release
 # 支持 WSL/Linux/macOS 环境
 
 set -e
@@ -31,8 +31,8 @@ IS_NATIVE_LINUX=false  # 纯Linux（非WSL）
 OS_TYPE="Unknown"   # 操作系统类型描述
 
 # 版本信息
-SCRIPT_VERSION="1.2"
-SCRIPT_DATE="2025-09-05"
+SCRIPT_VERSION="1.5"
+SCRIPT_DATE="2025-11-04"
 
 # 错误处理函数
 error_handler() {
