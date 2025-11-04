@@ -262,6 +262,44 @@
                                 </div>
                                 <small data-i18n="settings.smartRoutingDesc">使用AI智能判断查询类型，自动选择最优执行路径，可显著提升简单查询的响应速度</small>
                             </div>
+                            <div class="form-group">
+                                <label data-i18n="settings.dbGuard">数据库守卫</label>
+                                <div class="switch-container">
+                                    <label class="switch">
+                                        <input type="checkbox" id="db-guard-toggle" checked>
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span class="switch-status" id="db-guard-status" data-i18n="settings.toggleOn">已启用</span>
+                                </div>
+                                <div>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" id="db-guard-warn-toggle" checked>
+                                        <span data-i18n="settings.dbGuardWarn">失败时提醒并允许继续执行</span>
+                                    </label>
+                                </div>
+                                <small data-i18n="settings.dbGuardDesc">运行前自动测试数据库连接，失败时提醒用户并可选择继续执行。</small>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="settings.thoughtStream">步骤播报</label>
+                                <div class="switch-container">
+                                    <label class="switch">
+                                        <input type="checkbox" id="thought-stream-toggle" checked>
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span class="switch-status" id="thought-stream-status" data-i18n="settings.toggleOn">已启用</span>
+                                </div>
+                                <small data-i18n="settings.thoughtStreamDesc">在执行每个主要动作前输出简短说明，实时展示智能助手的思考过程。</small>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="settings.thoughtTemplateZh">步骤模板（中文）</label>
+                                <input type="text" id="thought-template-zh" placeholder="步骤{index}：{summary}">
+                                <small data-i18n="settings.thoughtTemplateHint">使用 {index} 表示步骤编号，{summary} 表示操作说明。</small>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="settings.thoughtTemplateEn">Step Template (English)</label>
+                                <input type="text" id="thought-template-en" placeholder="Step {index}: {summary}">
+                                <small data-i18n="settings.thoughtTemplateHintEn">Use {index} for the step number and {summary} for the brief action description.</small>
+                            </div>
                         </div>
                     </div>
                     

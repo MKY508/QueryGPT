@@ -439,7 +439,7 @@ class ConfigLoader:
     @staticmethod
     def get_config() -> Dict[str, Any]:
         """返回聚合配置（向后兼容tests期望）。"""
-        return {
+        base = {
             "api": {
                 "key": os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", ""),
                 "base_url": os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE") or os.getenv("API_BASE_URL", ""),
@@ -453,6 +453,27 @@ class ConfigLoader:
                 "rate_limit": int(os.getenv("RATE_LIMIT", "60"))
             }
         }
+
+        file_config = ConfigLoader._load_config_file()
+        if isinstance(file_config, dict):
+            for key in (
+                "interface_language",
+                "interface_theme",
+                "auto_run_code",
+                "show_thinking",
+                "context_rounds",
+                "default_view_mode"
+            ):
+                if key in file_config:
+                    base[key] = file_config[key]
+
+            if 'features' in file_config and isinstance(file_config['features'], dict):
+                base['features'] = file_config['features']
+
+        if 'features' not in base:
+            base['features'] = {}
+
+        return base
     
     @staticmethod
     def get_log_config() -> Dict[str, Any]:

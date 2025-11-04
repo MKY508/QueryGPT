@@ -375,6 +375,15 @@ def chat():
         
         # 准备上下文
         context = {}
+        config_snapshot = ConfigLoader.get_config()
+        feature_section = config_snapshot.get('features', {}) if isinstance(config_snapshot.get('features', {}), dict) else {}
+        feature_cfg = feature_section
+        thought_cfg = feature_cfg.get('thought_stream') if isinstance(feature_cfg.get('thought_stream'), dict) else {}
+        template_key = 'template_en' if user_language == 'en' else 'template_zh'
+        default_template = 'Step {index}: {summary}' if user_language == 'en' else '步骤{index}：{summary}'
+        context['step_logging_enabled'] = thought_cfg.get('enabled', True)
+        context['step_template'] = thought_cfg.get(template_key, default_template)
+        context['step_min_words'] = thought_cfg.get('min_words', 3)
         if use_database:
             if not ensure_database_manager():
                 logger.warning("请求使用数据库，但未检测到有效配置，自动降级为非数据库模式")
@@ -417,13 +426,8 @@ def chat():
         
         try:
             # 检查智能路由是否启用
-            config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.json')
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            else:
-                config = {}
-            smart_routing_enabled = config.get('features', {}).get('smart_routing', {}).get('enabled', False)
+            smart_routing_cfg = feature_cfg.get('smart_routing') if isinstance(feature_cfg.get('smart_routing'), dict) else {}
+            smart_routing_enabled = smart_routing_cfg.get('enabled', False)
             
             # 使用智能路由系统
             if smart_router and smart_routing_enabled:
@@ -436,7 +440,11 @@ def chat():
                     'context_rounds': context_rounds,
                     'stop_checker': lambda: _get_stop_status(conversation_id),
                     'connection_info': context.get('connection_info', {}),
-                    'force_execute': force_execute
+                    'force_execute': force_execute,
+                    'feature_flags': feature_cfg,
+                    'step_logging_enabled': context.get('step_logging_enabled'),
+                    'step_template': context.get('step_template'),
+                    'step_min_words': context.get('step_min_words')
                 }
                 result = smart_router.route(full_query, router_context)
                 if result.get('status') == 'db_unavailable':
@@ -501,6 +509,10 @@ def chat():
                 "conversation_id": conversation_id,
                 "timestamp": datetime.now().isoformat()
             }
+            if result.get('routing_info'):
+                resp_payload['routing_info'] = result['routing_info']
+            if result.get('classification'):
+                resp_payload['classification'] = result['classification']
             sql_text = result.get('sql')
             if not sql_text and isinstance(result.get('result'), list):
                 for item in result['result']:

@@ -147,6 +147,7 @@ class InterpreterManager:
         执行查询并返回结果，支持会话上下文和中断
         """
         try:
+            context = dict(context or {})
             # 查询澄清检查已禁用 - 让 OpenInterpreter 自行处理所有查询
             # 直接使用原始查询，不进行预处理
             # 创建新的interpreter实例
@@ -164,7 +165,7 @@ class InterpreterManager:
             
             # 根据路由类型和语言设置系统消息
             lang_key = 'en' if language == 'en' else 'zh'
-            route_type = context.get('route_type', 'ANALYSIS') if context else 'ANALYSIS'
+            route_type = context.get('route_type', 'ANALYSIS')
 
             system_messages = (prompt_config or {}).get('systemMessage', {})
 
@@ -225,6 +226,39 @@ class InterpreterManager:
                 """
                 _apply_prompt('ANALYSIS', default_zh, default_en, '分析型prompt')
             
+            # 附加额外系统说明（思考步骤、执行计划）
+            step_logging_enabled = context.get('step_logging_enabled', True)
+            step_template = context.get('step_template') or ('Step {index}: {summary}' if language == 'en' else '步骤{index}：{summary}')
+            step_template_display = step_template.replace('{', '{{').replace('}', '}}')
+            step_min_words = max(int(context.get('step_min_words', 3) or 3), 1)
+            suggested_plan = context.get('suggested_plan') if isinstance(context.get('suggested_plan'), (list, tuple)) else []
+
+            append_segments = []
+            if suggested_plan:
+                plan_title = '推荐执行计划' if language != 'en' else 'Suggested Plan'
+                plan_lines = '\n'.join(f"- {str(item)}" for item in suggested_plan)
+                append_segments.append(f"{plan_title}:\n{plan_lines}")
+
+            if step_logging_enabled:
+                if language == 'en':
+                    append_segments.append(
+                        "Step Logging Requirement: before each major action, print a short summary using the template "
+                        f"\"{step_template_display}\" (replace {{index}} with step number starting at 1 and {{summary}} with an action description of at least {step_min_words} words) before executing the code."
+                    )
+                else:
+                    append_segments.append(
+                        "步骤输出要求：每个关键动作开始前打印一行说明，格式遵循 \""
+                        f"{step_template_display}\"（将{{index}}替换为从1开始的步骤编号，将{{summary}}替换为不少于{step_min_words}字的动作描述），然后再执行代码。"
+                    )
+            else:
+                if language == 'en':
+                    append_segments.append("Step logging is disabled for this run. Ignore any earlier instructions about step summaries and proceed directly with the actions.")
+                else:
+                    append_segments.append("本次执行已关闭步骤播报，请忽略上方关于步骤说明的要求，直接执行各项操作。")
+
+            if append_segments:
+                interpreter.system_message = (interpreter.system_message.rstrip() + "\n\n" + "\n".join(append_segments)).strip()
+
             # 获取会话历史（如果有）
             conversation_history = None
             if conversation_id:
@@ -237,6 +271,12 @@ class InterpreterManager:
             
             # 构建包含历史的提示词（使用增强后的查询）
             full_prompt = self._build_prompt_with_context(query, context, conversation_history, language)
+
+            # 在完整提示前注入推荐步骤，帮助模型规划执行顺序
+            if suggested_plan:
+                heading = '## 推荐执行计划' if language != 'en' else '## Suggested Execution Plan'
+                plan_lines = '\n'.join(f"{idx + 1}. {str(item)}" for idx, item in enumerate(suggested_plan))
+                full_prompt = f"{heading}\n{plan_lines}\n\n{full_prompt}"
             logger.debug(f"[会话上下文] 构建的完整提示词长度: {len(full_prompt)} 字符")
             
             # 存储当前的interpreter以便停止

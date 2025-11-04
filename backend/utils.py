@@ -128,8 +128,21 @@ def generate_progress_plan(
     except Exception as e:
         logger.debug(f"生成进度计划失败: {e}")
         pass
-    # 默认计划
-    return ['准备', '解析需求', '查询数据', '生成图表', '总结输出'] if language != 'en' else ['Prepare', 'Parse', 'Query', 'Chart', 'Summary']
+    # 默认计划（根据路线区分）
+    route_key = (route_type or 'analysis').lower()
+    if language == 'en':
+        defaults = {
+            'qa': ['Greet', 'Clarify Scope', 'Wrap Up'],
+            'sql_only': ['Confirm Scope', 'Inspect Schema', 'Run SQL', 'Validate Result'],
+            'analysis': ['Understand Need', 'Explore Data', 'Analyze', 'Visualize', 'Summarize']
+        }
+    else:
+        defaults = {
+            'qa': ['确认需求', '说明范围', '友好结束'],
+            'sql_only': ['确认目标', '检查结构', '执行SQL', '校验结果'],
+            'analysis': ['理解需求', '探索数据', '深入分析', '生成图表', '总结输出']
+        }
+    return defaults.get(route_key, defaults['analysis'])
 
 
 # ============ 限流装饰器 ============
