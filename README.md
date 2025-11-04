@@ -104,9 +104,11 @@
 
 - Python 3.10.x（必需，OpenInterpreter 0.4.3 依赖）
 - MySQL 协议兼容的数据库（详见下方支持列表）
-- 支持系统：Linux、macOS、**Windows (必须通过WSL)**
+- 支持系统：Linux、macOS、**Windows (原生支持 + WSL)**
 
-> ⚠️ **Windows用户重要提示**：本项目使用bash脚本，**必须在WSL (Windows Subsystem for Linux) 中运行**，不支持在PowerShell或CMD中直接运行。
+> ✅ **Windows用户**：现在支持两种方式运行：
+> - **原生 Windows**：直接双击 `setup.bat` 和 `start.bat`（推荐）
+> - **WSL**：使用 `setup.sh` 和 `start.sh`（功能完全相同）
 
 <br/>
 
@@ -142,7 +144,20 @@ chmod +x setup.sh start.sh
 
 就这么简单！✨ 
 
-#### 🪟 Windows WSL 用户
+#### 🪟 Windows 用户（原生支持）
+```cmd
+# 1. 克隆项目（在 PowerShell 或 CMD 中）
+git clone https://github.com/MKY508/QueryGPT.git
+cd QueryGPT
+
+# 2. 运行脚本
+setup.bat   # 自动安装所有依赖（2-5分钟）
+start.bat   # 启动服务
+```
+
+> 💡 **提示**：Windows 下会使用 `venv_py310\Scripts\` 作为虚拟环境目录，与 Linux/macOS 的 `venv_py310/bin/` 完全兼容。
+
+#### 🐧 Windows WSL 用户
 ```bash
 # 步骤1：进入WSL（在PowerShell中）
 wsl
@@ -204,12 +219,22 @@ cd QueryGPT
 
 ## 🔧 快速故障排除
 
-### Windows/WSL 常见问题
+### Windows 常见问题
 
 | 问题 | 解决方案 |
 |------|---------|
-| **bash: ./setup.sh: No such file or directory** | 您在PowerShell中，请先输入 `wsl` 进入WSL环境 |
-| **'.' 不是内部或外部命令** | 同上，必须在WSL中运行，不能在CMD/PowerShell |
+| **'python' 不是内部或外部命令** | 请安装 Python 3.10 并添加到系统 PATH，或使用 `py -3.10` 运行 |
+| **setup.bat 执行失败** | 确保已安装 Python 3.10，运行 `python --version` 检查版本 |
+| **虚拟环境创建失败** | 运行 `python -m venv venv_py310` 手动创建，或检查 Python 安装是否完整 |
+| **start.bat 找不到虚拟环境** | 确保已运行 `setup.bat` 完成初始化 |
+| **端口被占用** | 脚本会自动查找可用端口（5000-5100），或设置环境变量 `set PORT=8080` |
+
+### Windows WSL 常见问题
+
+| 问题 | 解决方案 |
+|------|---------|
+| **bash: ./setup.sh: No such file or directory** | 您在PowerShell中，请先输入 `wsl` 进入WSL环境，或使用 `setup.bat` |
+| **'.' 不是内部或外部命令** | 在 WSL 中使用 `./setup.sh`，或在 Windows 中使用 `setup.bat` |
 | **Permission denied** | 运行 `chmod +x setup.sh start.sh` 添加执行权限 |
 | **WSL中进程立即停止** | 脚本已自动处理，使用前台运行模式 |
 | **模块库确实** | 没有进入python虚拟环境(一般来说脚本会自动进入,但是有些系统受兼容性影响虚拟环境有问题,可以尝试自己创建) |
