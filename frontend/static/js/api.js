@@ -131,7 +131,8 @@ class API {
                         type: 'result', 
                         content: data.result,
                         model: data.model,
-                        conversationId: data.conversation_id 
+                        conversationId: data.conversation_id,
+                        steps: data.steps || []
                     });
                 }
             } else if (data.interrupted) {

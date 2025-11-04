@@ -8,6 +8,7 @@ import signal
 import warnings
 from typing import Dict, Any, Optional, Set
 import logging
+import re
 
 warnings.filterwarnings(
     "ignore",
@@ -177,23 +178,7 @@ class InterpreterManager:
                     interpreter.system_message = default_zh if lang_key == 'zh' else default_en
                 logger.info(f"使用{category}路由的{log_suffix}")
 
-            if route_type == 'SQL_ONLY':
-                default_zh = """
-                你是一个SQL快速核查助手。遵循以下原则：
-                1. 仅执行只读SQL，不生成图表或保存文件；操作前后输出“步骤说明”
-                2. 执行前确认库表和字段，执行后报告记录数与执行时间
-                3. 对空结果或异常值给出标注与后续建议
-                4. 如关键信息缺失，先向用户澄清再执行
-                """
-                default_en = """
-                You are a SQL verification assistant. Follow these rules:
-                1. Execute read-only SQL only, no charts or files; print a "Step" summary before each action
-                2. Clarify tables/fields before running SQL, report row counts and timing afterward
-                3. Highlight empty or suspicious results and suggest next steps
-                4. Ask users for missing details before executing
-                """
-                _apply_prompt('SQL_ONLY', default_zh, default_en, '限制性prompt')
-            elif route_type == 'QA':
+            if route_type == 'QA':
                 default_zh = """
                 你是一个数据库助手。当用户提问与数据库或分析无关时，请礼貌拒绝：
                 - 明确说明你专注于数据库取数与分析
@@ -209,20 +194,107 @@ class InterpreterManager:
                 _apply_prompt('QA', default_zh, default_en, '礼貌拒绝prompt')
             else:
                 default_zh = """
-                你是一个数据分析助手，需遵循以下流程：
-                1. 在每个操作前输出“步骤说明”，说明即将进行的动作
-                2. 使用pandas处理数据，必要时使用plotly绘制图表
-                3. 重要结果保存到output目录，并提示用户文件位置
-                4. 操作保持安全：数据库只读；安装依赖需获得用户许可
-                5. 收尾时总结发现、局限与建议
-                """
+                你是 QueryGPT 的数据分析助手，负责从只读数据库中探索、取数并生成业务洞察。请沿着以下完整流程开展工作：
+
+                【阶段 1：建立连接】
+                - 使用提供的 pymysql 参数建立连接，例如：
+                  import pymysql
+                  try:
+                      conn = pymysql.connect(host='...', port=..., user='...', password='...', database='...')
+                      cursor = conn.cursor()
+                  except Exception as e:
+                      print(f"数据库连接失败: {e}")
+                      raise
+                - 若连接失败，详细说明 host:port 与报错信息，提醒用户检查服务/凭证/网络后终止本次任务。
+
+                【阶段 2：版本识别】
+                - cursor.execute("SELECT VERSION()")
+                - db_version = cursor.fetchone()[0]
+                - print(f"数据库版本: {db_version}")
+
+                【阶段 3：数据库探索策略（当未指定 database 时）】
+                1. cursor.execute("SHOW DATABASES")
+                2. 根据业务关键词智能筛选：销售相关优先匹配 sales/trade/order/trd；数据仓库优先级 center_dws > dws > dwh > dw > ods > ads
+                3. cursor.execute(f"USE `{target_db}`")
+                4. cursor.execute("SHOW TABLES")
+                5. 对候选表执行 DESCRIBE 以及 SELECT * LIMIT 10，核对字段与样本数据
+
+                【阶段 4：表选择策略】
+                - 优先选择包含 trd/trade/order/sale + detail/day 的交易明细表
+                - 避免 production/forecast/plan/budget 等计划类表
+                - 确认表数据量和日期范围覆盖用户需求
+
+                【阶段 5：字段识别规则】
+                - 月份字段：v_month > month > year_month > year_of_month
+                - 销量字段：sale_num > sale_qty > quantity > qty
+                - 金额字段：pay_amount > order_amount > total_amount
+
+                【阶段 6：数据处理规则】
+                - Decimal 类型转换为 float
+                - 统一日期格式（如 "2025-01"）
+                - 识别异常或负值时，可在 SQL 中通过 WHERE 条件过滤
+
+                【阶段 7：执行与分析】
+                - 编写只读 SQL 获取数据，使用 pandas 进行清洗、聚合与分析
+                - 需要可视化时使用 plotly 绘制图表并保存到 output/ 目录
+                - 每个操作前可用 print(f"[步骤 {{index}}] {{summary}}") 告知即将进行的动作；真正的发现、错误与建议请用普通文本向用户说明
+                - 严禁访问本地 CSV/Excel/SQLite 文件，除非用户明确提供并授权
+
+                【阶段 8：输出要求与沟通】
+                - 清晰陈述完成的任务、关键发现、局限与下一步建议
+                - 遇到阻断（如连接失败、缺少权限、无匹配数据）时，说明具体原因并给出实际可执行的排查步骤
+                - 仅在多次探索仍缺少关键信息时，礼貌询问用户补充细节。
+                        """
                 default_en = """
-                You are a data analysis assistant. Follow these steps:
-                1. Print a "Step" summary before each action to keep the user informed
-                2. Use pandas for data processing and plotly for visualization when helpful
-                3. Save important outputs to the output directory and tell the user the file path
-                4. Maintain safety: read-only database access; request approval before installing packages
-                5. Conclude with findings, limitations, and recommendations
+                You are the QueryGPT data analysis assistant. Handle database-related tasks by following this end-to-end workflow:
+
+                [Stage 1: Establish the connection]
+                - Use the provided pymysql credentials, for example:
+                  import pymysql
+                  try:
+                      conn = pymysql.connect(host="...", port=..., user="...", password="...", database="...")
+                      cursor = conn.cursor()
+                  except Exception as e:
+                      print(f"Database connection failed: {e}")
+                      raise
+                - If the connection fails, report the host:port and the exact error, advise the user to check the service/credentials/network, and stop.
+
+                [Stage 2: Identify database version]
+                - cursor.execute("SELECT VERSION()")
+                - db_version = cursor.fetchone()[0]
+                - print(f"Database version: {db_version}")
+
+                [Stage 3: Database exploration strategy (when database is not specified)]
+                1. cursor.execute("SHOW DATABASES")
+                2. Choose candidates by business keywords (sales/trade/order/trd) and priority order center_dws > dws > dwh > dw > ods > ads
+                3. cursor.execute(f"USE `{target_db}`")
+                4. cursor.execute("SHOW TABLES")
+                5. Run DESCRIBE and SELECT * LIMIT 10 on candidates to verify structure and sample data
+
+                [Stage 4: Table selection strategy]
+                - Prefer tables containing trd/trade/order/sale plus detail/day
+                - Avoid production/forecast/plan/budget tables
+                - Confirm the table’s date range and volume cover the request
+
+                [Stage 5: Field recognition]
+                - Month columns: v_month > month > year_month > year_of_month
+                - Volume columns: sale_num > sale_qty > quantity > qty
+                - Amount columns: pay_amount > order_amount > total_amount
+
+                [Stage 6: Data processing rules]
+                - Cast Decimal to float when needed
+                - Normalize date formats (e.g., "2025-01")
+                - When encountering anomalies or negative values, filter them in SQL with WHERE clauses
+
+                [Stage 7: Execution and analysis]
+                - Write read-only SQL to fetch data, process with pandas, and create visualisations with plotly (save outputs to the output/ directory)
+                - You may print(f"[Step {{index}}] {{summary}}") before each action, but present findings, errors, and recommendations in regular prose
+                - Never access local CSV/Excel/SQLite files unless the user explicitly supplies and authorises them
+
+                [Stage 8: Reporting & communication]
+                - Summarise completed tasks, key findings, limitations, and next steps
+                - If blocked (e.g., connection failure, missing permissions, no matching data), explain the precise reason and offer actionable troubleshooting guidance
+                - Only ask the user for additional details after you have exhausted the exploration strategy above.
                 """
                 _apply_prompt('ANALYSIS', default_zh, default_en, '分析型prompt')
             
@@ -242,23 +314,41 @@ class InterpreterManager:
             if step_logging_enabled:
                 if language == 'en':
                     append_segments.append(
-                        "Step Logging Requirement: before each major action, print a short summary using the template "
-                        f"\"{step_template_display}\" (replace {{index}} with step number starting at 1 and {{summary}} with an action description of at least {step_min_words} words) before executing the code."
+                        (
+                            "Step logging requirement: before running any code, output one line with "
+                            f"print(f\"{step_template_display}\") where {{index}} starts at 1 and {{summary}} "
+                            f"describes the action in at least {step_min_words} words. Keep the line on a single row and avoid extra punctuation. "
+                            "Example: print(f\"[Step {{index}}] validating database connection\")."
+                        )
                     )
                 else:
                     append_segments.append(
-                        "步骤输出要求：每个关键动作开始前打印一行说明，格式遵循 \""
-                        f"{step_template_display}\"（将{{index}}替换为从1开始的步骤编号，将{{summary}}替换为不少于{step_min_words}字的动作描述），然后再执行代码。"
+                        (
+                            "步骤输出要求：执行前请调用 print(f\""
+                            f"{step_template_display}\") 输出一行说明，{{index}} 从 1 开始递增，{{summary}} 至少包含 "
+                            f"{step_min_words} 个字，禁止换行或添加多余分隔符。示例：print(f\"[步骤 {{index}}] 校验数据库连接\")."
+                        )
                     )
             else:
                 if language == 'en':
-                    append_segments.append("Step logging is disabled for this run. Ignore any earlier instructions about step summaries and proceed directly with the actions.")
+                    append_segments.append(
+                        "Step logging is disabled for this run. Ignore previous instructions about step summaries and proceed directly."
+                    )
                 else:
-                    append_segments.append("本次执行已关闭步骤播报，请忽略上方关于步骤说明的要求，直接执行各项操作。")
+                    append_segments.append("本次执行已关闭步骤播报，可忽略所有相关要求，直接按计划执行。")
+
+            if language == 'en':
+                append_segments.append(
+                    "Always self-explore using SHOW DATABASES, SHOW TABLES, DESCRIBE, and SELECT * LIMIT 10 before crafting queries. Only when exploration cannot resolve an ambiguity may you ask the user for precise details. Step summaries must be imperative statements and must not contain questions unless explicitly requesting clarification. Use the step log only to announce forthcoming actions; deliver findings, errors, and final answers in regular prose without the step prefix."
+                )
+            else:
+                append_segments.append(
+                    "在编写查询前必须使用 SHOW DATABASES、SHOW TABLES、DESCRIBE、SELECT * LIMIT 10 等指令自行探索。仅当充分探索仍无法消除歧义时，方可礼貌地向用户确认具体信息。步骤说明必须是动作陈述句，除非明确请求澄清，否则禁止使用问句。步骤播报只用于说明即将执行的操作；最终结论、发现与错误信息请以正常表述输出，勿再使用“步骤”前缀。"
+                )
 
             if append_segments:
                 interpreter.system_message = (interpreter.system_message.rstrip() + "\n\n" + "\n".join(append_segments)).strip()
-
+            
             # 获取会话历史（如果有）
             conversation_history = None
             if conversation_id:
@@ -315,6 +405,7 @@ class InterpreterManager:
                 self._start_process_monitoring(conversation_id)
             
             # 执行查询（带停止检查）
+            steps = []
             try:
                 # 创建一个包装函数来定期检查停止状态
                 result = None
@@ -365,6 +456,11 @@ class InterpreterManager:
                 
                 if error_occurred:
                     raise Exception(f"执行出错: {result}")
+                try:
+                    steps = self._extract_steps_from_result_payload(result)
+                except Exception as step_err:  # pylint: disable=broad-except
+                    logger.debug("提取思考步骤失败: %s", step_err)
+                    steps = []
                 
             finally:
                 # 停止进程监控
@@ -380,7 +476,8 @@ class InterpreterManager:
                 "success": True,
                 "result": result,
                 "model": model_name or self.config.get("current_model"),
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
+                "steps": steps
             }
             
         except KeyboardInterrupt:
@@ -398,7 +495,8 @@ class InterpreterManager:
                 "success": False,
                 "error": str(e),
                 "model": model_name or self.config.get("current_model"),
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
+                "steps": []
             }
         finally:
             # 清理session cache
@@ -437,21 +535,25 @@ class InterpreterManager:
             if language == 'en':
                 # 英文版prompt - 从配置文件构建
                 prompt_parts = [
-                    "【IMPORTANT】: All data is in MySQL database, DO NOT look for CSV or any files!",
-                    "Use pymysql to connect to database and execute SQL queries directly.",
-                    f"\nDatabase Connection (Apache Doris, MySQL Protocol):",
-                    f"host = '{conn['host']}'",
-                    f"port = {conn['port']}",
-                    f"user = '{conn['user']}'",
-                    f"password = '{conn['password']}'",
-                    f"database = '{conn.get('database', '')}'  # If empty, explore available databases first",
-                    "\n【Database Exploration Steps】:",
-                    "1. If no database specified, run SHOW DATABASES to see all available databases",
-                    "2. Select appropriate database based on business needs (e.g., containing sales/order/trade keywords)",
-                    "3. USE the selected database, then SHOW TABLES to view table structure",
-                    "4. Run DESCRIBE to understand field structure, SELECT * LIMIT 10 to view sample data",
-                    "5. Based on data characteristics and user needs, write and execute appropriate SQL queries",
-                    f"\nUser Request: {query}\n",
+                    "### Database connection (run before everything else)",
+                    "import pymysql",
+                    f"conn = pymysql.connect(host='{conn['host']}', port={conn['port']}, user='{conn['user']}', password='{conn['password']}', database='{conn.get('database', '')}')",
+                    "cursor = conn.cursor()",
+                    "cursor.execute('SELECT VERSION()')",
+                    "db_version = cursor.fetchone()[0]",
+                    "print(f\"Detected database version: {db_version}\")",
+                    "If the connection fails, stop immediately and report the error. Do not fall back to local files or mock data.",
+                    "",
+                    "### Exploration guidance",
+                    "- Prefer SHOW DATABASES / SHOW TABLES / DESCRIBE for MySQL/Doris dialects.",
+                    "- When syntax errors occur, switch to ANSI information_schema queries (e.g., SELECT schema_name FROM information_schema.schemata, SELECT column_name FROM information_schema.columns WHERE table_name='xxx').",
+                    "- Confirm the target database and tables before running business queries.",
+                    "",
+                    "### Safety notes",
+                    "- Execute only read-only SQL (SELECT/SHOW/DESCRIBE/EXPLAIN).",
+                    "- Never access local CSV/Excel/SQLite files or fabricate data.",
+                    "",
+                    f"User Request: {query}\n",
                     "Important Requirements:"
                 ]
                 
@@ -483,21 +585,25 @@ class InterpreterManager:
             else:
                 # 中文版prompt - 从配置文件构建
                 prompt_parts = [
-                    "【重要】：所有数据都在MySQL数据库中，不要查找CSV或任何文件！",
-                    "直接使用pymysql连接数据库并执行SQL查询。",
-                    f"\n数据库连接信息（Apache Doris，MySQL协议）：",
-                    f"host = '{conn['host']}'",
-                    f"port = {conn['port']}",
-                    f"user = '{conn['user']}'",
-                    f"password = '{conn['password']}'",
-                    f"database = '{conn.get('database', '')}'  # 如果为空，需要先探索可用数据库",
-                    "\n【数据库探索步骤】：",
-                    "1. 如果没有指定数据库，先执行 SHOW DATABASES 查看所有可用数据库",
-                    "2. 根据业务需求选择合适的数据库（如包含sales/order/trade等关键词的库）",
-                    "3. USE 选中的数据库，然后 SHOW TABLES 查看表结构",
-                    "4. 对相关表执行 DESCRIBE 了解字段结构，执行 SELECT * LIMIT 10 查看样本数据",
-                    "5. 根据数据特征和用户需求，编写并执行相应的SQL查询",
-                    f"\n用户需求：{query}\n",
+                    "### 数据库连接（务必优先执行）",
+                    "import pymysql",
+                    f"conn = pymysql.connect(host='{conn['host']}', port={conn['port']}, user='{conn['user']}', password='{conn['password']}', database='{conn.get('database', '')}')",
+                    "cursor = conn.cursor()",
+                    "cursor.execute('SELECT VERSION()')",
+                    "db_version = cursor.fetchone()[0]",
+                    "print(f\"检测到数据库版本: {db_version}\")",
+                    "若连接失败，请立即停止并向用户说明，不要尝试本地文件或伪造数据。",
+                    "",
+                    "### 探索指引",
+                    "- MySQL / Doris 优先使用 SHOW DATABASES、SHOW TABLES、DESCRIBE；",
+                    "- 若语法不兼容，改用 ANSI information_schema 查询（如 SELECT schema_name FROM information_schema.schemata、SELECT column_name FROM information_schema.columns WHERE table_name='xxx'）；",
+                    "- 在执行业务查询前，先确认目标数据库与表结构。",
+                    "",
+                    "### 安全提示",
+                    "- 仅执行只读 SQL（SELECT / SHOW / DESCRIBE / EXPLAIN）；",
+                    "- 禁止访问本地 CSV/Excel/SQLite 文件或生成伪造数据。",
+                    "",
+                    f"用户需求：{query}\n",
                     "重要要求："
                 ]
                 
@@ -812,6 +918,62 @@ class InterpreterManager:
             return '\n'.join(key_info) if key_info else str(result)[:500]
         
         return str(result)[:500]
+
+    @staticmethod
+    def _extract_steps_from_result_payload(payload: Any) -> list:
+        """从执行结果中提取步骤播报"""
+        if payload is None:
+            return []
+
+        pattern = re.compile(r"\[(?:步骤|Step)\s*(\d+)\]\s*(.+)")
+        steps = []
+        seen = set()
+
+        def append_step(index_str: str, summary_text: str):
+            if summary_text is None:
+                return
+            summary = str(summary_text).replace('\r', ' ').replace('\n', ' ').strip()
+            if not summary:
+                return
+            if len(summary) > 120:
+                summary = summary[:117] + '...'
+            try:
+                idx = int(index_str)
+            except (ValueError, TypeError):
+                idx = len(steps) + 1
+            key = (idx, summary)
+            if key in seen:
+                return
+            seen.add(key)
+            steps.append({'index': idx, 'summary': summary})
+
+        def inspect_text(text: str):
+            if not text:
+                return
+            for match in pattern.finditer(text):
+                append_step(match.group(1), match.group(2))
+
+        def traverse(obj: Any):
+            if obj is None:
+                return
+            if isinstance(obj, dict):
+                obj_type = obj.get('type')
+                if obj_type in {'console', 'message', 'assistant', 'system', 'text', 'output'} and obj.get('content'):
+                    inspect_text(str(obj.get('content')))
+                else:
+                    for value in obj.values():
+                        traverse(value)
+            elif isinstance(obj, list):
+                for item in obj:
+                    traverse(item)
+            elif isinstance(obj, str):
+                inspect_text(obj)
+            else:
+                inspect_text(str(obj))
+
+        traverse(payload)
+        steps.sort(key=lambda item: item.get('index', 0))
+        return steps
     
     def _build_prompt_with_context(self, query: str, context: Dict[str, Any] = None, 
                                    conversation_history: list = None, language: str = 'zh') -> str:
@@ -1112,3 +1274,4 @@ class InterpreterManager:
                 })
         
         logger.info(f"查询停止完成: {conversation_id}")
+

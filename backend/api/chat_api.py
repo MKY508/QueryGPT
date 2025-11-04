@@ -223,7 +223,8 @@ def chat_stream():
                     'success': result.get('success', False),
                     'result': result.get('result') or result.get('error'),
                     'model': result.get('model'),
-                    'conversation_id': conv_id
+                    'conversation_id': conv_id,
+                    'steps': result.get('steps', [])
                 })
 
                 yield sse_format('done', {'conversation_id': conv_id})
@@ -507,7 +508,8 @@ def chat():
                 "result": result['result'],
                 "model": result['model'],
                 "conversation_id": conversation_id,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "steps": result.get('steps', [])
             }
             if result.get('routing_info'):
                 resp_payload['routing_info'] = result['routing_info']
@@ -525,10 +527,10 @@ def chat():
                 for item in result['result']:
                     content = item.get('content') if isinstance(item, dict) else None
                     if content:
-                        parts.append(str(content))
-                resp_payload['response'] = '\n'.join(parts)[:2000]
+                        parts.append(_sanitize_user_facing_output(str(content)))
+                resp_payload['response'] = '\n'.join(filter(None, parts))[:2000]
             else:
-                resp_payload['response'] = str(result.get('result'))[:2000]
+                resp_payload['response'] = _sanitize_user_facing_output(str(result.get('result')))[:2000]
             return jsonify(resp_payload)
         elif result.get('interrupted'):
             if history_manager and conversation_id:
@@ -610,4 +612,13 @@ def stop_query():
     except Exception as e:
         logger.error(f"停止查询失败: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+def _sanitize_user_facing_output(text: str) -> str:
+    import re
+    if not isinstance(text, str):
+        text = str(text)
+    cleaned = re.sub(r'^\[(?:步骤|Step)\s*\d+\].*$', '', text, flags=re.MULTILINE)
+    cleaned = re.sub(r'\n{2,}', '\n', cleaned)
+    return cleaned.strip()
 

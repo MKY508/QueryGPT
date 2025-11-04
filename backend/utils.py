@@ -131,18 +131,16 @@ def generate_progress_plan(
     # 默认计划（根据路线区分）
     route_key = (route_type or 'analysis').lower()
     if language == 'en':
-        defaults = {
-            'qa': ['Greet', 'Clarify Scope', 'Wrap Up'],
-            'sql_only': ['Confirm Scope', 'Inspect Schema', 'Run SQL', 'Validate Result'],
-            'analysis': ['Understand Need', 'Explore Data', 'Analyze', 'Visualize', 'Summarize']
+        default_plans = {
+            'qa': ['Clarify Query', 'Request Details'],
+            'analysis': ['Connect DB', 'Explore Schema', 'Query Data', 'Analyze', 'Summarize']
         }
     else:
-        defaults = {
-            'qa': ['确认需求', '说明范围', '友好结束'],
-            'sql_only': ['确认目标', '检查结构', '执行SQL', '校验结果'],
-            'analysis': ['理解需求', '探索数据', '深入分析', '生成图表', '总结输出']
+        default_plans = {
+            'qa': ['确认需求', '引导澄清'],
+            'analysis': ['连接数据库', '探索结构', '获取数据', '分析处理', '总结汇报']
         }
-    return defaults.get(route_key, defaults['analysis'])
+    return default_plans.get(route_key, default_plans['analysis'])
 
 
 # ============ 限流装饰器 ============

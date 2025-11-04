@@ -245,17 +245,34 @@ class SettingsManager {
      * 切换设置标签页
      */
     switchSettingsTab(tabName) {
-        // 更新标签按钮状态
-        document.querySelectorAll('.settings-tab').forEach(tab => {
-            tab.classList.remove('active');
+        // 更新侧边栏标签按钮状态
+        document.querySelectorAll('.nav-link[data-tab="settings"]').forEach(tab => {
+            if (tab.dataset.settingsTab) {
+                tab.classList.remove('active');
+            }
         });
-        document.querySelector(`[data-settings-tab="${tabName}"]`).classList.add('active');
+        const targetNavLink = document.querySelector(`.nav-link[data-settings-tab="${tabName}"]`);
+        if (targetNavLink) {
+            targetNavLink.classList.add('active');
+        }
+
+        // 更新设置页面顶部标签状态
+        document.querySelectorAll('.settings-tab').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        const targetTopTab = document.querySelector(`.settings-tab[data-settings-tab="${tabName}"]`);
+        if (targetTopTab) {
+            targetTopTab.classList.add('active');
+        }
 
         // 更新面板显示
         document.querySelectorAll('.settings-panel').forEach(panel => {
             panel.classList.remove('active');
         });
-        document.getElementById(`${tabName}-settings`).classList.add('active');
+        const targetPanel = document.getElementById(`${tabName}-settings`);
+        if (targetPanel) {
+            targetPanel.classList.add('active');
+        }
         
         // 移除首次进入自动批量测试，避免错误修改状态
         // if (tabName === 'models' && !this.hasTestedModels) {
@@ -452,7 +469,7 @@ class SettingsManager {
             return false;
         }
     }
-
+    
     /**
      * 切换智能路由
      */
@@ -1832,53 +1849,61 @@ class SettingsManager {
 
 1. QA
    - 适用：闲聊、与数据库无关的问题
-   - 输出：礼貌拒绝并引导用户提供数据库需求
+   - 输出：礼貌拒绝或引导用户提供数据库需求
    - 不执行 SQL 或代码
 
-2. SQL_ONLY
-   - 适用：明确的取数需求、基础聚合、筛选或排序
-   - 要求：生成 SQL、执行前后给出步骤说明；允许必要的库表探索
-   - 不绘图、不安装额外库
-
-3. ANALYSIS
-   - 适用：复杂分析、可视化、趋势研判或需要多步脚本的任务
-   - 允许：执行 Python、生成图表，安装库需先征得用户同意
+2. ANALYSIS
+   - 适用：所有与数据库相关的取数或数据分析任务（无论简单或复杂）
+   - 允许：执行 Python、生成图表，必要时经用户确认安装库
 
 如判断输入与数据库无关，应选择 QA。
-如请求不完整但可能涉及数据查询，可倾向 SQL_ONLY，并在 reason 中说明缺失信息。
+如请求涉及数据库或数据分析，即使只需简单 SQL，也选择 ANALYSIS，并在 reason 中说明判断依据。
 
 输出 JSON（仅此内容）：
 {
-  "route": "QA | SQL_ONLY | ANALYSIS",
+  "route": "QA | ANALYSIS",
   "confidence": 0.0-1.0,
   "reason": "简要说明判断依据",
-  "suggested_plan": ["步骤1", "步骤2"],
-  "suggested_sql": "如为 SQL_ONLY，可提供建议 SQL"
+  "suggested_plan": ["步骤1", "步骤2"]
 }
 
 若无法判定，请将 route 设置为 "ANALYSIS" 并说明原因。`,
 
             qaPrompt: `你是一个数据库助手。当用户提问与数据库或分析无关时，请礼貌拒绝并引导用户提供需要查询的表、指标或时间范围。`,
 
-            sqlOnlyPrompt: `你是一个SQL快速核查助手：
-1. 仅执行只读SQL，禁止生成图表或保存文件
-2. 每个操作前输出"步骤说明"，确认所用库表与字段
-3. 执行后报告记录数与耗时，对空结果或异常值给出提示
-4. 如信息不足，请先向用户澄清`,
+            analysisPrompt: `你是 QueryGPT 的数据分析助手，负责从只读数据库中探索、取数并生成业务洞察。请遵循以下流程：
 
-            analysisPrompt: `你是一个数据分析助手：
-1. 在每个动作前输出"步骤说明"
-2. 使用pandas处理数据，必要时用plotly绘图并保存到output目录
-3. 保证操作安全：数据库只读；安装依赖需获得用户许可
-4. 分析结束后总结发现、局限与建议`,
+【阶段 1：建立连接】
+- 使用提供的 pymysql 参数建立连接（失败时说明 host:port 与报错并结束）。
+- 连接成功后执行 SELECT VERSION() 获取数据库方言。
+
+【阶段 2：数据库探索策略（未指定 database 时）】
+1. cursor.execute("SHOW DATABASES")
+2. 根据业务关键词与优先级筛选库：销售相关优先匹配 sales/trade/order/trd；仓库优先级 center_dws > dws > dwh > dw > ods > ads
+3. cursor.execute(f"USE `{target_db}`")
+4. cursor.execute("SHOW TABLES")
+5. 对候选表执行 DESCRIBE 与 SELECT * LIMIT 10 验证结构与样本
+
+【阶段 3：表选择与字段策略】
+- 优先选择包含 trd/trade/order/sale + detail/day 的表；避免 production/forecast/plan/budget
+- 字段识别：月份 v_month > month > year_month > year_of_month；销量 sale_num > sale_qty > quantity > qty；金额 pay_amount > order_amount > total_amount
+
+【阶段 4：数据处理与分析】
+- Decimal 转 float，统一日期格式，必要时在 SQL 中过滤异常值
+- 编写只读 SQL，使用 pandas 处理；需要可视化时用 plotly 保存到 output/ 目录
+- 操作前可用 print(f"[步骤 {{index}}] {{summary}}") 说明动作，真实发现请用普通文本描述
+- 严禁访问本地 CSV/Excel/SQLite 文件，除非用户明确授权
+
+【阶段 5：输出要求】
+- 说明完成的操作、关键发现、局限与下一步建议
+- 若遇阻断（连接失败、无匹配数据等），说明具体原因并提供排查建议
+- 仅在多次探索仍缺少信息时，礼貌向用户询问补充细节。`,
 
             // 兼容旧字段
-            directSql: '',
             aiAnalysis: '',
             
             exploration: `先理解用户需求中的业务语义：
 * "销量"通常指实际销售数量（sale_num/sale_qty/quantity）
-* "七折销量"：销量字段 * 0.7
 * "订单金额"指实际成交金额（knead_pay_amount/pay_amount）
 
 数据库选择优先级：
@@ -1920,10 +1945,8 @@ class SettingsManager {
         const promptSettings = {
             routing: document.getElementById('prompt-routing')?.value || defaults.routing,
             qaPrompt: document.getElementById('prompt-qa')?.value || defaults.qaPrompt,
-            sqlOnlyPrompt: document.getElementById('prompt-sql-only')?.value || defaults.sqlOnlyPrompt,
             analysisPrompt: document.getElementById('prompt-analysis')?.value || defaults.analysisPrompt,
             // 兼容旧版本字段
-            directSql: document.getElementById('prompt-sql-only')?.value || defaults.sqlOnlyPrompt,
             aiAnalysis: document.getElementById('prompt-analysis')?.value || defaults.analysisPrompt,
             exploration: document.getElementById('prompt-exploration').value,
             tableSelection: document.getElementById('prompt-table-selection').value,
@@ -1983,7 +2006,6 @@ class SettingsManager {
             document.getElementById('prompt-routing').value = defaultSettings.routing;
         }
         const qaEl = document.getElementById('prompt-qa'); if (qaEl) qaEl.value = defaultSettings.qaPrompt;
-        const sqlEl = document.getElementById('prompt-sql-only'); if (sqlEl) sqlEl.value = defaultSettings.sqlOnlyPrompt;
         const analysisEl = document.getElementById('prompt-analysis'); if (analysisEl) analysisEl.value = defaultSettings.analysisPrompt;
         document.getElementById('prompt-exploration').value = defaultSettings.exploration;
         document.getElementById('prompt-table-selection').value = defaultSettings.tableSelection;
@@ -2020,9 +2042,7 @@ class SettingsManager {
         const promptSettings = {
             routing: document.getElementById('prompt-routing')?.value || d.routing,
             qaPrompt: document.getElementById('prompt-qa')?.value || d.qaPrompt,
-            sqlOnlyPrompt: document.getElementById('prompt-sql-only')?.value || d.sqlOnlyPrompt,
             analysisPrompt: document.getElementById('prompt-analysis')?.value || d.analysisPrompt,
-            directSql: document.getElementById('prompt-sql-only')?.value || d.sqlOnlyPrompt,
             aiAnalysis: document.getElementById('prompt-analysis')?.value || d.analysisPrompt,
             exploration: document.getElementById('prompt-exploration').value,
             tableSelection: document.getElementById('prompt-table-selection').value,
@@ -2076,14 +2096,10 @@ class SettingsManager {
                 if (settings.qaPrompt !== undefined) {
                     const el = document.getElementById('prompt-qa'); if (el) el.value = settings.qaPrompt;
                 }
-                if (settings.sqlOnlyPrompt !== undefined) {
-                    const el = document.getElementById('prompt-sql-only'); if (el) el.value = settings.sqlOnlyPrompt;
-                } else if (settings.directSql !== undefined) {
-                    const el = document.getElementById('prompt-sql-only'); if (el) el.value = settings.directSql;
-                }
                 if (settings.analysisPrompt !== undefined) {
                     const el = document.getElementById('prompt-analysis'); if (el) el.value = settings.analysisPrompt;
-                } else if (settings.aiAnalysis !== undefined) {
+                }
+                if (settings.aiAnalysis !== undefined) {
                     const el = document.getElementById('prompt-analysis'); if (el) el.value = settings.aiAnalysis;
                 }
                 if (settings.exploration !== undefined) {
@@ -2164,10 +2180,6 @@ class SettingsManager {
                 if (document.getElementById('prompt-qa')) {
                     document.getElementById('prompt-qa').value = settings.qaPrompt || defaults.qaPrompt;
                 }
-                if (document.getElementById('prompt-sql-only')) {
-                    const sqlPrompt = settings.sqlOnlyPrompt || settings.directSql || defaults.sqlOnlyPrompt;
-                    document.getElementById('prompt-sql-only').value = sqlPrompt;
-                }
                 if (document.getElementById('prompt-analysis')) {
                     const analysisPrompt = settings.analysisPrompt || settings.aiAnalysis || defaults.analysisPrompt;
                     document.getElementById('prompt-analysis').value = analysisPrompt;
@@ -2212,7 +2224,6 @@ class SettingsManager {
                     document.getElementById('prompt-routing').value = defaultSettings.routing;
                 }
                 const qaEl = document.getElementById('prompt-qa'); if (qaEl) qaEl.value = defaultSettings.qaPrompt;
-                const sqlEl = document.getElementById('prompt-sql-only'); if (sqlEl) sqlEl.value = defaultSettings.sqlOnlyPrompt;
                 const analysisEl = document.getElementById('prompt-analysis'); if (analysisEl) analysisEl.value = defaultSettings.analysisPrompt;
                 document.getElementById('prompt-exploration').value = defaultSettings.exploration;
                 document.getElementById('prompt-table-selection').value = defaultSettings.tableSelection;

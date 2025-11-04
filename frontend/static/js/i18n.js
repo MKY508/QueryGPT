@@ -168,12 +168,11 @@ const i18n = {
             routingPrompt: '智能路由提示词',
             routingClassifier: '路由分类策略',
             routingStrategy: '路由策略',
-            directSqlPrompt: '直接SQL执行提示词',
+            exploration: '数据库探索策略',
             simpleAnalysisPrompt: '简单分析提示词',
             complexAnalysisPrompt: '复杂分析提示词（默认）',
             visualizationPrompt: '可视化提示词',
             databaseQuery: '数据库查询提示词',
-            explorationStrategy: '探索策略',
             businessTerms: '业务术语',
             tableSelection: '表选择策略',
             fieldMapping: '字段识别规则',
@@ -370,6 +369,21 @@ const i18n = {
             sendFailed: '发送失败，请重试',
             requestFailed: '处理请求失败。检查网络连接或稍后重试。'
         },
+
+        warnings: {
+            dbUnavailable: '数据库连接失败，请先完成配置或稍后重试。',
+            dbWarningTitle: '数据库连接失败',
+            dbWarningDesc: '当前无法连接数据库，相关操作已暂停。',
+            dbHint: '最近尝试',
+            dbTarget: '目标',
+            dbUser: '用户',
+            dbCheckedAt: '上次检测',
+            dbAutoDismiss: '提示将在',
+            dbContinue: '继续执行',
+            dbForce: '已忽略数据库检查，正在继续执行…',
+            dbConfigure: '前往設定',
+            seconds: '秒後自動隱藏。'
+        },
         
         // 查询相关
         query: {
@@ -564,12 +578,11 @@ const i18n = {
             routingPrompt: 'Smart Routing Prompts',
             routingClassifier: 'Routing Classification Strategy',
             routingStrategy: 'Routing Strategy',
-            directSqlPrompt: 'Direct SQL Execution Prompt',
+            exploration: 'Exploration Strategy',
             simpleAnalysisPrompt: 'Simple Analysis Prompt',
             complexAnalysisPrompt: 'Complex Analysis Prompt (Default)',
             visualizationPrompt: 'Visualization Prompt',
             databaseQuery: 'Database Query Prompts',
-            explorationStrategy: 'Exploration Strategy',
             businessTerms: 'Business Terms',
             tableSelection: 'Table Selection Strategy',
             fieldMapping: 'Field Mapping Rules',
@@ -765,6 +778,21 @@ const i18n = {
             uiSettingsSaved: 'Interface settings saved',
             sendFailed: 'Send failed, please try again',
             requestFailed: 'Request processing failed. Check network connection or try again later.'
+        },
+
+        warnings: {
+            dbUnavailable: 'Database connection failed. Please configure the connection or try again later.',
+            dbWarningTitle: 'Database connection failed',
+            dbWarningDesc: 'The assistant cannot reach the database, so this action has been paused.',
+            dbHint: 'Last attempt',
+            dbTarget: 'Target',
+            dbUser: 'User',
+            dbCheckedAt: 'Last checked',
+            dbAutoDismiss: 'This notice will auto hide in',
+            dbContinue: 'Continue anyway',
+            dbForce: 'Bypassing the guard and continuing without a valid database connection…',
+            dbConfigure: 'Open configuration',
+            seconds: 'seconds'
         },
         
         // Query related
@@ -1101,6 +1129,21 @@ const i18n = {
             sendFailed: 'Отправка не удалась, попробуйте снова',
             requestFailed: 'Обработка запроса не удалась. Проверьте сетевое соединение или попробуйте позже.'
         },
+
+        warnings: {
+            dbUnavailable: 'Database connection failed. Please configure the connection or try again later.',
+            dbWarningTitle: 'Database connection failed',
+            dbWarningDesc: 'The assistant cannot reach the database, so this action has been paused.',
+            dbHint: 'Last attempt',
+            dbTarget: 'Target',
+            dbUser: 'User',
+            dbCheckedAt: 'Last checked',
+            dbAutoDismiss: 'This notice will auto hide in',
+            dbContinue: 'Continue anyway',
+            dbForce: 'Bypassing the guard and continuing without a valid database connection…',
+            dbConfigure: 'Open configuration',
+            seconds: 'seconds.'
+        },
         
         // Запросы
         query: {
@@ -1423,6 +1466,21 @@ const i18n = {
             uiSettingsSaved: '介面設定已儲存',
             sendFailed: '傳送失敗，請重試',
             requestFailed: '處理請求失敗。檢查網路連線或稍後重試。'
+        },
+
+        warnings: {
+            dbUnavailable: '資料庫連線失敗，請先完成設定或稍後再試。',
+            dbWarningTitle: '資料庫連線失敗',
+            dbWarningDesc: '目前無法連線資料庫，相關操作已暫停。',
+            dbHint: '最近嘗試',
+            dbTarget: '目標',
+            dbUser: '使用者',
+            dbCheckedAt: '最近檢測時間',
+            dbAutoDismiss: '提示將在',
+            dbContinue: '仍要繼續',
+            dbForce: '已忽略資料庫守衛，繼續執行…',
+            dbConfigure: '前往設定',
+            seconds: '秒後自動隱藏。'
         },
         
         // 查詢相關
@@ -1760,6 +1818,21 @@ const i18n = {
             sendFailed: 'Falha no envio, tente novamente',
             requestFailed: 'Falha no processamento da solicitação. Verifique a conexão de rede ou tente novamente mais tarde.'
         },
+
+        warnings: {
+            dbUnavailable: 'Falha na conexão com o banco de dados. Configure as credenciais ou tente novamente mais tarde.',
+            dbWarningTitle: 'Falha na conexão com o banco de dados',
+            dbWarningDesc: 'Não foi possível acessar o banco; a execução foi pausada.',
+            dbHint: 'Última tentativa',
+            dbTarget: 'Destino',
+            dbUser: 'Usuário',
+            dbCheckedAt: 'Última verificação',
+            dbAutoDismiss: 'Este aviso será fechado em',
+            dbContinue: 'Continuar mesmo assim',
+            dbForce: 'Ignorando a proteção e continuando sem uma conexão válida…',
+            dbConfigure: 'Abrir configurações',
+            seconds: 'segundos'
+        },
         
         // Relacionado a consultas
         query: {
@@ -2088,6 +2161,21 @@ const i18n = {
             uiSettingsSaved: 'Configuraciones de interfaz guardadas',
             sendFailed: 'Error de envío, intente de nuevo',
             requestFailed: 'Error en el procesamiento de la solicitud. Verifique la conexión de red o intente más tarde.'
+        },
+
+        warnings: {
+            dbUnavailable: 'Fallo al conectar con la base de datos. Configura la conexión o inténtalo más tarde.',
+            dbWarningTitle: 'Error de conexión con la base de datos',
+            dbWarningDesc: 'No se pudo acceder a la base de datos, la ejecución se ha detenido.',
+            dbHint: 'Último intento',
+            dbTarget: 'Destino',
+            dbUser: 'Usuario',
+            dbCheckedAt: 'Última comprobación',
+            dbAutoDismiss: 'Este aviso se cerrará en',
+            dbContinue: 'Continuar de todos modos',
+            dbForce: 'Ignorando la protección y continuando sin una conexión válida…',
+            dbConfigure: 'Abrir configuración',
+            seconds: 'segundos'
         },
         
         // Relacionado con consultas

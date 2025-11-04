@@ -583,7 +583,7 @@ class DataAnalysisPlatform {
                                     }
                                 }
                                 if (payload.success) {
-                                    this.handleStreamResponse({ type: 'result', content: payload.result, conversationId: this.currentConversationId }, thinkingId);
+                                    this.handleStreamResponse({ type: 'result', content: payload.result, conversationId: this.currentConversationId, steps: payload.steps || [] }, thinkingId);
                                 } else {
                                     this.handleStreamResponse({ type: 'error', message: payload.result || '执行失败' }, thinkingId);
                                 }
@@ -840,6 +840,17 @@ class DataAnalysisPlatform {
         if (data.type === 'thinking') {
             this.updateThinkingProcess(thinkingId, data.content);
         } else if (data.type === 'result') {
+            const steps = Array.isArray(data.steps) ? data.steps : [];
+            if (steps.length) {
+                this.playStepSummaries(thinkingId, steps)
+                    .catch(err => {
+                        console.warn('播放步骤过程失败:', err);
+                    })
+                    .finally(() => {
+                        this.transformThinkingToResult(thinkingId, data);
+                    });
+                return;
+            }
             // 将思考对话框转换为结果对话框，而不是删除它
             this.transformThinkingToResult(thinkingId, data);
         } else if (data.type === 'interrupted') {
@@ -859,8 +870,9 @@ class DataAnalysisPlatform {
     }
 
     handleDbUnavailable(payload, originalMessage, thinkingId) {
-        this.hideThinkingProcess(thinkingId);
         this.finishProcessing();
+
+        const i18n = window.i18nManager || { t: () => '' };
 
         const messageInput = document.getElementById('message-input');
         if (messageInput) {
@@ -869,41 +881,103 @@ class DataAnalysisPlatform {
             messageInput.focus();
         }
 
-        // 弱提示提醒用户配置数据库
-        this.showNotification(window.i18nManager?.t('warnings.dbUnavailable') || '数据库连接失败，请先完成配置或稍后重试。', 'warning');
+        const notifyText = payload?.error || i18n.t?.('warnings.dbUnavailable') || '数据库连接失败，请先完成配置或稍后重试。';
+        this.showNotification(notifyText, 'warning');
+
+        if (this.activeDbWarningTimer) {
+            clearTimeout(this.activeDbWarningTimer);
+            this.activeDbWarningTimer = null;
+        }
+        if (this.activeDbCountdownTimer) {
+            clearInterval(this.activeDbCountdownTimer);
+            this.activeDbCountdownTimer = null;
+        }
 
         if (this.activeDbWarning && this.activeDbWarning.remove) {
             this.activeDbWarning.remove();
+            this.activeDbWarning = null;
         }
 
         const card = document.createElement('div');
         card.className = 'db-warning-card';
 
         const title = document.createElement('h4');
-        title.textContent = window.i18nManager?.t('warnings.dbWarningTitle') || '数据库连接失败';
+        title.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${i18n.t?.('warnings.dbWarningTitle') || '数据库连接失败'}`;
         card.appendChild(title);
 
         const message = document.createElement('p');
         message.className = 'db-warning-message-text';
-        message.textContent = payload?.error || (window.i18nManager?.t('warnings.dbWarningDesc') || '当前无法连接数据库，相关查询已暂停。');
+        message.textContent = payload?.error || i18n.t?.('warnings.dbWarningDesc') || '当前无法连接数据库，相关查询已暂停。';
         card.appendChild(message);
 
-        const details = payload?.db_check?.details || payload?.db_check || {};
-        const host = details.host || '-';
-        const port = details.port || '-';
-        const user = details.user || '-';
+        const connection = payload?.connection || payload?.db_check?.target || {};
+        const host = connection.host ?? '-';
+        const port = connection.port ?? '-';
+        const user = connection.user ?? '-';
+        const database = connection.database ? ` · DB: <code>${connection.database}</code>` : '';
 
         const meta = document.createElement('div');
         meta.className = 'db-warning-meta';
-        meta.innerHTML = `目标: <code>${host}:${port}</code> · 用户: <code>${user}</code>`;
+        meta.innerHTML = `${i18n.t?.('warnings.dbTarget') || '目标'}: <code>${host}:${port}</code> · ${i18n.t?.('warnings.dbUser') || '用户'}: <code>${user}</code>${database}`;
         card.appendChild(meta);
 
+        const checkedAt = payload?.db_check?.checked_at;
+        if (checkedAt) {
+            const ts = new Date(checkedAt * 1000);
+            const hint = document.createElement('p');
+            hint.className = 'db-warning-hint';
+            hint.textContent = `${i18n.t?.('warnings.dbCheckedAt') || '上次检测'}: ${ts.toLocaleString()}`;
+            card.appendChild(hint);
+        }
+
+        const details = payload?.db_check?.details;
         if (Array.isArray(details?.test_queries) && details.test_queries.length) {
             const hint = document.createElement('p');
             hint.className = 'db-warning-hint';
             const lastTest = details.test_queries.find(q => q.success) || details.test_queries[0];
-            hint.textContent = `${window.i18nManager?.t('warnings.dbHint') || '最近尝试:'} ${lastTest.message}`;
+            hint.textContent = `${i18n.t?.('warnings.dbHint') || '最近尝试'}: ${lastTest.message}`;
             card.appendChild(hint);
+        }
+
+        const planSource = Array.isArray(payload?.routing_info?.plan) && payload.routing_info.plan.length
+            ? payload.routing_info.plan
+            : (Array.isArray(payload?.classification?.suggested_plan) ? payload.classification.suggested_plan : []);
+        if (planSource && planSource.length) {
+            const list = document.createElement('ul');
+            list.className = 'db-warning-plan';
+            planSource.slice(0, 4).forEach((step, idx) => {
+                const item = document.createElement('li');
+                item.textContent = `${idx + 1}. ${String(step)}`;
+                list.appendChild(item);
+            });
+            card.appendChild(list);
+        }
+
+        const autoDismissMs = payload?.ui?.auto_dismiss_ms ?? payload?.guard_config?.auto_dismiss_ms ?? 8000;
+        const secondsTotal = Math.max(Math.round(autoDismissMs / 1000), 0);
+
+        let timingHint = null;
+        if (secondsTotal > 0) {
+            const autoDismissLabel = i18n.t?.('warnings.dbAutoDismiss') || '提示将在';
+            const secondsLabel = i18n.t?.('warnings.seconds') || '秒后自动隐藏。';
+            let remaining = secondsTotal;
+            timingHint = document.createElement('p');
+            timingHint.className = 'db-warning-hint';
+            const renderCountdown = () => {
+                timingHint.textContent = `${autoDismissLabel} ${Math.max(remaining, 0)} ${secondsLabel}`;
+            };
+            renderCountdown();
+            this.activeDbCountdownTimer = setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    renderCountdown();
+                    clearInterval(this.activeDbCountdownTimer);
+                    this.activeDbCountdownTimer = null;
+                } else {
+                    renderCountdown();
+                }
+            }, 1000);
+            card.appendChild(timingHint);
         }
 
         const actions = document.createElement('div');
@@ -911,8 +985,16 @@ class DataAnalysisPlatform {
 
         const continueBtn = document.createElement('button');
         continueBtn.className = 'btn btn-primary';
-        continueBtn.textContent = window.i18nManager?.t('warnings.dbContinue') || '继续执行';
+        continueBtn.textContent = i18n.t?.('warnings.dbContinue') || '继续执行';
         continueBtn.addEventListener('click', () => {
+            if (this.activeDbWarningTimer) {
+                clearTimeout(this.activeDbWarningTimer);
+                this.activeDbWarningTimer = null;
+            }
+            if (this.activeDbCountdownTimer) {
+                clearInterval(this.activeDbCountdownTimer);
+                this.activeDbCountdownTimer = null;
+            }
             if (this.activeDbWarning && this.activeDbWarning.remove) {
                 this.activeDbWarning.remove();
                 this.activeDbWarning = null;
@@ -921,15 +1003,23 @@ class DataAnalysisPlatform {
             if (input) {
                 input.value = '';
             }
-            this.showNotification(window.i18nManager?.t('warnings.dbForce') || '已忽略数据库检查，正在继续执行…', 'info');
+            this.showNotification(i18n.t?.('warnings.dbForce') || '已忽略数据库检查，正在继续执行…', 'info');
             this.sendMessage(originalMessage, { forceExecute: true, skipUserMessage: true });
         });
         actions.appendChild(continueBtn);
 
         const cancelBtn = document.createElement('button');
         cancelBtn.className = 'btn btn-secondary';
-        cancelBtn.textContent = window.i18nManager?.t('warnings.dbConfigure') || '去配置';
+        cancelBtn.textContent = i18n.t?.('warnings.dbConfigure') || '去配置';
         cancelBtn.addEventListener('click', () => {
+            if (this.activeDbWarningTimer) {
+                clearTimeout(this.activeDbWarningTimer);
+                this.activeDbWarningTimer = null;
+            }
+            if (this.activeDbCountdownTimer) {
+                clearInterval(this.activeDbCountdownTimer);
+                this.activeDbCountdownTimer = null;
+            }
             if (this.activeDbWarning && this.activeDbWarning.remove) {
                 this.activeDbWarning.remove();
                 this.activeDbWarning = null;
@@ -940,10 +1030,50 @@ class DataAnalysisPlatform {
 
         card.appendChild(actions);
 
-        const wrapper = this.addMessage('bot', card);
+        let wrapper = null;
+        if (thinkingId) {
+            const thinking = document.getElementById(thinkingId);
+            const message = thinking?.closest('.message');
+            const content = message?.querySelector('.message-content');
+            if (content) {
+                content.innerHTML = '';
+                content.appendChild(card);
+                wrapper = message;
+            }
+        }
+
+        if (!wrapper) {
+            wrapper = this.addMessage('bot', card);
+        }
+
         if (wrapper) {
             wrapper.classList.add('db-warning-message');
             this.activeDbWarning = wrapper;
+
+            if (autoDismissMs > 0) {
+                this.activeDbWarningTimer = setTimeout(() => {
+                    if (!wrapper.isConnected) {
+                        this.activeDbWarningTimer = null;
+                        if (this.activeDbCountdownTimer) {
+                            clearInterval(this.activeDbCountdownTimer);
+                            this.activeDbCountdownTimer = null;
+                        }
+                        return;
+                    }
+                    card.classList.add('fade-out');
+                    setTimeout(() => {
+                        if (wrapper && wrapper.remove) {
+                            wrapper.remove();
+                        }
+                        this.activeDbWarning = null;
+                        this.activeDbWarningTimer = null;
+                        if (this.activeDbCountdownTimer) {
+                            clearInterval(this.activeDbCountdownTimer);
+                            this.activeDbCountdownTimer = null;
+                        }
+                    }, 320);
+                }, autoDismissMs);
+            }
         }
     }
 
@@ -1139,6 +1269,7 @@ class DataAnalysisPlatform {
         
         // 如果有 OpenInterpreter 的总结，优先显示
         if (finalSummary) {
+            const cleanedSummary = this.removeStepLines(finalSummary);
             summaryHtml = `
                 <div class="user-summary-content">
                     <div class="summary-header">
@@ -1146,7 +1277,7 @@ class DataAnalysisPlatform {
                     </div>
                     
                     <div class="ai-summary">
-                        ${this.renderMarkdown(finalSummary)}
+                        ${this.renderMarkdown(cleanedSummary)}
                     </div>
                     
                     ${chartPaths.length > 0 ? `
@@ -1756,17 +1887,7 @@ class DataAnalysisPlatform {
         const tip = this.getContextualTip();
         
         // 获取随机的Loading文案
-        const loadingTexts = [
-            window.i18nManager.t('common.analyzingRequirements'),
-            window.i18nManager.t('common.dataMining'),
-            window.i18nManager.t('common.understandingRequest'), 
-            window.i18nManager.t('common.connectingDatabase'),
-            window.i18nManager.t('common.generatingQuery'),
-            window.i18nManager.t('common.processingData'),
-            window.i18nManager.t('common.optimizingQuery'),
-            window.i18nManager.t('common.parsingDataStructure')
-        ];
-        const randomLoadingText = loadingTexts[Math.floor(Math.random() * loadingTexts.length)];
+        const randomLoadingText = window.i18nManager.t('common.understandingRequest');
         
         thinking.innerHTML = `
             <div class="thinking-header">
@@ -1817,13 +1938,13 @@ class DataAnalysisPlatform {
             active.classList.remove('active');
             active.classList.add('completed');
             const icon = active.querySelector('.stage-icon');
-            if (icon) icon.innerHTML = '<i class=\"fas fa-check\"></i>';
+            if (icon) icon.innerHTML = '<i class="fas fa-check"></i>';
         }
         const next = stages.querySelector('.thinking-stage:not(.completed):not(.active)');
         if (next) {
             next.classList.add('active');
             const icon = next.querySelector('.stage-icon');
-            if (icon) icon.innerHTML = '<i class=\"fas fa-spinner fa-spin\"></i>';
+            if (icon) icon.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             const text = next.querySelector('.stage-text');
             if (text && tipText) text.textContent = String(tipText).slice(0, 10);
         } else {
@@ -3014,12 +3135,10 @@ class DataAnalysisPlatform {
 
         const labelMap = isEnglish ? {
             qa: 'QA · Polite Decline',
-            sql_only: 'Quick SQL Check',
             analysis: 'Deep Analysis',
             aborted: 'Aborted'
         } : {
             qa: '礼貌答复（QA）',
-            sql_only: '快速SQL核查',
             analysis: '深度分析',
             aborted: '已终止'
         };
@@ -3086,6 +3205,88 @@ class DataAnalysisPlatform {
                 ${sections.join('')}
             </div>
         `;
+    }
+
+    async playStepSummaries(thinkingId, steps = []) {
+        if (!Array.isArray(steps) || steps.length === 0) {
+            return;
+        }
+        const thinking = document.getElementById(thinkingId);
+        if (!thinking) return;
+        const stages = thinking.querySelector('.thinking-stages');
+        if (!stages) return;
+ 
+        let currentActive = stages.querySelector('.thinking-stage.active');
+        if (!currentActive && stages.lastElementChild) {
+            currentActive = stages.lastElementChild;
+        }
+ 
+        for (const step of steps) {
+            if (!document.body.contains(stages)) break;
+ 
+            if (currentActive) {
+                currentActive.classList.remove('active');
+                currentActive.classList.add('completed');
+                const prevIcon = currentActive.querySelector('.stage-icon');
+                if (prevIcon) {
+                    prevIcon.innerHTML = '<i class="fas fa-check"></i>';
+                }
+            }
+ 
+            const formatted = this.formatStepSummary(step);
+            if (!formatted) {
+                continue;
+            }
+ 
+            const stage = document.createElement('div');
+            stage.className = 'thinking-stage active';
+            stage.innerHTML = `
+                <div class="stage-icon"><i class="fas fa-spinner fa-spin"></i></div>
+                <span class="stage-text">${formatted}</span>
+            `;
+            stages.appendChild(stage);
+            currentActive = stage;
+            await this.sleep(500);
+        }
+ 
+        if (currentActive && document.body.contains(currentActive)) {
+            currentActive.classList.remove('active');
+            currentActive.classList.add('completed');
+            const icon = currentActive.querySelector('.stage-icon');
+            if (icon) {
+                icon.innerHTML = '<i class="fas fa-check"></i>';
+            }
+        }
+ 
+        await this.sleep(200);
+    }
+
+    formatStepSummary(step) {
+        if (!step) return '';
+        const raw = step.summary || step.text || step.description || '';
+        let summary = String(raw).replace(/\s+/g, ' ').trim();
+        if (!summary) return '';
+        const indexValue = parseInt(step.index, 10);
+        if (!Number.isNaN(indexValue) && indexValue > 0) {
+            summary = `[${indexValue}] ${summary}`;
+        }
+        if (summary.length > 80) {
+            summary = `${summary.slice(0, 77)}...`;
+        }
+        return this.escapeHtml(summary);
+    }
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    removeStepLines(text) {
+        if (!text) return '';
+        return String(text)
+            .split(/\n/)
+            .filter(line => !/^\[(步骤|Step)\s*\d+\]/.test(line.trim()))
+            .join('\n')
+            .trim();
     }
 }
 
