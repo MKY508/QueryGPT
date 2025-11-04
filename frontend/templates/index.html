@@ -429,13 +429,13 @@
                             
                             <!-- 智能路由提示词部分 -->
                             <div class="prompt-section" id="routing-prompts-section">
-                                <h4 class="collapsible-header">
+                                <h4 class="collapsible-header collapsed">
                                     <i class="fas fa-route"></i> 
                                     <span data-i18n="prompts.routingPrompt">智能路由提示词</span>
                                     <i class="fas fa-chevron-down collapse-icon"></i>
                                 </h4>
                                 
-                                <div class="collapsible-content">
+                                <div class="collapsible-content collapsed">
                                     <!-- 路由分类提示词 -->
                                     <div class="form-group">
                                         <label data-i18n="prompts.routingClassifier">路由分类策略</label>
@@ -512,56 +512,62 @@
                                 </div>
                             </div>
                             
-                            <div class="prompt-section">
-                                <h4 data-i18n="prompts.databaseQuery">数据库查询提示词</h4>
-                                <div class="form-group">
-                                    <label data-i18n="prompts.explorationStrategy">探索策略</label>
-                                    <textarea id="prompt-exploration" rows="6" placeholder="设置数据库探索策略...">先理解用户需求中的业务语义：
+                            <div class="prompt-section" id="database-prompts-section">
+                                <h4 class="collapsible-header collapsed">
+                                    <i class="fas fa-database"></i>
+                                    <span data-i18n="prompts.databaseQuery">数据库查询提示词</span>
+                                    <i class="fas fa-chevron-down collapse-icon"></i>
+                                </h4>
+                                <div class="collapsible-content collapsed">
+                                    <div class="form-group">
+                                        <label data-i18n="prompts.explorationStrategy">探索策略</label>
+                                        <textarea id="prompt-exploration" rows="6" placeholder="设置数据库探索策略...">先理解用户需求中的业务语义：
 * "销量"通常指实际销售数量（sale_num/sale_qty/quantity）
 * "订单金额"指实际成交金额（knead_pay_amount/pay_amount）
 
 数据库选择优先级：
 * 优先探索数据仓库：center_dws > dws > dwh > dw
 * 其次考虑：ods（原始数据）> ads（汇总数据）</textarea>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label data-i18n="prompts.tableSelection">表选择策略</label>
-                                    <textarea id="prompt-table-selection" rows="4" placeholder="设置表选择策略...">优先选择包含：trd/trade/order/sale + detail/day 的表（交易明细表）
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label data-i18n="prompts.tableSelection">表选择策略</label>
+                                        <textarea id="prompt-table-selection" rows="4" placeholder="设置表选择策略...">优先选择包含：trd/trade/order/sale + detail/day 的表（交易明细表）
 避免：production/forecast/plan/budget（计划类表）
 检查表数据量和日期范围，确保包含所需时间段</textarea>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label data-i18n="prompts.fieldMapping">字段识别规则</label>
-                                    <textarea id="prompt-field-mapping" rows="4" placeholder="设置字段识别规则...">月份字段：v_month > month > year_month > year_of_month
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label data-i18n="prompts.fieldMapping">字段识别规则</label>
+                                        <textarea id="prompt-field-mapping" rows="4" placeholder="设置字段识别规则...">月份字段：v_month > month > year_month > year_of_month
 销量字段：sale_num > sale_qty > quantity > qty
 金额字段：pay_amount > order_amount > total_amount</textarea>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label data-i18n="prompts.dataProcessing">数据处理规则</label>
-                                    <textarea id="prompt-data-processing" rows="4" placeholder="设置数据处理规则...">Decimal类型需转换为float进行计算
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label data-i18n="prompts.dataProcessing">数据处理规则</label>
+                                        <textarea id="prompt-data-processing" rows="4" placeholder="设置数据处理规则...">Decimal类型需转换为float进行计算
 日期格式统一处理（如 '2025-01' 格式）
 如果发现负销量或异常值，在SQL中用WHERE条件过滤</textarea>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label data-i18n="prompts.outputRequirements">输出要求</label>
-                                    <textarea id="prompt-output-requirements" rows="4" placeholder="设置输出要求...">使用 plotly 生成可视化图表
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label data-i18n="prompts.outputRequirements">输出要求</label>
+                                        <textarea id="prompt-output-requirements" rows="4" placeholder="设置输出要求...">使用 plotly 生成可视化图表
 将 HTML 文件保存到 output 目录
 提供简洁的总结，包括完成的任务和关键发现</textarea>
+                                    </div>
                                 </div>
                             </div>
                             
                             <!-- 高级Prompt（可选） -->
                             <div class="prompt-section">
-                                <h4 class="collapsible-header">
+                                <h4 class="collapsible-header collapsed">
                                     <i class="fas fa-tools"></i> 
                                     <span>高级 Prompt（可选）</span>
                                     <i class="fas fa-chevron-down collapse-icon"></i>
                                 </h4>
-                                <div class="collapsible-content">
+                                <div class="collapsible-content collapsed">
                                     <div class="form-group">
                                         <label>总结输出（用户视角）</label>
                                         <textarea id="prompt-summarization" rows="3" placeholder="设置结果总结的风格与要求..."></textarea>
