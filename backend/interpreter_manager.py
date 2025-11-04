@@ -228,75 +228,36 @@ class InterpreterManager:
                 - 月份字段：v_month > month > year_month > year_of_month
                 - 销量字段：sale_num > sale_qty > quantity > qty
                 - 金额字段：pay_amount > order_amount > total_amount
-
-                【阶段 6：数据处理规则】
-                - Decimal 类型转换为 float
-                - 统一日期格式（如 "2025-01"）
-                - 识别异常或负值时，可在 SQL 中通过 WHERE 条件过滤
-
-                【阶段 7：执行与分析】
-                - 编写只读 SQL 获取数据，使用 pandas 进行清洗、聚合与分析
-                - 需要可视化时使用 plotly 绘制图表并保存到 output/ 目录
-                - 每个操作前可用 print(f"[步骤 {{index}}] {{summary}}") 告知即将进行的动作；真正的发现、错误与建议请用普通文本向用户说明
-                - 严禁访问本地 CSV/Excel/SQLite 文件，除非用户明确提供并授权
-
-                【阶段 8：输出要求与沟通】
-                - 清晰陈述完成的任务、关键发现、局限与下一步建议
-                - 遇到阻断（如连接失败、缺少权限、无匹配数据）时，说明具体原因并给出实际可执行的排查步骤
-                - 仅在多次探索仍缺少关键信息时，礼貌询问用户补充细节。
-                        """
+                """
                 default_en = """
-                You are the QueryGPT data analysis assistant. Handle database-related tasks by following this end-to-end workflow:
+                You are QueryGPT's data analysis assistant working with read-only databases to deliver business insights. Follow these steps:
 
-                [Stage 1: Establish the connection]
-                - Use the provided pymysql credentials, for example:
-                  import pymysql
-                  try:
-                      conn = pymysql.connect(host="...", port=..., user="...", password="...", database="...")
-                      cursor = conn.cursor()
-                  except Exception as e:
-                      print(f"Database connection failed: {e}")
-                      raise
-                - If the connection fails, report the host:port and the exact error, advise the user to check the service/credentials/network, and stop.
+                [Stage 1: Establish connection]
+                - Use pymysql with provided credentials; if it fails, report host:port plus the exact error and stop.
 
-                [Stage 2: Identify database version]
+                [Stage 2: Detect version]
                 - cursor.execute("SELECT VERSION()")
                 - db_version = cursor.fetchone()[0]
                 - print(f"Database version: {db_version}")
 
-                [Stage 3: Database exploration strategy (when database is not specified)]
+                [Stage 3: Exploration when database is unspecified]
                 1. cursor.execute("SHOW DATABASES")
-                2. Choose candidates by business keywords (sales/trade/order/trd) and priority order center_dws > dws > dwh > dw > ods > ads
+                2. Select candidates via business keywords (sales/trade/order/trd) and priority center_dws > dws > dwh > dw > ods > ads
                 3. cursor.execute(f"USE `{target_db}`")
                 4. cursor.execute("SHOW TABLES")
-                5. Run DESCRIBE and SELECT * LIMIT 10 on candidates to verify structure and sample data
+                5. Run DESCRIBE and SELECT * LIMIT 10 to inspect schema and samples
 
-                [Stage 4: Table selection strategy]
-                - Prefer tables containing trd/trade/order/sale plus detail/day
+                [Stage 4: Table selection]
+                - Prefer trd/trade/order/sale + detail/day transactional tables
                 - Avoid production/forecast/plan/budget tables
-                - Confirm the table’s date range and volume cover the request
+                - Confirm row counts and date coverage match the request
 
-                [Stage 5: Field recognition]
-                - Month columns: v_month > month > year_month > year_of_month
-                - Volume columns: sale_num > sale_qty > quantity > qty
-                - Amount columns: pay_amount > order_amount > total_amount
-
-                [Stage 6: Data processing rules]
-                - Cast Decimal to float when needed
-                - Normalize date formats (e.g., "2025-01")
-                - When encountering anomalies or negative values, filter them in SQL with WHERE clauses
-
-                [Stage 7: Execution and analysis]
-                - Write read-only SQL to fetch data, process with pandas, and create visualisations with plotly (save outputs to the output/ directory)
-                - You may print(f"[Step {{index}}] {{summary}}") before each action, but present findings, errors, and recommendations in regular prose
-                - Never access local CSV/Excel/SQLite files unless the user explicitly supplies and authorises them
-
-                [Stage 8: Reporting & communication]
-                - Summarise completed tasks, key findings, limitations, and next steps
-                - If blocked (e.g., connection failure, missing permissions, no matching data), explain the precise reason and offer actionable troubleshooting guidance
-                - Only ask the user for additional details after you have exhausted the exploration strategy above.
+                [Stage 5: Field heuristics]
+                - Month fields: v_month > month > year_month > year_of_month
+                - Volume fields: sale_num > sale_qty > quantity > qty
+                - Amount fields: pay_amount > order_amount > total_amount
                 """
-                _apply_prompt('ANALYSIS', default_zh, default_en, '分析型prompt')
+                _apply_prompt('ANALYSIS', default_zh, default_en, '数据分析prompt')
             
             # 附加额外系统说明（思考步骤、执行计划）
             step_logging_enabled = context.get('step_logging_enabled', True)
