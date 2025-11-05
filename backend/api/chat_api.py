@@ -418,6 +418,7 @@ def chat():
         # 准备上下文（优化：缓存配置读取，避免重复调用）
         config_snapshot = ConfigLoader.get_config()  # 使用缓存版本
         feature_section = config_snapshot.get('features', {}) if isinstance(config_snapshot.get('features', {}), dict) else {}
+        context = {}
         feature_cfg = feature_section
         thought_cfg = feature_cfg.get('thought_stream') if isinstance(feature_cfg.get('thought_stream'), dict) else {}
         template_key = 'template_en' if user_language == 'en' else 'template_zh'
