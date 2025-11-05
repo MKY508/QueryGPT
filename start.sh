@@ -70,14 +70,14 @@ PY
 
 wait_for_ready() {
     local attempts=0
-    local max_attempts=60
+    local max_attempts=5  # 减少等待时间，最多等待5秒
     printf '等待后端服务启动'
     while [ $attempts -lt $max_attempts ]; do
         if "$PYTHON_BIN" - "$PORT" <<'PY' 2>/dev/null
 import socket, sys
 port = int(sys.argv[1])
 with socket.socket() as s:
-    s.settimeout(0.5)
+    s.settimeout(0.2)  # 减少超时时间
     try:
         s.connect(("127.0.0.1", port))
     except OSError:
@@ -89,13 +89,13 @@ PY
             ok "后端服务已启动"
             return 0
         fi
-        sleep 1
+        sleep 0.5  # 减少等待间隔
         printf '.'
         attempts=$((attempts + 1))
     done
     printf '\n'
-    warn "未能确认后端端口已就绪，可稍后手动访问 http://localhost:${PORT}"
-    return 1
+    warn "后端服务可能仍在启动中，浏览器将自动打开"
+    return 0  # 即使没完全启动也继续，因为服务会延迟初始化
 }
 
 open_browser() {
@@ -113,11 +113,11 @@ start_service() {
     ( cd backend && "$PYTHON_BIN" app.py ) &
     APP_PID=$!
 
-    if wait_for_ready; then
-        open_browser
-    else
-        info "请稍后在浏览器中访问 http://localhost:${PORT}"
-    fi
+    # 快速检查端口是否就绪，然后立即打开浏览器
+    # 后端会在首次请求时完成初始化，不会阻塞启动
+    wait_for_ready
+    open_browser
+    
     local status=0
     wait "$APP_PID" || status=$?
     return $status

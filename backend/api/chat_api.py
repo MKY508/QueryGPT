@@ -4,7 +4,7 @@ import json
 import logging
 import re
 import uuid as uuid_module
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, request, jsonify, Response, g
 from datetime import datetime
 
 from backend.auth import optional_auth
@@ -21,9 +21,44 @@ chat_bp = Blueprint('chat', __name__, url_prefix='/api')
 services = service_container
 
 
+def _get_services():
+    """从 Flask 上下文获取服务实例（优先），否则回退到全局服务容器"""
+    if hasattr(g, 'services'):
+        return g.services
+    return services
+
+
+def _get_database_manager():
+    """获取数据库管理器"""
+    if hasattr(g, 'database_manager'):
+        return g.database_manager
+    return services.database_manager
+
+
+def _get_history_manager():
+    """获取历史记录管理器"""
+    if hasattr(g, 'history_manager'):
+        return g.history_manager
+    return services.history_manager
+
+
+def _get_interpreter_manager():
+    """获取解释器管理器"""
+    if hasattr(g, 'interpreter_manager'):
+        return g.interpreter_manager
+    return services.interpreter_manager
+
+
+def _get_smart_router():
+    """获取智能路由器"""
+    if hasattr(g, 'smart_router'):
+        return g.smart_router
+    return services.smart_router
+
+
 def _refresh_manager_aliases():
     """刷新管理器别名"""
-    pass  # 直接使用services访问
+    pass  # 直接使用_get_*函数访问
 
 
 def _get_stop_status(conversation_id):
@@ -32,12 +67,18 @@ def _get_stop_status(conversation_id):
 
 
 def ensure_database_manager(force_reload: bool = False) -> bool:
-    """确保 database_manager 已准备好"""
+    """确保 database_manager 已准备好（优化版本，减少锁竞争）"""
+    db_manager = _get_database_manager()
+    if db_manager is not None and getattr(db_manager, "is_configured", True):
+        return True
+    # 只有真正需要时才调用初始化
     return services.ensure_database_manager(force_reload=force_reload)
 
 
 def ensure_history_manager(force_reload: bool = False) -> bool:
-    """确保 history_manager 已初始化"""
+    """确保 history_manager 已初始化（优化版本）"""
+    if _get_history_manager() is not None:
+        return True
     return services.ensure_history_manager(force_reload=force_reload)
 
 
@@ -52,9 +93,9 @@ def init_managers(force_reload: bool = False):
 def chat_stream():
     """SSE流式查询：仅推送友好的进度与最终结果，不包含代码。"""
     try:
-        interpreter_manager = services.interpreter_manager
-        history_manager = services.history_manager
-        smart_router = services.smart_router
+        interpreter_manager = _get_interpreter_manager()
+        history_manager = _get_history_manager()
+        smart_router = _get_smart_router()
 
         if interpreter_manager is None:
             return Response(sse_format('error', {"error": "LLM 解释器未初始化"}), mimetype='text/event-stream')
@@ -257,16 +298,16 @@ def chat():
     """处理用户查询"""
     try:
         # 惰性初始化
-        if services.interpreter_manager is None:
+        if _get_interpreter_manager() is None:
             try:
                 init_managers()
             except Exception:
                 logger.error("InterpreterManager 未初始化")
         
-        interpreter_manager = services.interpreter_manager
-        history_manager = services.history_manager
-        smart_router = services.smart_router
-        database_manager = services.database_manager
+        interpreter_manager = _get_interpreter_manager()
+        history_manager = _get_history_manager()
+        smart_router = _get_smart_router()
+        database_manager = _get_database_manager()
 
         data = request.get_json(silent=True) or {}
         user_query = data.get('query') or data.get('message') or ''
@@ -374,9 +415,8 @@ def chat():
                 "timestamp": datetime.now().isoformat()
             })
         
-        # 准备上下文
-        context = {}
-        config_snapshot = ConfigLoader.get_config()
+        # 准备上下文（优化：缓存配置读取，避免重复调用）
+        config_snapshot = ConfigLoader.get_config()  # 使用缓存版本
         feature_section = config_snapshot.get('features', {}) if isinstance(config_snapshot.get('features', {}), dict) else {}
         feature_cfg = feature_section
         thought_cfg = feature_cfg.get('thought_stream') if isinstance(feature_cfg.get('thought_stream'), dict) else {}
@@ -390,14 +430,16 @@ def chat():
                 logger.warning("请求使用数据库，但未检测到有效配置，自动降级为非数据库模式")
                 use_database = False
             else:
-                db_config = ConfigLoader.get_database_config()
-                context['connection_info'] = {
-                    'host': db_config['host'],
-                    'port': db_config['port'],
-                    'user': db_config['user'],
-                    'password': db_config['password'],
-                    'database': db_config.get('database', '')
-                }
+                # 优化：直接从缓存配置获取数据库信息，避免重复读取
+                db_config = config_snapshot.get('database', {})
+                if db_config:
+                    context['connection_info'] = {
+                        'host': db_config.get('host', ''),
+                        'port': db_config.get('port', 3306),
+                        'user': db_config.get('user', ''),
+                        'password': db_config.get('password', ''),
+                        'database': db_config.get('database', '')
+                    }
                 if database_manager and getattr(database_manager, 'is_configured', False):
                     global_disabled = getattr(database_manager, '_global_disabled', False)
                     if not global_disabled:
@@ -597,7 +639,7 @@ def stop_query():
             query_found = True
             logger.info(f"已设置停止标志: {conversation_id}")
 
-        interpreter = services.interpreter_manager
+        interpreter = _get_interpreter_manager()
         if interpreter:
             logger.info(f"调用interpreter_manager.stop_query: {conversation_id}")
             interpreter.stop_query(conversation_id)

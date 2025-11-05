@@ -775,17 +775,7 @@ class DataAnalysisPlatform {
         // 发送停止请求到后端
         if (this.currentConversationId) {
             try {
-                const response = await fetch('/api/stop_query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        conversation_id: this.currentConversationId
-                    })
-                });
-                
-                const data = await response.json();
+                const data = await api.stopQuery(this.currentConversationId);
                 console.log('停止请求响应:', data);
                 if (data.success) {
                     console.log('停止请求成功');
@@ -2897,31 +2887,37 @@ class DataAnalysisPlatform {
     /**
      * 切换语言
      */
-    changeLanguage(newLang) {
-        window.i18nManager.setLanguage(newLang);
-        
-        // 重新初始化Tips以使用新语言
-        this.initTipsManager();
-        
-        // 同步更新两个语言切换控件
-        const languageSelect = document.getElementById('language-select');
-        if (languageSelect) {
-            languageSelect.value = newLang;
+    async changeLanguage(newLang) {
+        try {
+            // 异步加载语言（如果还未加载）
+            await window.i18nManager.setLanguage(newLang);
+            
+            // 重新初始化Tips以使用新语言
+            this.initTipsManager();
+            
+            // 同步更新两个语言切换控件
+            const languageSelect = document.getElementById('language-select');
+            if (languageSelect) {
+                languageSelect.value = newLang;
+            }
+            
+            
+            // 刷新欢迎消息（如果当前没有对话）
+            const messagesContainer = document.getElementById('chat-messages');
+            if (messagesContainer && messagesContainer.querySelector('.welcome-message')) {
+                this.showWelcomeMessage();
+            }
+            
+            // 显示通知
+            const i18n = window.i18nManager || { t: (key) => key };
+            this.showNotification(
+                newLang === 'zh' ? i18n.t('errors.languageSwitchedZh') : i18n.t('errors.languageSwitchedEn'), 
+                'success'
+            );
+        } catch (error) {
+            console.error('Failed to change language:', error);
+            this.showNotification('语言切换失败，请重试', 'error');
         }
-        
-        
-        // 刷新欢迎消息（如果当前没有对话）
-        const messagesContainer = document.getElementById('chat-messages');
-        if (messagesContainer && messagesContainer.querySelector('.welcome-message')) {
-            this.showWelcomeMessage();
-        }
-        
-        // 显示通知
-        const i18n = window.i18nManager || { t: (key) => key };
-        this.showNotification(
-            newLang === 'zh' ? i18n.t('errors.languageSwitchedZh') : i18n.t('errors.languageSwitchedEn'), 
-            'success'
-        );
     }
     
     

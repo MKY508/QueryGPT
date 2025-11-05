@@ -4,7 +4,7 @@ import re
 import logging
 import platform
 from datetime import datetime
-from flask import Blueprint, request, jsonify, send_from_directory
+from flask import Blueprint, request, jsonify, send_from_directory, g
 from pathlib import Path
 
 from backend.auth import require_auth
@@ -22,8 +22,26 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'output')
 
 
+def _get_database_manager():
+    """从 Flask 上下文获取数据库管理器（优先），否则回退到全局服务容器"""
+    if hasattr(g, 'database_manager'):
+        return g.database_manager
+    return services.database_manager
+
+
+def _get_smart_router():
+    """从 Flask 上下文获取智能路由器（优先），否则回退到全局服务容器"""
+    if hasattr(g, 'smart_router'):
+        return g.smart_router
+    return services.smart_router
+
+
 def ensure_database_manager(force_reload: bool = False) -> bool:
-    """确保 database_manager 已准备好"""
+    """确保 database_manager 已准备好（优化版本，减少锁竞争）"""
+    db_manager = _get_database_manager()
+    if db_manager is not None and getattr(db_manager, "is_configured", True):
+        return True
+    # 只有真正需要时才调用初始化
     return services.ensure_database_manager(force_reload=force_reload)
 
 
@@ -34,7 +52,7 @@ def get_schema():
         if not ensure_database_manager():
             return jsonify({"error": "数据库未配置"}), 503
         
-        database_manager = services.database_manager
+        database_manager = _get_database_manager()
         schema = database_manager.get_database_schema()
         return jsonify({
             "schema": schema,
@@ -56,7 +74,7 @@ def test_connection():
                 "test_queries": []
             }), 503
         
-        database_manager = services.database_manager
+        database_manager = _get_database_manager()
         test_result = database_manager.test_connection()
         test_result["timestamp"] = datetime.now().isoformat()
         
@@ -107,7 +125,7 @@ def test_model():
 def get_routing_stats():
     """获取智能路由统计信息"""
     try:
-        smart_router = services.smart_router
+        smart_router = _get_smart_router()
         if smart_router:
             stats = smart_router.get_routing_stats()
             
@@ -339,7 +357,7 @@ def execute_sql():
         if not READONLY_SQL.match(sql_query):
             return jsonify({"error": "仅允许只读查询（SELECT/SHOW/DESCRIBE/EXPLAIN）"}), 403
         
-        database_manager = services.database_manager
+        database_manager = _get_database_manager()
         results = database_manager.execute_query(sql_query)
         
         return jsonify({
@@ -373,7 +391,7 @@ def query_sql_alias():
         if not READONLY_SQL.match(sql_query or ''):
             return jsonify({"error": "仅允许只读查询（SELECT/SHOW/DESCRIBE/EXPLAIN）"}), 400
 
-        database_manager = services.database_manager
+        database_manager = _get_database_manager()
         results = database_manager.execute_query(sql_query)
         
         if isinstance(results, dict):

@@ -283,13 +283,16 @@ class DatabaseManager:
                 logger.warning(f"检测到危险的SQL模式: {pattern}")
                 raise ValueError("查询包含不允许的SQL模式")
         
-        # 缓存命中
+        # 缓存命中（优化：使用更高效的缓存键生成）
         cache_key = None
         if self.cache_enabled and not params:
             db_marker = self.config.get('database') or self.config.get('host') or 'default'
-            cache_key = f"{db_marker}:{query.strip().lower()}"
-            if cache_key in self._cache:
-                return self._cache[cache_key]
+            # 优化：简化查询字符串处理，减少字符串操作
+            query_normalized = query.strip().lower()[:200]  # 只使用前200字符作为缓存键
+            cache_key = f"{db_marker}:{query_normalized}"
+            cached_result = self._cache.get(cache_key)
+            if cached_result is not None:
+                return cached_result
 
         # 执行原始查询
         result = self._execute_raw_query(query, params)

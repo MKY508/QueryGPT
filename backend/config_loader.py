@@ -118,6 +118,10 @@ DEFAULT_MODELS = [
 class ConfigLoader:
     """统一的配置加载器，优先使用.env文件"""
     _env_loaded = False
+    # 配置缓存（避免重复读取文件）
+    _config_cache: Dict[str, Any] | None = None
+    _config_cache_time: float | None = None
+    _config_cache_ttl: float = 5.0  # 缓存5秒，平衡性能和实时性
 
     @staticmethod
     def normalize_model_id(model_id: str) -> str:
@@ -438,7 +442,17 @@ class ConfigLoader:
 
     @staticmethod
     def get_config() -> Dict[str, Any]:
-        """返回聚合配置（向后兼容tests期望）。"""
+        """返回聚合配置（向后兼容tests期望）。使用缓存减少重复读取。"""
+        import time
+        
+        # 检查缓存是否有效
+        current_time = time.time()
+        if (ConfigLoader._config_cache is not None and 
+            ConfigLoader._config_cache_time is not None and
+            current_time - ConfigLoader._config_cache_time < ConfigLoader._config_cache_ttl):
+            return ConfigLoader._config_cache
+        
+        # 重新加载配置
         base = {
             "api": {
                 "key": os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", ""),
@@ -473,7 +487,17 @@ class ConfigLoader:
         if 'features' not in base:
             base['features'] = {}
 
+        # 更新缓存
+        ConfigLoader._config_cache = base
+        ConfigLoader._config_cache_time = current_time
+        
         return base
+    
+    @staticmethod
+    def clear_config_cache():
+        """清除配置缓存（在配置更新后调用）"""
+        ConfigLoader._config_cache = None
+        ConfigLoader._config_cache_time = None
     
     @staticmethod
     def get_log_config() -> Dict[str, Any]:

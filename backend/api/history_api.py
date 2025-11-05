@@ -1,6 +1,6 @@
 """历史记录API蓝图"""
 import logging
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, g
 
 from backend.core import service_container
 from backend.utils import parse_date_param, conversation_in_range
@@ -11,8 +11,17 @@ history_bp = Blueprint('history', __name__, url_prefix='/api/history')
 services = service_container
 
 
+def _get_history_manager():
+    """从 Flask 上下文获取历史记录管理器（优先），否则回退到全局服务容器"""
+    if hasattr(g, 'history_manager'):
+        return g.history_manager
+    return services.history_manager
+
+
 def ensure_history_manager(force_reload: bool = False) -> bool:
-    """确保 history_manager 已初始化"""
+    """确保 history_manager 已初始化（优化版本）"""
+    if _get_history_manager() is not None:
+        return True
     return services.ensure_history_manager(force_reload=force_reload)
 
 
@@ -23,7 +32,7 @@ def get_conversations():
         if not ensure_history_manager():
             return jsonify({"success": False, "conversations": [], "error": "历史记录未启用"}), 503
 
-        history_manager = services.history_manager
+        history_manager = _get_history_manager()
         query = request.args.get('q', '')
         limit = int(request.args.get('limit', 50))
         favorites_only = request.args.get('favorites', 'false').lower() == 'true'
@@ -63,7 +72,7 @@ def get_conversation_detail(conversation_id):
         if not ensure_history_manager():
             return jsonify({"error": "历史记录未启用"}), 503
 
-        history_manager = services.history_manager
+        history_manager = _get_history_manager()
         conversation = history_manager.get_conversation_history(conversation_id)
         if not conversation:
             return jsonify({"error": "对话不存在"}), 404
@@ -84,7 +93,7 @@ def get_conversation_detail_compat(conversation_id):
         if not ensure_history_manager():
             return jsonify({"error": "历史记录未启用"}), 503
 
-        history_manager = services.history_manager
+        history_manager = _get_history_manager()
         conv = history_manager.get_conversation_history(conversation_id)
         if not conv:
             return jsonify({"error": "对话不存在"}), 404
@@ -108,7 +117,7 @@ def toggle_favorite_conversation(conversation_id):
         if not ensure_history_manager():
             return jsonify({"error": "历史记录未启用"}), 503
 
-        history_manager = services.history_manager
+        history_manager = _get_history_manager()
         is_favorite = history_manager.toggle_favorite(conversation_id)
         return jsonify({
             "success": True,
@@ -126,7 +135,7 @@ def delete_conversation_api(conversation_id):
         if not ensure_history_manager():
             return jsonify({"success": False, "error": "历史记录未启用"}), 503
 
-        history_manager = services.history_manager
+        history_manager = _get_history_manager()
         
         # 验证对话是否存在
         conversation = history_manager.get_conversation_history(conversation_id)
@@ -172,7 +181,7 @@ def get_history_statistics():
         if not ensure_history_manager():
             return jsonify({"error": "历史记录未启用"}), 503
 
-        history_manager = services.history_manager
+        history_manager = _get_history_manager()
         stats = history_manager.get_statistics()
         return jsonify({
             "success": True,
@@ -190,7 +199,7 @@ def cleanup_history():
         if not ensure_history_manager():
             return jsonify({"error": "历史记录未启用"}), 503
 
-        history_manager = services.history_manager
+        history_manager = _get_history_manager()
         data = request.json or {}
         days = data.get('days', 90)
         history_manager.cleanup_old_conversations(days)
@@ -210,7 +219,7 @@ def replay_conversation(conversation_id):
         if not ensure_history_manager():
             return jsonify({"error": "历史记录未启用"}), 503
 
-        history_manager = services.history_manager
+        history_manager = _get_history_manager()
         conversation = history_manager.get_conversation_history(conversation_id)
         if not conversation:
             return jsonify({"error": "对话不存在"}), 404

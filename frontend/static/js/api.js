@@ -480,6 +480,18 @@ class API {
     }
     
     /**
+     * 停止查询
+     */
+    async stopQuery(conversationId) {
+        return this.request('/api/stop_query', {
+            method: 'POST',
+            body: JSON.stringify({
+                conversation_id: conversationId
+            })
+        });
+    }
+    
+    /**
      * 复现对话
      */
     async replayConversation(conversationId) {

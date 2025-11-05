@@ -119,23 +119,48 @@ _BOOTSTRAP_DONE = False
 
 @app.before_request
 def _bootstrap_on_first_request():
-    """在首个请求到达时进行一次性初始化。"""
+    """在首个请求到达时进行一次性初始化（目录创建和服务初始化）。"""
     global _BOOTSTRAP_DONE
     if _BOOTSTRAP_DONE:
+        # 服务已初始化，直接挂载到上下文
+        from flask import g
+        g.services = services
+        g.database_manager = services.database_manager
+        g.interpreter_manager = services.interpreter_manager
+        g.history_manager = services.history_manager
+        g.smart_router = services.smart_router
+        g.sql_executor = services.sql_executor
         return
+    
     try:
+        # 创建必要的目录
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         os.makedirs('cache', exist_ok=True)
     except Exception:
         pass
+    
     try:
+        # 初始化管理器（延迟初始化，不阻塞启动）
         init_managers()
     except Exception as e:
         logger.error(f"惰性初始化失败: {e}")
+    
+    # 挂载服务到上下文
+    from flask import g
+    g.services = services
+    g.database_manager = services.database_manager
+    g.interpreter_manager = services.interpreter_manager
+    g.history_manager = services.history_manager
+    g.smart_router = services.smart_router
+    g.sql_executor = services.sql_executor
+    
     _BOOTSTRAP_DONE = True
 
 
 # ============ 注册蓝图 ============
+# 延迟初始化：在注册蓝图时不立即初始化，而是在首次请求时初始化
+# 这样可以快速启动服务，让用户立即看到页面
+
 app.register_blueprint(config_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(history_bp)
@@ -244,15 +269,15 @@ def create_app(config_override: dict | None = None):
 # ============ 启动入口 ============
 
 if __name__ == '__main__':
-    # 同步配置文件，确保一致性
-    sync_config_files()
+    # 创建必要的目录（快速操作，不阻塞）
+    try:
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        os.makedirs('cache', exist_ok=True)
+    except Exception:
+        pass
     
-    # 初始化管理器
-    init_managers()
-    
-    # 创建必要的目录
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs('cache', exist_ok=True)
+    # 不在这里初始化管理器，让它在首次请求时延迟初始化
+    # 这样可以快速启动服务，立即响应前端请求
     
     # 自动查找可用端口
     def find_available_port(start_port=5000, max_attempts=100):
@@ -295,6 +320,7 @@ if __name__ == '__main__':
     print(f"✅ QueryGPT 服务已启动")
     print(f"🌐 访问地址: http://localhost:{port}")
     print(f"📊 API文档: http://localhost:{port}/api/docs")
+    print(f"💡 提示: 服务初始化将在首次请求时完成")
     print(f"🛑 停止服务: Ctrl+C")
     print(f"{'='*50}\n")
     
