@@ -1,7 +1,7 @@
 .chat-header {
-    background: white;
+    background: var(--color-bg-secondary);
     padding: 15px 30px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--color-border-primary);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -11,7 +11,7 @@
 .chat-header h1 {
     font-size: 24px;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 
 .model-selector {
@@ -20,12 +20,12 @@
 
 .model-selector select {
     padding: 10px 40px 10px 15px;
-    border: 2px solid #e1e8ed;
+    border: 2px solid var(--color-border-primary);
     border-radius: 10px;
-    background: white;
+    background: var(--color-bg-secondary);
     font-size: 14px;
     font-weight: 500;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     cursor: pointer;
     transition: all 0.3s ease;
     appearance: none;
@@ -50,7 +50,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: white;
+    background: var(--color-bg-secondary);
     overflow: hidden;
     min-height: 0; /* 重要：允许flex子元素收缩 */
 }
@@ -82,17 +82,17 @@
 
 .user-message .message-avatar {
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .bot-message .message-avatar {
     background: #2c3e50;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .message-content {
     flex: 1;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     padding: 15px;
     border-radius: 10px;
     max-width: calc(100% - 55px);
@@ -204,13 +204,13 @@
 
 .toggle-card label {
     font-weight: 600;
-    color: #25324b;
+    color: var(--color-text-primary);
 }
 
 .toggle-card small {
     display: block;
     margin-top: 8px;
-    color: #607087;
+    color: var(--color-text-secondary);
     line-height: 1.6;
 }
 
@@ -275,7 +275,7 @@
     background: #4a5568;
     border: none;
     border-radius: 4px;
-    color: white;
+    color: var(--color-text-inverse);
     font-size: 12px;
     cursor: pointer;
     transition: background 0.2s;
@@ -314,7 +314,7 @@
 
 .chart-container {
     margin: 15px 0;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--color-border-primary);
     border-radius: 8px;
     overflow: hidden;
 }
@@ -330,7 +330,7 @@
 
 .thinking-tip-text {
     font-size: 12px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-style: italic;
     opacity: 0.8;
 }
@@ -346,7 +346,7 @@
 
 .chat-input-container {
     padding: 15px 20px 10px 20px;
-    background: white;
+    background: var(--color-bg-secondary);
     border-top: 1px solid #e0e0e0;
     flex-shrink: 0; /* 防止输入框被压缩 */
     margin-bottom: 0;
@@ -374,7 +374,7 @@
 .send-button {
     padding: 8px 16px;
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -402,7 +402,7 @@
 .stop-button {
     padding: 8px 16px;
     background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
-    color: white;
+    color: var(--color-text-inverse);
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -455,7 +455,7 @@
 
 /* 其他页面样式 */
 .page-header {
-    background: white;
+    background: var(--color-bg-secondary);
     padding: 20px 30px;
     border-bottom: 1px solid #e0e0e0;
     display: flex;
@@ -466,7 +466,7 @@
 .page-header h1 {
     font-size: 24px;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 
 .cards-container {
@@ -478,7 +478,7 @@
 }
 
 .card {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 10px;
     padding: 25px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -492,7 +492,7 @@
 
 .card h3 {
     margin-bottom: 20px;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -515,7 +515,7 @@
     display: block;
     margin-bottom: 5px;
     font-weight: 500;
-    color: #555;
+    color: var(--color-text-secondary);
 }
 
 .form-group input,
@@ -559,7 +559,7 @@
 
 .btn-primary {
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -580,7 +580,7 @@
 
 .btn-secondary {
     background: #95a5a6;
-    color: white;
+    color: var(--color-text-inverse);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -642,7 +642,7 @@
 }
 
 .example-btn {
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #ddd;
     border-radius: 6px;
     padding: 10px 15px;
@@ -652,12 +652,12 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 
 .example-btn:hover {
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
     border-color: #3498db;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
@@ -682,7 +682,7 @@
 }
 
 .info-card h5 {
-    color: #2c3e50;
+    color: var(--color-text-primary);
     margin-bottom: 8px;
     font-size: 16px;
 }
@@ -709,7 +709,7 @@
 }
 
 .history-item {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 8px;
     margin-bottom: 15px;
     transition: all 0.3s;
@@ -739,7 +739,7 @@
 
 .history-title {
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     margin-bottom: 5px;
 }
 
@@ -831,7 +831,7 @@
 
 /* 开发者模式流式传输样式 */
 .developer-stream-container {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border: 1px solid #dee2e6;
     border-radius: 8px;
     overflow: hidden;
@@ -839,7 +839,7 @@
 
 .developer-stream-header {
     background: #e74c3c;
-    color: white;
+    color: var(--color-text-inverse);
     padding: 10px 15px;
     display: flex;
     align-items: center;
@@ -868,7 +868,7 @@
 }
 
 .code-block-stream .code-header {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     padding: 8px 12px;
     border-bottom: 1px solid #dee2e6;
     display: flex;
@@ -878,14 +878,14 @@
 }
 
 .code-language {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-weight: 500;
 }
 
 .copy-btn {
     background: none;
     border: none;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     cursor: pointer;
     padding: 4px 8px;
     border-radius: 4px;
@@ -959,7 +959,7 @@
 
 .settings-sidebar {
     width: 200px;
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -981,7 +981,7 @@
     gap: 10px;
     padding: 10px 15px;
     text-decoration: none;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     border-radius: 6px;
     transition: all 0.2s;
 }
@@ -992,7 +992,7 @@
 
 .settings-link.active {
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .settings-content {
@@ -1041,7 +1041,7 @@
     width: 18px;
     left: 3px;
     bottom: 3px;
-    background-color: white;
+    background-color: var(--color-text-inverse);
     transition: .4s;
     border-radius: 50%;
 }
@@ -1077,7 +1077,7 @@ input:checked + .slider:before {
     bottom: 100%;
     right: 0;
     margin-bottom: 8px;
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #dee2e6;
     border-radius: 8px;
     padding: 16px;
@@ -1119,14 +1119,14 @@ input:checked + .slider:before {
 .tooltip-section h4 {
     font-size: 13px;
     margin: 0 0 6px 0;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     font-weight: 600;
 }
 
 .tooltip-section p {
     font-size: 12px;
     margin: 2px 0;
-    color: #555;
+    color: var(--color-text-secondary);
     line-height: 1.4;
 }
 
@@ -1152,14 +1152,14 @@ input:checked + .slider:before {
     gap: 8px;
     margin-bottom: 15px;
     padding: 8px 12px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 8px 8px 0 0;
     border-bottom: 1px solid #dee2e6;
 }
 
 .mode-view-btn {
     background: #6c757d;
-    color: white;
+    color: var(--color-text-inverse);
     border: none;
     padding: 6px 12px;
     border-radius: 4px;
@@ -1183,7 +1183,7 @@ input:checked + .slider:before {
 /* 用户模式容器 */
 .user-mode-container {
     display: none;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 8px;
     padding: 15px;
     border: 1px solid #dee2e6;
@@ -1194,7 +1194,7 @@ input:checked + .slider:before {
 }
 
 .thinking-process {
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #e9ecef;
     border-radius: 8px;
     padding: 15px;
@@ -1279,7 +1279,7 @@ input:checked + .slider:before {
 }
 
 .stage-description {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-size: 12px;
     line-height: 1.4;
 }
@@ -1349,7 +1349,7 @@ input:checked + .slider:before {
 
 .developer-header {
     background: #4a5568;
-    color: white;
+    color: var(--color-text-inverse);
     padding: 12px 15px;
     display: flex;
     align-items: center;
@@ -1365,12 +1365,12 @@ input:checked + .slider:before {
     font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
     font-size: 13px;
     line-height: 1.5;
-    background: #ffffff;
+    background: var(--color-bg-secondary);
 }
 
 /* 内容区域样式 */
 .user-content-area {
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #dee2e6;
     border-radius: 6px;
     padding: 15px;
@@ -1407,7 +1407,7 @@ input:checked + .slider:before {
 
 .developer-mode-container .copy-btn {
     color: #4a5568;
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #cbd5e0;
     padding: 4px 8px;
     border-radius: 4px;
@@ -1521,7 +1521,7 @@ input:checked + .slider:before {
 /* 系统概览卡片 */
 .system-overview-card {
     background: linear-gradient(135deg, #3498db 0%, #2c88c7 100%);
-    color: white;
+    color: var(--color-text-inverse);
     border-radius: 12px;
     padding: 40px;
     margin-bottom: 30px;
@@ -1570,7 +1570,7 @@ input:checked + .slider:before {
 }
 
 .info-card {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 10px;
     padding: 25px;
     display: flex;
@@ -1599,14 +1599,14 @@ input:checked + .slider:before {
 
 .info-content h4 {
     font-size: 14px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     margin-bottom: 5px;
     font-weight: 500;
 }
 
 .info-content p {
     font-size: 18px;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     font-weight: 600;
     margin-bottom: 5px;
 }
@@ -1638,11 +1638,11 @@ input:checked + .slider:before {
 
 .info-item label {
     font-weight: 500;
-    color: #555;
+    color: var(--color-text-secondary);
 }
 
 .info-item span {
-    color: #2c3e50;
+    color: var(--color-text-primary);
     font-weight: 600;
 }
 
@@ -1655,7 +1655,7 @@ input:checked + .slider:before {
 }
 
 .license-section h4 {
-    color: #2c3e50;
+    color: var(--color-text-primary);
     margin-bottom: 10px;
     font-size: 16px;
 }
@@ -1667,7 +1667,7 @@ input:checked + .slider:before {
 .license-list li {
     margin-bottom: 15px;
     padding: 10px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 6px;
     border-left: 4px solid #3498db;
 }
@@ -1700,7 +1700,7 @@ input:checked + .slider:before {
 }
 
 .tech-category h4 {
-    color: #2c3e50;
+    color: var(--color-text-primary);
     font-size: 14px;
     margin-bottom: 8px;
     border-bottom: 2px solid #3498db;
@@ -1710,7 +1710,7 @@ input:checked + .slider:before {
 .tech-badge {
     display: inline-block;
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
     padding: 4px 10px;
     border-radius: 12px;
     font-size: 12px;
@@ -1724,7 +1724,7 @@ input:checked + .slider:before {
 
 .about-section ol li {
     margin-bottom: 8px;
-    color: #555;
+    color: var(--color-text-secondary);
 }
 
 /* 许可证工具提示 */
@@ -1734,7 +1734,7 @@ input:checked + .slider:before {
     width: 16px;
     height: 16px;
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
     border-radius: 50%;
     text-align: center;
     font-size: 12px;
@@ -1754,7 +1754,7 @@ input:checked + .slider:before {
     left: 50%;
     transform: translateX(-50%);
     background: #2c3e50;
-    color: white;
+    color: var(--color-text-inverse);
     padding: 8px 12px;
     border-radius: 6px;
     font-size: 12px;
@@ -1783,7 +1783,7 @@ input:checked + .slider:before {
 }
 
 .execution-result {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-left-color: #28a745;
 }
 
@@ -1806,7 +1806,7 @@ input:checked + .slider:before {
 
 .execution-result pre,
 .execution-error pre {
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #e1e5e9;
     border-radius: 4px;
     padding: 10px;
@@ -1826,12 +1826,12 @@ input:checked + .slider:before {
     border: 1px solid #dee2e6;
     border-radius: 6px;
     overflow: hidden;
-    background: white;
+    background: var(--color-bg-secondary);
     font-size: 12px;
 }
 
 .result-table th {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     color: #495057;
     font-weight: 600;
     padding: 8px 10px;
@@ -1848,7 +1848,7 @@ input:checked + .slider:before {
 }
 
 .result-table tbody tr:hover {
-    background: #f5f5f5;
+    background: var(--color-bg-tertiary);
 }
 
 .result-table tbody tr:nth-child(even) {
@@ -1858,7 +1858,7 @@ input:checked + .slider:before {
 .data-info {
     margin-top: 8px;
     font-size: 11px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     text-align: right;
 }
 
@@ -1895,7 +1895,7 @@ input:checked + .slider:before {
 
 .btn-danger {
     background-color: #dc3545;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-danger:hover {
@@ -1927,7 +1927,7 @@ input:checked + .slider:before {
 /* MVP 模式标记 */
 .mvp-indicator {
     background: linear-gradient(45deg, #28a745, #20c997);
-    color: white;
+    color: var(--color-text-inverse);
     padding: 2px 8px;
     border-radius: 12px;
     font-size: 10px;
@@ -1958,13 +1958,13 @@ input:checked + .slider:before {
 .html-snippet-item {
     margin-bottom: 15px;
     padding: 15px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 8px;
     border: 1px solid #dee2e6;
 }
 
 .chart-container {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 6px;
     padding: 10px;
     overflow: hidden;
@@ -2003,7 +2003,7 @@ input:checked + .slider:before {
     display: flex;
     flex-direction: column;
     padding: 12px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 6px;
     border: 1px solid #dee2e6;
     text-align: center;
@@ -2011,7 +2011,7 @@ input:checked + .slider:before {
 
 .status-label {
     font-size: 12px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     margin-bottom: 5px;
     font-weight: 500;
 }
@@ -2031,7 +2031,7 @@ input:checked + .slider:before {
 }
 
 .cache-details {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border: 1px solid #dee2e6;
     border-radius: 6px;
     padding: 15px;
@@ -2166,7 +2166,7 @@ select:disabled {
     justify-content: space-between;
     align-items: center;
     padding: 20px 30px;
-    background: white;
+    background: var(--color-bg-secondary);
     border-bottom: 1px solid #e0e0e0;
     min-height: 80px;
 }
@@ -2181,7 +2181,7 @@ select:disabled {
     margin: 0;
     font-size: 24px;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 
 
@@ -2195,10 +2195,10 @@ select:disabled {
     padding: 8px 35px 8px 12px;
     border: 2px solid #e1e8ed;
     border-radius: 8px;
-    background: white;
+    background: var(--color-bg-secondary);
     font-size: 13px;
     font-weight: 500;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     min-width: 160px;
     transition: all 0.3s ease;
 }
@@ -2229,7 +2229,7 @@ select:disabled {
 
 .btn-secondary.btn-sm {
     background: #6c757d;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-secondary.btn-sm:hover {
@@ -2299,7 +2299,7 @@ select:disabled {
 }
 
 .toggle-label.user-mode {
-    color: white;
+    color: var(--color-text-inverse);
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
@@ -2313,7 +2313,7 @@ select:disabled {
 }
 
 .toggle-switch input:checked + .toggle-slider .dev-mode {
-    color: white;
+    color: var(--color-text-inverse);
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
@@ -2356,7 +2356,7 @@ select:disabled {
     width: 18px;
     left: 3px;
     bottom: 3px;
-    background-color: white;
+    background-color: var(--color-text-inverse);
     transition: .3s;
 }
 
@@ -2416,7 +2416,7 @@ input:checked + .slider:before {
 
 /* 路由prompt禁用状态 */
 .routing-prompt:disabled {
-    background: #f5f5f5;
+    background: var(--color-bg-tertiary);
     color: #999;
     cursor: not-allowed;
     opacity: 0.7;
@@ -2432,7 +2432,7 @@ input:checked + .slider:before {
 .execution-metrics {
     margin-top: 15px;
     padding: 10px 15px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 6px;
     border-top: 2px solid #3498db;
     font-size: 12px;
@@ -2457,7 +2457,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     gap: 4px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     white-space: nowrap;
 }
 
@@ -2475,7 +2475,7 @@ input:checked + .slider:before {
     border: 1px solid #dee2e6;
     border-radius: 8px;
     overflow: hidden;
-    background: white;
+    background: var(--color-bg-secondary);
 }
 
 .chart-header {
@@ -2483,7 +2483,7 @@ input:checked + .slider:before {
     justify-content: space-between;
     align-items: center;
     padding: 10px 15px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-bottom: 1px solid #dee2e6;
 }
 
@@ -2504,7 +2504,7 @@ input:checked + .slider:before {
 .chart-action-btn {
     padding: 4px 8px;
     background: #6c757d;
-    color: white;
+    color: var(--color-text-inverse);
     border: none;
     border-radius: 4px;
     font-size: 11px;
@@ -2527,7 +2527,7 @@ input:checked + .slider:before {
 }
 
 .chart-preview:hover {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
 }
 
 /* 全屏图表模态框 */
@@ -2546,7 +2546,7 @@ input:checked + .slider:before {
 }
 
 .modal-content {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 10px;
     width: 90vw;
     height: 90vh;
@@ -2558,7 +2558,7 @@ input:checked + .slider:before {
 
 .modal-header {
     padding: 15px 20px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-bottom: 1px solid #dee2e6;
     display: flex;
     justify-content: space-between;
@@ -2651,14 +2651,14 @@ input:checked + .slider:before {
 /* ============================== */
 
 .semantic-status-section {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 8px;
     padding: 20px;
     border: 1px solid #dee2e6;
 }
 
 .semantic-toggle-section {
-    background: white;
+    background: var(--color-bg-secondary);
     padding: 15px;
     border-radius: 6px;
     border: 1px solid #dee2e6;
@@ -2675,7 +2675,7 @@ input:checked + .slider:before {
 }
 
 .semantic-details-section {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 6px;
     border: 1px solid #dee2e6;
     min-height: 200px;
@@ -2704,7 +2704,7 @@ input:checked + .slider:before {
 .semantic-preview .database-section {
     margin-bottom: 20px;
     padding: 15px;
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 6px;
     border: 1px solid #dee2e6;
 }
@@ -2712,7 +2712,7 @@ input:checked + .slider:before {
 .semantic-preview .database-title {
     font-size: 14px;
     font-weight: bold;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     border-bottom: 2px solid #3498db;
     padding-bottom: 8px;
     margin-bottom: 15px;
@@ -2721,7 +2721,7 @@ input:checked + .slider:before {
 .semantic-preview .table-section {
     margin-bottom: 15px;
     padding: 10px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-left: 3px solid #17a2b8;
 }
 
@@ -2734,7 +2734,7 @@ input:checked + .slider:before {
 .semantic-preview .field-item {
     margin: 5px 0;
     padding: 5px 10px;
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 4px;
     display: flex;
     justify-content: space-between;
@@ -2756,7 +2756,7 @@ input:checked + .slider:before {
 }
 
 .help-content h4 {
-    color: #2c3e50;
+    color: var(--color-text-primary);
     margin: 20px 0 10px 0;
     font-size: 16px;
     border-bottom: 1px solid #dee2e6;
@@ -2770,7 +2770,7 @@ input:checked + .slider:before {
 
 .help-content li {
     margin: 8px 0;
-    color: #555;
+    color: var(--color-text-secondary);
 }
 
 .note-box {
@@ -2794,7 +2794,7 @@ input:checked + .slider:before {
 }
 
 .status-value.semantic-disabled {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-weight: bold;
 }
 
@@ -2837,7 +2837,7 @@ input:checked + .slider:before {
     width: 20px;
     left: 2px;
     bottom: 2px;
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 50%;
     transition: transform 0.3s ease;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -2881,7 +2881,7 @@ input:checked + .slider:before {
 }
 
 .database-title {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     padding: 12px 16px;
     font-weight: 600;
     font-size: 14px;
@@ -2902,7 +2902,7 @@ input:checked + .slider:before {
     padding: 10px 16px;
     font-weight: 500;
     font-size: 13px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     border-bottom: 1px solid #f1f3f4;
 }
 
@@ -2920,7 +2920,7 @@ input:checked + .slider:before {
 }
 
 .field-item:hover {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
 }
 
 .field-name {
@@ -2939,7 +2939,7 @@ input:checked + .slider:before {
 
 /* 语义层统计摘要 */
 .semantic-summary {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border: 1px solid #dee2e6;
     border-radius: 6px;
     padding: 15px;
@@ -2957,7 +2957,7 @@ input:checked + .slider:before {
 
 /* 翻译示例展示 */
 .mapping-examples {
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #dee2e6;
     border-radius: 6px;
     padding: 15px;
@@ -2976,14 +2976,14 @@ input:checked + .slider:before {
     align-items: center;
     padding: 8px 12px;
     margin-bottom: 8px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 4px;
     border-left: 3px solid #3498db;
 }
 
 .field-original {
     font-family: 'Consolas', 'Monaco', monospace;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-size: 12px;
     flex: 1;
 }
@@ -2995,7 +2995,7 @@ input:checked + .slider:before {
 }
 
 .field-translated {
-    color: #2c3e50;
+    color: var(--color-text-primary);
     font-weight: 500;
     font-size: 13px;
     flex: 1;
@@ -3004,7 +3004,7 @@ input:checked + .slider:before {
 
 .no-examples {
     text-align: center;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-style: italic;
     padding: 20px;
 }
@@ -3017,7 +3017,7 @@ input:checked + .slider:before {
 
 /* 数据库预览样式 */
 .db-preview-section {
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #dee2e6;
     border-radius: 6px;
     padding: 15px;
@@ -3037,20 +3037,20 @@ input:checked + .slider:before {
     align-items: center;
     padding: 8px 12px;
     margin-bottom: 6px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 4px;
     border-left: 3px solid #95a5a6;
 }
 
 .db-name {
     font-family: 'Consolas', 'Monaco', monospace;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     font-size: 13px;
     font-weight: 500;
 }
 
 .db-count {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-size: 12px;
     background: #e9ecef;
     padding: 2px 8px;
@@ -3063,12 +3063,12 @@ input:checked + .slider:before {
 }
 
 .db-preview-item.more .db-name {
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 /* 数据库区域增强 - 简化版 */
 .database-title {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     padding: 12px 16px;
     font-weight: 600;
     font-size: 14px;
@@ -3081,11 +3081,11 @@ input:checked + .slider:before {
 }
 
 .database-title i {
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 .db-stats {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-weight: 400;
     font-size: 12px;
     background: #e9ecef;
@@ -3094,7 +3094,7 @@ input:checked + .slider:before {
 }
 
 .expand-hint {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-weight: 400;
     font-size: 11px;
     font-style: italic;
@@ -3103,7 +3103,7 @@ input:checked + .slider:before {
 /* 表摘要和标签 */
 .table-summary {
     padding: 15px;
-    background: #fff;
+    background: var(--color-bg-secondary);
 }
 
 .table-list {
@@ -3113,7 +3113,7 @@ input:checked + .slider:before {
 }
 
 .table-tag {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     color: #495057;
     padding: 4px 8px;
     border-radius: 12px;
@@ -3125,13 +3125,13 @@ input:checked + .slider:before {
 }
 
 .table-tag small {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-size: 10px;
 }
 
 .table-tag.more {
     background: #e9ecef;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-style: italic;
 }
 
@@ -3143,9 +3143,9 @@ input:checked + .slider:before {
 .no-data {
     padding: 15px;
     text-align: center;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-style: italic;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
 }
 
 /* 状态消息样式 */
@@ -3155,7 +3155,7 @@ input:checked + .slider:before {
 .loading-message {
     text-align: center;
     padding: 40px 20px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 .no-cache-message i, 
@@ -3180,20 +3180,20 @@ input:checked + .slider:before {
 }
 
 .loading-message {
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 .no-tables, .no-fields {
     padding: 20px;
     text-align: center;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-style: italic;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
 }
 
 /* 文本信息显示 */
 .semantic-text-info {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border: 1px solid #dee2e6;
     border-radius: 8px;
     padding: 15px;
@@ -3235,7 +3235,7 @@ input:checked + .slider:before {
 
 .notification-content {
     background: #2c3e50;
-    color: white;
+    color: var(--color-text-inverse);
     padding: 12px 20px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(44, 62, 80, 0.3);
@@ -3373,7 +3373,7 @@ input:checked + .slider:before {
 }
 
 .confirm-dialog {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 8px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     min-width: 320px;
@@ -3399,7 +3399,7 @@ input:checked + .slider:before {
 
 .confirm-content {
     padding: 20px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     line-height: 1.5;
 }
 
@@ -3423,7 +3423,7 @@ input:checked + .slider:before {
 
 .confirm-cancel {
     background: #6c757d;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .confirm-cancel:hover {
@@ -3432,7 +3432,7 @@ input:checked + .slider:before {
 
 .confirm-ok {
     background: #0078d4;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .confirm-ok:hover {
@@ -3526,7 +3526,7 @@ input:checked + .slider:before {
 }
 
 .clarification-modal {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     max-width: 600px;
@@ -3549,7 +3549,7 @@ input:checked + .slider:before {
 
 .clarification-header {
     background: linear-gradient(135deg, #3498db, #2980b9);
-    color: white;
+    color: var(--color-text-inverse);
     padding: 20px;
     display: flex;
     justify-content: space-between;
@@ -3565,7 +3565,7 @@ input:checked + .slider:before {
 .clarification-header .close-btn {
     background: none;
     border: none;
-    color: white;
+    color: var(--color-text-inverse);
     font-size: 24px;
     cursor: pointer;
     padding: 0;
@@ -3589,7 +3589,7 @@ input:checked + .slider:before {
 }
 
 .original-query {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     padding: 15px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -3600,14 +3600,14 @@ input:checked + .slider:before {
 .clarification-prompt {
     font-size: 16px;
     margin-bottom: 20px;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     font-weight: 500;
 }
 
 .term-clarification {
     margin-bottom: 25px;
     padding: 20px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 8px;
     border: 1px solid #dee2e6;
 }
@@ -3615,11 +3615,11 @@ input:checked + .slider:before {
 .term-title {
     font-size: 16px;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     margin: 0 0 15px 0;
     padding: 8px 12px;
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
     border-radius: 6px;
     display: inline-block;
 }
@@ -3634,7 +3634,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     padding: 12px;
-    background: white;
+    background: var(--color-bg-secondary);
     border: 2px solid #e9ecef;
     border-radius: 6px;
     cursor: pointer;
@@ -3655,7 +3655,7 @@ input:checked + .slider:before {
 
 .option-item input[type="radio"]:checked + .option-text {
     font-weight: 500;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 
 .option-item:has(input:checked) {
@@ -3691,7 +3691,7 @@ input:checked + .slider:before {
 
 .btn-cancel {
     background: #6c757d;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-cancel:hover {
@@ -3700,7 +3700,7 @@ input:checked + .slider:before {
 
 .btn-confirm {
     background: #3498db;
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .btn-confirm:hover {
@@ -3754,7 +3754,7 @@ input:checked + .slider:before {
 .message-content .markdown-content h6 {
     margin: 16px 0 8px 0;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     border-bottom: 1px solid #e0e0e0;
     padding-bottom: 4px;
 }
@@ -3784,7 +3784,7 @@ input:checked + .slider:before {
 .message-content .markdown-content blockquote {
     margin: 12px 0;
     padding: 8px 16px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-left: 4px solid #3498db;
     color: #666;
     font-style: italic;
@@ -3831,7 +3831,7 @@ input:checked + .slider:before {
 }
 
 .message-content .markdown-content table th {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     font-weight: 600;
     color: #495057;
 }
@@ -3905,7 +3905,7 @@ input:checked + .slider:before {
     justify-content: space-between;
     margin-bottom: 15px;
     padding: 12px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 8px;
     border: 1px solid #dee2e6;
 }
@@ -3944,7 +3944,7 @@ input:checked + .slider:before {
     left: 2px;
     width: 20px;
     height: 20px;
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 50%;
     transition: transform 0.3s ease;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
@@ -3980,7 +3980,7 @@ input:checked + .slider:before {
     align-items: center;
     gap: 8px;
     font-size: 12px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 .mode-info i {
@@ -4011,7 +4011,7 @@ input:checked + .slider:before {
 
 .output-mode-tabs {
     display: flex;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-bottom: 1px solid #dee2e6;
 }
 
@@ -4023,14 +4023,14 @@ input:checked + .slider:before {
     cursor: pointer;
     font-size: 13px;
     font-weight: 500;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     transition: all 0.2s ease;
     position: relative;
 }
 
 .output-tab.active {
     color: #495057;
-    background: white;
+    background: var(--color-bg-secondary);
 }
 
 .output-tab.active::after {
@@ -4048,18 +4048,18 @@ input:checked + .slider:before {
 }
 
 .output-tab.active:hover {
-    background: white;
+    background: var(--color-bg-secondary);
 }
 
 .output-content {
     padding: 15px;
-    background: white;
+    background: var(--color-bg-secondary);
 }
 
 .developer-output {
     font-family: 'Monaco', 'Consolas', 'SF Mono', monospace;
     font-size: 12px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     padding: 12px;
     border-radius: 6px;
     border: 1px solid #dee2e6;
@@ -4081,7 +4081,7 @@ input:checked + .slider:before {
 
 /* 缓存统计摘要 */
 .cache-stats-summary {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -4098,7 +4098,7 @@ input:checked + .slider:before {
     align-items: center;
     gap: 12px;
     flex: 1;
-    background: white;
+    background: var(--color-bg-secondary);
     padding: 15px;
     border-radius: 6px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -4117,17 +4117,17 @@ input:checked + .slider:before {
 .stat-value {
     font-size: 18px;
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 
 .stat-label {
     font-size: 12px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 /* 数据库列表容器 */
 .db-list-container {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
@@ -4137,7 +4137,7 @@ input:checked + .slider:before {
 
 .db-list-container h4 {
     margin-bottom: 15px;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     font-size: 16px;
     font-weight: 600;
 }
@@ -4155,7 +4155,7 @@ input:checked + .slider:before {
 }
 
 .db-item {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--color-border-primary);
     border-radius: 6px;
     overflow: hidden;
     transition: all 0.3s ease;
@@ -4173,7 +4173,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     padding: 12px 15px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     cursor: pointer;
     user-select: none;
 }
@@ -4184,13 +4184,13 @@ input:checked + .slider:before {
 
 .db-header i {
     margin-right: 10px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 .db-name {
     flex: 1;
     font-weight: 500;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 
 .table-count {
@@ -4199,18 +4199,18 @@ input:checked + .slider:before {
     background: #e9ecef;
     border-radius: 12px;
     font-size: 12px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 .toggle-icon {
     margin-left: 10px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     transition: transform 0.3s ease;
 }
 
 /* 数据库详情 */
 .db-detail {
-    background: white;
+    background: var(--color-bg-secondary);
     border-top: 1px solid #e0e0e0;
 }
 
@@ -4227,7 +4227,7 @@ input:checked + .slider:before {
 }
 
 .table-item:hover {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
 }
 
 .table-item i {
@@ -4243,12 +4243,12 @@ input:checked + .slider:before {
 
 .field-count {
     font-size: 11px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     margin-left: 8px;
 }
 
 .table-item.more {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-style: italic;
     font-size: 12px;
 }
@@ -4259,7 +4259,7 @@ input:checked + .slider:before {
 }
 
 .db-item.more .db-name {
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-style: italic;
 }
 
@@ -4267,14 +4267,14 @@ input:checked + .slider:before {
 .no-data {
     text-align: center;
     padding: 40px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
     font-size: 14px;
 }
 
 .no-cache-message {
     text-align: center;
     padding: 40px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 .no-cache-message i {
@@ -4297,7 +4297,7 @@ input:checked + .slider:before {
 }
 
 .thinking-container {
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 15px;
@@ -4308,7 +4308,7 @@ input:checked + .slider:before {
     align-items: center;
     gap: 10px;
     margin-bottom: 20px;
-    color: #2c3e50;
+    color: var(--color-text-primary);
 }
 
 .thinking-header i {
@@ -4334,9 +4334,9 @@ input:checked + .slider:before {
     align-items: flex-start;
     gap: 15px;
     padding: 12px;
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 6px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--color-border-primary);
     transition: all 0.3s ease;
 }
 
@@ -4366,13 +4366,13 @@ input:checked + .slider:before {
 
 .stage-title {
     font-weight: 600;
-    color: #2c3e50;
+    color: var(--color-text-primary);
     margin-bottom: 4px;
 }
 
 .stage-description {
     font-size: 13px;
-    color: #6c757d;
+    color: var(--color-text-secondary);
 }
 
 /* 进度条 */
@@ -4404,7 +4404,7 @@ input:checked + .slider:before {
 .thinking-summary {
     margin-top: 15px;
     padding: 15px;
-    background: #f8f9fa;
+    background: var(--color-bg-tertiary);
     border-radius: 6px;
 }
 
@@ -4442,7 +4442,7 @@ input:checked + .slider:before {
     background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
     border-radius: 12px;
     padding: 20px;
-    color: white;
+    color: var(--color-text-inverse);
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
 }
 
@@ -4512,7 +4512,7 @@ input:checked + .slider:before {
 /* 图表容器样式 - 新增 */
 .chart-container {
     margin: 20px 0;
-    background: white;
+    background: var(--color-bg-secondary);
     border: 1px solid #e9ecef;
     border-radius: 12px;
     overflow: hidden;
@@ -4531,7 +4531,7 @@ input:checked + .slider:before {
     justify-content: space-between;
     padding: 15px 20px;
     background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .chart-header i {
@@ -4558,7 +4558,7 @@ input:checked + .slider:before {
     border: 1px solid #e5e7eb;
     border-radius: 12px;
     overflow: hidden;
-    background: #ffffff;
+    background: var(--color-bg-secondary);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     transition: box-shadow 0.3s ease;
 }
@@ -4574,7 +4574,7 @@ input:checked + .slider:before {
     align-items: center;
     padding: 12px 16px;
     background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .chart-filename {
@@ -4594,7 +4594,7 @@ input:checked + .slider:before {
 .chart-embed-header .chart-actions button {
     background: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
+    color: var(--color-text-inverse);
     padding: 6px 10px;
     border-radius: 6px;
     cursor: pointer;
@@ -4647,7 +4647,7 @@ input:checked + .slider:before {
     width: 100%;
     min-height: 600px;
     border: none;
-    background: white;
+    background: var(--color-bg-secondary);
 }
 
 /* 全屏模式样式 */
@@ -4712,7 +4712,7 @@ input:checked + .slider:before {
 .chart-action-btn {
     background: rgba(255, 255, 255, 0.2);
     border: none;
-    color: white;
+    color: var(--color-text-inverse);
     padding: 8px 12px;
     border-radius: 6px;
     cursor: pointer;
@@ -4727,7 +4727,7 @@ input:checked + .slider:before {
 
 .chart-content {
     padding: 20px;
-    background: white;
+    background: var(--color-bg-secondary);
 }
 
 .chart-error {
@@ -4766,7 +4766,7 @@ input:checked + .slider:before {
 }
 
 .chart-modal-content {
-    background: white;
+    background: var(--color-bg-secondary);
     border-radius: 12px;
     max-width: 90vw;
     max-height: 90vh;
@@ -4792,7 +4792,7 @@ input:checked + .slider:before {
     align-items: center;
     padding: 20px 25px;
     background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .chart-modal-header h3 {
@@ -4804,7 +4804,7 @@ input:checked + .slider:before {
 .chart-modal-close {
     background: none;
     border: none;
-    color: white;
+    color: var(--color-text-inverse);
     font-size: 24px;
     cursor: pointer;
     padding: 5px;
@@ -4947,7 +4947,7 @@ input:checked + .slider:before {
 }
 
 .routing-sql {
-    background: #ffffff;
+    background: var(--color-bg-secondary);
     border: 1px dashed #c6d0f5;
     padding: 10px;
     border-radius: 6px;

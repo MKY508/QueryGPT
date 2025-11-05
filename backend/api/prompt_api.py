@@ -2,7 +2,7 @@
 import os
 import json
 import logging
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 
 from backend.core import service_container
 
@@ -10,6 +10,13 @@ logger = logging.getLogger(__name__)
 
 prompt_bp = Blueprint('prompt', __name__, url_prefix='/api')
 services = service_container
+
+
+def _get_smart_router():
+    """从 Flask 上下文获取智能路由器（优先），否则回退到全局服务容器"""
+    if hasattr(g, 'smart_router'):
+        return g.smart_router
+    return services.smart_router
 
 
 def _get_default_prompts():
@@ -145,7 +152,7 @@ def save_prompts():
             json.dump(new_config, f, ensure_ascii=False, indent=2)
         
         # 更新智能路由器的prompt
-        smart_router = services.smart_router
+        smart_router = _get_smart_router()
         if 'routing' in new_config and smart_router:
             smart_router.update_routing_prompt(new_config['routing'])
             logger.info("智能路由Prompt已更新")
@@ -170,7 +177,7 @@ def reset_prompts():
             json.dump(default_prompts, f, ensure_ascii=False, indent=2)
         
         # 更新智能路由器的prompt
-        smart_router = services.smart_router
+        smart_router = _get_smart_router()
         if smart_router and 'routing' in default_prompts:
             smart_router.update_routing_prompt(default_prompts['routing'])
             logger.info("智能路由Prompt已恢复默认")
