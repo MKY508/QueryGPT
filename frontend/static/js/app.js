@@ -2,6 +2,26 @@
  * 数据分析平台主应用
  */
 
+const appLogger = (function resolveAppLogger() {
+    if (window.loggerFactory && typeof window.loggerFactory.createSafeLogger === 'function') {
+        return window.loggerFactory.createSafeLogger('frontend:app');
+    }
+    if (window.Logger && typeof window.Logger.getLogger === 'function') {
+        return window.Logger.getLogger('frontend:app');
+    }
+    const fallback = {};
+    ['error', 'warn', 'info', 'debug', 'trace'].forEach((level) => {
+        fallback[level] = (...args) => {
+            if (window.console && typeof window.console[level] === 'function') {
+                window.console[level](...args);
+            } else if (window.console && typeof window.console.log === 'function') {
+                window.console.log(...args);
+            }
+        };
+    });
+    return fallback;
+})();
+
 class DataAnalysisPlatform {
     constructor() {
         // 启动时不自动恢复会话，始终开始新对话
@@ -77,7 +97,7 @@ class DataAnalysisPlatform {
         initTasks.forEach((result, index) => {
             if (result.status === 'rejected') {
                 const taskNames = [window.i18nManager?.t('config.configuration') || '配置', window.i18nManager?.t('config.model') || '模型', window.i18nManager?.t('config.settings') || '设置'];
-                console.warn(`${taskNames[index]}加载失败，使用默认值:`, result.reason?.message);
+                appLogger.warn(`${taskNames[index]}加载失败，使用默认值:`, result.reason?.message);
             }
         });
         
@@ -96,7 +116,7 @@ class DataAnalysisPlatform {
                 this.currentViewMode = basicSettings.default_view_mode;
             }
         } catch (error) {
-            console.warn('加载基础设置失败:', error);
+            appLogger.warn('加载基础设置失败:', error);
         }
         
         // 设置事件监听器（不依赖后端）
@@ -221,7 +241,7 @@ class DataAnalysisPlatform {
         
         // 检查元素是否存在
         if (!sendButton || !stopButton) {
-            console.error('按钮元素未找到:', { sendButton: !!sendButton, stopButton: !!stopButton });
+            appLogger.error('按钮元素未找到:', { sendButton: !!sendButton, stopButton: !!stopButton });
         }
         
         if (sendButton) {
@@ -244,7 +264,7 @@ class DataAnalysisPlatform {
                 if (this.isProcessing) {
                     this.stopQuery();
                 } else {
-                    console.warn('当前没有正在执行的查询');
+                    appLogger.warn('当前没有正在执行的查询');
                 }
             });
         }
@@ -309,7 +329,7 @@ class DataAnalysisPlatform {
                         window.OnboardingGuide.start();
                     }
                 } catch (err) {
-                    console.warn('启动新手引导失败:', err);
+                    appLogger.warn('启动新手引导失败:', err);
                 }
             }, { passive: true });
         }
@@ -433,7 +453,7 @@ class DataAnalysisPlatform {
         if (!this._historyModulePromise) {
             this._historyModulePromise = import('./history-support.js')
                 .catch(error => {
-                    console.error('加载历史模块失败:', error);
+                    appLogger.error('加载历史模块失败:', error);
                     this._historyModulePromise = null;
                     throw error;
                 });
@@ -470,13 +490,13 @@ class DataAnalysisPlatform {
                 try {
                     manager.loadRecentConversationsIfNeeded(shouldReload);
                 } catch (error) {
-                    console.error('加载历史记录失败:', error);
+                    appLogger.error('加载历史记录失败:', error);
                 }
             }, 180);
 
             await this.loadHistoryStatisticsOnce(historyModule);
         } catch (error) {
-            console.error('激活历史标签失败:', error);
+            appLogger.error('激活历史标签失败:', error);
         }
     }
 
@@ -490,7 +510,7 @@ class DataAnalysisPlatform {
             await module.loadHistoryStatistics(this);
             this._historyStatsLoaded = true;
         } catch (error) {
-            console.warn('加载历史统计信息失败:', error);
+            appLogger.warn('加载历史统计信息失败:', error);
         }
     }
 
@@ -668,7 +688,7 @@ class DataAnalysisPlatform {
                     this.activeEventSource = eventSource;
                     usedSSE = true;
                 } catch (e) {
-                    console.warn('SSE 初始化失败，回退至普通请求:', e);
+                    appLogger.warn('SSE 初始化失败，回退至普通请求:', e);
                     if (this.activeEventSource) {
                         try { this.activeEventSource.close(); } catch (_) {}
                         this.activeEventSource = null;
@@ -722,7 +742,7 @@ class DataAnalysisPlatform {
                 this.showNotification(window.i18nManager.t('common.stopped'), 'info', { duration: 2000 });
                 this.transformThinkingToInterrupted(this.activeThinkingId || thinkingId);
             } else {
-                console.error('发送消息失败:', error);
+                appLogger.error('发送消息失败:', error);
                 this.showNotification(window.i18nManager?.t('notifications.sendFailed') || '发送失败，请重试', 'error');
                 this.hideThinkingProcess(thinkingId);
                 this.addMessage('bot', window.i18nManager?.t('notifications.requestFailed') || '处理请求失败。检查网络连接或稍后重试。');
@@ -781,13 +801,13 @@ class DataAnalysisPlatform {
                     console.log('停止请求成功');
                     this.showNotification(i18n.t('common.stopped') || '查询已停止', 'success', { duration: 2200 });
                 } else {
-                    console.warn('停止请求失败:', data.error);
+                    appLogger.warn('停止请求失败:', data.error);
                     if (data.error) {
                         this.showNotification(data.error, 'warning', { duration: 2500 });
                     }
                 }
             } catch (error) {
-                console.error('发送停止请求失败:', error);
+            appLogger.error('发送停止请求失败:', error);
                 this.showNotification(i18n.t('errors.stopFailed') || '停止失败，请稍后重试', 'error', { duration: 2500 });
             }
         }
@@ -881,7 +901,7 @@ class DataAnalysisPlatform {
                 this.showWelcomeMessage();
             }
         } catch (error) {
-            console.error('恢复会话失败:', error);
+            appLogger.error('恢复会话失败:', error);
             this.currentConversationId = null;
             localStorage.removeItem('currentConversationId');
             this.showWelcomeMessage();
@@ -951,7 +971,7 @@ class DataAnalysisPlatform {
             if (steps.length) {
                 this.playStepSummaries(thinkingId, steps)
                     .catch(err => {
-                        console.warn('播放步骤过程失败:', err);
+                        appLogger.warn('播放步骤过程失败:', err);
                     })
                     .finally(() => {
                         this.transformThinkingToResult(thinkingId, event);
@@ -2385,7 +2405,7 @@ class DataAnalysisPlatform {
             
             this.showNotification('已加载历史对话', 'success');
         } catch (error) {
-            console.error('加载对话失败:', error);
+            appLogger.error('加载对话失败:', error);
             this.showNotification('加载对话失败', 'error');
         }
     }
@@ -2420,7 +2440,7 @@ class DataAnalysisPlatform {
             }
         } catch (error) {
             // 静默处理错误，使用默认配置
-            console.warn('配置加载失败，使用默认值:', error.message);
+            appLogger.warn('配置加载失败，使用默认值:', error.message);
             this.config = {
                 current_model: 'gpt-4.1',
                 api_base: 'http://localhost:11434/v1'
@@ -2493,7 +2513,7 @@ class DataAnalysisPlatform {
             
             console.log('模型列表更新完成，当前激活模型数量:', models.filter(m => m.status === 'active' || m.status === undefined).length);
         } catch (error) {
-            console.error('加载模型列表失败:', error);
+            appLogger.error('加载模型列表失败:', error);
         }
     }
 
@@ -2504,7 +2524,7 @@ class DataAnalysisPlatform {
         try {
             await api.saveConfig(this.config);
         } catch (error) {
-            console.error('保存配置失败:', error);
+            appLogger.error('保存配置失败:', error);
         }
     }
 
@@ -2559,7 +2579,7 @@ class DataAnalysisPlatform {
                 document.getElementById('default-view-mode').value = uiConfig.default_view_mode;
             }
         } catch (error) {
-            console.error('加载设置失败:', error);
+            appLogger.error('加载设置失败:', error);
         }
     }
 
@@ -2705,7 +2725,7 @@ class DataAnalysisPlatform {
     showNotification(text, type = 'info', options = {}) {
         const notification = document.getElementById('notification');
         if (!notification) {
-            console.warn('Notification container not found');
+            appLogger.warn('Notification container not found');
             return;
         }
         const iconMap = {
@@ -2915,7 +2935,7 @@ class DataAnalysisPlatform {
                 'success'
             );
         } catch (error) {
-            console.error('Failed to change language:', error);
+            appLogger.error('Failed to change language:', error);
             this.showNotification('语言切换失败，请重试', 'error');
         }
     }
@@ -3084,7 +3104,7 @@ class DataAnalysisPlatform {
         this.ensureHistorySupport().then(module => {
             module.loadHistoryConversation(this, conversation);
         }).catch(error => {
-            console.error('加载历史对话失败:', error);
+            appLogger.error('加载历史对话失败:', error);
         });
     }
     

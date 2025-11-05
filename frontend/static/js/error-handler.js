@@ -3,6 +3,26 @@
  * 提供全局错误捕获、日志记录和错误提示
  */
 
+const errorHandlerLogger = (function resolveErrorLogger() {
+    if (window.loggerFactory && typeof window.loggerFactory.createSafeLogger === 'function') {
+        return window.loggerFactory.createSafeLogger('frontend:error-handler');
+    }
+    if (window.Logger && typeof window.Logger.getLogger === 'function') {
+        return window.Logger.getLogger('frontend:error-handler');
+    }
+    const fallback = {};
+    ['error', 'warn', 'info', 'debug', 'trace'].forEach((level) => {
+        fallback[level] = (...args) => {
+            if (window.console && typeof window.console[level] === 'function') {
+                window.console[level](...args);
+            } else if (window.console && typeof window.console.log === 'function') {
+                window.console.log(...args);
+            }
+        };
+    });
+    return fallback;
+})();
+
 class ErrorHandler {
     constructor() {
         this.errorLog = [];
@@ -12,7 +32,7 @@ class ErrorHandler {
         // 增加延迟时间，确保页面完全初始化
         setTimeout(() => {
             this.pageLoadComplete = true;
-            console.log('错误处理器已激活');
+            errorHandlerLogger.info('错误处理器已激活');
         }, 5000);  // 增加到5秒
         
         this.setupGlobalHandlers();
@@ -53,7 +73,7 @@ class ErrorHandler {
         
         // 页面加载期间不显示错误通知
         if (!this.pageLoadComplete) {
-            console.warn('页面加载期间的错误（已忽略）:', errorInfo);
+            errorHandlerLogger.warn('页面加载期间的错误（已忽略）:', errorInfo);
             return;
         }
         
@@ -81,7 +101,7 @@ class ErrorHandler {
         
         // 开发环境输出详细信息
         if (this.isDevelopment()) {
-            console.error('Error details:', errorInfo);
+            errorHandlerLogger.error('Error details:', errorInfo);
         }
     }
     
