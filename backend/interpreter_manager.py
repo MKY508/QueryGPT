@@ -193,77 +193,61 @@ class InterpreterManager:
                 """
                 _apply_prompt('QA', default_zh, default_en, '礼貌拒绝prompt')
             else:
-                default_zh = """
-                你是 QueryGPT 的数据分析助手，必须在当前沙箱中亲自运行 Python 代码完成工作。遵循下列流程：
-                1. 建立连接：使用提供的 pymysql 参数创建连接和 cursor。若连接失败，立即汇报 host:port 与报错并终止任务。
-                2. 探索数据库：当 database 未指定时，先 SHOW DATABASES → 根据业务关键词选择目标库 → USE 目标库 → SHOW TABLES → 对候选表执行 DESCRIBE 与 SELECT * LIMIT 10。
-                3. 执行分析：编写只读 SQL（SELECT/SHOW/DESCRIBE/EXPLAIN），使用 pandas 处理结果，必要时用 plotly 生成图表并保存到 output/ 目录（标题与标注使用中文）。
-                4. 汇报结论：在最终答复中分别给出【用户视图】和【开发者视图】，列出关键 SQL、耗时、样本行数与生成的文件。
-                严禁访问本地文件或构造虚假数据，所有操作均需通过实际 Python 代码完成。
-                """
-                default_en = """
-                You are QueryGPT's data analysis assistant and must execute real Python code inside this sandbox. Follow this workflow:
-                1. Connect: create a pymysql connection with the provided parameters. If the connection fails, report host:port plus the exact error and stop.
-                2. Explore: when no database is specified, run SHOW DATABASES → choose the most relevant schema → USE it → SHOW TABLES → run DESCRIBE and SELECT * LIMIT 10 to inspect candidates.
-                3. Analyse: write read-only SQL (SELECT/SHOW/DESCRIBE/EXPLAIN), process results with pandas, and create visualisations with plotly saved under output/ with Chinese titles and labels.
-                4. Report: end with both "User View" and "Developer View" summaries, including executed SQL, runtime, row counts, and generated artifacts.
-                Never access local files or fabricate data; every action must be performed via executed Python code.
-                """
+                default_zh = """你是一个完整的数据分析 Agent，直接在沙箱中运行 Python 代码以完成用户的数据分析需求。
+
+**完成标准（缺一不可）：**
+✓ 生成至少一个 Plotly 图表，保存为 HTML
+✓ 输出【用户视图】：2-3 句业务结论
+✓ 输出【开发者视图】：SQL、耗时、行数、文件路径
+
+**执行原则：**
+整个分析是一个完整任务，在一次回复中完成所有步骤，不要分段输出或等待下一轮对话。
+
+**工作流程：**
+1. 连接数据库（使用提供的连接参数）
+2. 自主探索（SHOW DATABASES/TABLES/DESCRIBE/SELECT * LIMIT 10）
+3. 编写并执行只读 SQL 获取数据
+4. 用 pandas 处理，用 plotly 生成图表（中文标题/图例），保存到 output/
+5. 输出双视图总结
+
+**步骤播报：**
+执行前可以输出 `[步骤 N] 简要说明` 让用户了解进度，但务必在同一次回复中完成所有步骤。
+
+**自检清单（回复前必查）：**
+- [ ] 是否已生成并保存 Plotly HTML？
+- [ ] 是否已准备好【用户视图】总结？
+- [ ] 是否已准备好【开发者视图】（含 SQL/路径）？
+- 如有任一未完成，继续执行而不要结束回复。
+
+如果遇到阻塞问题（连接失败、无数据），明确报告并给出建议，但不要返回半成品。"""
+                default_en = """You are a complete data analysis agent that runs Python code directly in a sandbox to fulfil the user's analytical request.
+
+**Completion criteria (all required):**
+✓ Generate at least one Plotly chart, saved as HTML
+✓ Provide "User View": 2-3 sentence business conclusion
+✓ Provide "Developer View": SQL, runtime, row count, file path
+
+**Execution principle:**
+The entire analysis is one complete task—finish all steps in a single response, not segmented or awaiting the next turn.
+
+**Workflow:**
+1. Connect to database (using provided credentials)
+2. Self-explore (SHOW DATABASES/TABLES/DESCRIBE/SELECT * LIMIT 10)
+3. Write and execute read-only SQL to fetch data
+4. Process with pandas, generate Plotly charts (Chinese titles/legends), save to output/
+5. Output dual-view summary
+
+**Step logging:**
+You may output `[Step N] brief description` before execution to inform users of progress, but must complete all steps in the same response.
+
+**Self-check before responding:**
+- [ ] Have you generated and saved a Plotly HTML?
+- [ ] Have you prepared the "User View" summary?
+- [ ] Have you prepared the "Developer View" (with SQL/paths)?
+- If any is missing, keep working instead of ending the response.
+
+If blocked (connection failure, no data), report clearly and suggest next steps, but don't return a half-finished result."""
                 _apply_prompt('ANALYSIS', default_zh, default_en, '数据分析prompt')
-            
-            # 附加额外系统说明（思考步骤、执行计划）
-            step_logging_enabled = context.get('step_logging_enabled', True)
-            step_template = context.get('step_template') or ('Step {index}: {summary}' if language == 'en' else '步骤{index}：{summary}')
-            step_template_display = step_template.replace('{', '{{').replace('}', '}}')
-            step_min_words = max(int(context.get('step_min_words', 3) or 3), 1)
-            suggested_plan = context.get('suggested_plan') if isinstance(context.get('suggested_plan'), (list, tuple)) else []
-
-            append_segments = []
-            if suggested_plan:
-                plan_title = '推荐执行计划' if language != 'en' else 'Suggested Plan'
-                plan_lines = '\n'.join(f"- {str(item)}" for item in suggested_plan)
-                append_segments.append(f"{plan_title}:\n{plan_lines}")
-
-            if step_logging_enabled:
-                if language == 'en':
-                    append_segments.append(
-                        (
-                            "Step logging requirement: before each major action, emit a plain-text line `[Step {index}] ...` outside any code block, then immediately share the Python code to be executed (use ```python blocks). Increase {index} sequentially and describe the action with at least "
-                            f"{step_min_words} words. Execute the code right away, capture key outputs, and never stop after showing code."
-                        )
-                    )
-                else:
-                    append_segments.append(
-                        (
-                            "步骤播报要求：每次执行代码前，先输出一行纯文本 `[步骤 {index}] ...`（不要写进代码块，也不要在 Python 中 print），随后给出要运行的 ```python 代码块并立刻执行。"
-                            f"{{index}} 需按顺序递增，说明至少包含 {step_min_words} 个字，且执行完成后务必汇报关键结果，不要只给出代码。"
-                        )
-                    )
-            else:
-                if language == 'en':
-                    append_segments.append(
-                        "Step logging is disabled for this run. Ignore previous instructions about step summaries and proceed directly."
-                    )
-                else:
-                    append_segments.append("本次执行已关闭步骤播报，可忽略所有相关要求，直接按计划执行。")
-
-            if language == 'en':
-                append_segments.append(
-                    "Always self-explore using SHOW DATABASES, SHOW TABLES, DESCRIBE, and SELECT * LIMIT 10 before crafting queries. Only when exploration cannot resolve an ambiguity may you ask the user for precise details. Step summaries must be imperative statements and must not contain questions unless explicitly requesting clarification. Use the step log only to announce forthcoming actions; deliver findings, errors, and final answers in regular prose without the step prefix."
-                )
-                append_segments.append(
-                    "After every executed block, provide concise natural-language findings (tables, metrics, chart locations). Do not leave raw Python or SQL as the final answer."
-                )
-            else:
-                append_segments.append(
-                    "在编写查询前必须使用 SHOW DATABASES、SHOW TABLES、DESCRIBE、SELECT * LIMIT 10 等指令自行探索。仅当充分探索仍无法消除歧义时，方可礼貌地向用户确认具体信息。步骤说明必须是动作陈述句，除非明确请求澄清，否则禁止使用问句。步骤播报只用于说明即将执行的操作；最终结论、发现与错误信息请以正常表述输出，勿再使用“步骤”前缀。"
-                )
-                append_segments.append(
-                    "每次代码执行完成后，立即用自然语言总结关键发现、数据指标或图表路径，禁止只输出 Python 或 SQL。"
-                )
-
-            if append_segments:
-                interpreter.system_message = (interpreter.system_message.rstrip() + "\n\n" + "\n".join(append_segments)).strip()
             
             # 获取会话历史（如果有）
             conversation_history = None
@@ -275,15 +259,10 @@ class InterpreterManager:
             else:
                 logger.warning("[会话上下文] 未提供会话ID，无法维持对话上下文")
             
-            # 构建包含历史的提示词（使用增强后的查询）
+            # 构建简洁的提示词（只包含连接参数和用户问题）
             full_prompt = self._build_prompt_with_context(query, context, conversation_history, language)
-
-            # 在完整提示前注入推荐步骤，帮助模型规划执行顺序
-            if suggested_plan:
-                heading = '## 推荐执行计划' if language != 'en' else '## Suggested Execution Plan'
-                plan_lines = '\n'.join(f"{idx + 1}. {str(item)}" for idx, item in enumerate(suggested_plan))
-                full_prompt = f"{heading}\n{plan_lines}\n\n{full_prompt}"
-            logger.debug(f"[会话上下文] 构建的完整提示词长度: {len(full_prompt)} 字符")
+            logger.debug(f"[提示词] 构建的完整提示词长度: {len(full_prompt)} 字符")
+            logger.debug(f"[System Message] 长度: {len(interpreter.system_message)} 字符")
             
             # 存储当前的interpreter以便停止
             if conversation_id:
@@ -442,12 +421,11 @@ class InterpreterManager:
             self._session_last_active.pop(oldest_session, None)
     
     def _build_prompt(self, query: str, context: Dict[str, Any] = None, language: str = 'zh') -> str:
-        """构建简洁的提示词，让 OpenInterpreter 自主工作，支持多语言"""
+        """构建简洁的提示词，只包含用户问题和必要的上下文信息"""
         
         import os
-        import json
         
-        # 如果有数据库连接信息，提供最基础的信息
+        # 如果有数据库连接信息，提供连接参数
         if context and context.get('connection_info'):
             conn = context['connection_info']
             
@@ -455,125 +433,27 @@ class InterpreterManager:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             output_dir = os.path.join(project_root, 'backend', 'output')
             
-            # 加载prompt配置
-            prompt_config = {}
-            config_path = os.path.join(os.path.dirname(__file__), 'prompt_config.json')
-            try:
-                if os.path.exists(config_path):
-                    with open(config_path, 'r', encoding='utf-8') as f:
-                        prompt_config = json.load(f)
-            except Exception as e:
-                logger.warning(f"加载prompt配置失败，使用默认配置: {e}")
-            
-            # 根据语言构建提示词
-            lang_key = 'en' if language == 'en' else 'zh'
-            
             if language == 'en':
-                # 英文版prompt - 从配置文件构建
-                prompt_parts = [
-                    "### Database connection (run before everything else)",
-                    "import pymysql",
-                    f"conn = pymysql.connect(host='{conn['host']}', port={conn['port']}, user='{conn['user']}', password='{conn['password']}', database='{conn.get('database', '')}')",
-                    "cursor = conn.cursor()",
-                    "cursor.execute('SELECT VERSION()')",
-                    "db_version = cursor.fetchone()[0]",
-                    "print(f\"Detected database version: {db_version}\")",
-                    "If the connection fails, stop immediately and report the error. Do not fall back to local files or mock data.",
-                    "",
-                    "### Exploration guidance",
-                    "- Prefer SHOW DATABASES / SHOW TABLES / DESCRIBE for MySQL/Doris dialects.",
-                    "- When syntax errors occur, switch to ANSI information_schema queries (e.g., SELECT schema_name FROM information_schema.schemata, SELECT column_name FROM information_schema.columns WHERE table_name='xxx').",
-                    "- Confirm the target database and tables before running business queries.",
-                    "",
-                    "### Safety notes",
-                    "- Execute only read-only SQL (SELECT/SHOW/DESCRIBE/EXPLAIN).",
-                    "- Never access local CSV/Excel/SQLite files or fabricate data.",
-                    "",
-                    f"User Request: {query}\n",
-                    "Important Requirements:"
-                ]
-                
-                # 添加配置中的各个部分
-                if prompt_config:
-                    sections = [
-                        ('databaseConnection', '1. Database Connection'),
-                        ('exploration', '2. Exploration Strategy'),
-                        ('businessTerms', '3. Business Terms'),
-                        ('tableSelection', '4. Table Selection'),
-                        ('fieldMapping', '5. Field Mapping'),
-                        ('dataProcessing', '6. Data Processing'),
-                        ('visualization', '7. Visualization'),
-                        ('outputRequirements', '8. Output Requirements'),
-                        ('errorHandling', '9. Error Handling')
-                    ]
-                    
-                    for key, title in sections:
-                        if key in prompt_config and lang_key in prompt_config[key]:
-                            prompt_parts.append(f"\n{title}:")
-                            prompt_parts.append(prompt_config[key][lang_key])
-                
-                # 添加输出目录信息
-                prompt_parts.append(f"\nOutput Directory: {output_dir}")
-                prompt_parts.append(f"Create output directory: os.makedirs('{output_dir}', exist_ok=True)")
-                
-                prompt = "\n".join(prompt_parts)
-            
+                prompt = f"""Database connection parameters:
+host='{conn['host']}', port={conn['port']}, user='{conn['user']}', password='{conn['password']}', database='{conn.get('database', '')}'
+
+Output directory: {output_dir}
+
+User request: {query}"""
             else:
-                # 中文版prompt - 从配置文件构建
-                prompt_parts = [
-                    "### 数据库连接（务必优先执行）",
-                    "import pymysql",
-                    f"conn = pymysql.connect(host='{conn['host']}', port={conn['port']}, user='{conn['user']}', password='{conn['password']}', database='{conn.get('database', '')}')",
-                    "cursor = conn.cursor()",
-                    "cursor.execute('SELECT VERSION()')",
-                    "db_version = cursor.fetchone()[0]",
-                    "print(f\"检测到数据库版本: {db_version}\")",
-                    "若连接失败，请立即停止并向用户说明，不要尝试本地文件或伪造数据。",
-                    "",
-                    "### 探索指引",
-                    "- MySQL / Doris 优先使用 SHOW DATABASES、SHOW TABLES、DESCRIBE；",
-                    "- 若语法不兼容，改用 ANSI information_schema 查询（如 SELECT schema_name FROM information_schema.schemata、SELECT column_name FROM information_schema.columns WHERE table_name='xxx'）；",
-                    "- 在执行业务查询前，先确认目标数据库与表结构。",
-                    "",
-                    "### 安全提示",
-                    "- 仅执行只读 SQL（SELECT / SHOW / DESCRIBE / EXPLAIN）；",
-                    "- 禁止访问本地 CSV/Excel/SQLite 文件或生成伪造数据。",
-                    "",
-                    f"用户需求：{query}\n",
-                    "重要要求："
-                ]
-                
-                # 添加配置中的各个部分
-                if prompt_config:
-                    sections = [
-                        ('databaseConnection', '1. 数据库连接'),
-                        ('exploration', '2. 探索策略'),
-                        ('businessTerms', '3. 业务术语'),
-                        ('tableSelection', '4. 表选择'),
-                        ('fieldMapping', '5. 字段映射'),
-                        ('dataProcessing', '6. 数据处理'),
-                        ('visualization', '7. 可视化'),
-                        ('outputRequirements', '8. 输出要求'),
-                        ('errorHandling', '9. 错误处理')
-                    ]
-                    
-                    for key, title in sections:
-                        if key in prompt_config and lang_key in prompt_config[key]:
-                            prompt_parts.append(f"\n{title}：")
-                            prompt_parts.append(prompt_config[key][lang_key])
-                
-                # 添加输出目录信息
-                prompt_parts.append(f"\n输出目录：{output_dir}")
-                prompt_parts.append(f"确保创建输出目录：os.makedirs('{output_dir}', exist_ok=True)")
-                
-                prompt = "\n".join(prompt_parts)
+                prompt = f"""数据库连接参数：
+host='{conn['host']}', port={conn['port']}, user='{conn['user']}', password='{conn['password']}', database='{conn.get('database', '')}'
+
+输出目录：{output_dir}
+
+用户需求：{query}"""
             
             # 如果有可用数据库列表，添加参考信息
             if context.get('available_databases'):
                 if language == 'en':
-                    prompt += f"\nAvailable databases: {', '.join(context['available_databases'])}"
+                    prompt += f"\n\nAvailable databases: {', '.join(context['available_databases'])}"
                 else:
-                    prompt += f"\n可用数据库参考：{', '.join(context['available_databases'])}"
+                    prompt += f"\n\n可用数据库：{', '.join(context['available_databases'])}"
             
             return prompt
         
@@ -896,31 +776,13 @@ class InterpreterManager:
     
     def _build_prompt_with_context(self, query: str, context: Dict[str, Any] = None, 
                                    conversation_history: list = None, language: str = 'zh') -> str:
-        """构建包含历史上下文的提示词"""
+        """构建包含历史上下文的提示词 - 简化版本，只传递核心信息"""
         
-        # 基础提示词
+        # 基础提示词（只包含连接参数和用户问题）
         base_prompt = self._build_prompt(query, context, language)
         
-        # 如果没有历史，直接返回基础提示词
-        if not conversation_history:
-            return base_prompt
-        
-        # 构建历史上下文
-        history_text = self._format_history(conversation_history)
-        
-        if history_text:
-            # 在提示词前添加历史上下文
-            enhanced_prompt = f"""## 之前的对话上下文
-{history_text}
-
-## 当前用户需求
-{query}
-
-请基于之前的对话上下文，继续处理当前的需求。如果之前有错误，请尝试修正。
-
-{base_prompt}"""
-            return enhanced_prompt
-        
+        # 历史上下文通过 OpenInterpreter 的内置机制管理，这里不再重复拼接
+        # 直接返回简洁的提示词
         return base_prompt
     
     def _format_history(self, conversation_history: list) -> str:
