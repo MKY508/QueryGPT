@@ -152,10 +152,11 @@ class HistoryManager:
         
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO conversations (id, title, model, database_name)
-                VALUES (?, ?, ?, ?)
-            """, (conversation_id, title, model, database_name))
+            cursor.execute(
+                """INSERT INTO conversations (id, title, model, database_name, status)
+                VALUES (?, ?, ?, ?, ?)""",
+                (conversation_id, title, model, database_name, 'active')
+            )
             conn.commit()
         
         return conversation_id
@@ -211,6 +212,41 @@ class HistoryManager:
             self._extract_query_template(content)
         
         return message_id
+
+    def update_last_message_context(self, conversation_id: str, message_type: str, updates: Dict[str, Any]) -> bool:
+        if not conversation_id or not updates:
+            return False
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute(
+                    """SELECT id, context FROM messages
+                    WHERE conversation_id = ? AND type = ?
+                    ORDER BY timestamp DESC
+                    LIMIT 1""",
+                    (conversation_id, message_type)
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                context_raw = row["context"] if isinstance(row, sqlite3.Row) else row[1]
+                context_data = {}
+                if context_raw:
+                    try:
+                        context_data = json.loads(context_raw)
+                    except Exception:
+                        context_data = {}
+                context_data.update(updates)
+                cursor.execute(
+                    "UPDATE messages SET context = ? WHERE id = ?",
+                    (json.dumps(context_data, ensure_ascii=False), row["id"] if isinstance(row, sqlite3.Row) else row[0])
+                )
+                conn.commit()
+                return True
+        except Exception as exc:
+            logger.warning(f"更新消息上下文失败: {exc}")
+            return False
     
     def remove_last_message(self, conversation_id: str, message_type: Optional[str] = None, delete_empty: bool = True) -> bool:
         """删除对话中最新的一条消息，可选限定类型。
@@ -277,10 +313,11 @@ class HistoryManager:
                         """
                         UPDATE conversations
                         SET updated_at = CURRENT_TIMESTAMP,
-                            query_count = ?
+                            query_count = ?,
+                            status = CASE WHEN ? = 0 THEN 'empty' ELSE status END
                         WHERE id = ?
                         """,
-                        (remaining_user, conversation_id)
+                        (remaining_user, remaining_user, conversation_id)
                     )
 
                 conn.commit()
@@ -748,3 +785,17 @@ class HistoryManager:
             ))
             
             conn.commit()
+
+    def update_conversation_status(self, conversation_id: str, status: str) -> bool:
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE conversations SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (status, conversation_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception as exc:
+            logger.warning(f"更新会话状态失败: {exc}")
+            return False

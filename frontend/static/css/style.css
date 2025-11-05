@@ -227,7 +227,7 @@
 }
 
 .message-content p {
-    margin-bottom: 10px;
+    margin: 0 0 10px;
 }
 
 .message-content p:last-child {
@@ -415,6 +415,25 @@
     gap: 6px;
     height: 38px;
     animation: pulse 1.5s infinite;
+}
+
+.button-visible {
+    display: flex !important;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.2s ease;
+}
+
+.button-hidden {
+    display: none !important;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.stop-button.button-hidden {
+    animation: none;
 }
 
 @keyframes pulse {
@@ -1235,6 +1254,10 @@ input:checked + .slider:before {
     background: #28a745;
 }
 
+.message.message-stopping {
+    animation: thinkingStopFade 0.3s ease forwards;
+}
+
 .stage-icon {
     flex-shrink: 0;
     width: 20px;
@@ -1259,6 +1282,37 @@ input:checked + .slider:before {
     color: #6c757d;
     font-size: 12px;
     line-height: 1.4;
+}
+
+.message.interrupted-message {
+    opacity: 0.9;
+    transition: opacity 0.2s ease;
+}
+
+@keyframes thinkingStopFade {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(-8px);
+        opacity: 0;
+    }
+}
+
+.input-rollback {
+    animation: inputRollback 0.25s ease;
+}
+
+@keyframes inputRollback {
+    from {
+        transform: translateY(-6px);
+        opacity: 0.6;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .thinking-progress {
@@ -3713,7 +3767,7 @@ input:checked + .slider:before {
 .message-content .markdown-content h6 { font-size: 12px; }
 
 .message-content .markdown-content p {
-    margin: 8px 0;
+    margin: 0 0 8px;
     line-height: 1.6;
 }
 

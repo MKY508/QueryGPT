@@ -399,7 +399,7 @@ def chat():
                     'database': db_config.get('database', '')
                 }
                 if database_manager and getattr(database_manager, 'is_configured', False):
-                    global_disabled = getattr(type(database_manager), 'GLOBAL_DISABLED', False)
+                    global_disabled = getattr(database_manager, '_global_disabled', False)
                     if not global_disabled:
                         try:
                             db_list = database_manager.get_database_list()
@@ -421,9 +421,14 @@ def chat():
                 context={
                     "model": model_name,
                     "use_database": use_database,
-                    "context_rounds": context_rounds
+                    "context_rounds": context_rounds,
+                    "status": "pending"
                 }
             )
+            try:
+                history_manager.update_conversation_status(conversation_id, status='active')
+            except Exception:
+                pass
         
         try:
             # 检查智能路由是否启用
@@ -503,6 +508,16 @@ def chat():
             )
         
         if result['success']:
+            if history_manager and conversation_id:
+                try:
+                    history_manager.update_last_message_context(
+                        conversation_id,
+                        message_type='user',
+                        updates={'status': 'completed'}
+                    )
+                    history_manager.update_conversation_status(conversation_id, status='completed')
+                except Exception as update_err:
+                    logger.warning(f"更新用户消息状态失败: {update_err}")
             resp_payload = {
                 "success": True,
                 "result": result['result'],

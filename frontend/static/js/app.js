@@ -25,6 +25,10 @@ class DataAnalysisPlatform {
         this._historySupportReady = false; // 历史模块是否已附加
         this._historyNeedsRefresh = false; // 历史列表是否需要刷新
         this._historyStatsLoaded = false; // 历史统计是否已加载
+        this.lastUserMessage = '';
+        this.stopInProgress = false;
+        this.pendingUserMessage = null;
+        this.pendingThinkingWrapper = null;
         
         this.init();
     }
@@ -574,27 +578,30 @@ class DataAnalysisPlatform {
         messageInput.disabled = true;
         document.getElementById('send-button').disabled = true;
         
+
         // 显示停止按钮，隐藏发送按钮
         const sendBtn = document.getElementById('send-button');
         const stopBtn = document.getElementById('stop-button');
         if (sendBtn) {
-            sendBtn.style.display = 'none';
-            sendBtn.style.visibility = 'hidden';
+            sendBtn.classList.add('button-hidden');
+            sendBtn.classList.remove('button-visible');
         }
         if (stopBtn) {
-            stopBtn.style.display = 'flex';
-            stopBtn.style.visibility = 'visible';
-            stopBtn.style.opacity = '1';
+            stopBtn.classList.remove('button-hidden');
+            stopBtn.classList.add('button-visible');
             stopBtn.removeAttribute('hidden');
-            console.log('停止按钮已显示', stopBtn.style.display, stopBtn.style.visibility);
         }
 
         // 仅在非重试场景下添加用户消息
         if (!skipUserMessage) {
-            this.addMessage('user', message);
+            const userMessageEl = this.addMessage('user', message);
+            this.pendingUserMessage = userMessageEl;
             messageInput.value = '';
+        } else {
+            this.pendingUserMessage = null;
         }
 
+        this.lastUserMessage = message;
         // 显示思考过程
         const thinkingId = this.showThinkingProcess();
         this.activeThinkingId = thinkingId;
@@ -712,8 +719,8 @@ class DataAnalysisPlatform {
         } catch (error) {
             if (error.name === 'AbortError') {
                 console.log('查询已取消');
-                this.showNotification(window.i18nManager.t('common.stopped'), 'info');
-                this.hideThinkingProcess(thinkingId);
+                this.showNotification(window.i18nManager.t('common.stopped'), 'info', { duration: 2000 });
+                this.transformThinkingToInterrupted(this.activeThinkingId || thinkingId);
             } else {
                 console.error('发送消息失败:', error);
                 this.showNotification(window.i18nManager?.t('notifications.sendFailed') || '发送失败，请重试', 'error');
@@ -737,28 +744,33 @@ class DataAnalysisPlatform {
         const sendBtn = document.getElementById('send-button');
         if (sendBtn) {
             sendBtn.disabled = false;
-            sendBtn.style.display = 'flex';
-            sendBtn.style.visibility = 'visible';
-            sendBtn.style.opacity = '1';
+            sendBtn.classList.add('button-visible');
+            sendBtn.classList.remove('button-hidden');
         }
         const stopBtn = document.getElementById('stop-button');
         if (stopBtn) {
-            stopBtn.style.display = 'none';
-            stopBtn.style.visibility = 'hidden';
-            stopBtn.style.opacity = '0';
+            stopBtn.classList.add('button-hidden');
+            stopBtn.classList.remove('button-visible');
+            stopBtn.setAttribute('hidden', 'hidden');
         }
         this.isProcessing = false;
         this.abortController = null;
         this.activeThinkingId = null;
+        this.stopInProgress = false;
     }
 
     /**
      * 停止查询
      */
     async stopQuery() {
+        if (!this.isProcessing || this.stopInProgress) {
+            return;
+        }
+        this.stopInProgress = true;
+
         console.log('开始停止查询, conversationId:', this.currentConversationId);
         const i18n = window.i18nManager || { t: key => key };
-        this.showNotification(i18n.t('common.stopping') || '正在停止...', 'info');
+        this.showNotification(i18n.t('common.stopping') || '正在停止...', 'info', { duration: 1500 });
         
         // 发送停止请求到后端
         if (this.currentConversationId) {
@@ -777,12 +789,16 @@ class DataAnalysisPlatform {
                 console.log('停止请求响应:', data);
                 if (data.success) {
                     console.log('停止请求成功');
-                    this.showNotification('查询已停止', 'success');
+                    this.showNotification(i18n.t('common.stopped') || '查询已停止', 'success', { duration: 2200 });
                 } else {
                     console.warn('停止请求失败:', data.error);
+                    if (data.error) {
+                        this.showNotification(data.error, 'warning', { duration: 2500 });
+                    }
                 }
             } catch (error) {
                 console.error('发送停止请求失败:', error);
+                this.showNotification(i18n.t('errors.stopFailed') || '停止失败，请稍后重试', 'error', { duration: 2500 });
             }
         }
         
@@ -818,6 +834,30 @@ class DataAnalysisPlatform {
         if (!transformed) {
             this.addMessage('bot', i18n.t('common.interruptedMessage'));
         }
+
+        const messageInput = document.getElementById('message-input');
+        if (messageInput && this.lastUserMessage) {
+            messageInput.value = this.lastUserMessage;
+            messageInput.classList.add('input-rollback');
+            setTimeout(() => {
+                messageInput.classList.remove('input-rollback');
+            }, 400);
+        }
+
+        if (this.pendingThinkingWrapper && this.pendingThinkingWrapper.parentNode) {
+            this.pendingThinkingWrapper.classList.add('message-stopping');
+            setTimeout(() => {
+                if (this.pendingThinkingWrapper && this.pendingThinkingWrapper.parentNode) {
+                    this.pendingThinkingWrapper.remove();
+                }
+            }, 320);
+        }
+        this.pendingThinkingWrapper = null;
+
+        if (this.pendingUserMessage && this.pendingUserMessage.parentNode) {
+            this.pendingUserMessage.remove();
+        }
+        this.pendingUserMessage = null;
 
         this.finishProcessing();
     }
@@ -941,8 +981,18 @@ class DataAnalysisPlatform {
         }
 
         if (type === 'error') {
-            this.hideThinkingProcess(thinkingId);
-            this.addMessage('bot', `错误: ${event.message}`);
+            const messageText = event.message || '';
+            if (this.stopInProgress || /aborted/i.test(messageText)) {
+                this.transformThinkingToInterrupted(this.activeThinkingId || thinkingId);
+            } else {
+                this.hideThinkingProcess(thinkingId);
+                if (messageText) {
+                    this.addMessage('bot', `错误: ${messageText}`);
+                }
+            }
+            this.pendingThinkingWrapper = null;
+            this.pendingUserMessage = null;
+            this.lastUserMessage = '';
             return;
         }
 
@@ -1987,7 +2037,8 @@ class DataAnalysisPlatform {
             ${tip ? `<div class="thinking-tip"><span class="thinking-tip-text">${tip}</span></div>` : ''}
         `;
         
-        this.addMessage('bot', thinking);
+        const wrapper = this.addMessage('bot', thinking);
+        this.pendingThinkingWrapper = wrapper;
         return thinkingId;
     }
 
@@ -2095,44 +2146,20 @@ class DataAnalysisPlatform {
         const i18n = window.i18nManager || { t: key => key };
 
         if (!thinking) {
-            if (!this.interruptNoticeActive) {
-                const message = this.addMessage('bot', i18n.t('common.interruptedMessage'));
-                if (message) {
-                    message.classList.add('interrupted-message');
-                }
-                this.interruptNoticeActive = true;
-            }
             return false;
         }
 
-        const wrapper = thinking.closest('.message');
-        const content = wrapper?.querySelector('.message-content');
-
-        if (content) {
-            const textBlock = document.createElement('div');
-            textBlock.className = 'interrupted-text-block';
-            textBlock.innerHTML = `
-                <i class="fas fa-ban"></i>
-                <span>${i18n.t('common.interruptedMessage')}</span>
-            `;
-
-            content.innerHTML = '';
-            content.appendChild(textBlock);
-        } else if (!this.interruptNoticeActive) {
-            const message = this.addMessage('bot', i18n.t('common.interruptedMessage'));
-            if (message) {
-                message.classList.add('interrupted-message');
-            }
-            this.interruptNoticeActive = true;
-        }
-
+        const wrapper = thinking.closest('.message') || this.pendingThinkingWrapper;
         if (wrapper) {
-            wrapper.classList.add('interrupted-message');
+            wrapper.classList.add('message-stopping');
+            setTimeout(() => {
+                wrapper.remove();
+            }, 320);
         }
 
-        thinking.remove();
-        this.interruptNoticeActive = true;
-        return true;
+        this.pendingThinkingWrapper = null;
+        this.interruptNoticeActive = false;
+        return Boolean(wrapper);
     }
 
     /**
@@ -2143,6 +2170,9 @@ class DataAnalysisPlatform {
         if (!thinking) {
             // 如果找不到思考对话框，创建新的
             this.addBotResponse(data);
+            this.pendingThinkingWrapper = null;
+            this.pendingUserMessage = null;
+            this.lastUserMessage = '';
             this.interruptNoticeActive = false;
             return;
         }
@@ -2195,8 +2225,11 @@ class DataAnalysisPlatform {
                 } else {
                     // 后备方案：如果找不到合适的容器，创建新消息
                     this.addBotResponse(data);
-                    thinking.remove();
                 }
+                thinking.remove();
+                this.pendingThinkingWrapper = null;
+                this.pendingUserMessage = null;
+                this.lastUserMessage = '';
                 this.interruptNoticeActive = false;
             }, 800); // 等待所有阶段完成动画
         }, allStages.length * 100);
@@ -2679,14 +2712,19 @@ class DataAnalysisPlatform {
     /**
      * 显示通知 - 渐入渐出效果
      */
-    showNotification(text, type = 'info') {
+    showNotification(text, type = 'info', options = {}) {
         const notification = document.getElementById('notification');
+        if (!notification) {
+            console.warn('Notification container not found');
+            return;
+        }
         const iconMap = {
             'success': 'fa-check-circle',
             'error': 'fa-times-circle',
             'warning': 'fa-exclamation-triangle',
             'info': 'fa-info-circle'
         };
+        const duration = typeof options.duration === 'number' ? options.duration : 3500;
         
         // 重置动画状态
         notification.classList.remove('show', 'hide');
@@ -2704,17 +2742,19 @@ class DataAnalysisPlatform {
         if (this.notificationTimeout) {
             clearTimeout(this.notificationTimeout);
         }
+        this.notificationTimeout = null;
         
-        // 设置自动隐藏
-        this.notificationTimeout = setTimeout(() => {
-            notification.classList.remove('show');
-            notification.classList.add('hide');
-            
-            // 动画结束后清理
-            setTimeout(() => {
-                notification.classList.remove('hide');
-            }, 400);
-        }, 3500);
+        if (duration !== Infinity && duration !== 0) {
+            this.notificationTimeout = setTimeout(() => {
+                notification.classList.remove('show');
+                notification.classList.add('hide');
+                
+                // 动画结束后清理
+                setTimeout(() => {
+                    notification.classList.remove('hide');
+                }, 400);
+            }, duration);
+        }
     }
 
     /**

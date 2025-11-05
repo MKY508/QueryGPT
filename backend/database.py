@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from contextlib import contextmanager
 import os
 import time
+from threading import Lock
 from backend.config_loader import ConfigLoader
 
 # 获取日志记录器
@@ -18,24 +19,27 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """数据库管理器，支持 MySQL(Doris) 与 SQLite（通过 DATABASE_URL）。"""
 
-    GLOBAL_DISABLED = False
-    
     def __init__(self, config_path: str = None):
         """初始化数据库管理器"""
         # 连接池/缓存
         self._connection_pool: List[Any] = []
+        self._pool_lock = Lock()
         self._sqlite_main_conn: Optional[sqlite3.Connection] = None
         self.cache_enabled: bool = True
         self._cache: Dict[str, Dict[str, Any]] = {}
+        self.max_pool_size = int(os.getenv('DB_POOL_SIZE', '5'))
 
         self.driver = 'mysql'
         self.is_configured = True
         self.last_error: Optional[Exception] = None
         self.config: Dict[str, Any] = {}
+        self._global_disabled = False
 
-        if DatabaseManager.GLOBAL_DISABLED:
+        # 启动时允许从环境变量禁用数据库（与旧行为兼容）
+        if os.getenv('DISABLE_DATABASE', '').lower() == 'true':
             self.is_configured = False
-            logger.warning("数据库功能已被标记为禁用（此前连接失败），跳过初始化")
+            self._global_disabled = True
+            logger.warning("环境变量 DISABLE_DATABASE=true，跳过数据库初始化")
             return
 
         # Driver 选择优先级（测试/开发友好）：
@@ -114,12 +118,14 @@ class DatabaseManager:
             if self._manager.driver == 'sqlite':
                 # 不真正关闭共享主连接
                 try:
-                    self._manager._connection_pool.append(self._conn)
+                    with self._manager._pool_lock:
+                        self._manager._connection_pool.append(self._conn)
                 except Exception:
                     pass
             else:
                 try:
-                    self._conn.close()
+                    if not self._manager._return_mysql_connection(self._conn):
+                        self._conn.close()
                 except Exception:
                     pass
 
@@ -128,7 +134,7 @@ class DatabaseManager:
         attempts = 0
         last_err = None
 
-        if DatabaseManager.GLOBAL_DISABLED:
+        if self._global_disabled:
             raise RuntimeError("数据库已禁用")
         while attempts < 3:
             try:
@@ -149,12 +155,42 @@ class DatabaseManager:
             except Exception as e:
                 last_err = e
                 attempts += 1
-                time.sleep(0.05)
+                time.sleep(min(0.5, 0.1 * (2 ** attempts)))
         logger.error(f"数据库连接失败: {last_err}")
-        DatabaseManager.GLOBAL_DISABLED = True
+        self._global_disabled = True
         self.is_configured = False
         self.last_error = last_err
         raise RuntimeError("数据库连接失败，已禁用后续自动连接尝试") from last_err
+
+    def _acquire_mysql_connection(self):
+        with self._pool_lock:
+            while self._connection_pool:
+                conn = self._connection_pool.pop()
+                try:
+                    conn.ping(reconnect=True)
+                    return conn
+                except Exception:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+            # 池中无可用连接，创建新连接
+        return self._connect_mysql()
+
+    def _return_mysql_connection(self, conn) -> bool:
+        if conn is None:
+            return False
+        with self._pool_lock:
+            if self.driver != 'mysql':
+                return False
+            if self.max_pool_size <= 0 or len(self._connection_pool) >= self.max_pool_size:
+                return False
+            try:
+                conn.ping(reconnect=True)
+            except Exception:
+                return False
+            self._connection_pool.append(conn)
+            return True
 
     @contextmanager
     def connection(self):
@@ -168,12 +204,13 @@ class DatabaseManager:
             finally:
                 pass
         else:
-            conn = self._connect_mysql()
+            conn = self._acquire_mysql_connection()
             try:
                 yield conn
             finally:
                 try:
-                    conn.close()
+                    if not self._return_mysql_connection(conn):
+                        conn.close()
                 except Exception:
                     pass
 
@@ -192,13 +229,14 @@ class DatabaseManager:
             except Exception:
                 pass
             # 尝试复用池
-            if self._connection_pool:
-                conn = self._connection_pool.pop()
-            else:
-                conn = self._sqlite_main_conn
+            with self._pool_lock:
+                if self._connection_pool:
+                    conn = self._connection_pool.pop()
+                else:
+                    conn = self._sqlite_main_conn
             return DatabaseManager._ConnectionWrapper(self, conn)
         else:
-            conn = self._connect_mysql()
+            conn = self._acquire_mysql_connection()
             return DatabaseManager._ConnectionWrapper(self, conn)
     
     # 预编译正则以避免重复开销
@@ -248,7 +286,8 @@ class DatabaseManager:
         # 缓存命中
         cache_key = None
         if self.cache_enabled and not params:
-            cache_key = query.strip().lower()
+            db_marker = self.config.get('database') or self.config.get('host') or 'default'
+            cache_key = f"{db_marker}:{query.strip().lower()}"
             if cache_key in self._cache:
                 return self._cache[cache_key]
 
@@ -420,7 +459,7 @@ class DatabaseManager:
         """
         获取数据库列表，供OpenInterpreter参考
         """
-        if DatabaseManager.GLOBAL_DISABLED or not getattr(self, 'is_configured', False):
+        if self._global_disabled or not getattr(self, 'is_configured', False):
             logger.debug("数据库未配置或已禁用，跳过数据库列表获取")
             return []
         try:
@@ -448,7 +487,7 @@ class DatabaseManager:
         Returns:
             表名列表
         """
-        if DatabaseManager.GLOBAL_DISABLED or not getattr(self, 'is_configured', False):
+        if self._global_disabled or not getattr(self, 'is_configured', False):
             logger.debug("数据库未配置或已禁用，跳过表列表获取")
             return []
         try:
@@ -517,7 +556,7 @@ class DatabaseManager:
 
     # 新增：获取表结构（用于SQLite测试）
     def get_table_schema(self, table: str) -> List[Dict[str, Any]]:
-        if DatabaseManager.GLOBAL_DISABLED or not getattr(self, 'is_configured', False):
+        if self._global_disabled or not getattr(self, 'is_configured', False):
             logger.debug("数据库未配置或已禁用，跳过表结构获取")
             return []
         if self.driver == 'sqlite':
