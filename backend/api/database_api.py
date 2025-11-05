@@ -303,6 +303,15 @@ def save_database_config():
         with open(env_path, 'w') as f:
             f.writelines(new_lines)
         
+        # 更新当前进程环境变量并清除配置缓存，确保后续读取命中最新值
+        for key, value in config_map.items():
+            os.environ[key] = str(value or '')
+        try:
+            ConfigLoader._env_loaded = False
+            ConfigLoader.clear_config_cache()
+        except Exception:
+            pass
+
         # 同时更新config.json
         PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         config_json_path = os.path.join(PROJECT_ROOT, 'config', 'config.json')

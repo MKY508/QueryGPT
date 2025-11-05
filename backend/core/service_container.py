@@ -106,18 +106,28 @@ class ServiceContainer:
         return self.history_manager is not None
 
     def ensure_database_manager(self, force_reload: bool = False) -> bool:
+        if force_reload:
+            try:
+                self.init_managers(force_reload=True)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                self.logger.error("初始化 database_manager 失败: %s", exc)
+            return self.database_manager is not None and getattr(
+                self.database_manager, "is_configured", True
+            )
+
         db_ready = self.database_manager is not None and getattr(
             self.database_manager, "is_configured", True
         )
-        if not db_ready:
-            try:
-                self.init_managers(force_reload=force_reload or self.database_manager is None)
-            except Exception as exc:  # pragma: no cover - defensive logging
-                self.logger.error("初始化 database_manager 失败: %s", exc)
-            db_ready = self.database_manager is not None and getattr(
-                self.database_manager, "is_configured", True
-            )
-        return db_ready
+        if db_ready:
+            return True
+
+        try:
+            self.init_managers(force_reload=self.database_manager is None)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            self.logger.error("初始化 database_manager 失败: %s", exc)
+        return self.database_manager is not None and getattr(
+            self.database_manager, "is_configured", True
+        )
 
     # ------------------------------------------------------------------
     # Active query tracking
