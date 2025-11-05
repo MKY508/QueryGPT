@@ -21,6 +21,10 @@ class DataAnalysisPlatform {
         this.activeDbWarning = null; // 数据库警告卡片引用
         this.activeThinkingId = null; // 当前思考气泡ID
         this.interruptNoticeActive = false; // 当前是否已有中断提示
+        this._historyModulePromise = null; // 懒加载历史模块的Promise
+        this._historySupportReady = false; // 历史模块是否已附加
+        this._historyNeedsRefresh = false; // 历史列表是否需要刷新
+        this._historyStatsLoaded = false; // 历史统计是否已加载
         
         this.init();
     }
@@ -99,14 +103,6 @@ class DataAnalysisPlatform {
         
         // 加载视图模式
         this.loadViewMode();
-        
-        // 初始化历史记录管理器
-        if (window.HistoryManager) {
-            this.historyManager = new HistoryManager();
-            // 保存实例引用以供HTML中直接调用
-            window.HistoryManager.instance = this.historyManager;
-            this.setupHistoryEventListeners();
-        }
         
         // 初始化Tips提示系统
         this.initTipsManager();
@@ -427,6 +423,83 @@ class DataAnalysisPlatform {
     }
 
     /**
+     * 懒加载历史模块并附加支持
+     */
+    async ensureHistorySupport(options = {}) {
+        if (!this._historyModulePromise) {
+            this._historyModulePromise = import('./history-support.js')
+                .catch(error => {
+                    console.error('加载历史模块失败:', error);
+                    this._historyModulePromise = null;
+                    throw error;
+                });
+        }
+
+        const module = await this._historyModulePromise;
+        if (!this._historySupportReady) {
+            module.attachHistorySupport(this);
+            this._historySupportReady = true;
+        }
+        if (options.ensureManager) {
+            await module.ensureHistoryManager(this, options);
+        }
+        return module;
+    }
+
+    /**
+     * 当历史标签被激活时触发懒加载
+     */
+    async activateHistoryTab(forceReload = false) {
+        try {
+            const historyModule = await this.ensureHistorySupport({ ensureManager: true, forceInit: true });
+            const manager = this.historyManager;
+            if (!manager) {
+                return;
+            }
+
+            const shouldReload = Boolean(forceReload || this._historyNeedsRefresh || manager.needsRefresh);
+            this._historyNeedsRefresh = false;
+            manager.needsRefresh = shouldReload;
+
+            // 延迟执行以避免切换动画卡顿
+            setTimeout(() => {
+                try {
+                    manager.loadRecentConversationsIfNeeded(shouldReload);
+                } catch (error) {
+                    console.error('加载历史记录失败:', error);
+                }
+            }, 180);
+
+            await this.loadHistoryStatisticsOnce(historyModule);
+        } catch (error) {
+            console.error('激活历史标签失败:', error);
+        }
+    }
+
+    async loadHistoryStatisticsOnce(historyModule = null) {
+        if (this._historyStatsLoaded) {
+            return;
+        }
+
+        try {
+            const module = historyModule || await this.ensureHistorySupport();
+            await module.loadHistoryStatistics(this);
+            this._historyStatsLoaded = true;
+        } catch (error) {
+            console.warn('加载历史统计信息失败:', error);
+        }
+    }
+
+    markHistoryNeedsRefresh() {
+        this._historyNeedsRefresh = true;
+        if (this.historyManager) {
+            this.historyManager.needsRefresh = true;
+        } else if (window.HistoryManager && window.HistoryManager.instance) {
+            window.HistoryManager.instance.needsRefresh = true;
+        }
+    }
+
+    /**
      * 切换标签页
      */
     switchTab(tabName, settingsTab = null) {
@@ -448,19 +521,6 @@ class DataAnalysisPlatform {
             activeLink.classList.add('active');
         }
         
-        // 如果切换到历史记录页面，按需加载历史记录
-        if (tabName === 'history' && this.historyManager) {
-            // 如果有标记需要刷新，强制刷新
-            const forceReload = this.historyManager.needsRefresh;
-            if (forceReload) {
-                this.historyManager.needsRefresh = false;
-            }
-            // 延迟加载，避免切换动画时的卡顿
-            setTimeout(() => {
-                this.historyManager.loadRecentConversationsIfNeeded(forceReload);
-            }, 200);
-        }
-
         // 更新内容
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.remove('active');
@@ -485,20 +545,8 @@ class DataAnalysisPlatform {
                 }
             }
         } else if (tabName === 'history') {
-            // 切换到历史记录页面时，确保已初始化
-            if (window.HistoryManager && window.HistoryManager.instance) {
-                const manager = window.HistoryManager.instance;
-                
-                // 确保已初始化
-                manager.ensureInitialized().then(() => {
-                    // 如果标记了需要刷新
-                    if (manager.needsRefresh) {
-                        console.log('历史记录需要刷新');
-                        manager.needsRefresh = false;
-                        manager.loadRecentConversations(0, true);  // 静默刷新
-                    }
-                });
-            }
+            const forceReload = this._historyNeedsRefresh || Boolean(this.historyManager?.needsRefresh);
+            this.activateHistoryTab(forceReload);
         }
     }
 
@@ -824,18 +872,13 @@ class DataAnalysisPlatform {
             chatMessages.innerHTML = '';
         }
         
-        // 标记历史记录需要刷新
-        if (this.historyManager) {
-            this.historyManager.markNeedsRefresh();
-        }
+        // 标记历史记录需要刷新（懒加载时待处理）
+        this.markHistoryNeedsRefresh();
         
         // 显示欢迎消息
         this.showWelcomeMessage();
         
-        // 如果有历史管理器，刷新历史列表
-        if (window.HistoryManager && window.HistoryManager.instance) {
-            window.HistoryManager.instance.loadRecentConversations();
-        }
+        // 历史列表刷新将在用户打开历史页时触发
         
         const i18n = window.i18nManager || { t: (key) => key };
         this.showNotification(i18n.t('errors.newConversationStarted'), 'success');
@@ -2985,157 +3028,28 @@ class DataAnalysisPlatform {
                 }
             }
         });
-    }
-    
-    /**
-     * 设置历史记录事件监听器
-     */
-    setupHistoryEventListeners() {
-        // 监听历史对话加载事件
-        window.addEventListener('historyConversationLoaded', (event) => {
-            this.loadHistoryConversation(event.detail);
-        });
-        
-        // 监听快捷键
+
+        // 快捷键：Ctrl+H 打开历史记录
         document.addEventListener('keydown', (e) => {
-            // Ctrl+H 打开历史记录
             if (e.ctrlKey && e.key === 'h') {
                 e.preventDefault();
                 this.switchTab('history');
             }
         });
-        
-        // 加载历史统计
-        this.loadHistoryStatistics();
     }
     
     /**
      * 加载历史对话
      */
     loadHistoryConversation(conversation) {
-        if (!conversation) return;
-        
-        // 设置当前对话ID并持久化
-        this.currentConversationId = conversation.conversation_id;
-        localStorage.setItem('currentConversationId', conversation.conversation_id);
-        
-        // 切换到聊天标签
-        this.switchTab('chat');
-        
-        // 清空当前消息
-        const messagesContainer = document.getElementById('chat-messages');
-        if (messagesContainer) {
-            messagesContainer.innerHTML = '';
+        if (!conversation) {
+            return;
         }
-        
-        // 加载历史消息
-        if (conversation.messages) {
-            conversation.messages.forEach(msg => {
-                if (msg.type === 'user') {
-                    this.addMessage('user', msg.content);
-                } else if (msg.type === 'assistant') {
-                    // 解析助手消息
-                    try {
-                        // 尝试解析JSON格式的内容
-                        let content = msg.content;
-                        if (typeof content === 'string') {
-                            try {
-                                content = JSON.parse(content);
-                            } catch (e) {
-                                // 如果不是JSON，作为普通文本处理
-                            }
-                        }
-                        
-                        // 检查内容类型
-                        if (content && typeof content === 'object') {
-                            if (content.type === 'dual_view' && content.data) {
-                                // 这是双视图格式
-                                const dualViewContainer = this.createDualViewContainer(content.data);
-                                this.addMessage('bot', dualViewContainer);
-                            } else if (content.type === 'raw_output' && content.data) {
-                                // 这是原始的OpenInterpreter输出
-                                // 需要包装成双视图格式
-                                const wrappedContent = {
-                                    content: content.data
-                                };
-                                const dualViewContainer = this.createDualViewContainer(wrappedContent);
-                                this.addMessage('bot', dualViewContainer);
-                            } else if (content.content) {
-                                // 旧格式的双视图数据
-                                const dualViewContainer = this.createDualViewContainer(content);
-                                this.addMessage('bot', dualViewContainer);
-                            } else if (Array.isArray(content)) {
-                                // 直接是数组格式（OpenInterpreter输出）
-                                const wrappedContent = {
-                                    content: content
-                                };
-                                const dualViewContainer = this.createDualViewContainer(wrappedContent);
-                                this.addMessage('bot', dualViewContainer);
-                            } else {
-                                // 其他对象格式 - 也通过双视图容器处理
-                                const dualViewContainer = this.createDualViewContainer(content);
-                                this.addMessage('bot', dualViewContainer);
-                            }
-                        } else if (typeof content === 'string') {
-                            // 纯文本消息
-                            this.addMessage('bot', content);
-                        } else {
-                            // 其他格式
-                            this.addMessage('bot', String(content));
-                        }
-                    } catch (error) {
-                        console.error('解析历史消息失败:', error, msg);
-                        // 降级处理：也通过双视图容器处理
-                        if (typeof msg.content === 'string') {
-                            this.addMessage('bot', msg.content);
-                        } else {
-                            const dualViewContainer = this.createDualViewContainer(msg.content);
-                            this.addMessage('bot', dualViewContainer);
-                        }
-                    }
-                }
-            });
-        }
-        
-        // 显示提示
-        this.showNotification(`已加载历史对话: ${conversation.metadata?.title || '未命名'}`, 'success');
-        
-        // 滚动到底部
-        if (messagesContainer) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-    }
-    
-    /**
-     * 加载历史统计信息
-     */
-    async loadHistoryStatistics() {
-        try {
-            const response = await fetch('/api/history/statistics');
-            const data = await response.json();
-            
-            if (data.success && data.statistics) {
-                const stats = data.statistics;
-                
-                // 更新统计显示
-                const totalElement = document.getElementById('stat-total');
-                const todayElement = document.getElementById('stat-today');
-                const favoritesElement = document.getElementById('stat-favorites');
-                
-                if (totalElement) totalElement.textContent = stats.total_conversations || 0;
-                if (todayElement) todayElement.textContent = stats.today_conversations || 0;
-                
-                // 更新徽章（如果有新的历史记录）
-                if (stats.today_conversations > 0) {
-                    const badge = document.getElementById('history-badge');
-                    if (badge) {
-                        badge.style.display = 'inline-block';
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('加载历史统计失败:', error);
-        }
+        this.ensureHistorySupport().then(module => {
+            module.loadHistoryConversation(this, conversation);
+        }).catch(error => {
+            console.error('加载历史对话失败:', error);
+        });
     }
     
     /**

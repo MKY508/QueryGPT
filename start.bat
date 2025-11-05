@@ -49,22 +49,32 @@ if not defined APP_PID (
     exit /b 1
 )
 
+echo ℹ 等待后端服务启动
+set SERVICE_READY=0
 set /a ATTEMPTS=0
-set /a MAX_ATTEMPTS=30
-echo ℹ 等待后端就绪
+set /a MAX_ATTEMPTS=60
 
-:WAIT_HEALTH
-powershell -NoProfile -Command "try { Invoke-WebRequest -Uri 'http://127.0.0.1:%PORT%/api/health' -UseBasicParsing -TimeoutSec 1 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
+:WAIT_PORT
+powershell -NoProfile -Command "param([int]$port) try { $client = New-Object System.Net.Sockets.TcpClient; $client.Connect('127.0.0.1',$port); $client.Close(); exit 0 } catch { exit 1 }" %PORT% >nul 2>&1
 if errorlevel 1 (
     set /a ATTEMPTS+=1
     if !ATTEMPTS! lss !MAX_ATTEMPTS! (
         timeout /t 1 /nobreak >nul
-        goto :WAIT_HEALTH
+        goto :WAIT_PORT
     )
-    echo ⚠ 未检测到健康检查响应，可手动访问 http://localhost:%PORT% 验证。
+    echo ⚠ 未能确认后端端口已就绪，可稍后手动访问 http://localhost:%PORT%
+    goto :AFTER_WAIT
 ) else (
+    set SERVICE_READY=1
     echo ✓ 后端服务已启动
+    goto :AFTER_WAIT
+)
+
+:AFTER_WAIT
+if "%SERVICE_READY%"=="1" (
     start "" "http://localhost:%PORT%"
+) else (
+    echo ℹ 稍后在浏览器中访问 http://localhost:%PORT%
 )
 
 echo ℹ 正在监听后端日志，按 Ctrl+C 停止
