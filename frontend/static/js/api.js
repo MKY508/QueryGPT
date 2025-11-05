@@ -3,6 +3,26 @@
  * 处理所有与后端的通信
  */
 
+const apiLogger = (function resolveApiLogger() {
+    if (window.loggerFactory && typeof window.loggerFactory.createSafeLogger === 'function') {
+        return window.loggerFactory.createSafeLogger('frontend:api');
+    }
+    if (window.Logger && typeof window.Logger.getLogger === 'function') {
+        return window.Logger.getLogger('frontend:api');
+    }
+    const fallback = {};
+    ['error', 'warn', 'info', 'debug', 'trace'].forEach((level) => {
+        fallback[level] = (...args) => {
+            if (window.console && typeof window.console[level] === 'function') {
+                window.console[level](...args);
+            } else if (window.console && typeof window.console.log === 'function') {
+                window.console.log(...args);
+            }
+        };
+    });
+    return fallback;
+})();
+
 class API {
     constructor() {
         this.baseURL = '';
@@ -82,10 +102,10 @@ class API {
         } catch (error) {
             // 页面加载时的网络错误静默处理
             if (url === '/api/config' || url === '/api/models') {
-                console.warn(`加载${url}失败，使用默认值:`, error.message);
+                apiLogger.warn(`加载${url}失败，使用默认值:`, error.message);
                 return url === '/api/config' ? {} : { models: [] };
             }
-            console.error('API请求失败:', error);
+            apiLogger.error('API请求失败:', error);
             throw error;
         }
     }
@@ -188,7 +208,7 @@ class API {
             
             return data;
         } catch (error) {
-            console.error('发送消息失败:', error);
+            apiLogger.error('发送消息失败:', error);
             if (onProgress) {
                 onProgress({ 
                     type: 'error', 

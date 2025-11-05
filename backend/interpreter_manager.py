@@ -664,7 +664,7 @@ class InterpreterManager:
             
             # 安全修复：检查缓存大小限制
             self._evict_if_needed_locked()
-
+            
             self._session_cache[conversation_id] = interpreter
             self._session_last_active[conversation_id] = time.time()
             return interpreter

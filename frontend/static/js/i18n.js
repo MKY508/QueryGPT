@@ -1,4 +1,35 @@
 // 国际化语言配置
+const i18nLogger = (function resolveI18nLogger() {
+    const fallback = {};
+    ['error', 'warn', 'info', 'debug', 'trace'].forEach((level) => {
+        fallback[level] = (...args) => {
+            if (window.console && typeof window.console[level] === 'function') {
+                window.console[level](...args);
+            } else if (window.console && typeof window.console.log === 'function') {
+                window.console.log(...args);
+            }
+        };
+    });
+
+    const getActiveLogger = () => {
+        if (window.loggerFactory && typeof window.loggerFactory.createSafeLogger === 'function') {
+            return window.loggerFactory.createSafeLogger('frontend:i18n');
+        }
+        if (window.Logger && typeof window.Logger.getLogger === 'function') {
+            return window.Logger.getLogger('frontend:i18n');
+        }
+        return fallback;
+    };
+
+    return {
+        error: (...args) => getActiveLogger().error(...args),
+        warn: (...args) => getActiveLogger().warn(...args),
+        info: (...args) => getActiveLogger().info(...args),
+        debug: (...args) => getActiveLogger().debug(...args),
+        trace: (...args) => getActiveLogger().trace(...args)
+    };
+})();
+
 const i18n = {
     zh: {
         // 系统标题
@@ -483,7 +514,7 @@ class LanguageManager {
                 return data;
             })
             .catch(error => {
-                console.warn(`Failed to load language ${lang}, falling back to zh:`, error);
+                i18nLogger.warn(`Failed to load language ${lang}, falling back to zh:`, error);
                 delete this.loadingPromises[lang];
                 // 如果加载失败，回退到默认语言
                 if (!this.translations[lang]) {
@@ -514,8 +545,8 @@ class LanguageManager {
             this.updatePageLanguage();
             return true;
         } catch (error) {
-            console.error(`Failed to set language to ${lang}:`, error);
-            return false;
+            i18nLogger.error(`Failed to set language to ${lang}:`, error);
+        return false;
         }
     }
     
