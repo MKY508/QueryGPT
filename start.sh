@@ -70,14 +70,21 @@ PY
 
 wait_for_ready() {
     local attempts=0
-    local max_attempts=30
-    if ! command -v curl >/dev/null 2>&1; then
-        warn "未检测到 curl，跳过健康检查。"
-        return 1
-    fi
-    printf '等待后端就绪'
+    local max_attempts=60
+    printf '等待后端服务启动'
     while [ $attempts -lt $max_attempts ]; do
-        if curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1; then
+        if "$PYTHON_BIN" - "$PORT" <<'PY' 2>/dev/null
+import socket, sys
+port = int(sys.argv[1])
+with socket.socket() as s:
+    s.settimeout(0.5)
+    try:
+        s.connect(("127.0.0.1", port))
+    except OSError:
+        sys.exit(1)
+sys.exit(0)
+PY
+        then
             printf '\n'
             ok "后端服务已启动"
             return 0
@@ -87,7 +94,7 @@ wait_for_ready() {
         attempts=$((attempts + 1))
     done
     printf '\n'
-    warn "未检测到健康检查响应，可手动访问 http://localhost:${PORT} 验证。"
+    warn "未能确认后端端口已就绪，可稍后手动访问 http://localhost:${PORT}"
     return 1
 }
 
@@ -106,7 +113,11 @@ start_service() {
     ( cd backend && "$PYTHON_BIN" app.py ) &
     APP_PID=$!
 
-    wait_for_ready && open_browser
+    if wait_for_ready; then
+        open_browser
+    else
+        info "请稍后在浏览器中访问 http://localhost:${PORT}"
+    fi
     local status=0
     wait "$APP_PID" || status=$?
     return $status
