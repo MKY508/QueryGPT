@@ -55,9 +55,9 @@ class InterpreterManager:
         self._clear_proxy_env()
         
         # 会话缓存：存储活跃的interpreter实例
-        self._session_cache = {}
+        self._session_cache: Dict[str, OpenInterpreter] = {}
         # 会话最后活跃时间
-        self._session_last_active = {}
+        self._session_last_active: Dict[str, float] = {}
         # 会话锁，避免并发问题
         self._session_lock = Lock()
         # 会话超时时间（秒）
@@ -334,16 +334,8 @@ class InterpreterManager:
             if conversation_id:
                 with self._session_lock:
                     # 安全修复：检查缓存大小限制
-                    if len(self._session_cache) >= self.max_session_cache_size:
-                        # 使用LRU策略：删除最久未使用的会话
-                        if self._session_last_active:
-                            oldest_session = min(self._session_last_active.items(), key=lambda x: x[1])[0]
-                            logger.info(f"缓存已满，删除最旧会话: {oldest_session}")
-                            if oldest_session in self._session_cache:
-                                del self._session_cache[oldest_session]
-                            if oldest_session in self._session_last_active:
-                                del self._session_last_active[oldest_session]
-                    
+                    self._cleanup_expired_sessions_locked()
+                    self._evict_if_needed_locked()
                     self._session_cache[conversation_id] = interpreter
                     self._session_last_active[conversation_id] = time.time()
             
@@ -461,10 +453,38 @@ class InterpreterManager:
             }
         finally:
             # 清理session cache
-            if conversation_id and conversation_id in self._session_cache:
+            if conversation_id:
                 with self._session_lock:
-                    if conversation_id in self._session_cache:
-                        del self._session_cache[conversation_id]
+                    self._session_cache.pop(conversation_id, None)
+                    self._session_last_active.pop(conversation_id, None)
+
+    def _cleanup_expired_sessions_locked(self) -> None:
+        """在持有会话锁的情况下清理过期会话。"""
+        current_time = time.time()
+        expired_sessions = [
+            session_id
+            for session_id, last_active in self._session_last_active.items()
+            if current_time - last_active > self.session_timeout
+        ]
+        for session_id in expired_sessions:
+            logger.info(f"清理过期会话: {session_id}")
+            self._session_cache.pop(session_id, None)
+            self._session_last_active.pop(session_id, None)
+
+    def _evict_if_needed_locked(self) -> None:
+        """在持有会话锁的情况下执行LRU淘汰。"""
+        if self.max_session_cache_size <= 0:
+            return
+        while len(self._session_cache) >= self.max_session_cache_size:
+            if not self._session_last_active:
+                logger.warning("检测到会话缓存不一致，强制清理全部会话缓存")
+                self._session_cache.clear()
+                self._session_last_active.clear()
+                break
+            oldest_session = min(self._session_last_active.items(), key=lambda item: item[1])[0]
+            logger.info(f"缓存已满，删除最旧会话: {oldest_session}")
+            self._session_cache.pop(oldest_session, None)
+            self._session_last_active.pop(oldest_session, None)
     
     def _build_prompt(self, query: str, context: Dict[str, Any] = None, language: str = 'zh') -> str:
         """构建简洁的提示词，让 OpenInterpreter 自主工作，支持多语言"""
@@ -619,7 +639,7 @@ class InterpreterManager:
         
         with self._session_lock:
             # 清理过期会话
-            self._cleanup_expired_sessions()
+            self._cleanup_expired_sessions_locked()
             
             # 如果没有conversation_id，总是创建新实例
             if not conversation_id:
@@ -643,14 +663,8 @@ class InterpreterManager:
             interpreter = self.create_interpreter(model_name)
             
             # 安全修复：检查缓存大小限制
-            if len(self._session_cache) >= self.max_session_cache_size:
-                # 使用LRU策略：删除最久未使用的会话
-                oldest_session = min(self._session_last_active.items(), key=lambda x: x[1])[0]
-                logger.info(f"缓存已满，删除最旧会话: {oldest_session}")
-                if oldest_session in self._session_cache:
-                    del self._session_cache[oldest_session]
-                del self._session_last_active[oldest_session]
-            
+            self._evict_if_needed_locked()
+
             self._session_cache[conversation_id] = interpreter
             self._session_last_active[conversation_id] = time.time()
             return interpreter
@@ -660,18 +674,7 @@ class InterpreterManager:
         清理过期的会话
         必须在锁内调用
         """
-        current_time = time.time()
-        expired_sessions = []
-        
-        for session_id, last_active in self._session_last_active.items():
-            if current_time - last_active > self.session_timeout:
-                expired_sessions.append(session_id)
-        
-        for session_id in expired_sessions:
-            logger.info(f"清理过期会话: {session_id}")
-            if session_id in self._session_cache:
-                del self._session_cache[session_id]
-            del self._session_last_active[session_id]
+        self._cleanup_expired_sessions_locked()
     
     def _build_prompt_with_history(self, query: str, context: Dict[str, Any] = None,
                                   conversation_history: Optional[list] = None) -> str:

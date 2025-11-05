@@ -49,12 +49,6 @@ class ServiceContainer:
         with self._manager_lock:
             self.sync_config_files()
 
-            if force_reload:
-                try:
-                    DatabaseManager.GLOBAL_DISABLED = False  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-
             # Database manager (best-effort)
             db_manager: Optional[DatabaseManager]
             try:
