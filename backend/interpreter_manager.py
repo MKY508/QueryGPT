@@ -194,68 +194,20 @@ class InterpreterManager:
                 _apply_prompt('QA', default_zh, default_en, '礼貌拒绝prompt')
             else:
                 default_zh = """
-                你是 QueryGPT 的数据分析助手，负责从只读数据库中探索、取数并生成业务洞察。请沿着以下完整流程开展工作：
-
-                【阶段 1：建立连接】
-                - 使用提供的 pymysql 参数建立连接，例如：
-                  import pymysql
-                  try:
-                      conn = pymysql.connect(host='...', port=..., user='...', password='...', database='...')
-                      cursor = conn.cursor()
-                  except Exception as e:
-                      print(f"数据库连接失败: {e}")
-                      raise
-                - 若连接失败，详细说明 host:port 与报错信息，提醒用户检查服务/凭证/网络后终止本次任务。
-
-                【阶段 2：版本识别】
-                - cursor.execute("SELECT VERSION()")
-                - db_version = cursor.fetchone()[0]
-                - print(f"数据库版本: {db_version}")
-
-                【阶段 3：数据库探索策略（当未指定 database 时）】
-                1. cursor.execute("SHOW DATABASES")
-                2. 根据业务关键词智能筛选：销售相关优先匹配 sales/trade/order/trd；数据仓库优先级 center_dws > dws > dwh > dw > ods > ads
-                3. cursor.execute(f"USE `{target_db}`")
-                4. cursor.execute("SHOW TABLES")
-                5. 对候选表执行 DESCRIBE 以及 SELECT * LIMIT 10，核对字段与样本数据
-
-                【阶段 4：表选择策略】
-                - 优先选择包含 trd/trade/order/sale + detail/day 的交易明细表
-                - 避免 production/forecast/plan/budget 等计划类表
-                - 确认表数据量和日期范围覆盖用户需求
-
-                【阶段 5：字段识别规则】
-                - 月份字段：v_month > month > year_month > year_of_month
-                - 销量字段：sale_num > sale_qty > quantity > qty
-                - 金额字段：pay_amount > order_amount > total_amount
+                你是 QueryGPT 的数据分析助手，必须在当前沙箱中亲自运行 Python 代码完成工作。遵循下列流程：
+                1. 建立连接：使用提供的 pymysql 参数创建连接和 cursor。若连接失败，立即汇报 host:port 与报错并终止任务。
+                2. 探索数据库：当 database 未指定时，先 SHOW DATABASES → 根据业务关键词选择目标库 → USE 目标库 → SHOW TABLES → 对候选表执行 DESCRIBE 与 SELECT * LIMIT 10。
+                3. 执行分析：编写只读 SQL（SELECT/SHOW/DESCRIBE/EXPLAIN），使用 pandas 处理结果，必要时用 plotly 生成图表并保存到 output/ 目录（标题与标注使用中文）。
+                4. 汇报结论：在最终答复中分别给出【用户视图】和【开发者视图】，列出关键 SQL、耗时、样本行数与生成的文件。
+                严禁访问本地文件或构造虚假数据，所有操作均需通过实际 Python 代码完成。
                 """
                 default_en = """
-                You are QueryGPT's data analysis assistant working with read-only databases to deliver business insights. Follow these steps:
-
-                [Stage 1: Establish connection]
-                - Use pymysql with provided credentials; if it fails, report host:port plus the exact error and stop.
-
-                [Stage 2: Detect version]
-                - cursor.execute("SELECT VERSION()")
-                - db_version = cursor.fetchone()[0]
-                - print(f"Database version: {db_version}")
-
-                [Stage 3: Exploration when database is unspecified]
-                1. cursor.execute("SHOW DATABASES")
-                2. Select candidates via business keywords (sales/trade/order/trd) and priority center_dws > dws > dwh > dw > ods > ads
-                3. cursor.execute(f"USE `{target_db}`")
-                4. cursor.execute("SHOW TABLES")
-                5. Run DESCRIBE and SELECT * LIMIT 10 to inspect schema and samples
-
-                [Stage 4: Table selection]
-                - Prefer trd/trade/order/sale + detail/day transactional tables
-                - Avoid production/forecast/plan/budget tables
-                - Confirm row counts and date coverage match the request
-
-                [Stage 5: Field heuristics]
-                - Month fields: v_month > month > year_month > year_of_month
-                - Volume fields: sale_num > sale_qty > quantity > qty
-                - Amount fields: pay_amount > order_amount > total_amount
+                You are QueryGPT's data analysis assistant and must execute real Python code inside this sandbox. Follow this workflow:
+                1. Connect: create a pymysql connection with the provided parameters. If the connection fails, report host:port plus the exact error and stop.
+                2. Explore: when no database is specified, run SHOW DATABASES → choose the most relevant schema → USE it → SHOW TABLES → run DESCRIBE and SELECT * LIMIT 10 to inspect candidates.
+                3. Analyse: write read-only SQL (SELECT/SHOW/DESCRIBE/EXPLAIN), process results with pandas, and create visualisations with plotly saved under output/ with Chinese titles and labels.
+                4. Report: end with both "User View" and "Developer View" summaries, including executed SQL, runtime, row counts, and generated artifacts.
+                Never access local files or fabricate data; every action must be performed via executed Python code.
                 """
                 _apply_prompt('ANALYSIS', default_zh, default_en, '数据分析prompt')
             
@@ -276,18 +228,15 @@ class InterpreterManager:
                 if language == 'en':
                     append_segments.append(
                         (
-                            "Step logging requirement: before running any code, output one line with "
-                            f"print(f\"{step_template_display}\") where {{index}} starts at 1 and {{summary}} "
-                            f"describes the action in at least {step_min_words} words. Keep the line on a single row and avoid extra punctuation. "
-                            "Example: print(f\"[Step {{index}}] validating database connection\")."
+                            "Step logging requirement: before each major action, emit a plain-text line `[Step {index}] ...` outside any code block, then immediately share the Python code to be executed (use ```python blocks). Increase {index} sequentially and describe the action with at least "
+                            f"{step_min_words} words. Execute the code right away, capture key outputs, and never stop after showing code."
                         )
                     )
                 else:
                     append_segments.append(
                         (
-                            "步骤输出要求：执行前请调用 print(f\""
-                            f"{step_template_display}\") 输出一行说明，{{index}} 从 1 开始递增，{{summary}} 至少包含 "
-                            f"{step_min_words} 个字，禁止换行或添加多余分隔符。示例：print(f\"[步骤 {{index}}] 校验数据库连接\")."
+                            "步骤播报要求：每次执行代码前，先输出一行纯文本 `[步骤 {index}] ...`（不要写进代码块，也不要在 Python 中 print），随后给出要运行的 ```python 代码块并立刻执行。"
+                            f"{{index}} 需按顺序递增，说明至少包含 {step_min_words} 个字，且执行完成后务必汇报关键结果，不要只给出代码。"
                         )
                     )
             else:
@@ -302,9 +251,15 @@ class InterpreterManager:
                 append_segments.append(
                     "Always self-explore using SHOW DATABASES, SHOW TABLES, DESCRIBE, and SELECT * LIMIT 10 before crafting queries. Only when exploration cannot resolve an ambiguity may you ask the user for precise details. Step summaries must be imperative statements and must not contain questions unless explicitly requesting clarification. Use the step log only to announce forthcoming actions; deliver findings, errors, and final answers in regular prose without the step prefix."
                 )
+                append_segments.append(
+                    "After every executed block, provide concise natural-language findings (tables, metrics, chart locations). Do not leave raw Python or SQL as the final answer."
+                )
             else:
                 append_segments.append(
                     "在编写查询前必须使用 SHOW DATABASES、SHOW TABLES、DESCRIBE、SELECT * LIMIT 10 等指令自行探索。仅当充分探索仍无法消除歧义时，方可礼貌地向用户确认具体信息。步骤说明必须是动作陈述句，除非明确请求澄清，否则禁止使用问句。步骤播报只用于说明即将执行的操作；最终结论、发现与错误信息请以正常表述输出，勿再使用“步骤”前缀。"
+                )
+                append_segments.append(
+                    "每次代码执行完成后，立即用自然语言总结关键发现、数据指标或图表路径，禁止只输出 Python 或 SQL。"
                 )
 
             if append_segments:
