@@ -256,6 +256,29 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
                 logger.info(f"[会话上下文] 会话ID: {conversation_id}, 历史消息数: {len(conversation_history) if conversation_history else 0}")
                 if conversation_history:
                     logger.debug(f"[会话上下文] 最近消息: {conversation_history[-2:] if len(conversation_history) >= 2 else conversation_history}")
+
+                    # 按上下文轮数限制加载到 interpreter 的消息数量
+                    max_rounds = int(getattr(self, 'max_history_rounds', 3) or 3)
+                    max_rounds = max(max_rounds, 0)
+                    max_messages = max_rounds * 2 if max_rounds > 0 else len(conversation_history)
+                    truncated_history = conversation_history[-max_messages:]
+
+                    interpreter.messages = []
+                    for msg in truncated_history:
+                        role = msg.get('role') or 'assistant'
+                        content = msg.get('content')
+                        if not content:
+                            continue
+                        interpreter.messages.append({
+                            "role": role,
+                            "content": content
+                        })
+
+                    logger.info(
+                        "已将 %s 条历史消息注入 interpreter (max_rounds=%s)",
+                        len(interpreter.messages),
+                        max_rounds,
+                    )
             else:
                 logger.warning("[会话上下文] 未提供会话ID，无法维持对话上下文")
             
