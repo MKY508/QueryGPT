@@ -1,3 +1,34 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments
+venv/
+venv_*/
+.venv/
+env/
+
+# Logs & outputs
+logs/
+backend/logs/
+output/
+backend/output/
+*.log
+
+# Local databases / caches
+data/
+backend/data/
+backend/backend/data/
+cache/
+*.db
+*.sqlite*
+
+# Node
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
 # Python 相关
 __pycache__/
 *.py[cod]

@@ -25,6 +25,8 @@
   [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=for-the-badge&color=yellow)](https://github.com/MKY508/QueryGPT/stargazers)
   
   <br/>
+
+  [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
   
   <h3>基于 OpenInterpreter 的智能数据分析 Agent</h3>
   <p><i>用自然语言与数据库对话</i></p>
@@ -128,6 +130,19 @@
 | **扩展能力** | **✅ 无限扩展** | ❌ | ❌ | ❌ | ❌ |
 
 ## 🚀 快速开始
+
+### ☁️ 一键部署（Render）
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
+
+1. 点击按钮并登录 Render（首次需要授权访问 GitHub）。
+2. 保持默认 `Free` 方案，点击 **Deploy QueryGPT** 开始构建。
+3. **可选**：在 Render 设置中补充以下环境变量，即可连接真实服务：
+   - `API_KEY` / `API_BASE_URL`：你的模型服务凭证（默认占位值会让 LLM 功能自动跳过）。
+   - `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_DATABASE`：数据库连接信息。
+4. 构建大约 3-5 分钟，完成后点击 Render 面板中的访问链接即可体验。
+
+> ℹ️ 线上 Demo 默认使用内置示例配置，可浏览 UI、历史记录等功能。如需完整 AI 分析体验，请在部署后填写自己的模型和数据库凭据。
 
 ### 极简安装
 
