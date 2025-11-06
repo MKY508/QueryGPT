@@ -24,10 +24,11 @@
   [![OpenInterpreter](https://img.shields.io/badge/OpenInterpreter-0.4.3-green.svg?style=for-the-badge)](https://github.com/OpenInterpreter/open-interpreter)
   [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=for-the-badge&color=yellow)](https://github.com/MKY508/QueryGPT/stargazers)
   
-  <br/>
-  [![一键部署-Render](https://img.shields.io/badge/一键部署-Render-2f54eb?style=for-the-badge&logo=render&logoColor=white)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
-  <h3>基于 OpenInterpreter 的智能数据分析 Agent</h3>
-  <p><i>用自然语言与数据库对话</i></p>
+<p>
+  <a href="https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT">
+    <img src="https://img.shields.io/badge/一键部署-Render-2f54eb?style=for-the-badge&logo=render&logoColor=white" alt="一键部署-Render" />
+  </a>
+</p>
   
 </div>
 
