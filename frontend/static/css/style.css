@@ -4645,9 +4645,10 @@ input:checked + .slider:before {
 .chart-iframe {
     display: block;
     width: 100%;
-    min-height: 600px;
+    min-height: 120px;
     border: none;
     background: var(--color-bg-secondary);
+    transition: height 0.2s ease;
 }
 
 /* 全屏模式样式 */

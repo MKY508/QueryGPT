@@ -6,7 +6,11 @@
 class ViewHelpers {
     // Constants to eliminate magic numbers
     static CONSTANTS = {
-        IFRAME_HEIGHT: 600,
+        IFRAME_DEFAULT_HEIGHT: 220,
+        IFRAME_MIN_HEIGHT: 120,
+        IFRAME_MAX_HEIGHT: 680,
+        IFRAME_RESIZE_DELAY: 120,
+        IFRAME_RESIZE_RETRY: 5,
         PREVIEW_LENGTH: 200,
         SQL_PREVIEW_LENGTH: 80,
         MIN_SUMMARY_LENGTH: 20,
@@ -87,7 +91,8 @@ class ViewHelpers {
                         class="chart-iframe"
                         frameborder="0"
                         width="100%"
-                        height="${this.CONSTANTS.IFRAME_HEIGHT}"
+                        style="min-height: ${this.CONSTANTS.IFRAME_MIN_HEIGHT}px; height: ${this.CONSTANTS.IFRAME_DEFAULT_HEIGHT}px;"
+                        data-auto-resize="true"
                         loading="lazy"
                         onload="ViewHelpers.handleIframeLoad('${iframeId}')"
                         onerror="ViewHelpers.handleIframeError('${iframeId}')">
@@ -105,6 +110,11 @@ class ViewHelpers {
         if (loadingEl) {
             loadingEl.style.display = 'none';
         }
+
+        // 在加载完成后尝试根据内容高度自适应
+        window.requestAnimationFrame(() => {
+            this.adjustIframeHeight(iframeId);
+        });
     }
 
     /**
@@ -117,6 +127,59 @@ class ViewHelpers {
                 <i class="fas fa-exclamation-triangle"></i> 
                 <span>图表加载失败</span>
             `;
+        }
+    }
+
+    /**
+     * 根据嵌入内容自适应 iframe 高度
+     */
+    static adjustIframeHeight(iframeId, attempt = 0) {
+        const iframe = document.getElementById(iframeId);
+        if (!iframe) return;
+
+        try {
+            const doc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (!doc || doc.readyState !== 'complete') {
+                if (attempt < this.CONSTANTS.IFRAME_RESIZE_RETRY) {
+                    setTimeout(() => this.adjustIframeHeight(iframeId, attempt + 1), this.CONSTANTS.IFRAME_RESIZE_DELAY);
+                }
+                return;
+            }
+
+            const body = doc.body;
+            const docEl = doc.documentElement;
+            const contentHeight = Math.max(
+                body?.scrollHeight || 0,
+                body?.offsetHeight || 0,
+                docEl?.scrollHeight || 0,
+                docEl?.offsetHeight || 0
+            );
+
+            if (!contentHeight) {
+                if (attempt < this.CONSTANTS.IFRAME_RESIZE_RETRY) {
+                    setTimeout(() => this.adjustIframeHeight(iframeId, attempt + 1), this.CONSTANTS.IFRAME_RESIZE_DELAY);
+                }
+                return;
+            }
+
+            const minHeight = this.CONSTANTS.IFRAME_MIN_HEIGHT;
+            const maxHeight = this.CONSTANTS.IFRAME_MAX_HEIGHT;
+            const finalHeight = Math.min(Math.max(contentHeight, minHeight), maxHeight);
+
+            iframe.style.height = `${finalHeight}px`;
+            iframe.dataset.autoHeight = String(finalHeight);
+
+            const container = iframe.closest('.chart-embed-container');
+            if (container) {
+                container.style.height = 'auto';
+            }
+        } catch (error) {
+            try {
+                const logger = window.loggerFactory?.createSafeLogger?.('frontend:view-helpers');
+                logger?.warn?.('自动调整图表高度失败', error);
+            } catch (_) {
+                // 忽略日志错误，保持界面正常
+            }
         }
     }
 
@@ -279,4 +342,8 @@ class ViewHelpers {
 // Export for use in app.js
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ViewHelpers;
+}
+
+if (typeof window !== 'undefined') {
+    window.ViewHelpers = ViewHelpers;
 }

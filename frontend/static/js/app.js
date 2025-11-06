@@ -1283,7 +1283,8 @@ class DataAnalysisPlatform {
         let queryData = [];
         let sqlCommands = [];
         let htmlGenerated = false;
-        let chartPaths = [];
+        const chartPathSet = new Set();
+        const chartPaths = [];
         let errorMessages = [];
         let finalSummary = null;
         
@@ -1299,21 +1300,31 @@ class DataAnalysisPlatform {
         }
         
         // 额外从 artifacts / files 收集可能的HTML图表文件
+        const registerChartPath = (raw) => {
+            if (!raw) return;
+            const filename = String(raw).split(/[\\/]/).pop();
+            if (!filename || !/\.html?$/i.test(filename) || chartPathSet.has(filename)) {
+                return;
+            }
+            chartPathSet.add(filename);
+            chartPaths.push(filename);
+            htmlGenerated = true;
+        };
         const collectArtifactPaths = (arr) => {
             if (!Array.isArray(arr)) return;
             arr.forEach(x => {
-                if (typeof x === 'string' && /\.html?$/i.test(x)) {
-                    const fname = x.split(/[\\/]/).pop();
-                    if (fname) chartPaths.push(fname);
-                }
-                if (x && typeof x === 'object' && x.path && /\.html?$/i.test(x.path)) {
-                    const fname = String(x.path).split(/[\\/]/).pop();
-                    if (fname) chartPaths.push(fname);
+                if (typeof x === 'string') {
+                    registerChartPath(x);
+                } else if (x && typeof x === 'object') {
+                    if (x.filename) registerChartPath(x.filename);
+                    if (x.path) registerChartPath(x.path);
+                    if (x.url) registerChartPath(x.url);
                 }
             });
         };
         if (Array.isArray(data?.artifacts)) collectArtifactPaths(data.artifacts);
         if (Array.isArray(data?.files)) collectArtifactPaths(data.files);
+        if (Array.isArray(data?.visualization)) collectArtifactPaths(data.visualization);
 
         if (data.content && Array.isArray(data.content)) {
             console.log('data.content 是数组，长度:', data.content.length);
@@ -1397,7 +1408,7 @@ class DataAnalysisPlatform {
                     
                     if (foundPaths.size > 0) {
                         htmlGenerated = true;
-                        chartPaths.push(...Array.from(foundPaths));
+                        foundPaths.forEach(registerChartPath);
                     }
                 }
                 if (item.type === 'error') {
@@ -1430,6 +1441,9 @@ class DataAnalysisPlatform {
                                 chartPaths.map(path => {
                                     const filename = path.split('/').pop();
                                     const iframeId = 'chart-iframe-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                                    const iframeDefaults = window.ViewHelpers?.CONSTANTS || {};
+                                    const iframeHeight = iframeDefaults.IFRAME_DEFAULT_HEIGHT || 220;
+                                    const iframeMinHeight = iframeDefaults.IFRAME_MIN_HEIGHT || 120;
                                     return `
                                     <div class="chart-embed-container">
                                         <div class="chart-embed-header">
@@ -1452,9 +1466,11 @@ class DataAnalysisPlatform {
                                             class="chart-iframe"
                                             frameborder="0"
                                             width="100%"
-                                            height="600"
-                                            onload="document.getElementById('loading-${iframeId}').style.display='none';"
-                                            onerror="document.getElementById('loading-${iframeId}').innerHTML='<i class=\"fas fa-exclamation-triangle\"></i> 图表加载失败';">
+                                            style="min-height: ${iframeMinHeight}px; height: ${iframeHeight}px;"
+                                            data-auto-resize="true"
+                                            loading="lazy"
+                                            onload="ViewHelpers.handleIframeLoad('${iframeId}')"
+                                            onerror="ViewHelpers.handleIframeError('${iframeId}')">
                                         </iframe>
                                         <div class="chart-download-link" style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 4px;">
                                             <i class="fas fa-download"></i> 
@@ -1532,6 +1548,9 @@ class DataAnalysisPlatform {
                                 ${chartPaths.map(path => {
                                     const filename = path.split('/').pop();
                                     const iframeId = 'chart-iframe-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                                    const iframeDefaults = window.ViewHelpers?.CONSTANTS || {};
+                                    const iframeHeight = iframeDefaults.IFRAME_DEFAULT_HEIGHT || 220;
+                                    const iframeMinHeight = iframeDefaults.IFRAME_MIN_HEIGHT || 120;
                                     return `
                                     <div class="chart-embed-container">
                                         <div class="chart-embed-header">
@@ -1551,8 +1570,11 @@ class DataAnalysisPlatform {
                                             class="chart-iframe"
                                             frameborder="0"
                                             width="100%"
-                                            height="600"
-                                            loading="lazy">
+                                            style="min-height: ${iframeMinHeight}px; height: ${iframeHeight}px;"
+                                            data-auto-resize="true"
+                                            loading="lazy"
+                                            onload="ViewHelpers.handleIframeLoad('${iframeId}')"
+                                            onerror="ViewHelpers.handleIframeError('${iframeId}')">
                                         </iframe>
                                     </div>
                                     `;

@@ -628,6 +628,8 @@ def chat():
                 resp_payload['routing_info'] = result['routing_info']
             if result.get('classification'):
                 resp_payload['classification'] = result['classification']
+            if result.get('visualization'):
+                resp_payload['visualization'] = result['visualization']
             sql_text = result.get('sql')
             if not sql_text and isinstance(result.get('result'), list):
                 for item in result['result']:
