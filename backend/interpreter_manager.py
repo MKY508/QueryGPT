@@ -205,10 +205,16 @@ class InterpreterManager:
 
 **工作流程：**
 1. 连接数据库（使用提供的连接参数）
-2. 自主探索（SHOW DATABASES/TABLES/DESCRIBE/SELECT * LIMIT 10）
+2. 自主探索（根据连接信息判断数据库驱动）
+   - MySQL/Doris：使用 `SHOW DATABASES;`、`SHOW TABLES;`、`DESCRIBE <表名>;`
+   - SQLite：使用 `PRAGMA database_list;`、`SELECT name FROM sqlite_master WHERE type='table';`、`PRAGMA table_info('<表名>');`
 3. 编写并执行只读 SQL 获取数据
 4. 用 pandas 处理，用 plotly 生成图表（中文标题/图例），保存到 output/
 5. 输出双视图总结
+
+**数据库适配提示：**
+- 如果上下文提供 `database_driver` 或“方言提示”，必须遵循对应语法。
+- 如遇方言差异，先用轻量命令验证连接，再继续后续步骤。
 
 **步骤播报：**
 执行前可以输出 `[步骤 N] 简要说明` 让用户了解进度，但务必在同一次回复中完成所有步骤。
@@ -232,10 +238,16 @@ The entire analysis is one complete task—finish all steps in a single response
 
 **Workflow:**
 1. Connect to database (using provided credentials)
-2. Self-explore (SHOW DATABASES/TABLES/DESCRIBE/SELECT * LIMIT 10)
+2. Self-explore (choose commands based on the database driver)
+   - MySQL/Doris: use `SHOW DATABASES;`, `SHOW TABLES;`, `DESCRIBE <table>;`
+   - SQLite: use `PRAGMA database_list;`, `SELECT name FROM sqlite_master WHERE type='table';`, `PRAGMA table_info('<table>');`
 3. Write and execute read-only SQL to fetch data
 4. Process with pandas, generate Plotly charts (Chinese titles/legends), save to output/
 5. Output dual-view summary
+
+**Database adaptation:**
+- When `database_driver` or dialect hints are provided, follow them strictly.
+- If dialect differences are unclear, run lightweight discovery commands first before heavier queries.
 
 **Step logging:**
 You may output `[Step N] brief description` before execution to inform users of progress, but must complete all steps in the same response.
@@ -462,38 +474,88 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
         
         import os
         
-        # 如果有数据库连接信息，提供连接参数
         if context and context.get('connection_info'):
-            conn = context['connection_info']
-            
+            conn = context.get('connection_info') or {}
+
             # 获取项目根目录的绝对路径
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             output_dir = os.path.join(project_root, 'backend', 'output')
-            
+
+            driver = (context.get('database_driver')
+                      or conn.get('driver')
+                      or conn.get('provider'))
+            driver_display = (str(driver).lower() if driver else 'unknown')
+
             if language == 'en':
-                prompt = f"""Database connection parameters:
-host='{conn['host']}', port={conn['port']}, user='{conn['user']}', password='{conn['password']}', database='{conn.get('database', '')}'
-
-Output directory: {output_dir}
-
-User request: {query}"""
+                lines = [f"Database driver: {driver_display}"]
             else:
-                prompt = f"""数据库连接参数：
-host='{conn['host']}', port={conn['port']}, user='{conn['user']}', password='{conn['password']}', database='{conn.get('database', '')}'
+                lines = [f"数据库驱动：{driver_display}"]
 
-输出目录：{output_dir}
+            if driver_display == 'sqlite':
+                sqlite_path = (conn.get('database')
+                               or conn.get('path')
+                               or conn.get('database_url')
+                               or '')
+                if language == 'en':
+                    lines.append(f"SQLite DSN: {sqlite_path}")
+                else:
+                    lines.append(f"SQLite 数据源：{sqlite_path}")
+            else:
+                host = conn.get('host') or ''
+                port = conn.get('port')
+                user = conn.get('user') or ''
+                password = conn.get('password') or ''
+                database_name = conn.get('database') or ''
+                port_repr = port if port not in (None, '') else ''
+                lines.append(
+                    "host='{host}', port={port}, user='{user}', password='{password}', database='{database}'".format(
+                        host=host,
+                        port=port_repr,
+                        user=user,
+                        password=password,
+                        database=database_name
+                    )
+                )
 
-用户需求：{query}"""
-            
+            connection_text = '\n'.join(lines)
+
+            if language == 'en':
+                prompt = (
+                    f"{connection_text}\n\n"
+                    f"Output directory: {output_dir}\n\n"
+                    f"User request: {query}"
+                )
+            else:
+                prompt = (
+                    f"{connection_text}\n\n"
+                    f"输出目录：{output_dir}\n\n"
+                    f"用户需求：{query}"
+                )
+
             # 如果有可用数据库列表，添加参考信息
             if context.get('available_databases'):
+                databases = ', '.join(context['available_databases'])
                 if language == 'en':
-                    prompt += f"\n\nAvailable databases: {', '.join(context['available_databases'])}"
+                    prompt += f"\n\nAvailable databases: {databases}"
                 else:
-                    prompt += f"\n\n可用数据库：{', '.join(context['available_databases'])}"
-            
+                    prompt += f"\n\n可用数据库：{databases}"
+
+            guidance = context.get('dialect_guidance')
+            guidance_text = None
+            if isinstance(guidance, dict):
+                key = 'en' if language == 'en' else 'zh'
+                guidance_text = guidance.get(key) or next(iter(guidance.values()), None)
+            elif isinstance(guidance, str):
+                guidance_text = guidance
+
+            if guidance_text:
+                if language == 'en':
+                    prompt += f"\n\nDialect hints: {guidance_text}"
+                else:
+                    prompt += f"\n\n方言提示：{guidance_text}"
+
             return prompt
-        
+ 
         # 非数据库查询，直接返回原始查询
         return query
     
