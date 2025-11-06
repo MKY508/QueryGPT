@@ -3,8 +3,12 @@
 set -euo pipefail
 
 VERSION="1.5"
-PYTHON_REQUIRED="3.10"
+PYTHON_REQUIRED_MAJOR=3
+PYTHON_MIN_MINOR=10
+PYTHON_MAX_MINOR=12
 VENV_DIR="venv_py310"
+PYTHON_CMD=""
+PYTHON_VERSION=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -40,23 +44,41 @@ detect_os() {
             ;;
     esac
     info "运行环境：$name"
+    if [ "$name" = "WSL" ]; then
+        warn "检测到 WSL：建议将仓库放在 Linux 文件系统中 (例如 /home/<user>)，以避免路径与权限问题。"
+    fi
 }
 
 check_python() {
-    local candidates=("python3.10" "python3" "python")
+    local candidates=("python3.10" "python3.11" "python3.12" "python3" "python")
     for cmd in "${candidates[@]}"; do
         if command -v "$cmd" >/dev/null 2>&1; then
             local resolved="$(command -v "$cmd")"
-            local short_version="$("$resolved" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)"
-            if [[ "$short_version" == "$PYTHON_REQUIRED" ]]; then
-                PYTHON_CMD="$resolved"
-                ok "检测到 Python ${PYTHON_REQUIRED}：$PYTHON_CMD"
-                return
+            local version_tuple
+            version_tuple="$("$resolved" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")' 2>/dev/null || true)"
+            if [[ "$version_tuple" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+                local major="${BASH_REMATCH[1]}"
+                local minor="${BASH_REMATCH[2]}"
+                if (( major == PYTHON_REQUIRED_MAJOR && minor >= PYTHON_MIN_MINOR )); then
+                    PYTHON_CMD="$resolved"
+                    PYTHON_VERSION="$version_tuple"
+                    if (( minor > PYTHON_MAX_MINOR )); then
+                        warn "检测到 Python ${PYTHON_VERSION}，高于推荐范围 (3.${PYTHON_MIN_MINOR}~3.${PYTHON_MAX_MINOR})，将尝试继续。"
+                    elif (( minor > PYTHON_MIN_MINOR )); then
+                        warn "检测到 Python ${PYTHON_VERSION}，与推荐版本 (3.${PYTHON_MIN_MINOR}) 略有不同，若遇兼容问题请切换到 3.${PYTHON_MIN_MINOR}."
+                    else
+                        ok "检测到 Python ${PYTHON_VERSION}：$PYTHON_CMD"
+                    fi
+                    if (( minor != PYTHON_MIN_MINOR )); then
+                        ok "使用 Python ${PYTHON_VERSION}：$PYTHON_CMD"
+                    fi
+                    return
+                fi
             fi
         fi
     done
-    err "需要 Python ${PYTHON_REQUIRED}，请安装对应版本后重试。"
-        exit 1
+    err "需要 Python 3.${PYTHON_MIN_MINOR}+ (推荐 3.${PYTHON_MIN_MINOR}~3.${PYTHON_MAX_MINOR})，请安装对应版本后重试。"
+    exit 1
 }
 
 activate_venv() {
@@ -67,24 +89,47 @@ activate_venv() {
     fi
     # shellcheck disable=SC1091
     source "$activate"
+    PYTHON_BIN="$VIRTUAL_ENV/bin/python"
     PIP_BIN="$VIRTUAL_ENV/bin/pip"
+}
+
+ensure_pip() {
+    if [ -z "${PYTHON_BIN:-}" ] || [ ! -x "$PYTHON_BIN" ]; then
+        err "虚拟环境缺少 python 可执行文件，请删除 $VENV_DIR 后重试。"
+        exit 1
+    fi
+
+    if [ ! -x "$PIP_BIN" ]; then
+        warn "虚拟环境中未找到 pip，尝试使用 ensurepip 安装..."
+        "$PYTHON_BIN" -m ensurepip --upgrade >/dev/null 2>&1 || true
+        PIP_BIN="$VIRTUAL_ENV/bin/pip"
+        if [ ! -x "$PIP_BIN" ]; then
+            err "仍无法在虚拟环境中找到 pip，请手动安装 python3-venv 或 pip 后重试。"
+            exit 1
+        fi
+    fi
+
+    info "升级 pip"
+    "$PIP_BIN" install --upgrade pip >/dev/null
 }
 
 ensure_venv() {
     if [ ! -d "$VENV_DIR" ]; then
-        info "创建虚拟环境：$VENV_DIR"
-        "$PYTHON_CMD" -m venv "$VENV_DIR" || {
-            err "无法创建虚拟环境，请确认已安装 python3-venv 或 virtualenv。"
-            exit 1
-        }
+        info "创建虚拟环境：$VENV_DIR (使用 $PYTHON_CMD)"
+        if ! "$PYTHON_CMD" -m venv "$VENV_DIR"; then
+            warn "首次创建虚拟环境失败，尝试运行 ensurepip 后重试..."
+            "$PYTHON_CMD" -m ensurepip --upgrade >/dev/null 2>&1 || true
+            if ! "$PYTHON_CMD" -m venv "$VENV_DIR"; then
+                err "无法创建虚拟环境，请安装 python3-venv 或 virtualenv 后重试。"
+                exit 1
+            fi
+        fi
     else
         info "使用已有虚拟环境：$VENV_DIR"
     fi
 
     activate_venv
-
-    info "升级 pip"
-    "$PIP_BIN" install --upgrade pip >/dev/null
+    ensure_pip
     ok "虚拟环境已激活：$VIRTUAL_ENV"
 }
 
@@ -95,8 +140,85 @@ install_requirements() {
     fi
     info "安装依赖 (requirements.txt)"
     warn "OpenInterpreter 包较大，安装过程可能需要数分钟。"
-    "$PIP_BIN" install -r requirements.txt
-    ok "依赖安装完成"
+    "$PIP_BIN" install --upgrade setuptools wheel >/dev/null || true
+
+    if "$PIP_BIN" install --upgrade -r requirements.txt; then
+        ok "依赖安装完成"
+        return
+    fi
+
+    warn "依赖安装失败，尝试使用官方源重新安装..."
+    if "$PIP_BIN" install --no-cache-dir --default-timeout=120 -r requirements.txt -i https://pypi.org/simple; then
+        ok "依赖安装完成"
+        return
+    fi
+
+    warn "使用官方源仍失败，尝试使用清华镜像..."
+    if "$PIP_BIN" install --no-cache-dir --default-timeout=120 -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple; then
+        ok "依赖安装完成"
+        return
+    fi
+
+    err "依赖安装失败，请检查网络或系统依赖。"
+    exit 1
+}
+
+verify_dependencies() {
+    info "验证核心依赖"
+    local missing_packages
+    missing_packages="$($PYTHON_BIN <<'PY'
+import importlib, sys
+targets = [
+    ("pymysql", "pymysql"),
+    ("plotly", "plotly"),
+    ("pandas", "pandas"),
+]
+failed = []
+for pkg, module in targets:
+    try:
+        importlib.import_module(module)
+    except Exception:
+        failed.append(pkg)
+if failed:
+    print(" ".join(failed))
+PY
+)"
+
+    if [ -n "$missing_packages" ]; then
+        warn "检测到缺失或导入失败的依赖: $missing_packages"
+        for pkg in $missing_packages; do
+            info "尝试重新安装 $pkg"
+            if ! "$PIP_BIN" install --no-cache-dir --default-timeout=120 "$pkg"; then
+                err "自动安装 $pkg 失败，请手动检查网络或系统依赖。"
+                exit 1
+            fi
+        done
+
+        # 重新验证
+        missing_packages="$($PYTHON_BIN <<'PY'
+import importlib, sys
+targets = [
+    ("pymysql", "pymysql"),
+    ("plotly", "plotly"),
+    ("pandas", "pandas"),
+]
+failed = []
+for pkg, module in targets:
+    try:
+        importlib.import_module(module)
+    except Exception:
+        failed.append(pkg)
+if failed:
+    print(" ".join(failed))
+PY
+)"
+        if [ -n "$missing_packages" ]; then
+            err "依赖验证失败，请手动安装: $missing_packages"
+            exit 1
+        fi
+    fi
+
+    ok "核心依赖验证通过"
 }
 
 ensure_directories() {
@@ -111,20 +233,23 @@ ensure_env_file() {
         return
     fi
     if [ -f ".env.example" ]; then
-        cp .env.example .env
+        if ! cp .env.example .env; then
+            err "复制 .env.example 失败，请检查文件权限或路径。"
+            exit 1
+        fi
     else
         cat > .env <<'EOF'
 # API配置
 API_KEY=
 API_BASE_URL=https://api.openai.com/v1/
-DEFAULT_MODEL=gpt-4.1
+DEFAULT_MODEL=gpt-5
 
 # 数据库配置
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
-DB_DATABASE=test
+DB_DATABASE=
 
 # 系统配置
 LOG_LEVEL=INFO
@@ -133,6 +258,11 @@ CACHE_TTL=3600
 OUTPUT_DIR=output
 CACHE_DIR=cache
 EOF
+    fi
+    chmod 600 .env 2>/dev/null || true
+    if [ ! -f ".env" ]; then
+        err "生成 .env 失败，请手动创建并重试。"
+        exit 1
     fi
     ok "已生成 .env 配置"
 }
@@ -160,6 +290,7 @@ summary() {
     printf '\n'
     ok "环境配置完成"
     info "虚拟环境：$VIRTUAL_ENV"
+    info "已生成配置文件：.env、config/models.json、backend/config/models.json（均为占位值，请替换为实际凭据）"
     info "下一步：运行 ./start.sh 启动服务"
 }
 
@@ -168,11 +299,12 @@ main() {
     require_project_root
     detect_os
     ensure_directories
+    ensure_env_file
+    sync_configs
     check_python
     ensure_venv
     install_requirements
-    ensure_env_file
-    sync_configs
+    verify_dependencies
     summary
 }
 
