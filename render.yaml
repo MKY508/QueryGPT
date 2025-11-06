@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: querygpt
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    autoDeploy: false
+    envVars:
+      - key: PORT
+        value: "5000"
+
