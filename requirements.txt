@@ -4,7 +4,8 @@ flask-cors==4.0.0
 flasgger==0.9.7.1
 pymysql==1.1.0
 pandas==2.0.3
-plotly==5.17.0
+plotly>=6.1.1,<7
+kaleido==0.2.1
 numpy==1.24.3
 cryptography==46.0.2
 pyyaml==6.0.3

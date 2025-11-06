@@ -25,7 +25,7 @@ from backend.core import service_container
 from backend.api.config_api import config_bp
 from backend.api.chat_api import chat_bp
 from backend.api.history_api import history_bp
-from backend.api.database_api import database_bp  # 包含文件服务
+from backend.api.database_api import database_bp, serve_output as serve_output_file  # 包含数据库和文件服务
 from backend.api.prompt_api import prompt_bp
 
 services = service_container
@@ -166,6 +166,12 @@ app.register_blueprint(chat_bp)
 app.register_blueprint(history_bp)
 app.register_blueprint(database_bp)  # 包含数据库和文件服务
 app.register_blueprint(prompt_bp)
+
+
+@app.route('/output/<path:filename>')
+def serve_output_compat(filename):
+    """兼容旧版 /output 路径，复用数据库蓝图的文件服务。"""
+    return serve_output_file(filename)
 
 # ============ 基础路由 ============
 

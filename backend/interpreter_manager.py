@@ -6,9 +6,10 @@ import os
 import json
 import signal
 import warnings
-from typing import Dict, Any, Optional, Set
+from typing import Dict, Any, Optional, Set, List, Tuple
 import logging
 import re
+import shutil
 
 warnings.filterwarnings(
     "ignore",
@@ -403,18 +404,38 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
                 if conversation_id:
                     self._stop_process_monitoring(conversation_id)
             
+            # 收集生成的文件，并确保在结果中体现
+            artifacts = self._collect_generated_artifacts(result)
+            if artifacts and isinstance(result, list):
+                existing_messages = {item.get('content') for item in result if isinstance(item, dict)}
+                for artifact in artifacts:
+                    message = (
+                        f"生成图表文件: {artifact['filename']}\n"
+                        f"访问链接: {artifact['url']}"
+                    )
+                    if message not in existing_messages:
+                        result.append({
+                            "type": "console",
+                            "content": message
+                        })
+                        existing_messages.add(message)
+
             # 保存到会话历史
             if conversation_id:
                 self._save_to_history(conversation_id, query, result)
             
             # 处理结果
-            return {
+            response_payload = {
                 "success": True,
                 "result": result,
                 "model": model_name or self.config.get("current_model"),
                 "conversation_id": conversation_id,
                 "steps": steps
             }
+            if artifacts:
+                response_payload["visualization"] = artifacts
+                response_payload.setdefault("artifacts", artifacts)
+            return response_payload
             
         except KeyboardInterrupt:
             logger.info(f"查询被中断: {conversation_id}")
@@ -817,6 +838,76 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
         
         return str(result)[:500]
 
+    def _collect_generated_artifacts(self, payload: Any) -> List[Dict[str, Any]]:
+        """从OpenInterpreter返回的payload中提取生成的文件信息。"""
+        artifacts: List[Dict[str, Any]] = []
+
+        if not isinstance(payload, list):
+            return artifacts
+
+        output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'output'))
+        os.makedirs(output_dir, exist_ok=True)
+
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            if item.get('type') != 'file':
+                continue
+
+            raw_path = item.get('path') or item.get('file_path') or item.get('content')
+            if not raw_path:
+                continue
+
+            # 规范化路径，确保文件位于 output 目录，必要时复制过去
+            normalized = self._normalize_artifact_path(raw_path, output_dir)
+            if not normalized:
+                continue
+
+            filename, absolute_path = normalized
+            artifact = {
+                "filename": filename,
+                "absolute_path": absolute_path,
+                "url": f"/output/{filename}",
+                "description": item.get('description') or item.get('caption') or '',
+                "format": item.get('format') or item.get('mime_type') or '',
+                "size": os.path.getsize(absolute_path) if os.path.exists(absolute_path) else None
+            }
+            artifacts.append(artifact)
+
+        return artifacts
+
+    def _normalize_artifact_path(self, raw_path: str, output_dir: str) -> Optional[Tuple[str, str]]:
+        """归一化文件路径，确保资源可通过/output访问。"""
+        if not raw_path:
+            return None
+
+        path = os.path.abspath(os.path.expanduser(raw_path))
+        if not os.path.exists(path):
+            # 如果OpenInterpreter给的是相对路径，尝试认为它位于 output_dir 下
+            candidate = os.path.join(output_dir, os.path.basename(raw_path))
+            if not os.path.exists(candidate):
+                return None
+            path = os.path.abspath(candidate)
+
+        if os.path.isdir(path):
+            return None
+
+        filename = os.path.basename(path)
+        destination = os.path.join(output_dir, filename)
+
+        # 如果文件不在 output 目录中，复制一份以便静态服务
+        if os.path.abspath(os.path.dirname(path)) != os.path.abspath(output_dir):
+            try:
+                shutil.copy2(path, destination)
+                path = destination
+            except Exception as copy_err:  # pragma: no cover - 防御性
+                logger.warning("复制生成文件失败: %s", copy_err)
+                return None
+        else:
+            path = destination
+
+        return filename, path
+ 
     @staticmethod
     def _extract_steps_from_result_payload(payload: Any) -> list:
         """从执行结果中提取步骤播报"""
