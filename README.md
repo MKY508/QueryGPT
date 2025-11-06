@@ -253,7 +253,7 @@ cd QueryGPT
 | 问题 | 解决方案 |
 |------|---------|
 | **找不到backend目录** | 运行 `cd ~/QueryGPT-github && ./start.sh` |
-| **环境检测问题** | 运行 `./diagnostic.sh` 查看详细环境信息,反馈邮箱 |
+| **环境检测问题** | 运行 `./scripts/diagnostics/diagnostic.sh` 查看详细环境信息,反馈邮箱 |
 
 ## 最新更新
 ### 2025-11-04 - v1.5 智能路由与 UX 全面重构

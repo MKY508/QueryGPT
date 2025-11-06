@@ -147,6 +147,7 @@ frontend/templates/test_guide.html
 
 # 临时文档
 AGENTS.md
+!docs/AGENTS.md
 manual_cleanup_guide.md
 UI_UX_IMPLEMENTATION_GUIDE.md
 perplexity_copyright_analysis.md
