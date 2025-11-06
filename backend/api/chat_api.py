@@ -433,14 +433,69 @@ def chat():
             else:
                 # 优化：直接从缓存配置获取数据库信息，避免重复读取
                 db_config = config_snapshot.get('database', {})
-                if db_config:
-                    context['connection_info'] = {
+                connection_info = {}
+                if isinstance(db_config, dict):
+                    connection_info = {
                         'host': db_config.get('host', ''),
                         'port': db_config.get('port', 3306),
                         'user': db_config.get('user', ''),
                         'password': db_config.get('password', ''),
-                        'database': db_config.get('database', '')
+                        'database': db_config.get('database', ''),
                     }
+
+                driver = None
+                if database_manager:
+                    driver = getattr(database_manager, 'driver', None)
+                if not driver and isinstance(db_config, dict):
+                    driver = db_config.get('driver') or db_config.get('provider')
+
+                if driver:
+                    driver = str(driver).lower()
+                    context['database_driver'] = driver
+                    connection_info.setdefault('driver', driver)
+
+                    if driver == 'sqlite':
+                        sqlite_dsn = connection_info.get('database') or os.getenv('DATABASE_URL', '')
+                        if sqlite_dsn:
+                            connection_info['database'] = sqlite_dsn
+                        context['dialect_guidance'] = {
+                            'zh': (
+                                "SQLite 不支持 SHOW DATABASES/SHOW TABLES。"
+                                "请使用 `PRAGMA database_list;`、`SELECT name FROM sqlite_master WHERE type='table';`、"
+                                "`PRAGMA table_info('表名');` 来探索库和表结构。"
+                            ),
+                            'en': (
+                                "SQLite does not support SHOW DATABASES/TABLES. "
+                                "Use `PRAGMA database_list;`, `SELECT name FROM sqlite_master WHERE type='table';`, "
+                                "and `PRAGMA table_info('table_name');` to explore schemas."
+                            )
+                        }
+                    elif driver in {'mysql', 'doris'}:
+                        context['dialect_guidance'] = {
+                            'zh': (
+                                "MySQL/Doris 支持 `SHOW DATABASES;`、`SHOW TABLES;`、`DESCRIBE 表名;`。"
+                                "始终编写只读 SQL（SELECT）并为探索查询加上 LIMIT。"
+                            ),
+                            'en': (
+                                "MySQL/Doris support `SHOW DATABASES;`, `SHOW TABLES;`, and `DESCRIBE <table>;`. "
+                                "Stick to read-only SQL (SELECT) and apply LIMIT clauses for exploration."
+                            )
+                        }
+                    else:
+                        context['dialect_guidance'] = {
+                            'zh': (
+                                f"当前数据库驱动 `{driver}` 支持标准的只读 SQL，"
+                                "请根据其语法使用安全命令（SELECT/PRAGMA）探索结构。"
+                            ),
+                            'en': (
+                                f"Current database driver `{driver}` supports standard read-only SQL. "
+                                "Explore the schema using safe commands such as SELECT or PRAGMA equivalents."
+                            )
+                        }
+
+                if connection_info:
+                    context['connection_info'] = connection_info
+
                 if database_manager and getattr(database_manager, 'is_configured', False):
                     global_disabled = getattr(database_manager, '_global_disabled', False)
                     if not global_disabled:
