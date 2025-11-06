@@ -263,7 +263,7 @@ DB_NAME=          # Leave empty for cross-database query support
 | **Port occupied** | Auto-scan ports 5000-5100 to find available port |
 | **backend directory not found** | Run `cd ~/QueryGPT-github && ./start.sh` |
 | **Virtual environment doesn't exist** | Run `./setup.sh` to reinstall |
-| **Environment detection issues** | Run `./diagnostic.sh` for detailed environment info |
+| **Environment detection issues** | Run `./scripts/diagnostics/diagnostic.sh` for detailed environment info |
 
 ## 🤝 Contributing
 
