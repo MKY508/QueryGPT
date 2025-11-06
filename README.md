@@ -25,9 +25,7 @@
   [![Stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=for-the-badge&color=yellow)](https://github.com/MKY508/QueryGPT/stargazers)
   
   <br/>
-
-  [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
-  
+  [![一键部署-Render](https://img.shields.io/badge/一键部署-Render-2f54eb?style=for-the-badge&logo=render&logoColor=white)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
   <h3>基于 OpenInterpreter 的智能数据分析 Agent</h3>
   <p><i>用自然语言与数据库对话</i></p>
   
@@ -133,16 +131,19 @@
 
 ### ☁️ 一键部署（Render）
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
+<p>
+  <a href="https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT">
+    <img src="https://img.shields.io/badge/一键部署-Render-2f54eb?style=for-the-badge&logo=render&logoColor=white" alt="一键部署-Render" />
+  </a>
+</p>
 
-1. 点击按钮并登录 Render（首次需要授权访问 GitHub）。
+1. 点击上方「一键部署」按钮并登录 Render（首次需要授权访问 GitHub）。
 2. 保持默认 `Free` 方案，点击 **Deploy QueryGPT** 开始构建。
-3. **可选**：在 Render 设置中补充以下环境变量，即可连接真实服务：
-   - `API_KEY` / `API_BASE_URL`：你的模型服务凭证（默认占位值会让 LLM 功能自动跳过）。
-   - `DB_HOST`、`DB_PORT`、`DB_USER`、`DB_PASSWORD`、`DB_DATABASE`：数据库连接信息。
-4. 构建大约 3-5 分钟，完成后点击 Render 面板中的访问链接即可体验。
+3. 构建完成后，在 Render 控制台点击服务访问链接（形如 `https://xxxx.onrender.com`，示例：`https://querygpt-sjje.onrender.com`）即可打开应用。
+4. 首次部署会经历 Render 约 90 秒的冷启动，加上应用初始化通常 3-10 分钟，请耐心等待页面加载完成。
+5. 首次进入后，在左侧边栏的 **设置** 中补充自己的模型 API（`API_KEY`/`API_BASE_URL`）和数据库连接信息，即可与真实服务联通。
 
-> ℹ️ 线上 Demo 默认使用内置示例配置，可浏览 UI、历史记录等功能。如需完整 AI 分析体验，请在部署后填写自己的模型和数据库凭据。
+> ℹ️ 线上 Demo 默认使用内置示例配置，可浏览 UI、历史记录等功能。配置完成后即可启用完整的 AI 分析能力。
 
 ### 极简安装
 
