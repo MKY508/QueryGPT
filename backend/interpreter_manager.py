@@ -258,12 +258,25 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
                     logger.debug(f"[会话上下文] 最近消息: {conversation_history[-2:] if len(conversation_history) >= 2 else conversation_history}")
 
                     # 按上下文轮数限制加载到 interpreter 的消息数量
-                    max_rounds = int(getattr(self, 'max_history_rounds', 3) or 3)
-                    max_rounds = max(max_rounds, 0)
-                    max_messages = max_rounds * 2 if max_rounds > 0 else len(conversation_history)
-                    truncated_history = conversation_history[-max_messages:]
+                    max_rounds_raw = getattr(self, 'max_history_rounds', 3)
+                    try:
+                        max_rounds = int(max_rounds_raw if max_rounds_raw is not None else 3)
+                    except (TypeError, ValueError):
+                        max_rounds = 3
+                    if max_rounds < 0:
+                        max_rounds = 0
 
-                    interpreter.messages = []
+                    if max_rounds == 0:
+                        truncated_history = []
+                    else:
+                        max_messages = max_rounds * 2
+                        truncated_history = conversation_history[-max_messages:]
+
+                    if not hasattr(interpreter, 'messages') or interpreter.messages is None:
+                        interpreter.messages = []
+                    else:
+                        interpreter.messages = []
+
                     for msg in truncated_history:
                         role = msg.get('role') or 'assistant'
                         content = msg.get('content')
@@ -271,7 +284,8 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
                             continue
                         interpreter.messages.append({
                             "role": role,
-                            "content": content
+                            "content": content,
+                            "type": "message"
                         })
 
                     logger.info(
