@@ -97,6 +97,20 @@ class LLMService:
         Returns:
             响应字典，包含生成的内容和使用统计
         """
+        requires_api_key = self.model_settings.get('requires_api_key')
+        if requires_api_key is None:
+            requires_api_key = self.provider not in {'ollama', 'custom', 'local'}
+
+        if requires_api_key and not self.api_key:
+            # 用户尚未配置密钥，不视为错误，直接返回跳过结果
+            logger.debug("LLM调用跳过：模型 %s 未配置有效 API KEY", self.model_name)
+            return {
+                "content": "",
+                "error": "LLM_NOT_CONFIGURED",
+                "success": False,
+                "skipped": True
+            }
+
         self.stats["total_requests"] += 1
 
         messages = [

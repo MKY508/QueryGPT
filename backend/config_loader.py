@@ -87,31 +87,36 @@ MODEL_TYPE_PRESETS = {
 
 DEFAULT_MODELS = [
     {
-        "id": "gpt-4o",
-        "name": "ChatGPT 4o",
+        "id": "gpt-5",
+        "name": "ChatGPT 5",
         "type": "openai",
         "status": "active",
         "api_base": "https://api.openai.com/v1",
-        "model_name": "gpt-4o"
+        "model_name": "gpt-5",
+        "requires_api_key": True,
+        "requires_api_base": True
     },
     {
-        "id": "qwen-plus",
-        "name": "Qwen Plus",
-        "type": "qwen",
+        "id": "deepseek-r1",
+        "name": "DeepSeek R1",
+        "type": "deepseek",
         "status": "inactive",
-        "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "model_name": "qwen-plus"
+        "api_base": "https://api.deepseek.com/v1",
+        "model_name": "deepseek-r1",
+        "requires_api_key": True,
+        "requires_api_base": True
     },
     {
-        "id": "ollama-llama3",
-        "name": "Ollama Llama3 本地",
+        "id": "ollama-llama4",
+        "name": "Llama 4 (local)",
         "type": "ollama",
         "status": "inactive",
         "api_base": "http://localhost:11434",
         "api_key": "not-needed",
-        "model_name": "llama3:latest",
-        "litellm_model": "ollama/llama3:latest",
-        "requires_api_key": False
+        "model_name": "llama4:latest",
+        "litellm_model": "ollama/llama4:latest",
+        "requires_api_key": False,
+        "requires_api_base": True
     }
 ]
 

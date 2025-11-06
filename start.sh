@@ -94,8 +94,8 @@ PY
         attempts=$((attempts + 1))
     done
     printf '\n'
-    warn "后端服务可能仍在启动中，浏览器将自动打开"
-    return 0  # 即使没完全启动也继续，因为服务会延迟初始化
+    warn "后端服务仍在启动中，稍候请手动访问 http://localhost:${PORT}"
+    return 1
 }
 
 open_browser() {
@@ -109,14 +109,18 @@ start_service() {
     info "服务端口：$PORT"
     info "访问地址：http://localhost:$PORT"
     warn "按 Ctrl+C 停止服务"
+    info "首次启动可能需要约 10-20 秒完成初始化，请耐心等待后端就绪。"
 
     ( cd backend && "$PYTHON_BIN" app.py ) &
     APP_PID=$!
 
     # 快速检查端口是否就绪，然后立即打开浏览器
     # 后端会在首次请求时完成初始化，不会阻塞启动
-    wait_for_ready
-    open_browser
+    if wait_for_ready; then
+        open_browser
+    else
+        warn "已跳过自动打开浏览器，可稍后手动访问：http://localhost:${PORT}"
+    fi
     
     local status=0
     wait "$APP_PID" || status=$?
