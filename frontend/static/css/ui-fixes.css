@@ -612,10 +612,7 @@ body {
 }
 
 .status-note {
-    display: block;
-    margin-top: 6px;
-    font-size: 12px;
-    color: #6c757d;
+    display: none;
 }
 
 .models-empty-row td {

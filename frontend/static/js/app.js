@@ -598,7 +598,7 @@ class DataAnalysisPlatform {
         messageInput.disabled = true;
         document.getElementById('send-button').disabled = true;
         
-
+        
         // 显示停止按钮，隐藏发送按钮
         const sendBtn = document.getElementById('send-button');
         const stopBtn = document.getElementById('stop-button');
@@ -2780,7 +2780,7 @@ class DataAnalysisPlatform {
             this.notificationTimeout = setTimeout(() => {
                 notification.classList.remove('show');
                 notification.classList.add('hide');
-                
+
                 // 动画结束后清理
                 setTimeout(() => {
                     notification.classList.remove('hide');
@@ -3048,10 +3048,16 @@ class DataAnalysisPlatform {
             });
         }
         
-        // 侧边栏内链接点击事件（小屏幕自动关闭）
+        // 侧边栏内链接点击事件（可选自动关闭）
         sidebar.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', () => {
                 const screenSize = getScreenSize();
+                const shouldAutoClose = link.dataset.autoClose === 'true';
+
+                if (!shouldAutoClose) {
+                    return;
+                }
+
                 if (screenSize === 'small' || screenSize === 'medium') {
                     setTimeout(() => {
                         sidebar.classList.remove('show');

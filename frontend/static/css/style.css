@@ -1461,43 +1461,57 @@ input:checked + .slider:before {
     .container {
         flex-direction: column;
     }
-    
+
     .sidebar {
-        width: 100%;
-        height: auto;
         position: fixed;
-        bottom: 0;
+        top: 0;
+        left: 0;
+        bottom: auto;
+        width: 82%;
+        max-width: 320px;
+        height: 100vh;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: 2px 0 20px rgba(0, 0, 0, 0.2);
         z-index: 1000;
     }
-    
-    .sidebar-nav ul {
-        display: flex;
-        justify-content: space-around;
-        padding: 10px 0;
+
+    .sidebar.show {
+        transform: translateX(0);
     }
-    
+
+    .sidebar-nav ul {
+        display: block;
+        padding: 12px 0;
+    }
+
     .sidebar-nav li {
         margin: 0;
     }
-    
+
+    .menu-header,
     .nav-link {
-        padding: 10px;
-        text-align: center;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 18px;
     }
-    
-    .nav-link span {
-        display: none;
+
+    .nav-link span,
+    .menu-header span {
+        display: inline;
     }
-    
+
     .main-content {
-        margin-bottom: 70px;
+        margin-left: 0;
+        margin-bottom: 0;
     }
-    
+
     .cards-container {
         grid-template-columns: 1fr;
         padding: 15px;
     }
-    
+
     .form-row {
         flex-direction: column;
     }

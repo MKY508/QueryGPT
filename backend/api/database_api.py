@@ -369,12 +369,31 @@ def execute_sql():
         database_manager = _get_database_manager()
         results = database_manager.execute_query(sql_query)
         
-        return jsonify({
-            "success": True,
-            "data": results,
-            "count": len(results),
-            "timestamp": datetime.now().isoformat()
-        })
+        if isinstance(results, dict):
+            row_count = results.get('row_count')
+            if row_count is None:
+                data = results.get('data') or []
+                row_count = len(data)
+
+            payload = {
+                "success": True,
+                "data": results,
+                "count": row_count,
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            row_count = len(results)
+            payload = {
+                "success": True,
+                "data": {
+                    "rows": results,
+                    "row_count": row_count
+                },
+                "count": row_count,
+                "timestamp": datetime.now().isoformat()
+            }
+
+        return jsonify(payload)
     except ValueError as e:
         return jsonify({"error": str(e)}), 403
     except Exception as e:

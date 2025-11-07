@@ -156,6 +156,31 @@
         overflow-y: auto;
         min-height: 100vh;
     }
+
+    .sidebar .menu-header,
+    .sidebar .nav-link {
+        justify-content: flex-start;
+    }
+
+    .chat-input {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .chat-input textarea {
+        min-height: 80px;
+        max-height: 160px;
+    }
+
+    .chat-input button {
+        width: 100%;
+        height: 44px;
+    }
+
+    .chat-input button + button {
+        margin-top: 4px;
+    }
     
     /* 优化的菜单按钮 - 与UI主题一致 */
     .mobile-menu-btn {
@@ -217,11 +242,29 @@
     /* 表格响应式 */
     .models-table {
         font-size: 14px;
+        min-width: 640px;
     }
     
     .models-table th,
     .models-table td {
         padding: 10px;
+    }
+
+    .models-table .actions-header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    #test-all-models-btn {
+        width: 100%;
+        max-width: 180px;
+        font-size: 14px;
+        padding: 10px 16px;
+    }
+
+    .table-container {
+        overflow-x: auto;
     }
     
     /* 设置面板 */
@@ -270,10 +313,10 @@
     }
     
     /* 聊天输入 */
-    .chat-input-group {
+    .chat-input {
         flex-direction: column;
     }
-    
+
     #message-input {
         margin-bottom: 10px;
     }
