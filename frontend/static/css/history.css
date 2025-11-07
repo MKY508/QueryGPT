@@ -218,8 +218,8 @@
 .history-item-meta {
     display: flex;
     gap: 15px;
-    font-size: 12px;
-    color: #999;
+    font-size: 13px;
+    color: #6c757d;
 }
 
 .history-item-meta span {

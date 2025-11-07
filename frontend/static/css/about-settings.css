@@ -397,6 +397,65 @@
     gap: 25px;
 }
 
+@media (max-width: 1024px) {
+    .about-hero {
+        margin: 20px;
+        padding: 32px 28px;
+    }
+
+    .hero-content {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 24px;
+    }
+
+    .hero-badges {
+        justify-content: center;
+    }
+
+    .about-cards,
+    .system-usage,
+    .tech-stack-section {
+        margin: 0 20px 30px 20px;
+    }
+
+    .about-card {
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+}
+
+@media (max-width: 640px) {
+    .badge-item {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .about-hero {
+        padding: 24px 20px;
+    }
+
+    .logo-section {
+        margin-bottom: 12px;
+    }
+
+    .about-card {
+        padding: 24px;
+        gap: 16px;
+    }
+
+    .card-icon {
+        width: 50px;
+        height: 50px;
+    }
+
+    .system-usage {
+        padding: 24px 20px;
+    }
+}
+
 .tech-group {
     background: white;
     border-radius: 12px;
