@@ -1,4 +1,5 @@
 from backend.config_loader import ConfigLoader, DEFAULT_MODELS
+from backend.core.service_container import service_container as services
 import os
 import json
 import logging
@@ -111,6 +112,10 @@ def handle_models():
                 ConfigLoader._models_mtime = None
             except Exception:
                 pass
+            try:
+                services.init_managers(force_reload=True)
+            except Exception as exc:
+                logger.warning(f"刷新服务容器失败: {exc}")
             return jsonify({"success": True})
         except Exception as e:
             logger.error(f"保存模型失败: {e}")
