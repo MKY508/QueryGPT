@@ -14,22 +14,29 @@ config_bp = Blueprint('config_bp', __name__)
 def handle_models():
     """获取或保存模型列表（Blueprint版本）"""
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    repo_root = os.path.dirname(PROJECT_ROOT)
     models_file = os.path.join(PROJECT_ROOT, 'config', 'models.json')
+    root_models_file = os.path.join(repo_root, 'config', 'models.json')
 
     if request.method == 'GET':
         try:
             api_config = ConfigLoader.get_api_config()
             models_from_file = []
-            if os.path.exists(models_file):
+            sources = [root_models_file, models_file]
+            for path in sources:
+                if not os.path.exists(path):
+                    continue
                 try:
-                    with open(models_file, 'r', encoding='utf-8') as f:
+                    with open(path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                         if isinstance(data, dict) and 'models' in data:
                             models_from_file = data['models']
                         elif isinstance(data, list):
                             models_from_file = data
+                    if models_from_file:
+                        break
                 except Exception as exc:
-                    logger.warning(f"读取 models.json 失败，使用默认模型: {exc}")
+                    logger.warning(f"读取 {path} 失败，继续尝试其他来源: {exc}")
                     models_from_file = []
             if not models_from_file:
                 models_from_file = [dict(item) if isinstance(item, dict) else {'id': str(item)} for item in DEFAULT_MODELS]
@@ -92,6 +99,12 @@ def handle_models():
             models_data = {"models": save_models}
             with open(models_file, 'w', encoding='utf-8') as f:
                 json.dump(models_data, f, indent=2, ensure_ascii=False)
+            try:
+                os.makedirs(os.path.dirname(root_models_file), exist_ok=True)
+                with open(root_models_file, 'w', encoding='utf-8') as f:
+                    json.dump(models_data, f, indent=2, ensure_ascii=False)
+            except Exception as exc:
+                logger.error(f"同步写入根目录 models.json 失败: {exc}")
             # 使配置缓存失效，确保后续读取到最新
             try:
                 ConfigLoader._api_config_cache = None
