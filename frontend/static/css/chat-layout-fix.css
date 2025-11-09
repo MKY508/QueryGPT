@@ -4,10 +4,31 @@
  * 支持响应式调整
  */
 
+/* 最高优先级：覆盖所有冲突的 tab-content 样式 */
+.tab-content#chat-tab,
+#chat-tab.tab-content,
+.tab-content#chat-tab.active,
+div.tab-content#chat-tab {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    position: relative !important;
+}
+
+/* 覆盖通用 tab-content 在 main-content 中的样式 */
+.main-content .tab-content#chat-tab,
+.main-content #chat-tab.tab-content {
+    overflow-y: hidden !important;
+    height: 100vh !important;
+}
+
 /* 聊天标签页容器 - 使用 flexbox 布局 */
 #chat-tab {
-    display: flex !important;
-    flex-direction: column;
+    display: grid !important;
+    grid-template-rows: auto 1fr;
     height: 100vh !important;
     max-height: 100vh !important;
     padding: 0 !important;
@@ -17,13 +38,15 @@
 
 /* 聊天容器 - 占据所有可用空间 */
 #chat-tab .chat-container {
+    grid-row: 2;
     flex: 1 1 auto;
     display: flex !important;
     flex-direction: column !important;
     min-height: 0 !important; /* 重要：允许 flex 子元素缩小 */
     height: 100% !important;
     padding: 15px 20px 10px 20px;
-    overflow: hidden !important;
+    overflow: visible !important;
+    position: relative;
 }
 
 /* 消息区域 - 可滚动，会被压缩以容纳输入框 */
@@ -36,6 +59,8 @@
     background: white;
     border-radius: 16px;
     padding: 20px;
+    padding-bottom: 140px;
+    scroll-padding-bottom: 140px;
     margin-bottom: 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
 }
@@ -49,7 +74,11 @@
     padding: 12px 16px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     margin-bottom: 10px;
-    position: relative;
+    margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    right: 0;
     z-index: 10;
 }
 
@@ -125,6 +154,22 @@
         padding: 10px 14px;
         margin-bottom: 8px;
     }
+    
+    #chat-tab .chat-header {
+        padding: 10px 16px !important;
+        gap: 12px;
+    }
+    
+    #chat-tab .chat-header .header-controls {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 10px;
+    }
+    
+    #chat-tab .chat-header .model-selector {
+        flex: 1 1 220px;
+        max-width: none;
+    }
 }
 
 /* 响应式调整 - 小屏幕 */
@@ -164,6 +209,26 @@
     #chat-tab .stop-button {
         width: 36px;
         height: 36px;
+    }
+    
+    #chat-tab .chat-header {
+        padding: 8px 12px !important;
+        gap: 10px;
+    }
+    
+    #chat-tab .chat-header h1 {
+        font-size: 18px !important;
+    }
+    
+    #chat-tab .chat-header .header-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    
+    #chat-tab .chat-header .model-selector,
+    #chat-tab .btn-new-conversation {
+        width: 100%;
     }
 }
 
@@ -288,11 +353,37 @@
 }
 
 /* 优化顶部标题和按钮区域 */
-#chat-tab > div:first-child {
-    flex-shrink: 0;
-    padding: 10px 20px !important;
+#chat-tab .chat-header {
+    grid-row: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 20px !important;
     background: var(--color-bg-secondary, #ffffff);
     border-bottom: 1px solid var(--color-border-primary, #e0e0e0);
+}
+
+#chat-tab .chat-header .header-left {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#chat-tab .chat-header h1 {
+    font-size: 22px !important;
+    margin: 0 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#chat-tab .chat-header .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 #chat-tab .btn-new-conversation {
@@ -308,7 +399,7 @@
 }
 
 /* 针对页面顶部的 flex 容器 */
-#chat-tab > div:first-child > div {
+#chat-tab .chat-header > div {
     display: flex;
     align-items: center;
     justify-content: space-between;

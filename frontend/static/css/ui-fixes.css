@@ -963,6 +963,13 @@ html, body {
     position: relative;
 }
 
+/* 聊天页面特殊处理：使用 flexbox 而不是滚动 */
+.tab-content#chat-tab {
+    overflow-y: hidden !important;
+    overflow-x: hidden !important;
+    height: 100vh !important;
+}
+
 /* ===========================
    通知系统 - 渐入渐出效果
    =========================== */
@@ -1115,35 +1122,37 @@ html, body {
 /* ===========================
    欢迎消息样式统一
    =========================== */
+/* 欢迎区域自适应布局 */
 .welcome-message {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 40px 20px;
+    justify-content: flex-start;
     text-align: center;
-    min-height: 500px;
+    padding: clamp(18px, 4vh, 36px) clamp(16px, 6vw, 32px);
+    gap: clamp(16px, 4vh, 30px);
+    min-height: auto;
 }
 
 .welcome-content {
-    max-width: 700px;
     width: 100%;
-    background: white;
-    border-radius: 20px;
-    padding: 40px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+    max-width: 640px;
+    background: #ffffff;
+    border-radius: 18px;
+    padding: clamp(18px, 5vw, 32px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 .welcome-header {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 15px;
-    margin-bottom: 20px;
+    gap: clamp(12px, 3vh, 20px);
+    margin-bottom: clamp(14px, 3vh, 24px);
 }
 
 .welcome-icon {
-    font-size: 48px;
+    font-size: clamp(28px, 5vw, 44px);
     color: #4a90e2;
     background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
     -webkit-background-clip: text;
@@ -1151,25 +1160,25 @@ html, body {
 }
 
 .welcome-content h2 {
-    font-size: 32px;
+    font-size: clamp(22px, 3.2vw, 30px);
     font-weight: 700;
     color: #2c3e50;
     margin: 0;
 }
 
 .welcome-subtitle {
-    font-size: 16px;
+    font-size: clamp(13px, 1.8vw, 16px);
     color: #6c757d;
-    margin-bottom: 35px;
+    margin-bottom: clamp(16px, 3vw, 26px);
     line-height: 1.6;
 }
 
 .welcome-features {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 20px;
-    margin-bottom: 35px;
-    padding: 25px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: clamp(12px, 2.4vw, 20px);
+    margin-bottom: clamp(16px, 3vw, 26px);
+    padding: clamp(12px, 3vw, 22px);
     background: #f8f9fa;
     border-radius: 12px;
 }
@@ -1178,66 +1187,66 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    padding: 15px;
+    gap: clamp(6px, 1.6vw, 12px);
+    padding: clamp(10px, 2.6vw, 16px);
 }
 
 .feature-item i {
-    font-size: 28px;
+    font-size: clamp(20px, 3vw, 28px);
     color: #4a90e2;
 }
 
 .feature-item span {
-    font-size: 14px;
+    font-size: clamp(12px, 1.6vw, 14px);
     color: #495057;
     font-weight: 500;
 }
 
 .example-section {
-    margin-bottom: 25px;
+    margin-bottom: clamp(14px, 3vw, 24px);
 }
 
 .section-title {
-    font-size: 14px;
+    font-size: clamp(12px, 1.6vw, 14px);
     font-weight: 600;
     color: #495057;
-    margin-bottom: 20px;
+    margin-bottom: clamp(12px, 2.4vw, 18px);
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .welcome-content .example-queries {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: clamp(10px, 2vw, 16px);
 }
 
 .welcome-content .example-btn {
-    background: white;
+    background: #ffffff;
     border: 2px solid #e9ecef;
     color: #495057;
-    padding: 15px 10px;
+    padding: clamp(10px, 2.6vw, 16px) clamp(8px, 2vw, 12px);
     border-radius: 12px;
-    font-size: 13px;
+    font-size: clamp(12px, 1.6vw, 13px);
     cursor: pointer;
     transition: all 0.3s;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: clamp(6px, 1.6vw, 10px);
     text-align: center;
 }
 
 .welcome-content .example-btn:hover {
     background: linear-gradient(135deg, #4a90e2 0%, #5ca0e9 100%);
-    color: white;
+    color: #ffffff;
     border-color: transparent;
     transform: translateY(-3px);
     box-shadow: 0 8px 20px rgba(74, 144, 226, 0.3);
 }
 
 .welcome-content .example-btn i {
-    font-size: 20px;
+    font-size: clamp(18px, 2.4vw, 22px);
 }
 
 .welcome-content .example-btn span {
@@ -1246,69 +1255,69 @@ html, body {
 
 .welcome-hint {
     display: flex;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 15px;
+    gap: clamp(8px, 1.8vw, 12px);
+    padding: clamp(12px, 2.4vw, 18px);
     background: linear-gradient(135deg, rgba(74, 144, 226, 0.1) 0%, rgba(92, 160, 233, 0.1) 100%);
     border-radius: 10px;
-    font-size: 14px;
+    font-size: clamp(12px, 1.6vw, 14px);
     color: #495057;
     margin: 0;
 }
 
 .welcome-hint i {
     color: #f39c12;
-    font-size: 16px;
+    font-size: clamp(14px, 2vw, 16px);
 }
 
-/* 新对话的欢迎消息保持一致的样式 */
+/* 对话区域内的欢迎面板高度限制 */
 .chat-messages .welcome-message {
     background: transparent;
     margin: 0;
-    padding: 20px;
-    min-height: calc(100vh - 300px);
+    padding: clamp(14px, 4vw, 24px);
+    min-height: clamp(220px, calc(100vh - 360px), 420px);
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-/* 移动端适配 */
+/* 响应式微调 */
+@media (max-width: 1024px) {
+    .welcome-content {
+        padding: clamp(18px, 5vw, 28px);
+    }
+    .welcome-features {
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    }
+}
+
 @media (max-width: 768px) {
-    .notification {
-        left: 10px;
-        right: 10px;
-        max-width: calc(100% - 20px);
-        min-width: auto;
+    .welcome-content {
+        padding: clamp(16px, 6vw, 24px);
     }
-    
-    .notification.show {
-        animation: slideInNotificationMobile 0.4s ease-out forwards;
+    .welcome-features {
+        padding: clamp(12px, 4vw, 20px);
+        gap: clamp(10px, 3vw, 16px);
     }
-    
-    .notification.hide {
-        animation: slideOutNotificationMobile 0.4s ease-in forwards;
+    .welcome-content .example-queries {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     }
-    
-    @keyframes slideInNotificationMobile {
-        0% {
-            opacity: 0;
-            transform: translateY(-100px);
-        }
-        100% {
-            opacity: 1;
-            transform: translateY(0);
-        }
+}
+
+@media (max-width: 480px) {
+    .welcome-message {
+        padding: 16px 12px;
     }
-    
-    @keyframes slideOutNotificationMobile {
-        0% {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        100% {
-            opacity: 0;
-            transform: translateY(-100px);
-        }
+    .welcome-content {
+        padding: 16px;
+        border-radius: 14px;
+    }
+    .welcome-features {
+        grid-template-columns: 1fr;
+    }
+    .welcome-content .example-queries {
+        grid-template-columns: 1fr;
     }
 }
