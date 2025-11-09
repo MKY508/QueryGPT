@@ -8,28 +8,31 @@
 #chat-tab {
     display: flex !important;
     flex-direction: column;
-    height: 100vh;
+    height: 100vh !important;
+    max-height: 100vh !important;
     padding: 0 !important;
-    overflow: hidden;
+    overflow: hidden !important;
+    position: relative;
 }
 
 /* 聊天容器 - 占据所有可用空间 */
 #chat-tab .chat-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0; /* 重要：允许 flex 子元素缩小 */
-    padding: 20px 25px 10px 25px;
-    overflow: hidden;
+    flex: 1 1 auto;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important; /* 重要：允许 flex 子元素缩小 */
+    height: 100% !important;
+    padding: 15px 20px 10px 20px;
+    overflow: hidden !important;
 }
 
 /* 消息区域 - 可滚动，会被压缩以容纳输入框 */
 #chat-tab .chat-messages {
-    flex: 1;
-    min-height: 200px; /* 最小高度，保证即使屏幕很小也能看到一些消息 */
+    flex: 1 1 auto !important;
+    min-height: 150px !important; /* 最小高度，保证即使屏幕很小也能看到一些消息 */
     max-height: none !important; /* 移除固定的最大高度限制 */
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
     background: white;
     border-radius: 16px;
     padding: 20px;
@@ -39,12 +42,15 @@
 
 /* 输入框容器 - 固定在底部，不滚动 */
 #chat-tab .chat-input-container {
-    flex-shrink: 0; /* 不允许缩小 */
+    flex-shrink: 0 !important; /* 不允许缩小 */
+    flex-grow: 0 !important; /* 不允许增长 */
     background: white;
     border-radius: 16px;
     padding: 12px 16px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     margin-bottom: 10px;
+    position: relative;
+    z-index: 10;
 }
 
 /* 输入框本身 */
@@ -95,35 +101,36 @@
 /* 响应式调整 - 大屏幕 */
 @media (min-width: 1400px) {
     #chat-tab .chat-container {
-        padding: 30px 40px 15px 40px;
+        padding: 20px 35px 12px 35px;
     }
     
     #chat-tab .chat-messages {
-        min-height: 300px;
-        padding: 30px;
+        min-height: 200px;
+        padding: 25px;
     }
 }
 
 /* 响应式调整 - 中等屏幕 */
 @media (max-width: 1200px) {
     #chat-tab .chat-container {
-        padding: 15px 20px 8px 20px;
+        padding: 12px 18px 8px 18px;
     }
     
     #chat-tab .chat-messages {
-        min-height: 180px;
+        min-height: 140px !important;
         padding: 16px;
     }
     
     #chat-tab .chat-input-container {
         padding: 10px 14px;
+        margin-bottom: 8px;
     }
 }
 
 /* 响应式调整 - 小屏幕 */
 @media (max-width: 768px) {
     #chat-tab {
-        height: 100vh;
+        height: 100vh !important;
     }
     
     #chat-tab .chat-container {
@@ -131,7 +138,7 @@
     }
     
     #chat-tab .chat-messages {
-        min-height: 150px;
+        min-height: 120px !important;
         padding: 12px;
         margin-bottom: 8px;
         border-radius: 12px;
@@ -167,7 +174,7 @@
     }
     
     #chat-tab .chat-messages {
-        min-height: 120px;
+        min-height: 100px !important;
         padding: 10px;
         margin-bottom: 6px;
         border-radius: 10px;
@@ -247,5 +254,65 @@
 #chat-tab .chat-messages {
     scrollbar-width: thin;
     scrollbar-color: rgba(74, 144, 226, 0.4) rgba(0, 0, 0, 0.05);
+}
+
+/* 覆盖欢迎区域的样式，防止占用过多空间 */
+#chat-tab .welcome-message,
+#chat-tab .empty-state,
+#chat-tab .chat-messages > div:first-child {
+    max-height: none !important;
+}
+
+/* 确保示例卡片不会太大 */
+#chat-tab .example-queries,
+#chat-tab .quick-actions {
+    margin: 15px 0;
+}
+
+/* 减小页面顶部的空白 */
+#chat-tab .page-header {
+    padding: 12px 20px !important;
+    flex-shrink: 0;
+}
+
+#chat-tab .page-header h1 {
+    font-size: 22px !important;
+    margin: 0 !important;
+}
+
+/* 减小顶部工具栏高度 */
+#chat-tab .chat-header,
+#chat-tab .toolbar {
+    padding: 8px 15px !important;
+    min-height: auto !important;
+}
+
+/* 优化顶部标题和按钮区域 */
+#chat-tab > div:first-child {
+    flex-shrink: 0;
+    padding: 10px 20px !important;
+    background: var(--color-bg-secondary, #ffffff);
+    border-bottom: 1px solid var(--color-border-primary, #e0e0e0);
+}
+
+#chat-tab .btn-new-conversation {
+    padding: 8px 16px !important;
+    font-size: 14px !important;
+}
+
+/* 确保模型选择器不会太大 */
+#chat-tab select,
+#chat-tab .model-selector {
+    max-width: 200px;
+    padding: 6px 12px !important;
+}
+
+/* 针对页面顶部的 flex 容器 */
+#chat-tab > div:first-child > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    min-height: 40px;
 }
 
