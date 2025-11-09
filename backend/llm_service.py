@@ -327,14 +327,26 @@ class LLMService:
     
     @staticmethod
     def test_model_connection(model_payload: Dict[str, Any]) -> Tuple[bool, str]:
+        """测试模型连接
+        
+        使用简化的测试调用来验证模型是否可用。
+        不使用JSON格式要求和特殊系统消息,使用最少的token。
+        """
         try:
             target_id = model_payload.get('model') or model_payload.get('id')
             service = LLMService(target_id)
             service.apply_overrides(model_payload)
-            result = service.complete("ping", temperature=0, max_tokens=8)
+            
+            # 使用专门的简单测试方法,不要求JSON格式,token消耗最少
+            result = service._simple_test_call("Hi")
+            
             if result.get('success'):
-                return True, (result.get('content') or 'OK')[:200]
-            return False, result.get('error', '未知错误')
+                content = result.get('content', 'OK')
+                return True, content[:200]
+            
+            error_msg = result.get('error', '未知错误')
+            return False, error_msg
+            
         except Exception as exc:
             return False, str(exc)
     
@@ -350,6 +362,125 @@ class LLMService:
         """
         result = self.complete(prompt)
         return result.get('content', '')
+    
+    def _simple_test_call(self, prompt: str = "Hi") -> Dict[str, Any]:
+        """
+        简单的测试调用,不使用JSON格式要求和特殊系统消息
+        专门用于测试模型连接,使用最少的token
+        
+        Args:
+            prompt: 测试提示词,默认为"Hi"
+            
+        Returns:
+            响应字典,包含success, content, error等字段
+        """
+        requires_api_key = self.model_settings.get('requires_api_key')
+        if requires_api_key is None:
+            requires_api_key = self.provider not in {'ollama', 'custom', 'local'}
+
+        if requires_api_key and not self.api_key:
+            return {
+                "content": "",
+                "error": "LLM_NOT_CONFIGURED",
+                "success": False,
+                "skipped": True
+            }
+
+        # 简单的测试消息,不要求JSON格式
+        messages = [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+
+        try:
+            response_payload = None
+            
+            # 根据provider选择调用方式
+            if self.provider == 'ollama':
+                # Ollama使用专门的方法
+                base = self.api_base or 'http://localhost:11434'
+                url = base.rstrip('/') + '/api/chat'
+                payload = {
+                    "model": self.model_settings.get('model_name', self.model_name),
+                    "messages": messages,
+                    "stream": False,
+                    "options": {"temperature": 0}
+                }
+                response = requests.post(url, json=payload, timeout=self.timeout)
+                if response.status_code >= 400:
+                    raise RuntimeError(f"Ollama请求失败: {response.status_code} - {response.text}")
+                data = response.json()
+                message = data.get('message', {}) or {}
+                content = message.get('content', '')
+                response_payload = {'choices': [{'message': {'content': content}}], 'usage': {}}
+            
+            elif LITELLM_AVAILABLE and self.litellm_model:
+                # 使用LiteLLM
+                try:
+                    kwargs: Dict[str, Any] = {
+                        "model": self.litellm_model,
+                        "messages": messages,
+                        "temperature": 0,
+                        "max_tokens": 10
+                    }
+                    if self.api_key:
+                        kwargs["api_key"] = self.api_key
+                    if self.api_base:
+                        kwargs["api_base"] = self.api_base
+                    provider = self._resolve_litellm_provider()
+                    if provider:
+                        kwargs["custom_llm_provider"] = provider
+                    extra_headers = self.model_settings.get('headers') or self.model_settings.get('extra_headers')
+                    if isinstance(extra_headers, dict):
+                        kwargs["extra_headers"] = extra_headers
+                    response_payload = litellm_completion(**kwargs)
+                except Exception as exc:
+                    logger.warning(f"LiteLLM测试调用失败,降级至HTTP: {exc}")
+                    response_payload = None
+            
+            # 如果LiteLLM失败或不可用,使用HTTP直接调用
+            if response_payload is None:
+                if not self.api_base:
+                    raise ValueError("未配置API地址")
+                headers = {"Content-Type": "application/json"}
+                if self.api_key:
+                    headers["Authorization"] = f"Bearer {self.api_key}"
+                extra_headers = self.model_settings.get('headers') or self.model_settings.get('extra_headers')
+                if isinstance(extra_headers, dict):
+                    headers.update(extra_headers)
+                payload = {
+                    "model": self.model_settings.get('model_name', self.model_name),
+                    "messages": messages,
+                    "temperature": 0,
+                    "max_tokens": 10
+                }
+                # 注意:不添加response_format JSON要求
+                api_url = self.api_base.rstrip('/') + '/chat/completions'
+                response = requests.post(api_url, headers=headers, json=payload, timeout=self.timeout)
+                if response.status_code >= 400:
+                    raise RuntimeError(f"API请求失败: {response.status_code} - {response.text}")
+                response_payload = response.json()
+
+            # 提取响应内容
+            content, usage = self._extract_response_content(response_payload)
+            
+            # 对于测试调用,即使content为空也不视为错误,只要API调用成功
+            return {
+                "content": content or "OK",
+                "usage": usage,
+                "model": self.model_settings.get('model_name', self.model_name),
+                "success": True
+            }
+
+        except Exception as e:
+            logger.error(f"LLM测试调用失败: {e}")
+            return {
+                "content": "",
+                "error": str(e),
+                "success": False
+            }
     
     def _estimate_cost(self, usage: Dict[str, Any]):
         """
