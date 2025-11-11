@@ -339,8 +339,7 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 - GitHub Issues: [提交问题](https://github.com/MKY508/QueryGPT/issues) 
 - Email: mky369258@gmail.com
-- 这是作者第一个项目作品,有任何疑问或者可能需要的改动,都可以提交issue或者pr,我会尽可能进行调整
-- 如果觉得有用，请给个 ⭐ Star 支持一下！这对作者的研究生复试很重要(也许)
+- 如果觉得有用，请给个 ⭐ Star 支持一下！
 ## ⭐ Star History
 
 <div align="center">
