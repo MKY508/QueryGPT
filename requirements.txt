@@ -6,7 +6,7 @@ pymysql==1.1.0
 pandas==2.0.3
 plotly>=6.1.1,<7
 kaleido==0.2.1
-numpy==1.24.3
+numpy==2.3.5
 cryptography==46.0.2
 pyyaml==6.0.3
 aiohttp>=3.10.0  # 修复 litellm 兼容性问题
