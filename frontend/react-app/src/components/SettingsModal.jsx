@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Undo, Database, Brain, MessageSquare, Activity, Settings as SettingsIcon, Plus, Trash2, Edit3, ArrowLeft, Check } from 'lucide-react';
+import { X, Save, Undo, Database, Brain, MessageSquare, Activity, Settings as SettingsIcon, Plus, Trash2, Edit3, ArrowLeft, Check, Moon, Sun, Play } from 'lucide-react';
 import axios from 'axios';
 import { useLanguage } from '../contexts/LanguageContext';
 
-export default function SettingsModal({ isOpen, onClose }) {
+export default function SettingsModal({ isOpen, onClose, onModelUpdate }) {
   const { changeLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState('basic');
   const [config, setConfig] = useState(null);
@@ -11,16 +11,18 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [prompts, setPrompts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [theme, setTheme] = useState('light');
 
-  // 模型添加状态
-  const [isAddingModel, setIsAddingModel] = useState(false);
-  const [newModel, setNewModel] = useState({
+  // 模型添加/编辑状态
+  const [isEditingModel, setIsEditingModel] = useState(false);
+  const [modelForm, setModelForm] = useState({
       name: '',
       id: '',
       provider: 'openai',
       api_key: '',
       base_url: ''
   });
+  const [testingModel, setTestingModel] = useState(false);
 
   // 数据库配置状态
   const [dbConfig, setDbConfig] = useState({
@@ -34,6 +36,11 @@ export default function SettingsModal({ isOpen, onClose }) {
   useEffect(() => {
     if (isOpen) {
       loadConfig();
+    } else {
+        // 当 Modal 关闭时通知父组件更新模型
+        if (onModelUpdate) {
+            onModelUpdate();
+        }
     }
   }, [isOpen]);
 
@@ -47,6 +54,9 @@ export default function SettingsModal({ isOpen, onClose }) {
       ]);
       
       setConfig(cfgRes.data);
+      if (cfgRes.data.interface_theme) {
+          setTheme(cfgRes.data.interface_theme);
+      }
       setModels(modelsRes.data.models || []);
       setPrompts(promptsRes.data);
       
@@ -86,14 +96,13 @@ export default function SettingsModal({ isOpen, onClose }) {
       } else if (section === 'models') {
          await axios.post('/api/models', { models: data });
          setModels(data);
-         return; // Early return for models
+         if (onModelUpdate) onModelUpdate(); // 立即同步
+         return;
       } else {
         if (section === 'basic') {
             newConfig = { ...newConfig, ...data };
-            // Sync language with context
-            if (data.language) {
-                changeLanguage(data.language);
-            }
+            if (data.language) changeLanguage(data.language);
+            if (data.interface_theme) setTheme(data.interface_theme);
         } else if (section === 'features') {
             newConfig.features = { ...(newConfig.features || {}), ...data };
         }
@@ -142,39 +151,84 @@ export default function SettingsModal({ isOpen, onClose }) {
     }
   };
 
+  // --- Model Management ---
+
   const deleteModel = async (modelId) => {
       if(!confirm('确定删除此模型配置吗？')) return;
       try {
           const newModels = models.filter(m => m.id !== modelId);
           await axios.post('/api/models', { models: newModels });
           setModels(newModels);
+          if (onModelUpdate) onModelUpdate();
       } catch (err) {
           alert('删除失败');
       }
   };
 
-  const handleAddModel = async () => {
-      if (!newModel.name || !newModel.id) {
+  const startEditModel = (model) => {
+      setModelForm({
+          name: model.name || '',
+          id: model.id || '',
+          provider: model.provider || model.type || 'openai',
+          api_key: model.api_key || '',
+          base_url: model.base_url || model.api_base || ''
+      });
+      setIsEditingModel(true);
+  };
+
+  const startAddModel = () => {
+      setModelForm({
+          name: '',
+          id: '',
+          provider: 'openai',
+          api_key: '',
+          base_url: ''
+      });
+      setIsEditingModel(true);
+  };
+
+  const handleSaveModel = async () => {
+      if (!modelForm.name || !modelForm.id) {
           alert("请填写模型名称和ID");
           return;
       }
       try {
           setSaving(true);
-          const updatedModels = [...models, newModel];
+          // 如果 ID 存在，则是更新（先移除旧的同 ID），否则是追加
+          let updatedModels = models.filter(m => m.id !== modelForm.id);
+          updatedModels.push(modelForm);
+
           await axios.post('/api/models', { models: updatedModels });
           setModels(updatedModels);
-          setIsAddingModel(false);
-          setNewModel({
-              name: '',
-              id: '',
-              provider: 'openai',
-              api_key: '',
-              base_url: ''
-          });
+          setIsEditingModel(false);
+          if (onModelUpdate) onModelUpdate();
       } catch (err) {
-          alert("添加模型失败: " + err.message);
+          alert("保存模型失败: " + err.message);
       } finally {
           setSaving(false);
+      }
+  };
+
+  const handleTestModel = async () => {
+      if (!modelForm.id) return;
+      setTestingModel(true);
+      try {
+          // 使用 chat API 发送一个简单的 hello 来测试
+          const res = await axios.post('/api/chat', {
+              query: 'Hello',
+              model: modelForm.id,
+              use_database: false, // 纯对话测试
+              history: []
+          });
+          if (res.data.success) {
+              alert("测试成功！模型回复正常。");
+          } else {
+              alert("测试失败: " + (res.data.error || "未知错误"));
+          }
+      } catch (e) {
+          alert("测试请求失败: " + (e.response?.data?.error || e.message));
+      } finally {
+          setTestingModel(false);
       }
   };
 
@@ -182,21 +236,21 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-[800px] h-[600px] flex flex-col overflow-hidden">
+      <div className={`bg-white rounded-xl shadow-2xl w-[800px] h-[600px] flex flex-col overflow-hidden ${theme === 'dark' ? 'dark bg-slate-900 text-white' : ''}`}>
         
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-slate-200">
+        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <SettingsIcon size={20} /> 系统设置
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
             <X size={20} />
           </button>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar Tabs */}
-          <div className="w-48 bg-slate-50 border-r border-slate-200 flex flex-col py-2">
+          <div className="w-48 bg-slate-50 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col py-2">
             <TabButton 
               id="basic" label="基础设置" icon={<SettingsIcon size={16} />} 
               active={activeTab === 'basic'} onClick={() => setActiveTab('basic')} 
@@ -220,7 +274,7 @@ export default function SettingsModal({ isOpen, onClose }) {
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-slate-900">
             {loading ? (
               <div className="flex items-center justify-center h-full text-slate-400">加载中...</div>
             ) : (
@@ -231,7 +285,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                     <div className="space-y-2">
                         <label className="block font-medium">语言 / Language</label>
                         <select 
-                            className="w-full p-2 border rounded-lg bg-white"
+                            className="w-full p-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600"
                             value={config?.language || 'zh'}
                             onChange={(e) => saveConfig('basic', { language: e.target.value })}
                         >
@@ -240,9 +294,26 @@ export default function SettingsModal({ isOpen, onClose }) {
                         </select>
                     </div>
                     <div className="space-y-2">
+                        <label className="block font-medium">界面主题</label>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={() => saveConfig('basic', { interface_theme: 'light' })}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'light' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200'}`}
+                            >
+                                <Sun size={16} /> 浅色
+                            </button>
+                             <button
+                                onClick={() => saveConfig('basic', { interface_theme: 'dark' })}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${theme === 'dark' ? 'border-blue-500 bg-blue-900/20 text-blue-400' : 'border-slate-200'}`}
+                            >
+                                <Moon size={16} /> 深色 (WIP)
+                            </button>
+                        </div>
+                    </div>
+                    <div className="space-y-2">
                         <label className="block font-medium">默认上下文轮数</label>
                         <select 
-                            className="w-full p-2 border rounded-lg bg-white"
+                            className="w-full p-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600"
                             value={config?.context_rounds || 3}
                             onChange={(e) => saveConfig('basic', { context_rounds: parseInt(e.target.value) })}
                         >
@@ -263,7 +334,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                             <label className="block text-sm font-medium">Host</label>
                             <input 
                                 type="text" 
-                                className="w-full p-2 border rounded-lg" 
+                                className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-600"
                                 value={dbConfig.host}
                                 onChange={(e) => setDbConfig({...dbConfig, host: e.target.value})}
                             />
@@ -272,7 +343,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                             <label className="block text-sm font-medium">Port</label>
                             <input 
                                 type="number" 
-                                className="w-full p-2 border rounded-lg" 
+                                className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-600"
                                 value={dbConfig.port}
                                 onChange={(e) => setDbConfig({...dbConfig, port: parseInt(e.target.value)})}
                             />
@@ -282,7 +353,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                         <label className="block text-sm font-medium">User</label>
                         <input 
                             type="text" 
-                            className="w-full p-2 border rounded-lg" 
+                            className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-600"
                             value={dbConfig.user}
                             onChange={(e) => setDbConfig({...dbConfig, user: e.target.value})}
                         />
@@ -291,7 +362,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                         <label className="block text-sm font-medium">Password</label>
                         <input 
                             type="password" 
-                            className="w-full p-2 border rounded-lg" 
+                            className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-600"
                             value={dbConfig.password}
                             onChange={(e) => setDbConfig({...dbConfig, password: e.target.value})}
                         />
@@ -300,7 +371,7 @@ export default function SettingsModal({ isOpen, onClose }) {
                         <label className="block text-sm font-medium">Database Name</label>
                         <input 
                             type="text" 
-                            className="w-full p-2 border rounded-lg" 
+                            className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-600"
                             value={dbConfig.database}
                             placeholder="Optional"
                             onChange={(e) => setDbConfig({...dbConfig, database: e.target.value})}
@@ -376,52 +447,6 @@ export default function SettingsModal({ isOpen, onClose }) {
                                 rows={10}
                                 placeholder="负责数据分析的核心 System Prompt"
                              />
-
-                             <div className="border-t pt-4 mt-6">
-                                <h3 className="font-medium mb-4 text-slate-800">高级配置 (Advanced)</h3>
-                                <div className="space-y-4">
-                                    <PromptField
-                                        label="智能路由规则 (Routing)"
-                                        value={prompts.routing}
-                                        onChange={(v) => setPrompts({...prompts, routing: v})}
-                                        rows={4}
-                                    />
-                                    <PromptField
-                                        label="数据库探索策略 (Exploration)"
-                                        value={prompts.exploration}
-                                        onChange={(v) => setPrompts({...prompts, exploration: v})}
-                                        rows={4}
-                                    />
-                                     <PromptField
-                                        label="表选择策略 (Table Selection)"
-                                        value={prompts.tableSelection}
-                                        onChange={(v) => setPrompts({...prompts, tableSelection: v})}
-                                        rows={3}
-                                    />
-                                    <PromptField
-                                        label="数据处理要求 (Data Processing)"
-                                        value={prompts.dataProcessing}
-                                        onChange={(v) => setPrompts({...prompts, dataProcessing: v})}
-                                        rows={3}
-                                    />
-                                    <PromptField
-                                        label="输出要求 (Output Requirements)"
-                                        value={prompts.outputRequirements}
-                                        onChange={(v) => setPrompts({...prompts, outputRequirements: v})}
-                                        rows={3}
-                                    />
-                                </div>
-                             </div>
-
-                             <div className="flex justify-end pt-4">
-                                <button
-                                    onClick={() => saveConfig('prompts', prompts)}
-                                    disabled={saving}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                                >
-                                    <Save size={16} /> 保存 Prompt 设置
-                                </button>
-                             </div>
                         </div>
                     </div>
                 )}
@@ -430,55 +455,56 @@ export default function SettingsModal({ isOpen, onClose }) {
                 {activeTab === 'models' && (
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                            <h3 className="font-medium">{isAddingModel ? "添加新模型" : "已配置模型"}</h3>
-                            {!isAddingModel ? (
+                            <h3 className="font-medium">{isEditingModel ? (modelForm.id ? "编辑模型" : "添加新模型") : "已配置模型"}</h3>
+                            {!isEditingModel ? (
                                 <button
                                     className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg"
-                                    onClick={() => setIsAddingModel(true)}
+                                    onClick={startAddModel}
                                 >
                                     <Plus size={16} /> 添加模型
                                 </button>
                             ) : (
                                 <button
                                     className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg"
-                                    onClick={() => setIsAddingModel(false)}
+                                    onClick={() => setIsEditingModel(false)}
                                 >
                                     <ArrowLeft size={16} /> 返回列表
                                 </button>
                             )}
                         </div>
                         
-                        {isAddingModel ? (
-                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                        {isEditingModel ? (
+                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="block text-sm font-medium text-slate-700">显示名称 (Name)</label>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">显示名称 (Name)</label>
                                         <input
                                             type="text"
-                                            className="w-full p-2 border rounded-lg"
+                                            className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600"
                                             placeholder="例如: GPT-4 Custom"
-                                            value={newModel.name}
-                                            onChange={e => setNewModel({...newModel, name: e.target.value})}
+                                            value={modelForm.name}
+                                            onChange={e => setModelForm({...modelForm, name: e.target.value})}
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="block text-sm font-medium text-slate-700">模型 ID (Model ID)</label>
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">模型 ID (Model ID)</label>
                                         <input
                                             type="text"
-                                            className="w-full p-2 border rounded-lg"
+                                            className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600"
                                             placeholder="例如: gpt-4-turbo-preview"
-                                            value={newModel.id}
-                                            onChange={e => setNewModel({...newModel, id: e.target.value})}
+                                            value={modelForm.id}
+                                            onChange={e => setModelForm({...modelForm, id: e.target.value})}
+                                            readOnly={!!models.find(m => m.id === modelForm.id && m.id !== '')} // 如果是编辑且ID已存在则只读? 简化起见允许修改ID会视为新模型
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-700">提供商 (Provider)</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">提供商 (Provider)</label>
                                     <select
-                                        className="w-full p-2 border rounded-lg bg-white"
-                                        value={newModel.provider}
-                                        onChange={e => setNewModel({...newModel, provider: e.target.value})}
+                                        className="w-full p-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600"
+                                        value={modelForm.provider}
+                                        onChange={e => setModelForm({...modelForm, provider: e.target.value})}
                                     >
                                         <option value="openai">OpenAI / Compatible</option>
                                         <option value="anthropic">Anthropic</option>
@@ -489,53 +515,69 @@ export default function SettingsModal({ isOpen, onClose }) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-700">API Key (Optional)</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">API Key (Optional)</label>
                                     <input
                                         type="password"
-                                        className="w-full p-2 border rounded-lg"
+                                        className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600"
                                         placeholder="sk-..."
-                                        value={newModel.api_key}
-                                        onChange={e => setNewModel({...newModel, api_key: e.target.value})}
+                                        value={modelForm.api_key}
+                                        onChange={e => setModelForm({...modelForm, api_key: e.target.value})}
                                     />
                                     <p className="text-xs text-slate-500">如果不填，将尝试使用环境变量中配置的 Key</p>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-700">API Base URL (Optional)</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">API Base URL (Optional)</label>
                                     <input
                                         type="text"
-                                        className="w-full p-2 border rounded-lg"
+                                        className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600"
                                         placeholder="https://api.openai.com/v1"
-                                        value={newModel.base_url}
-                                        onChange={e => setNewModel({...newModel, base_url: e.target.value})}
+                                        value={modelForm.base_url}
+                                        onChange={e => setModelForm({...modelForm, base_url: e.target.value})}
                                     />
                                 </div>
 
-                                <div className="pt-4 flex justify-end">
+                                <div className="pt-4 flex justify-between items-center">
+                                     <button
+                                        onClick={handleTestModel}
+                                        disabled={testingModel || !modelForm.id}
+                                        className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors flex items-center gap-2"
+                                    >
+                                        {testingModel ? <Activity size={16} className="animate-spin" /> : <Play size={16} />}
+                                        测试可用性
+                                    </button>
                                     <button
-                                        onClick={handleAddModel}
-                                        disabled={saving || !newModel.name || !newModel.id}
+                                        onClick={handleSaveModel}
+                                        disabled={saving || !modelForm.name || !modelForm.id}
                                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        <Check size={16} /> 确认添加
+                                        <Check size={16} /> 保存模型
                                     </button>
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                                 {models.map(model => (
-                                    <div key={model.id} className="p-4 border border-slate-200 rounded-lg flex justify-between items-center bg-slate-50 hover:bg-white hover:shadow-sm transition-all">
+                                    <div key={model.id} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg flex justify-between items-center bg-slate-50 dark:bg-slate-800 hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm transition-all">
                                         <div>
-                                            <div className="font-medium text-slate-800">{model.name}</div>
+                                            <div className="font-medium text-slate-800 dark:text-slate-200">{model.name}</div>
                                             <div className="text-xs text-slate-500 flex gap-2 mt-1">
-                                                <span className="bg-slate-200 px-1.5 py-0.5 rounded">{model.provider || model.type}</span>
+                                                <span className="bg-slate-200 dark:bg-slate-600 px-1.5 py-0.5 rounded">{model.provider || model.type}</span>
                                                 <span className="font-mono">{model.id}</span>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
+                                                onClick={() => startEditModel(model)}
+                                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                                title="编辑"
+                                            >
+                                                <Edit3 size={16} />
+                                            </button>
+                                            <button
                                                 onClick={() => deleteModel(model.id)}
-                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                                title="删除"
                                             >
                                                 <Trash2 size={16} />
                                             </button>
@@ -566,7 +608,7 @@ function TabButton({ id, label, icon, active, onClick }) {
     <button
       onClick={onClick}
       className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors
-        ${active ? 'bg-white text-blue-600 border-r-2 border-blue-600' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+        ${active ? 'bg-white dark:bg-slate-900 text-blue-600 border-r-2 border-blue-600' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}`}
     >
       {icon}
       {label}
@@ -576,14 +618,14 @@ function TabButton({ id, label, icon, active, onClick }) {
 
 function Toggle({ label, desc, checked, onChange }) {
     return (
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
             <div>
                 <div className="font-medium">{label}</div>
                 <div className="text-sm text-slate-500">{desc}</div>
             </div>
             <button 
                 onClick={() => onChange(!checked)}
-                className={`w-12 h-6 rounded-full transition-colors relative ${checked ? 'bg-blue-600' : 'bg-slate-300'}`}
+                className={`w-12 h-6 rounded-full transition-colors relative ${checked ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
             >
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${checked ? 'left-7' : 'left-1'}`} />
             </button>
@@ -594,9 +636,9 @@ function Toggle({ label, desc, checked, onChange }) {
 function PromptField({ label, value, onChange, placeholder, rows = 3 }) {
     return (
         <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-700">{label}</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
             <textarea
-                className="w-full p-3 border rounded-lg text-sm font-mono bg-slate-50 focus:bg-white transition-colors"
+                className="w-full p-3 border rounded-lg text-sm font-mono bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-700 transition-colors"
                 value={value || ''}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
