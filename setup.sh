@@ -194,6 +194,7 @@ targets = [
     ("pandas", "pandas", None),
     ("DBUtils", "dbutils", "dbutils.pooled_db"),
     ("cachetools", "cachetools", None),
+    ("psutil", "psutil", None),
 ]
 failed = []
 for pkg, module, submodule in targets:
@@ -228,6 +229,7 @@ targets = [
     ("pandas", "pandas", None),
     ("DBUtils", "dbutils", "dbutils.pooled_db"),
     ("cachetools", "cachetools", None),
+    ("psutil", "psutil", None),
 ]
 failed = []
 for pkg, module, submodule in targets:

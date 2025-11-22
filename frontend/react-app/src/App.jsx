@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Settings, Database, History, Trash2, Plus, Loader2, ChevronDown, Box } from 'lucide-react';
+import { Send, Settings, Database, History, Trash2, Plus, Loader2, ChevronDown, Box, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { clsx } from 'clsx';
@@ -237,7 +237,18 @@ function App() {
         setMessages(prev => [...prev, botMsg]);
         loadHistory();
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: `出错了: ${data.error}`, isError: true }]);
+        // 如果是数据库连接错误，尝试在步骤中显示
+        const errorMsg = data.error || '未知错误';
+        const isConnectionError = errorMsg.includes('connect') || errorMsg.includes('Unknown MySQL server') || errorMsg.includes('Access denied');
+
+        const botMsg = {
+            role: 'assistant',
+            content: isConnectionError ? '数据库连接失败，请检查配置。' : `出错了: ${errorMsg}`,
+            isError: true,
+            steps: isConnectionError ? [{ index: '!', summary: `连接失败: ${errorMsg}`, isError: true }] : []
+        };
+
+        setMessages(prev => [...prev, botMsg]);
       }
     } catch (err) {
         setMessages(prev => [...prev, { role: 'assistant', content: `请求失败: ${err.message || '未知错误'}`, isError: true }]);
@@ -390,27 +401,50 @@ function App() {
                         {msg.steps && msg.steps.length > 0 && (
                             <div className="mb-4 space-y-2">
                                 {msg.steps.map((step, i) => (
-                                    <div key={i} className="flex items-start gap-2 text-xs text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">
-                                        <div className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">
+                                    <div
+                                        key={i}
+                                        className={clsx(
+                                            "flex items-start gap-2 text-xs p-2 rounded border transition-all",
+                                            step.isError
+                                                ? "bg-red-50 text-red-600 border-red-100"
+                                                : "bg-slate-50 text-slate-500 border-slate-100"
+                                        )}
+                                    >
+                                        <div className={clsx(
+                                            "w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold",
+                                            step.isError ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
+                                        )}>
                                             {step.index}
                                         </div>
-                                        <span>{step.summary}</span>
+                                        <span className={step.isError ? "font-medium" : ""}>{step.summary}</span>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        <ReactMarkdown 
-                            className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-slate-800 prose-pre:text-slate-100"
-                            components={{
-                                table: ({node, ...props}) => <div className="overflow-x-auto my-4 border rounded-lg"><table className="min-w-full divide-y divide-slate-200" {...props} /></div>,
-                                thead: ({node, ...props}) => <thead className="bg-slate-50" {...props} />,
-                                th: ({node, ...props}) => <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider" {...props} />,
-                                td: ({node, ...props}) => <td className="px-3 py-2 whitespace-nowrap text-sm text-slate-600 border-t border-slate-100" {...props} />,
-                            }}
-                        >
-                            {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
-                        </ReactMarkdown>
+                        {/* Error Warning Card */}
+                        {msg.isError && msg.content && !msg.steps?.length && (
+                            <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-lg flex gap-3">
+                                <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
+                                <div className="text-sm text-red-700">
+                                    {msg.content}
+                                </div>
+                            </div>
+                        )}
+
+                        {!msg.isError && (
+                            <ReactMarkdown
+                                className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-slate-800 prose-pre:text-slate-100"
+                                components={{
+                                    table: ({node, ...props}) => <div className="overflow-x-auto my-4 border rounded-lg"><table className="min-w-full divide-y divide-slate-200" {...props} /></div>,
+                                    thead: ({node, ...props}) => <thead className="bg-slate-50" {...props} />,
+                                    th: ({node, ...props}) => <th className="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider" {...props} />,
+                                    td: ({node, ...props}) => <td className="px-3 py-2 whitespace-nowrap text-sm text-slate-600 border-t border-slate-100" {...props} />,
+                                }}
+                            >
+                                {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)}
+                            </ReactMarkdown>
+                        )}
                         
                         {msg.sql && (
                             <div className="mt-4">

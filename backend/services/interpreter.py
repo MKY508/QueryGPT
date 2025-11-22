@@ -30,12 +30,21 @@ except ImportError:
     class OpenInterpreter:
         def __init__(self):
             raise NotImplementedError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
-from backend.core.config import ConfigLoader
+
+# Lazy import to avoid circular dependency
+# from backend.core.config import ConfigLoader
 # from backend.query_clarifier import SmartQueryProcessor  # 已禁用查询澄清器
 import time
-import psutil
 import signal
 from threading import Lock, Thread, Event
+
+# 尝试导入 psutil，如果失败则设置标志
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    psutil = None
+    PSUTIL_AVAILABLE = False
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -48,6 +57,8 @@ class InterpreterManager:
         # 基本属性（即使未安装也初始化，以便测试桩可工作）
         self.enabled = INTERPRETER_AVAILABLE
         # 从.env文件加载配置
+        # 延迟导入 ConfigLoader 以解决循环导入
+        from backend.core.config import ConfigLoader
         api_config = ConfigLoader.get_api_config()
         self.config = {
             "models": api_config["models"],
@@ -1023,6 +1034,9 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
     
     def _continuous_process_monitor(self, conversation_id: str, parent_pid: int):
         """持续监控进程，捕获动态创建的子进程"""
+        if not PSUTIL_AVAILABLE:
+            return
+
         logger.info(f"启动进程监控线程: {conversation_id}")
         
         while not self._stop_events.get(conversation_id, Event()).is_set():
@@ -1055,6 +1069,10 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
     
     def _start_process_monitoring(self, conversation_id: str):
         """启动进程监控线程"""
+        if not PSUTIL_AVAILABLE:
+            logger.warning("psutil 未安装，进程监控不可用")
+            return
+
         with self._monitor_lock:
             # 创建停止事件
             self._stop_events[conversation_id] = Event()
@@ -1090,6 +1108,9 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
     
     def _track_processes(self, conversation_id: str):
         """跟踪当前Python进程的所有子进程（保留用于初始跟踪）"""
+        if not PSUTIL_AVAILABLE:
+            return
+
         try:
             current_process = psutil.Process()
             children = current_process.children(recursive=True)
@@ -1107,6 +1128,9 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
     
     def _terminate_processes(self, conversation_id: str, timeout: int = 3):
         """终止与会话相关的所有进程（增强版）"""
+        if not PSUTIL_AVAILABLE:
+            return
+
         with self._process_lock:
             if conversation_id not in self._active_processes:
                 logger.debug(f"没有找到会话 {conversation_id} 的进程记录")
