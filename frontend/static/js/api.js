@@ -199,9 +199,11 @@ class API {
                 }
             } else {
                 if (onProgress) {
+                    // 如果后端返回了详细的内容描述（如配置缺失提示），优先显示
+                    const errorMsg = (data.content && data.content.length < 100) ? data.content : (data.error || '处理请求时出错');
                     onProgress({ 
                         type: 'error', 
-                        message: data.error || '处理请求时出错' 
+                        message: errorMsg
                     });
                 }
             }

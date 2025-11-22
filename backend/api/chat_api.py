@@ -7,11 +7,12 @@ import uuid as uuid_module
 from flask import Blueprint, request, jsonify, Response, g
 from datetime import datetime
 
-from backend.auth import optional_auth
-from backend.rate_limiter import rate_limit
-from backend.config_loader import ConfigLoader
+from backend.core.auth import optional_auth
+from backend.services.limiter import rate_limit
+from backend.core.config import ConfigLoader
 from backend.core import service_container
-from backend.utils import sse_format, generate_progress_plan, dynamic_rate_limit
+from backend.services.guard import build_guard_block_payload
+from backend.common.utils import sse_format, generate_progress_plan, dynamic_rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,13 @@ def _get_smart_router():
     return services.smart_router
 
 
+def _get_database_guard():
+    """获取数据库守卫实例"""
+    if hasattr(g, 'database_guard'):
+        return g.database_guard
+    return getattr(services, 'database_guard', None)
+
+
 def _refresh_manager_aliases():
     """刷新管理器别名"""
     pass  # 直接使用_get_*函数访问
@@ -96,6 +104,7 @@ def chat_stream():
         interpreter_manager = _get_interpreter_manager()
         history_manager = _get_history_manager()
         smart_router = _get_smart_router()
+        database_guard = _get_database_guard()
 
         if interpreter_manager is None:
             return Response(sse_format('error', {"error": "LLM 解释器未初始化"}), mimetype='text/event-stream')
@@ -308,6 +317,7 @@ def chat():
         history_manager = _get_history_manager()
         smart_router = _get_smart_router()
         database_manager = _get_database_manager()
+        database_guard = _get_database_guard()
 
         data = request.get_json(silent=True) or {}
         user_query = data.get('query') or data.get('message') or ''
@@ -321,6 +331,7 @@ def chat():
         context_rounds = data.get('context_rounds', 3)
         user_language = data.get('language', 'zh')
         force_execute = bool(data.get('force_execute'))
+        force_db_check = bool(data.get('force_db_check'))
         
         # 简易SSE兼容
         if data.get('stream') is True:
@@ -418,6 +429,8 @@ def chat():
         # 准备上下文（优化：缓存配置读取，避免重复调用）
         config_snapshot = ConfigLoader.get_config()  # 使用缓存版本
         feature_section = config_snapshot.get('features', {}) if isinstance(config_snapshot.get('features', {}), dict) else {}
+        guard_cfg = feature_section.get('db_guard') if isinstance(feature_section.get('db_guard'), dict) else {}
+        warn_on_guard_failure = guard_cfg.get('warn_on_failure', True)
         context = {}
         feature_cfg = feature_section
         thought_cfg = feature_cfg.get('thought_stream') if isinstance(feature_cfg.get('thought_stream'), dict) else {}
@@ -426,6 +439,8 @@ def chat():
         context['step_logging_enabled'] = thought_cfg.get('enabled', True)
         context['step_template'] = thought_cfg.get(template_key, default_template)
         context['step_min_words'] = thought_cfg.get('min_words', 3)
+        context['force_execute'] = force_execute
+        context['force_db_check'] = force_db_check
         if use_database:
             if not ensure_database_manager():
                 logger.warning("请求使用数据库，但未检测到有效配置，自动降级为非数据库模式")
@@ -566,6 +581,34 @@ def chat():
                     logger.info("智能路由已禁用，使用标准AI流程")
                 else:
                     logger.info("智能路由未初始化，使用标准AI流程")
+                if use_database and guard_cfg.get('auto_check', True):
+                    if not database_guard:
+                        logger.warning("数据库守卫未初始化，无法执行预检")
+                    else:
+                        guard_context = dict(context)
+                        guard_context['conversation_id'] = conversation_id
+                        guard_context['model_name'] = model_name
+                        db_check = database_guard.ensure_database_ready(
+                            route_type='analysis',
+                            context=guard_context,
+                            guard_cfg=guard_cfg
+                        )
+                        if not db_check.get('ok'):
+                            guard_response = build_guard_block_payload(
+                                db_check,
+                                guard_cfg,
+                                query=full_query,
+                                warn_on_failure=warn_on_guard_failure,
+                                route_type='analysis',
+                                routing_info={
+                                    'route_type': 'analysis',
+                                    'method': 'direct'
+                                },
+                                conversation_id=conversation_id,
+                                model_name=model_name or "interpreter"
+                            )
+                            guard_response['timestamp'] = datetime.now().isoformat()
+                            return jsonify(guard_response)
                 result = interpreter_manager.execute_query(
                     full_query,
                     context=context,

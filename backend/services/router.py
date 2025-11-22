@@ -1,15 +1,14 @@
-from backend.config_loader import ConfigLoader
 """
 AI驱动的智能查询路由系统
 完全使用AI进行查询分类和路由决策
 """
 import logging
 import time
-from threading import Lock
 from typing import Dict, Any, Optional
 from backend.ai_router import AIRoutingClassifier, RouteType
-from backend.llm_service import llm_manager
-from backend.config_loader import ConfigLoader
+from backend.services.llm import llm_manager
+from backend.core.config import ConfigLoader
+from backend.services.guard import DatabaseGuard, build_guard_block_payload
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ class SmartRouter:
     使用AI判断查询类型并选择最优执行路径
     """
     
-    def __init__(self, database_manager=None, interpreter_manager=None):
+    def __init__(self, database_manager=None, interpreter_manager=None, database_guard: DatabaseGuard | None = None):
         """
         初始化智能路由器
         
@@ -28,6 +27,7 @@ class SmartRouter:
             interpreter_manager: OpenInterpreter管理器
         """
         self.database_manager = database_manager
+        self.database_guard = database_guard or DatabaseGuard(database_manager)
         self.interpreter_manager = interpreter_manager
         
         # 加载保存的routing prompt
@@ -70,12 +70,8 @@ class SmartRouter:
             "total_time_saved": 0.0,
             "fallback_count": 0,
             "rule_based_routes": 0,
-            "forced_queries": 0,
-            "db_health_cache_hits": 0,
-            "db_health_cache_misses": 0
+            "forced_queries": 0
         }
-        self._db_health_cache: Dict[str, Any] = {"result": None, "timestamp": 0.0}
-        self._db_cache_lock = Lock()
     
     def _load_feature_flags(self) -> Dict[str, Any]:
         """加载最新的功能开关配置"""
@@ -264,53 +260,35 @@ class SmartRouter:
             guard_cfg = feature_flags.get('db_guard', {}) if isinstance(feature_flags.get('db_guard', {}), dict) else {}
             auto_check_db = guard_cfg.get('auto_check', True)
             warn_on_failure = guard_cfg.get('warn_on_failure', True)
-            cache_ttl_success = guard_cfg.get('cache_ttl_seconds', 30)
-            cache_ttl_failure = guard_cfg.get('failure_cache_seconds', 5)
-
-            connection_snapshot = self._sanitize_connection_info(context.get('connection_info')) if isinstance(context, dict) else {}
-            if not connection_snapshot and self.database_manager:
-                connection_snapshot = self._sanitize_connection_info(getattr(self.database_manager, 'config', {}))
-            if not connection_snapshot:
-                try:
-                    connection_snapshot = self._sanitize_connection_info(ConfigLoader.get_database_config())
-                except Exception:  # pylint: disable=broad-except
-                    connection_snapshot = {}
 
             if requires_db and use_database and auto_check_db:
-                db_check = self._ensure_database_ready(
-                    route_type,
-                    context or {},
-                    connection_snapshot,
-                    cache_ttl_success=cache_ttl_success,
-                    cache_ttl_failure=cache_ttl_failure
-                )
-                if not db_check.get('ok'):
-                    self.routing_stats["aborted_queries"] += 1
-                    logger.error("数据库健康检查未通过，终止执行: %s", db_check.get('message'))
-                    connection_payload = db_check.get('target') or connection_snapshot
-                    response_payload = {
-                        "success": False,
-                        "status": "db_unavailable",
-                        "error": db_check.get('message', '数据库不可用'),
-                        "db_check": db_check,
-                        "routing_info": routing_info,
-                        "query_type": route_type,
-                        "requires_user_action": warn_on_failure,
-                        "forceable": True,
-                        "original_query": query,
-                        "guard_config": guard_cfg,
-                        "classification": classification,
-                        "connection": connection_payload,
-                        "ui": {
-                            "auto_dismiss_ms": guard_cfg.get('auto_dismiss_ms', 8000),
-                            "emphasis": guard_cfg.get('emphasis', 'low'),
-                            "hint_timeout": guard_cfg.get('hint_timeout', 8)
-                        }
-                    }
-                    if context:
-                        response_payload['conversation_id'] = context.get('conversation_id')
-                        response_payload['model'] = context.get('model_name')
-                    return response_payload
+                if not self.database_guard:
+                    logger.warning("数据库守卫未初始化，跳过连通性检查")
+                else:
+                    guard_context = dict(context or {})
+                    guard_context.setdefault('force_execute', guard_context.get('force_execute'))
+                    db_check = self.database_guard.ensure_database_ready(
+                        route_type=route_type,
+                        context=guard_context,
+                        guard_cfg=guard_cfg
+                    )
+                    if db_check.get('message') == 'force_execute':
+                        self.routing_stats["forced_queries"] += 1
+                    if not db_check.get('ok'):
+                        self.routing_stats["aborted_queries"] += 1
+                        logger.error("数据库健康检查未通过，终止执行: %s", db_check.get('message'))
+                        response_payload = build_guard_block_payload(
+                            db_check,
+                            guard_cfg,
+                            query=query,
+                            warn_on_failure=warn_on_failure,
+                            route_type=route_type,
+                            classification=classification,
+                            routing_info=routing_info,
+                            conversation_id=context.get('conversation_id') if context else None,
+                            model_name=context.get('model_name') if context else None
+                        )
+                        return response_payload
             
             # 记录路由决策
             logger.info(f"🔄 路由决策: {route_type} (置信度: {confidence:.2f}, 方法: {method})")
@@ -375,120 +353,6 @@ class SmartRouter:
         
         return routing_context
     
-    @staticmethod
-    def _sanitize_connection_info(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        if not isinstance(raw, dict):
-            return {}
-        allowed_keys = ('host', 'port', 'user', 'database')
-        sanitized = {key: raw.get(key) for key in allowed_keys if raw.get(key) not in (None, '')}
-        return sanitized
-
-    def _ensure_database_ready(
-        self,
-        route_type: str,
-        context: Optional[Dict[str, Any]],
-        connection_snapshot: Optional[Dict[str, Any]] = None,
-        cache_ttl_success: int = 30,
-        cache_ttl_failure: int = 5
-    ) -> Dict[str, Any]:
-        """在执行需要数据库的路线前进行健康检查"""
-        ctx = context if isinstance(context, dict) else {}
-        force_execute = bool(ctx.get('force_execute'))
-        force_db_refresh = bool(ctx.get('force_db_check'))
-
-        target_info = self._sanitize_connection_info(connection_snapshot)
-        ctx_conn = self._sanitize_connection_info(ctx.get('connection_info'))
-        manager_conn = {}
-        if self.database_manager and hasattr(self.database_manager, 'config'):
-            manager_cfg = getattr(self.database_manager, 'config')
-            if isinstance(manager_cfg, dict):
-                manager_conn = self._sanitize_connection_info(manager_cfg)
-
-        for key in ('host', 'port', 'user', 'database'):
-            if key not in target_info or target_info.get(key) in (None, ''):
-                candidate = ctx_conn.get(key)
-                if candidate in (None, ''):
-                    candidate = manager_conn.get(key)
-                if candidate not in (None, ''):
-                    target_info[key] = candidate
-
-        target_info = {k: v for k, v in target_info.items() if v not in (None, '')}
-
-        base_payload = {
-            'checked_at': time.time(),
-            'target': target_info
-        }
-
-        if force_execute:
-            logger.warning("用户选择忽略数据库连通性检查，继续执行 %s 路线", route_type)
-            self.routing_stats["forced_queries"] += 1
-            return {"ok": True, "message": "force_execute", **base_payload}
-
-        if not self.database_manager:
-            return {
-                "ok": False,
-                "message": "未检测到数据库管理器配置，请先完成数据库设置",
-                "reason": "manager_missing",
-                **base_payload
-            }
-
-        if not getattr(self.database_manager, 'is_configured', False):
-            return {
-                "ok": False,
-                "message": "数据库参数未配置，无法执行数据查询",
-                "reason": "not_configured",
-                **base_payload
-            }
-
-        if getattr(self.database_manager, '_global_disabled', False):
-            return {
-                "ok": False,
-                "message": "数据库此前连接失败已被禁用，请检查配置后重试",
-                "reason": "global_disabled",
-                **base_payload
-            }
-
-        check, checked_at = self._get_db_health_status(
-            force_refresh=force_db_refresh,
-            success_ttl=cache_ttl_success,
-            failure_ttl=cache_ttl_failure
-        )
-        base_payload['checked_at'] = checked_at
-        if check.get('connected'):
-            return {"ok": True, "message": "connected", "details": check, **base_payload}
-        return {
-            "ok": False,
-            "message": check.get('error') or "无法连接数据库",
-            "reason": check.get('reason', 'connection_failed'),
-            "details": check,
-            **base_payload
-        }
-
-    def _get_db_health_status(self, force_refresh: bool, success_ttl: int, failure_ttl: int):
-        success_ttl = max(0, success_ttl)
-        failure_ttl = max(0, failure_ttl)
-        now = time.time()
-        with self._db_cache_lock:
-            cached_result = self._db_health_cache.get('result')
-            cached_timestamp = self._db_health_cache.get('timestamp', 0.0)
-            if not force_refresh and cached_result is not None:
-                age = now - cached_timestamp
-                ttl = failure_ttl if not cached_result.get('connected') else success_ttl
-                if ttl > 0 and age <= ttl:
-                    self.routing_stats["db_health_cache_hits"] += 1
-                    return cached_result, cached_timestamp
-
-            self.routing_stats["db_health_cache_misses"] += 1
-            try:
-                check = self.database_manager.test_connection()
-            except Exception as exc:  # pylint: disable=broad-except
-                logger.error("数据库健康检查异常: %s", exc)
-                check = {"connected": False, "error": str(exc), "reason": "exception"}
-            self._db_health_cache = {
-                "result": check,
-                "timestamp": time.time()
-            }
-            return check, self._db_health_cache['timestamp']
 
     def _execute_qa_response(self, query: str, classification: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """

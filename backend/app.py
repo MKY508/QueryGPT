@@ -5,7 +5,7 @@ Flask主应用 - 模块化重构版本
 import os
 import sys
 import logging
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, abort
 from flask_cors import CORS
 from datetime import datetime
 
@@ -13,12 +13,14 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 清理代理环境变量，避免LiteLLM冲突
-for k in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
-    os.environ.pop(k, None)
+# 除非显式设置 USE_SYSTEM_PROXY=true，否则清除代理
+if os.environ.get('USE_SYSTEM_PROXY', 'false').lower() != 'true':
+    for k in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        os.environ.pop(k, None)
 
 # 导入自定义模块
-from backend.config_loader import ConfigLoader
-from backend.cache_manager import CacheManager
+from backend.core.config import ConfigLoader
+from backend.services.cache import CacheManager
 from backend.core import service_container
 
 # 导入蓝图
@@ -42,6 +44,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')
 STATIC_DIR = os.path.join(FRONTEND_DIR, 'static')
 TEMPLATE_DIR = os.path.join(FRONTEND_DIR, 'templates')
+REACT_DIST_DIR = os.path.join(FRONTEND_DIR, 'react-app', 'dist')
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'output')
 
 # 初始化Flask应用
@@ -52,7 +55,7 @@ app = Flask(__name__,
 
 # 初始化日志（文件轮转、第三方库降噪）
 try:
-    from backend.log_config import setup_logging, setup_request_logging
+    from backend.core.logger import setup_logging, setup_request_logging
     setup_logging(app_name="querygpt", log_dir=os.path.join(PROJECT_ROOT, 'logs'))
     setup_request_logging()
 except Exception as _e:
@@ -177,8 +180,31 @@ def serve_output_compat(filename):
 
 @app.route('/')
 def index():
-    """主页路由"""
+    """主页路由：优先返回构建好的 React 前端。"""
+    react_index = os.path.join(REACT_DIST_DIR, 'index.html')
+    
+    # 调试日志
+    logger.debug(f"尝试加载 React 前端: {react_index}")
+    
+    if os.path.exists(react_index):
+        return send_from_directory(REACT_DIST_DIR, 'index.html', max_age=0)
+
+    logger.warning(f'❌ React 构建产物未找到 (路径: {react_index})，回退到传统模板。')
+    logger.warning('请检查 frontend/react-app/dist 是否存在，或执行 cd frontend/react-app && npm run build')
+    
+    if os.path.exists(os.path.join(TEMPLATE_DIR, 'index-modern.html')):
+        return render_template('index-modern.html')
     return render_template('index.html')
+
+
+@app.route('/assets/<path:filename>')
+def serve_react_assets(filename: str):
+    """提供 React 构建后的静态资源。"""
+    assets_dir = os.path.join(REACT_DIST_DIR, 'assets')
+    file_path = os.path.join(assets_dir, filename)
+    if not os.path.exists(file_path):
+        abort(404)
+    return send_from_directory(assets_dir, filename, max_age=0)
 
 
 @app.route('/test_guide')
@@ -336,4 +362,3 @@ if __name__ == '__main__':
         debug=False,
         threaded=True
     )
-

@@ -30,7 +30,7 @@ except ImportError:
     class OpenInterpreter:
         def __init__(self):
             raise NotImplementedError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
-from backend.config_loader import ConfigLoader
+from backend.core.config import ConfigLoader
 # from backend.query_clarifier import SmartQueryProcessor  # 已禁用查询澄清器
 import time
 import psutil
@@ -111,7 +111,7 @@ class InterpreterManager:
                 return _DummyInterpreter()
             raise RuntimeError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
         
-        from backend.config_loader import ConfigLoader
+        from backend.core.config import ConfigLoader
         model_name = model_name or self.config.get("current_model", "gpt-4o")
         model_name = ConfigLoader.normalize_model_id(model_name)
         models_dict = self.config.get("models", {})
@@ -751,7 +751,7 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
         
         # 如果内存中没有，尝试从数据库加载
         try:
-            from backend.history_manager import HistoryManager
+            from backend.services.history import HistoryManager
             history_manager = HistoryManager()
             
             # 从数据库获取历史

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Callable
 from functools import wraps
 
-from backend.llm_service import LLMService
+from backend.services.llm import LLMService
 
 logger = logging.getLogger(__name__)
 

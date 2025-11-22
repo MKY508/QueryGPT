@@ -2,13 +2,14 @@
 
 set -euo pipefail
 
-VERSION="1.5"
+VERSION="1.6"
 PYTHON_REQUIRED_MAJOR=3
 PYTHON_MIN_MINOR=10
 PYTHON_MAX_MINOR=12
 VENV_DIR="venv_py310"
 PYTHON_CMD=""
 PYTHON_VERSION=""
+RESET_CONFIG=false
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -142,6 +143,25 @@ install_requirements() {
     warn "OpenInterpreter 包较大，安装过程可能需要数分钟。"
     "$PIP_BIN" install --upgrade setuptools wheel >/dev/null || true
 
+    # 智能跳过：仅当依赖缺失时才安装
+    if "$PIP_BIN" freeze | grep -q "DBUtils"; then
+        info "检测到关键依赖已安装，尝试执行增量更新..."
+        # 使用 --upgrade-strategy only-if-needed 避免不必要的重装
+        if "$PIP_BIN" install -r requirements.txt --upgrade-strategy only-if-needed; then
+            ok "依赖检查通过"
+            return
+        fi
+    fi
+
+    # 预先安装 tiktoken，优先使用 binary wheel 避免编译
+    if ! "$PIP_BIN" freeze | grep -q "tiktoken"; then
+        if ! "$PIP_BIN" install tiktoken; then
+            warn "tiktoken 安装失败，尝试升级 pip 后重试..."
+            "$PIP_BIN" install --upgrade pip
+            "$PIP_BIN" install tiktoken || true # 允许 tiktoken 失败以便后续尝试
+        fi
+    fi
+
     if "$PIP_BIN" install --upgrade -r requirements.txt; then
         ok "依赖安装完成"
         return
@@ -169,15 +189,20 @@ verify_dependencies() {
     missing_packages="$($PYTHON_BIN <<'PY'
 import importlib, sys
 targets = [
-    ("pymysql", "pymysql"),
-    ("plotly", "plotly"),
-    ("pandas", "pandas"),
+    ("pymysql", "pymysql", None),
+    ("plotly", "plotly", None),
+    ("pandas", "pandas", None),
+    ("DBUtils", "dbutils", "dbutils.pooled_db"),
+    ("cachetools", "cachetools", None),
 ]
 failed = []
-for pkg, module in targets:
+for pkg, module, submodule in targets:
     try:
         importlib.import_module(module)
-    except Exception:
+        if submodule:
+            # 验证子模块也能导入（如 PooledDB）
+            importlib.import_module(submodule)
+    except Exception as e:
         failed.append(pkg)
 if failed:
     print(" ".join(failed))
@@ -198,15 +223,20 @@ PY
         missing_packages="$($PYTHON_BIN <<'PY'
 import importlib, sys
 targets = [
-    ("pymysql", "pymysql"),
-    ("plotly", "plotly"),
-    ("pandas", "pandas"),
+    ("pymysql", "pymysql", None),
+    ("plotly", "plotly", None),
+    ("pandas", "pandas", None),
+    ("DBUtils", "dbutils", "dbutils.pooled_db"),
+    ("cachetools", "cachetools", None),
 ]
 failed = []
-for pkg, module in targets:
+for pkg, module, submodule in targets:
     try:
         importlib.import_module(module)
-    except Exception:
+        if submodule:
+            # 验证子模块也能导入（如 PooledDB）
+            importlib.import_module(submodule)
+    except Exception as e:
         failed.append(pkg)
 if failed:
     print(" ".join(failed))
@@ -283,7 +313,49 @@ sync_configs() {
     copy_if_missing "config/config.example.json" "config/config.json"
     copy_if_missing "config/models.json" "backend/config/models.json"
     copy_if_missing "config/config.json" "backend/config/config.json"
+
+    if [ "$RESET_CONFIG" = true ]; then
+        info "重置系统配置为默认模板"
+        if cp "config/config.example.json" "config/config.json"; then
+            ok "已重置 config/config.json"
+        else
+            err "重置 config/config.json 失败"
+        fi
+        if cp "config/config.json" "backend/config/config.json"; then
+            ok "已同步 backend/config/config.json"
+        else
+            err "同步 backend/config/config.json 失败"
+        fi
+    fi
+
     ok "配置检查完成"
+}
+
+setup_frontend() {
+    info "检查前端构建环境"
+    if command -v npm >/dev/null 2>&1; then
+        info "检测到 npm，尝试构建 React 前端..."
+        if [ -d "frontend/react-app" ]; then
+            (
+                cd frontend/react-app
+                info "正在安装前端依赖..."
+                npm install >/dev/null 2>&1 || {
+                    warn "npm install 失败，跳过前端构建。你可能需要手动进入 frontend/react-app 安装依赖。"
+                    return
+                }
+                info "正在构建前端..."
+                npm run build >/dev/null 2>&1 || {
+                    warn "npm run build 失败，将使用传统模板。"
+                    return
+                }
+                ok "React 前端构建成功"
+            )
+        else
+            warn "未找到 frontend/react-app 目录，跳过构建"
+        fi
+    else
+        warn "未检测到 npm，跳过 React 前端构建，将使用传统模版"
+    fi
 }
 
 summary() {
@@ -292,6 +364,35 @@ summary() {
     info "虚拟环境：$VIRTUAL_ENV"
     info "已生成配置文件：.env、config/models.json、backend/config/models.json（均为占位值，请替换为实际凭据）"
     info "下一步：运行 ./start.sh 启动服务"
+}
+
+usage() {
+    cat <<'EOF'
+用法: ./setup.sh [--reset-config]
+
+  --reset-config   强制使用示例模板重置 config/config.json 与 backend/config/config.json
+  -h, --help       显示此帮助信息
+EOF
+}
+
+parse_args() {
+    while (($#)); do
+        case "$1" in
+            --reset-config)
+                RESET_CONFIG=true
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                err "未知参数: $1"
+                usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
 }
 
 main() {
@@ -305,10 +406,12 @@ main() {
     ensure_venv
     install_requirements
     verify_dependencies
+    setup_frontend
     summary
 }
 
 trap 'err "执行失败，请检查上方日志。"; exit 1' ERR
 
-main "$@"
+parse_args "$@"
+main
 

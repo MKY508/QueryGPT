@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-11-20
+
+### Major Changes
+- **架构重组**: 后端代码全面模块化重构，拆分为 `core` (核心), `services` (服务), `api` (接口), `common` (公共) 四大层级，大幅提升代码可维护性与扩展性。
+- **React 前端**: 引入全新的现代 React + Vite 前端架构 (`frontend/react-app`)，支持组件化开发与极致的用户体验。
+- **启动逻辑**: 更新 `setup.sh` 自动检测并构建 React 前端，`app.py` 无缝集成静态资源托管，保证平滑过渡。
+
+### Added
+- **backend/services/**: 集中管理 Database, LLM, Router, History 等核心业务逻辑。
+- **backend/core/**: 统一管理配置 (Config), 日志 (Logger), 认证 (Auth) 与服务容器 (Container)。
+- **frontend/react-app**: 基于 Tailwind CSS + Lucide React 的全新聊天界面。
+
+### Changed
+- **Import 路径**: 所有后端引用已更新为绝对路径 (`backend.services.xxx`)，消除循环依赖风险。
+- **构建流程**: `setup.sh` 新增前端构建步骤，支持 `npm` 环境自动集成。
+
 ## [1.5] - 2025-11-04
 
 ### Added

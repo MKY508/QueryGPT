@@ -3,7 +3,7 @@ import logging
 from flask import Blueprint, request, jsonify, session, g
 
 from backend.core import service_container
-from backend.utils import parse_date_param, conversation_in_range
+from backend.common.utils import parse_date_param, conversation_in_range
 
 logger = logging.getLogger(__name__)
 
