@@ -120,6 +120,16 @@ DEFAULT_MODELS = [
     }
 ]
 
+DEFAULT_DB_GUARD_FEATURES = {
+    "auto_check": True,
+    "warn_on_failure": True,
+    "cache_ttl_seconds": 30,
+    "failure_cache_seconds": 5,
+    "auto_dismiss_ms": 8000,
+    "hint_timeout": 8,
+    "emphasis": "low"
+}
+
 class ConfigLoader:
     """统一的配置加载器，优先使用.env文件"""
     _env_loaded = False
@@ -489,8 +499,22 @@ class ConfigLoader:
             if 'features' in file_config and isinstance(file_config['features'], dict):
                 base['features'] = file_config['features']
 
-        if 'features' not in base:
+        if 'features' not in base or not isinstance(base['features'], dict):
             base['features'] = {}
+
+        features_section = base['features']
+        if 'smart_routing' not in features_section:
+            features_section['smart_routing'] = {"enabled": False}
+
+        db_guard_section = features_section.get('db_guard')
+        if isinstance(db_guard_section, dict):
+            merged_guard = dict(DEFAULT_DB_GUARD_FEATURES)
+            for key, value in db_guard_section.items():
+                if value is not None:
+                    merged_guard[key] = value
+            features_section['db_guard'] = merged_guard
+        else:
+            features_section['db_guard'] = dict(DEFAULT_DB_GUARD_FEATURES)
 
         # 更新缓存
         ConfigLoader._config_cache = base

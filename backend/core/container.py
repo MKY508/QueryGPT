@@ -7,12 +7,13 @@ import threading
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from backend.database import DatabaseManager
-from backend.history_manager import HistoryManager
-from backend.interpreter_manager import InterpreterManager
+from backend.services.database import DatabaseManager
+from backend.services.history import HistoryManager
+from backend.services.interpreter import InterpreterManager
 from backend.prompts import PromptTemplates
-from backend.smart_router import SmartRouter
-from backend.sql_executor import DirectSQLExecutor
+from backend.services.guard import DatabaseGuard
+from backend.services.router import SmartRouter
+from backend.services.executor import DirectSQLExecutor
 
 
 class ServiceContainer:
@@ -28,6 +29,7 @@ class ServiceContainer:
         self.history_manager: Optional[HistoryManager] = None
         self.smart_router: Optional[SmartRouter] = None
         self.sql_executor: Optional[DirectSQLExecutor] = None
+        self.database_guard: Optional[DatabaseGuard] = None
 
         # Runtime state
         self.bootstrap_done: bool = False
@@ -64,6 +66,10 @@ class ServiceContainer:
                 self.logger.error("数据库管理器初始化失败: %s", exc)
                 db_manager = None
             self.database_manager = db_manager
+            if self.database_guard is None and db_manager is not None:
+                self.database_guard = DatabaseGuard(db_manager)
+            elif self.database_guard is not None:
+                self.database_guard.update_manager(db_manager)
 
             # Interpreter manager
             try:
@@ -77,7 +83,11 @@ class ServiceContainer:
 
             # Smart router initialisation (optional)
             try:
-                self.smart_router = SmartRouter(self.database_manager, self.interpreter_manager)
+                self.smart_router = SmartRouter(
+                    self.database_manager,
+                    self.interpreter_manager,
+                    self.database_guard
+                )
             except Exception as exc:
                 self.logger.warning("智能路由器初始化失败，将使用默认路由: %s", exc)
                 self.smart_router = None

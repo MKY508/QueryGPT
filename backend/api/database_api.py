@@ -7,10 +7,10 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, send_from_directory, g
 from pathlib import Path
 
-from backend.auth import require_auth
-from backend.config_loader import ConfigLoader
+from backend.core.auth import require_auth
+from backend.core.config import ConfigLoader
 from backend.core import service_container
-from backend.llm_service import LLMService
+from backend.services.llm import LLMService
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,14 @@
 {
   "features": {
+    "db_guard": {
+      "auto_check": true,
+      "warn_on_failure": true,
+      "cache_ttl_seconds": 30,
+      "failure_cache_seconds": 5,
+      "auto_dismiss_ms": 8000,
+      "hint_timeout": 8,
+      "emphasis": "low"
+    },
     "smart_routing": {
       "enabled": false
     }

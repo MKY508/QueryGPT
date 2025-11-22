@@ -11,7 +11,7 @@ class PromptTemplates:
     @staticmethod
     def _get_default_connection() -> Dict[str, Any]:
         """获取默认数据库连接信息 - DRY原则"""
-        from backend.config_loader import ConfigLoader
+        from backend.core.config import ConfigLoader
         db_config = ConfigLoader.get_database_config()
         return {
             'host': db_config['host'],
@@ -138,7 +138,7 @@ print(f"推荐字段: {{fields}}")
         """
         # 从ConfigLoader获取连接信息
         if not connection_info:
-            from backend.config_loader import ConfigLoader
+            from backend.core.config import ConfigLoader
             db_config = ConfigLoader.get_database_config()
             connection_info = {
                 'host': db_config['host'],

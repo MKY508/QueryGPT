@@ -1,5 +1,5 @@
-from backend.config_loader import ConfigLoader, DEFAULT_MODELS
-from backend.core.service_container import service_container as services
+from backend.core.config import ConfigLoader, DEFAULT_MODELS
+from backend.core.container import service_container as services
 import os
 import json
 import logging
@@ -10,20 +10,43 @@ logger = logging.getLogger(__name__)
 
 config_bp = Blueprint('config_bp', __name__)
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPO_ROOT = os.path.dirname(PROJECT_ROOT)
+BACKEND_CONFIG_DIR = os.path.join(PROJECT_ROOT, 'config')
+ROOT_CONFIG_DIR = os.path.join(REPO_ROOT, 'config')
+BACKEND_CONFIG_PATH = os.path.join(BACKEND_CONFIG_DIR, 'config.json')
+ROOT_CONFIG_PATH = os.path.join(ROOT_CONFIG_DIR, 'config.json')
+BACKEND_MODELS_PATH = os.path.join(BACKEND_CONFIG_DIR, 'models.json')
+ROOT_MODELS_PATH = os.path.join(ROOT_CONFIG_DIR, 'models.json')
+ENV_PATH = os.path.join(PROJECT_ROOT, '.env')
+
+
+def _load_json(path: str) -> dict:
+    if not path or not os.path.exists(path):
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception as exc:  # pragma: no cover - best-effort logging
+        logger.warning(f"读取 {path} 失败: {exc}")
+        return {}
+
+
+def _write_json(path: str, payload: dict) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+
 
 @config_bp.route('/api/models', methods=['GET', 'POST'])
 def handle_models():
     """获取或保存模型列表（Blueprint版本）"""
-    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    repo_root = os.path.dirname(PROJECT_ROOT)
-    models_file = os.path.join(PROJECT_ROOT, 'config', 'models.json')
-    root_models_file = os.path.join(repo_root, 'config', 'models.json')
-
     if request.method == 'GET':
         try:
             api_config = ConfigLoader.get_api_config()
             models_from_file = []
-            sources = [root_models_file, models_file]
+            sources = [ROOT_MODELS_PATH, BACKEND_MODELS_PATH]
             for path in sources:
                 if not os.path.exists(path):
                     continue
@@ -61,7 +84,7 @@ def handle_models():
     else:
         try:
             data = request.json
-            os.makedirs(os.path.dirname(models_file), exist_ok=True)
+            os.makedirs(os.path.dirname(BACKEND_MODELS_PATH), exist_ok=True)
             # 接受 {models: [...]} 或直接的列表，保持字段原样，不做强制覆盖或状态变更
             if isinstance(data, dict) and 'models' in data:
                 raw_models = data['models']
@@ -98,12 +121,9 @@ def handle_models():
                     save_models.append({"id": str(m), "name": str(m)})
 
             models_data = {"models": save_models}
-            with open(models_file, 'w', encoding='utf-8') as f:
-                json.dump(models_data, f, indent=2, ensure_ascii=False)
+            _write_json(BACKEND_MODELS_PATH, models_data)
             try:
-                os.makedirs(os.path.dirname(root_models_file), exist_ok=True)
-                with open(root_models_file, 'w', encoding='utf-8') as f:
-                    json.dump(models_data, f, indent=2, ensure_ascii=False)
+                _write_json(ROOT_MODELS_PATH, models_data)
             except Exception as exc:
                 logger.error(f"同步写入根目录 models.json 失败: {exc}")
             # 使配置缓存失效，确保后续读取到最新
@@ -130,8 +150,6 @@ def get_model_status():
     - 否则需存在有效 API Key（排除占位符），且状态为 active 才视为 available=true。
     """
     try:
-        PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        models_file = os.path.join(PROJECT_ROOT, 'config', 'models.json')
         api_config = ConfigLoader.get_api_config()
 
         placeholder_keys = {
@@ -149,13 +167,11 @@ def get_model_status():
         models_status = []
         models_list = []
         try:
-            if os.path.exists(models_file):
-                with open(models_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if isinstance(data, dict) and 'models' in data:
-                        models_list = data['models']
-                    elif isinstance(data, list):
-                        models_list = data
+            data = _load_json(BACKEND_MODELS_PATH)
+            if isinstance(data, dict) and 'models' in data:
+                models_list = data['models']
+            elif isinstance(data, list):
+                models_list = data
         except Exception:
             models_list = []
 
@@ -194,10 +210,6 @@ def get_model_status():
 @config_bp.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
     """获取或保存配置（Blueprint版本）"""
-    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    config_path = os.path.join(PROJECT_ROOT, 'config', 'config.json')
-    env_path = os.path.join(PROJECT_ROOT, '.env')
-
     if request.method == 'GET':
         try:
             # 优先用聚合配置，并兼容旧字段
@@ -214,11 +226,9 @@ def handle_config():
 
             api_config = ConfigLoader.get_api_config()
             db_config = ConfigLoader.get_database_config()
-            try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    full_config = json.load(f)
-            except Exception:
-                full_config = {}
+            full_config = _load_json(BACKEND_CONFIG_PATH)
+            if not full_config:
+                full_config = _load_json(ROOT_CONFIG_PATH)
 
             config = {
                 "api_key": api_config.get("api_key", ""),
@@ -233,16 +243,14 @@ def handle_config():
                 "database": db_config,
                 "features": full_config.get("features", {})
             }
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, 'r') as f:
-                        saved_config = json.load(f)
-                        for key in ['interface_language', 'interface_theme', 'auto_run_code', 'show_thinking',
-                                    'context_rounds', 'default_view_mode']:
-                            if key in saved_config:
-                                config[key] = saved_config[key]
-                except Exception:
-                    pass
+            saved_config = _load_json(BACKEND_CONFIG_PATH)
+            if not saved_config:
+                saved_config = _load_json(ROOT_CONFIG_PATH)
+            if saved_config:
+                for key in ['interface_language', 'interface_theme', 'auto_run_code', 'show_thinking',
+                            'context_rounds', 'default_view_mode']:
+                    if key in saved_config:
+                        config[key] = saved_config[key]
             return jsonify(config)
         except Exception as e:
             logger.error(f"读取配置失败: {e}")
@@ -283,8 +291,8 @@ def handle_config():
 
             if env_updates:
                 env_lines = []
-                if os.path.exists(env_path):
-                    with open(env_path, 'r', encoding='utf-8') as f:
+                if os.path.exists(ENV_PATH):
+                    with open(ENV_PATH, 'r', encoding='utf-8') as f:
                         env_lines = f.readlines()
                 seen_keys = set()
                 new_lines = []
@@ -302,7 +310,7 @@ def handle_config():
                 for key, value in env_updates.items():
                     if key not in seen_keys:
                         new_lines.append(f"{key}={value}\n")
-                with open(env_path, 'w', encoding='utf-8') as f:
+                with open(ENV_PATH, 'w', encoding='utf-8') as f:
                     f.writelines(new_lines)
                 try:
                     ConfigLoader._env_loaded = False
@@ -313,18 +321,20 @@ def handle_config():
 
             ui_keys = ['interface_language', 'interface_theme', 'auto_run_code', 'show_thinking', 'context_rounds', 'default_view_mode', 'features']
             to_save = {k: v for k, v in config.items() if k in ui_keys}
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            try:
-                if os.path.exists(config_path):
-                    with open(config_path, 'r', encoding='utf-8') as f:
-                        existing = json.load(f)
-                else:
-                    existing = {}
-            except Exception:
-                existing = {}
+            os.makedirs(os.path.dirname(BACKEND_CONFIG_PATH), exist_ok=True)
+            existing_backend = _load_json(BACKEND_CONFIG_PATH)
+            existing_root = _load_json(ROOT_CONFIG_PATH)
+            existing = {}
+            if isinstance(existing_root, dict):
+                existing.update(existing_root)
+            if isinstance(existing_backend, dict):
+                existing.update(existing_backend)
             existing.update(to_save)
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(existing, f, indent=2, ensure_ascii=False)
+            _write_json(BACKEND_CONFIG_PATH, existing)
+            try:
+                _write_json(ROOT_CONFIG_PATH, existing)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.warning(f"同步写入根目录 config.json 失败: {exc}")
 
             try:
                 ConfigLoader._env_loaded = False

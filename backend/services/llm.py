@@ -4,9 +4,12 @@ LLM服务封装
 """
 import logging
 import json
+import os
 from typing import Dict, Any, Optional, Tuple
 import requests
-from backend.config_loader import ConfigLoader, PLACEHOLDER_KEYS
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from backend.core.config import ConfigLoader, PLACEHOLDER_KEYS
 
 try:
     from litellm import completion as litellm_completion
@@ -69,6 +72,21 @@ class LLMService:
             "total_cost": 0.0
         }
     
+    def _create_session(self) -> requests.Session:
+        """创建带有重试机制的HTTP会话"""
+        session = requests.Session()
+        retry = Retry(
+            total=3,
+            read=3,
+            connect=3,
+            backoff_factor=0.5,
+            status_forcelist=(500, 502, 503, 504)
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+        return session
+
     def _resolve_api_key(self) -> str:
         candidate = (self.model_settings.get('api_key') or '').strip()
         if not candidate or candidate in PLACEHOLDER_KEYS:
@@ -105,8 +123,8 @@ class LLMService:
             # 用户尚未配置密钥，不视为错误，直接返回跳过结果
             logger.debug("LLM调用跳过：模型 %s 未配置有效 API KEY", self.model_name)
             return {
-                "content": "",
-                "error": "LLM_NOT_CONFIGURED",
+                "content": "未配置 API Key，无法使用该模型。",
+                "error": "API Key Missing",
                 "success": False,
                 "skipped": True
             }
@@ -206,13 +224,19 @@ class LLMService:
         if self.provider in ('openai', 'custom', ''):
             payload["response_format"] = {"type": "json_object"}
         api_url = self.api_base.rstrip('/') + '/chat/completions'
-        response = requests.post(api_url, headers=headers, json=payload, timeout=self.timeout)
-        if response.status_code >= 400:
-            raise RuntimeError(f"API请求失败: {response.status_code} - {response.text}")
-        return response.json()
+        session = self._create_session()
+        try:
+            response = session.post(api_url, headers=headers, json=payload, timeout=self.timeout)
+            if response.status_code >= 400:
+                raise RuntimeError(f"API请求失败: {response.status_code} - {response.text}")
+            return response.json()
+        finally:
+            session.close()
     
     def _complete_via_ollama(self, messages: list[Dict[str, Any]], temperature: float):
-        base = self.api_base or 'http://localhost:11434'
+        base = self.api_base
+        if not base:
+             base = os.getenv('OLLAMA_HOST') or os.getenv('OLLAMA_BASE_URL') or 'http://localhost:11434'
         url = base.rstrip('/') + '/api/chat'
         payload = {
             "model": self.model_settings.get('model_name', self.model_name),
@@ -222,10 +246,15 @@ class LLMService:
                 "temperature": temperature
             }
         }
-        response = requests.post(url, json=payload, timeout=self.timeout)
-        if response.status_code >= 400:
-            raise RuntimeError(f"Ollama请求失败: {response.status_code} - {response.text}")
-        data = response.json()
+        session = self._create_session()
+        try:
+            response = session.post(url, json=payload, timeout=self.timeout)
+            if response.status_code >= 400:
+                raise RuntimeError(f"Ollama请求失败: {response.status_code} - {response.text}")
+            data = response.json()
+        finally:
+            session.close()
+        
         if 'choices' not in data:
             message = data.get('message', {}) or {}
             content = message.get('content', '')

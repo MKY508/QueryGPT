@@ -1,13 +1,17 @@
-open-interpreter==0.4.3
-flask==2.3.3
-flask-cors==4.0.0
-flasgger==0.9.7.1
-pymysql==1.1.0
-pandas==2.0.3
+# open-interpreter==0.4.3
+# tiktoken
+flask>=3.0.0
+flask-cors>=4.0.0
+flasgger>=0.9.7.1
+pymysql>=1.1.0
+pandas>=2.2.0
 plotly>=6.1.1,<7
-kaleido==0.2.1
-numpy==1.24.3
-cryptography==46.0.2
-pyyaml==6.0.3
-aiohttp>=3.10.0  # 修复 litellm 兼容性问题
-requests>=2.31.0  # LLM服务HTTP请求依赖
+kaleido>=0.2.1
+numpy>=1.26.0
+cryptography>=46.0.2
+pyyaml>=6.0.3
+aiohttp>=3.10.0
+requests>=2.31.0
+DBUtils>=3.1.0
+cachetools>=5.3.3
+psutil>=5.9.0
