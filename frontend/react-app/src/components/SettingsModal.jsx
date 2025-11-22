@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Undo, Database, Brain, MessageSquare, Activity, Settings as SettingsIcon, Plus, Trash2 } from 'lucide-react';
+import { X, Save, Undo, Database, Brain, MessageSquare, Activity, Settings as SettingsIcon, Plus, Trash2, Edit3 } from 'lucide-react';
 import axios from 'axios';
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('basic');
   const [config, setConfig] = useState(null);
   const [models, setModels] = useState([]);
+  const [prompts, setPrompts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -27,13 +28,15 @@ export default function SettingsModal({ isOpen, onClose }) {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const [cfgRes, modelsRes] = await Promise.all([
+      const [cfgRes, modelsRes, promptsRes] = await Promise.all([
         axios.get('/api/config'),
-        axios.get('/api/models')
+        axios.get('/api/models'),
+        axios.get('/api/prompts')
       ]);
       
       setConfig(cfgRes.data);
       setModels(modelsRes.data.models || []);
+      setPrompts(promptsRes.data);
       
       // 加载数据库配置
       if (cfgRes.data.database) {
@@ -55,6 +58,14 @@ export default function SettingsModal({ isOpen, onClose }) {
   const saveConfig = async (section, data) => {
     try {
       setSaving(true);
+
+      if (section === 'prompts') {
+        await axios.post('/api/prompts', data);
+        setPrompts({ ...prompts, ...data });
+        alert('Prompt设置已保存');
+        return;
+      }
+
       let newConfig = { ...config };
       
       if (section === 'database') {
@@ -76,6 +87,22 @@ export default function SettingsModal({ isOpen, onClose }) {
       alert('保存失败: ' + (error.response?.data?.error || error.message));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const resetPrompts = async () => {
+    if (!confirm('确定要恢复默认 Prompt 设置吗？所有自定义修改将丢失。')) return;
+    try {
+        setSaving(true);
+        const res = await axios.post('/api/prompts/reset');
+        if (res.data.success) {
+            setPrompts(res.data.prompts);
+            alert('已恢复默认设置');
+        }
+    } catch (error) {
+        alert('重置失败: ' + error.message);
+    } finally {
+        setSaving(false);
     }
   };
 
@@ -136,6 +163,10 @@ export default function SettingsModal({ isOpen, onClose }) {
             <TabButton 
               id="database" label="数据库配置" icon={<Database size={16} />} 
               active={activeTab === 'database'} onClick={() => setActiveTab('database')} 
+            />
+            <TabButton
+              id="prompts" label="Prompt 设置" icon={<Edit3 size={16} />}
+              active={activeTab === 'prompts'} onClick={() => setActiveTab('prompts')}
             />
             <TabButton 
               id="features" label="功能开关" icon={<Activity size={16} />} 
@@ -274,6 +305,82 @@ export default function SettingsModal({ isOpen, onClose }) {
                   </div>
                 )}
 
+                {/* Prompt Settings */}
+                {activeTab === 'prompts' && prompts && (
+                    <div className="space-y-6">
+                        <div className="flex justify-end mb-4">
+                             <button
+                                onClick={resetPrompts}
+                                className="text-sm text-slate-500 hover:text-red-600 flex items-center gap-1"
+                            >
+                                <Undo size={14} /> 恢复默认设置
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                             <PromptField
+                                label="QA 模式提示词"
+                                value={prompts.qaPrompt}
+                                onChange={(v) => setPrompts({...prompts, qaPrompt: v})}
+                                placeholder="当用户查询与数据库无关时的系统提示词"
+                             />
+                             <PromptField
+                                label="Analysis 模式提示词 (Analysis Prompt)"
+                                value={prompts.analysisPrompt}
+                                onChange={(v) => setPrompts({...prompts, analysisPrompt: v})}
+                                rows={10}
+                                placeholder="负责数据分析的核心 System Prompt"
+                             />
+
+                             <div className="border-t pt-4 mt-6">
+                                <h3 className="font-medium mb-4 text-slate-800">高级配置 (Advanced)</h3>
+                                <div className="space-y-4">
+                                    <PromptField
+                                        label="智能路由规则 (Routing)"
+                                        value={prompts.routing}
+                                        onChange={(v) => setPrompts({...prompts, routing: v})}
+                                        rows={4}
+                                    />
+                                    <PromptField
+                                        label="数据库探索策略 (Exploration)"
+                                        value={prompts.exploration}
+                                        onChange={(v) => setPrompts({...prompts, exploration: v})}
+                                        rows={4}
+                                    />
+                                     <PromptField
+                                        label="表选择策略 (Table Selection)"
+                                        value={prompts.tableSelection}
+                                        onChange={(v) => setPrompts({...prompts, tableSelection: v})}
+                                        rows={3}
+                                    />
+                                    <PromptField
+                                        label="数据处理要求 (Data Processing)"
+                                        value={prompts.dataProcessing}
+                                        onChange={(v) => setPrompts({...prompts, dataProcessing: v})}
+                                        rows={3}
+                                    />
+                                    <PromptField
+                                        label="输出要求 (Output Requirements)"
+                                        value={prompts.outputRequirements}
+                                        onChange={(v) => setPrompts({...prompts, outputRequirements: v})}
+                                        rows={3}
+                                    />
+                                </div>
+                             </div>
+
+                             <div className="flex justify-end pt-4">
+                                <button
+                                    onClick={() => saveConfig('prompts', prompts)}
+                                    disabled={saving}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                                >
+                                    <Save size={16} /> 保存 Prompt 设置
+                                </button>
+                             </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Models Management */}
                 {activeTab === 'models' && (
                     <div className="space-y-4">
@@ -348,6 +455,21 @@ function Toggle({ label, desc, checked, onChange }) {
             >
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${checked ? 'left-7' : 'left-1'}`} />
             </button>
+        </div>
+    );
+}
+
+function PromptField({ label, value, onChange, placeholder, rows = 3 }) {
+    return (
+        <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-700">{label}</label>
+            <textarea
+                className="w-full p-3 border rounded-lg text-sm font-mono bg-slate-50 focus:bg-white transition-colors"
+                value={value || ''}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                rows={rows}
+            />
         </div>
     );
 }

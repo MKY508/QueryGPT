@@ -66,9 +66,10 @@ class ServiceContainer:
                 self.logger.error("数据库管理器初始化失败: %s", exc)
                 db_manager = None
             self.database_manager = db_manager
-            if self.database_guard is None and db_manager is not None:
+            if self.database_guard is None:
+                # Ensure guard is always initialized even if db_manager is None initially
                 self.database_guard = DatabaseGuard(db_manager)
-            elif self.database_guard is not None:
+            else:
                 self.database_guard.update_manager(db_manager)
 
             # Interpreter manager
