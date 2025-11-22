@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Undo, Database, Brain, MessageSquare, Activity, Settings as SettingsIcon, Plus, Trash2, Edit3 } from 'lucide-react';
+import { X, Save, Undo, Database, Brain, MessageSquare, Activity, Settings as SettingsIcon, Plus, Trash2, Edit3, ArrowLeft, Check } from 'lucide-react';
 import axios from 'axios';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function SettingsModal({ isOpen, onClose }) {
+  const { changeLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState('basic');
   const [config, setConfig] = useState(null);
   const [models, setModels] = useState([]);
   const [prompts, setPrompts] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // 模型添加状态
+  const [isAddingModel, setIsAddingModel] = useState(false);
+  const [newModel, setNewModel] = useState({
+      name: '',
+      id: '',
+      provider: 'openai',
+      api_key: '',
+      base_url: ''
+  });
 
   // 数据库配置状态
   const [dbConfig, setDbConfig] = useState({
@@ -71,9 +83,17 @@ export default function SettingsModal({ isOpen, onClose }) {
       if (section === 'database') {
         await axios.post('/api/database/config', data);
         newConfig.database = data;
+      } else if (section === 'models') {
+         await axios.post('/api/models', { models: data });
+         setModels(data);
+         return; // Early return for models
       } else {
         if (section === 'basic') {
             newConfig = { ...newConfig, ...data };
+            // Sync language with context
+            if (data.language) {
+                changeLanguage(data.language);
+            }
         } else if (section === 'features') {
             newConfig.features = { ...(newConfig.features || {}), ...data };
         }
@@ -130,6 +150,31 @@ export default function SettingsModal({ isOpen, onClose }) {
           setModels(newModels);
       } catch (err) {
           alert('删除失败');
+      }
+  };
+
+  const handleAddModel = async () => {
+      if (!newModel.name || !newModel.id) {
+          alert("请填写模型名称和ID");
+          return;
+      }
+      try {
+          setSaving(true);
+          const updatedModels = [...models, newModel];
+          await axios.post('/api/models', { models: updatedModels });
+          setModels(updatedModels);
+          setIsAddingModel(false);
+          setNewModel({
+              name: '',
+              id: '',
+              provider: 'openai',
+              api_key: '',
+              base_url: ''
+          });
+      } catch (err) {
+          alert("添加模型失败: " + err.message);
+      } finally {
+          setSaving(false);
       }
   };
 
@@ -385,39 +430,126 @@ export default function SettingsModal({ isOpen, onClose }) {
                 {activeTab === 'models' && (
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                            <h3 className="font-medium">已配置模型</h3>
-                            <button className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700" onClick={() => alert('新增功能开发中')}>
-                                <Plus size={16} /> 添加模型
-                            </button>
-                        </div>
-                        
-                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                            {models.map(model => (
-                                <div key={model.id} className="p-4 border border-slate-200 rounded-lg flex justify-between items-center bg-slate-50 hover:bg-white hover:shadow-sm transition-all">
-                                    <div>
-                                        <div className="font-medium text-slate-800">{model.name}</div>
-                                        <div className="text-xs text-slate-500 flex gap-2 mt-1">
-                                            <span className="bg-slate-200 px-1.5 py-0.5 rounded">{model.provider || model.type}</span>
-                                            <span className="font-mono">{model.id}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button 
-                                            onClick={() => deleteModel(model.id)}
-                                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                            
-                            {models.length === 0 && (
-                                <div className="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
-                                    暂无模型，请添加
-                                </div>
+                            <h3 className="font-medium">{isAddingModel ? "添加新模型" : "已配置模型"}</h3>
+                            {!isAddingModel ? (
+                                <button
+                                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg"
+                                    onClick={() => setIsAddingModel(true)}
+                                >
+                                    <Plus size={16} /> 添加模型
+                                </button>
+                            ) : (
+                                <button
+                                    className="flex items-center gap-1 text-sm text-slate-600 hover:text-slate-800 bg-slate-100 px-3 py-1.5 rounded-lg"
+                                    onClick={() => setIsAddingModel(false)}
+                                >
+                                    <ArrowLeft size={16} /> 返回列表
+                                </button>
                             )}
                         </div>
+                        
+                        {isAddingModel ? (
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-700">显示名称 (Name)</label>
+                                        <input
+                                            type="text"
+                                            className="w-full p-2 border rounded-lg"
+                                            placeholder="例如: GPT-4 Custom"
+                                            value={newModel.name}
+                                            onChange={e => setNewModel({...newModel, name: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-slate-700">模型 ID (Model ID)</label>
+                                        <input
+                                            type="text"
+                                            className="w-full p-2 border rounded-lg"
+                                            placeholder="例如: gpt-4-turbo-preview"
+                                            value={newModel.id}
+                                            onChange={e => setNewModel({...newModel, id: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-700">提供商 (Provider)</label>
+                                    <select
+                                        className="w-full p-2 border rounded-lg bg-white"
+                                        value={newModel.provider}
+                                        onChange={e => setNewModel({...newModel, provider: e.target.value})}
+                                    >
+                                        <option value="openai">OpenAI / Compatible</option>
+                                        <option value="anthropic">Anthropic</option>
+                                        <option value="google">Google Gemini</option>
+                                        <option value="ollama">Ollama</option>
+                                        <option value="azure">Azure OpenAI</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-700">API Key (Optional)</label>
+                                    <input
+                                        type="password"
+                                        className="w-full p-2 border rounded-lg"
+                                        placeholder="sk-..."
+                                        value={newModel.api_key}
+                                        onChange={e => setNewModel({...newModel, api_key: e.target.value})}
+                                    />
+                                    <p className="text-xs text-slate-500">如果不填，将尝试使用环境变量中配置的 Key</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-700">API Base URL (Optional)</label>
+                                    <input
+                                        type="text"
+                                        className="w-full p-2 border rounded-lg"
+                                        placeholder="https://api.openai.com/v1"
+                                        value={newModel.base_url}
+                                        onChange={e => setNewModel({...newModel, base_url: e.target.value})}
+                                    />
+                                </div>
+
+                                <div className="pt-4 flex justify-end">
+                                    <button
+                                        onClick={handleAddModel}
+                                        disabled={saving || !newModel.name || !newModel.id}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Check size={16} /> 确认添加
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                                {models.map(model => (
+                                    <div key={model.id} className="p-4 border border-slate-200 rounded-lg flex justify-between items-center bg-slate-50 hover:bg-white hover:shadow-sm transition-all">
+                                        <div>
+                                            <div className="font-medium text-slate-800">{model.name}</div>
+                                            <div className="text-xs text-slate-500 flex gap-2 mt-1">
+                                                <span className="bg-slate-200 px-1.5 py-0.5 rounded">{model.provider || model.type}</span>
+                                                <span className="font-mono">{model.id}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => deleteModel(model.id)}
+                                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {models.length === 0 && (
+                                    <div className="text-center py-8 text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
+                                        暂无模型，请添加
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
               </>
