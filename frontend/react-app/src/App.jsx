@@ -69,7 +69,21 @@ function App() {
   useEffect(() => {
     loadHistory();
     loadModels();
+    loadConfig();
   }, []);
+
+  const loadConfig = async () => {
+    try {
+      const res = await axios.get('/api/config');
+      if (res.data.interface_theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } catch (e) {
+      console.error("Failed to load config", e);
+    }
+  };
 
   const loadHistory = async () => {
     try {
@@ -291,9 +305,14 @@ function App() {
     setMessages([]);
   };
 
+  const handleModelUpdate = () => {
+    loadModels();
+    loadConfig(); // Reload config to apply theme changes if any
+  };
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white">
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onModelUpdate={handleModelUpdate} />
 
       {/* Sidebar */}
       <div className={clsx("bg-slate-900 text-slate-300 flex-shrink-0 transition-all duration-300 flex flex-col border-r border-slate-800 overflow-hidden", sidebarOpen ? "w-64" : "w-0")}>
