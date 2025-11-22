@@ -1,5 +1,5 @@
-# open-interpreter==0.4.3
-# tiktoken
+open-interpreter==0.4.3
+tiktoken
 flask>=3.0.0
 flask-cors>=4.0.0
 flasgger>=0.9.7.1
