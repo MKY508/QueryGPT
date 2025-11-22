@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Settings, Database, History, Trash2, Plus, Loader2, ChevronDown, Box, AlertTriangle, Square, Code, Eye } from 'lucide-react';
+import { Send, Settings, Database, History, Trash2, Plus, Loader2, ChevronDown, Box, AlertTriangle, Square, Code, Eye, Brain, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { clsx } from 'clsx';
@@ -296,7 +296,7 @@ function App() {
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Sidebar */}
-      <div className={clsx("bg-slate-900 text-slate-300 flex-shrink-0 transition-all duration-300 flex flex-col border-r border-slate-800", sidebarOpen ? "w-64" : "w-0")}>
+      <div className={clsx("bg-slate-900 text-slate-300 flex-shrink-0 transition-all duration-300 flex flex-col border-r border-slate-800 overflow-hidden", sidebarOpen ? "w-64" : "w-0")}>
         <div className="p-4 flex justify-between items-center h-16">
           <div className="flex items-center gap-2 font-bold text-white">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -565,3 +565,5 @@ function App() {
     </div>
   );
 }
+
+export default App;
