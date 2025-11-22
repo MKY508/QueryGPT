@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Settings, Database, History, Trash2, Plus, Loader2, ChevronDown, Box, AlertTriangle } from 'lucide-react';
+import { Send, Settings, Database, History, Trash2, Plus, Loader2, ChevronDown, Box, AlertTriangle, Square, Code, Eye } from 'lucide-react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { clsx } from 'clsx';
 import SettingsModal from './components/SettingsModal';
 import ArtifactViewer from './components/ArtifactViewer';
+import { useLanguage } from './contexts/LanguageContext';
 
 // 简单的 API 封装
 const api = {
@@ -22,6 +23,9 @@ const api = {
       throw error.response?.data || error;
     }
   },
+  stop: async (conversationId) => {
+     return axios.post('/api/stop_query', { conversation_id: conversationId });
+  },
   getHistory: async () => {
     return axios.get('/api/history/conversations').then(r => r.data.conversations);
   },
@@ -37,6 +41,7 @@ const api = {
 };
 
 function App() {
+  const { t } = useLanguage();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -49,6 +54,7 @@ function App() {
   const [models, setModels] = useState([]);
   const [currentModel, setCurrentModel] = useState('gpt-4o');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [showDevMode, setShowDevMode] = useState(false);
 
   const messagesEndRef = React.useRef(null);
 
@@ -154,9 +160,11 @@ function App() {
         if (msg.execution) { // 注意：后端使用的是 execution 字段
             sql = msg.execution.sql;
             visualization = msg.execution.visualization;
+            steps = msg.execution.steps || [];
         } else if (msg.execution_details) { // 兼容旧数据
             sql = msg.execution_details.sql;
             visualization = msg.execution_details.visualization;
+            steps = msg.execution_details.steps || [];
         }
 
         return {
@@ -205,7 +213,20 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (isLoading) {
+        // Handle Stop
+        if (conversationId) {
+            try {
+                await api.stop(conversationId);
+                setIsLoading(false); // Optimistically stop loading
+            } catch (err) {
+                console.error("Failed to stop", err);
+            }
+        }
+        return;
+    }
+
+    if (!input.trim()) return;
 
     const userMsg = { role: 'user', content: input };
     setMessages(prev => [...prev, userMsg]);
@@ -236,6 +257,14 @@ function App() {
 
         setMessages(prev => [...prev, botMsg]);
         loadHistory();
+      } else if (data.interrupted) {
+        const botMsg = {
+            role: 'assistant',
+            content: data.partial_result || '已中断',
+            isError: true,
+            steps: [{ index: '!', summary: '用户中断查询', isError: true }]
+        };
+        setMessages(prev => [...prev, botMsg]);
       } else {
         // 如果是数据库连接错误，尝试在步骤中显示
         const errorMsg = data.error || '未知错误';
@@ -275,13 +304,13 @@ function App() {
             </div>
             <span className="text-lg">QueryGPT</span>
           </div>
-          <button onClick={startNewChat} className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white" title="新对话">
+          <button onClick={startNewChat} className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white" title={t('sidebar.newChat')}>
             <Plus size={20} />
           </button>
         </div>
         
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 scrollbar-thin">
-            <div className="text-xs font-medium text-slate-500 uppercase px-2 mb-2 mt-2">最近对话</div>
+            <div className="text-xs font-medium text-slate-500 uppercase px-2 mb-2 mt-2">{t('sidebar.recentChats')}</div>
             {conversations.map(chat => (
                 <div 
                     key={chat.id}
@@ -292,12 +321,12 @@ function App() {
                     )}
                 >
                     <MessageSquare size={14} className={clsx("flex-shrink-0", conversationId === chat.id ? "text-blue-400" : "text-slate-500 group-hover:text-blue-400")} />
-                    <span className="truncate">{chat.title || "未命名对话"}</span>
+                    <span className="truncate">{chat.title || t('sidebar.unnamed')}</span>
                     
                     <button 
                         onClick={(e) => handleDeleteConversation(e, chat.id)}
                         className="absolute right-1 p-1.5 rounded hover:bg-red-500/20 hover:text-red-400 text-slate-600 opacity-0 group-hover:opacity-100 transition-all"
-                        title="删除"
+                        title={t('sidebar.delete')}
                     >
                         <Trash2 size={12} />
                     </button>
@@ -310,7 +339,7 @@ function App() {
                 onClick={() => setSettingsOpen(true)}
                 className="flex items-center gap-3 text-sm w-full p-2 hover:bg-slate-800 rounded-lg transition-colors"
             >
-                <Settings size={18} /> 设置
+                <Settings size={18} /> {t('sidebar.settings')}
             </button>
         </div>
       </div>
@@ -325,36 +354,51 @@ function App() {
                 </button>
                 
                 {/* Model Selector */}
-                <div className="relative">
+                <div className="flex items-center gap-2">
+                    {/* View Mode Toggle */}
                     <button 
-                        onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+                        onClick={() => setShowDevMode(!showDevMode)}
+                        className={clsx(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                            showDevMode ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        )}
+                        title={showDevMode ? t('viewMode.user') : t('viewMode.dev')}
                     >
-                        <Box size={16} className="text-blue-600" />
-                        {models.find(m => m.id === currentModel)?.name || currentModel}
-                        <ChevronDown size={14} className={`transition-transform ${modelDropdownOpen ? 'rotate-180' : ''}`} />
+                        {showDevMode ? <Code size={16} /> : <Eye size={16} />}
+                        {showDevMode ? "Dev" : "User"}
                     </button>
-                    
-                    {modelDropdownOpen && (
-                        <>
-                            <div className="fixed inset-0 z-10" onClick={() => setModelDropdownOpen(false)} />
-                            <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-20 animate-in fade-in zoom-in-95 duration-100">
-                                {models.map(model => (
-                                    <button
-                                        key={model.id}
-                                        onClick={() => handleModelSelect(model.id)}
-                                        className={clsx(
-                                            "w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 flex items-center justify-between",
-                                            currentModel === model.id ? "text-blue-600 bg-blue-50" : "text-slate-700"
-                                        )}
-                                    >
-                                        {model.name}
-                                        {currentModel === model.id && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
-                                    </button>
-                                ))}
-                            </div>
-                        </>
-                    )}
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-700 transition-colors"
+                        >
+                            <Box size={16} className="text-blue-600" />
+                            {models.find(m => m.id === currentModel)?.name || currentModel}
+                            <ChevronDown size={14} className={`transition-transform ${modelDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {modelDropdownOpen && (
+                            <>
+                                <div className="fixed inset-0 z-10" onClick={() => setModelDropdownOpen(false)} />
+                                <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-1 z-20 animate-in fade-in zoom-in-95 duration-100">
+                                    {models.map(model => (
+                                        <button
+                                            key={model.id}
+                                            onClick={() => handleModelSelect(model.id)}
+                                            className={clsx(
+                                                "w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 flex items-center justify-between",
+                                                currentModel === model.id ? "text-blue-600 bg-blue-50" : "text-slate-700"
+                                            )}
+                                        >
+                                            {model.name}
+                                            {currentModel === model.id && <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </header>
@@ -366,8 +410,8 @@ function App() {
                     <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-6">
                         <Database size={32} className="text-slate-400" />
                     </div>
-                    <h2 className="text-xl font-semibold text-slate-700 mb-2">欢迎使用 QueryGPT</h2>
-                    <p className="text-slate-500 max-w-md text-center">开始探索您的数据。我可以执行 SQL 查询、生成图表并进行深度分析。</p>
+                    <h2 className="text-xl font-semibold text-slate-700 mb-2">{t('app.welcome')}</h2>
+                    <p className="text-slate-500 max-w-md text-center">{t('app.description')}</p>
                     
                     <div className="grid grid-cols-2 gap-4 mt-8 max-w-2xl w-full">
                         {['显示最近的销售数据', '分析用户增长趋势', '按收入统计热门产品', '上个月的销售趋势'].map(q => (
@@ -400,25 +444,34 @@ function App() {
                         {/* Thinking Steps */}
                         {msg.steps && msg.steps.length > 0 && (
                             <div className="mb-4 space-y-2">
-                                {msg.steps.map((step, i) => (
-                                    <div
-                                        key={i}
-                                        className={clsx(
-                                            "flex items-start gap-2 text-xs p-2 rounded border transition-all",
-                                            step.isError
-                                                ? "bg-red-50 text-red-600 border-red-100"
-                                                : "bg-slate-50 text-slate-500 border-slate-100"
-                                        )}
-                                    >
-                                        <div className={clsx(
-                                            "w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold",
-                                            step.isError ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
-                                        )}>
-                                            {step.index}
+                                {showDevMode ? (
+                                    // Developer Mode: Show all steps detailed
+                                    msg.steps.map((step, i) => (
+                                        <div
+                                            key={i}
+                                            className={clsx(
+                                                "flex items-start gap-2 text-xs p-2 rounded border transition-all",
+                                                step.isError
+                                                    ? "bg-red-50 text-red-600 border-red-100"
+                                                    : "bg-slate-50 text-slate-500 border-slate-100"
+                                            )}
+                                        >
+                                            <div className={clsx(
+                                                "w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold",
+                                                step.isError ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
+                                            )}>
+                                                {step.index}
+                                            </div>
+                                            <span className={step.isError ? "font-medium" : ""}>{step.summary}</span>
                                         </div>
-                                        <span className={step.isError ? "font-medium" : ""}>{step.summary}</span>
+                                    ))
+                                ) : (
+                                    // User Mode: Show simple summary
+                                    <div className="flex items-center gap-2 text-xs text-slate-500 italic">
+                                        <Brain size={12} />
+                                        <span>{t('chat.stepsCompleted').replace('{count}', msg.steps.length)}</span>
                                     </div>
-                                ))}
+                                )}
                             </div>
                         )}
 
@@ -446,10 +499,10 @@ function App() {
                             </ReactMarkdown>
                         )}
                         
-                        {msg.sql && (
+                        {msg.sql && showDevMode && (
                             <div className="mt-4">
                                 <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                                    <Database size={12} /> 执行的 SQL
+                                    <Database size={12} /> {t('chat.executingSql')}
                                 </div>
                                 <div className="bg-slate-900 text-slate-200 p-3 rounded-lg text-xs font-mono overflow-x-auto border border-slate-800 shadow-inner">
                                     {msg.sql}
@@ -472,7 +525,7 @@ function App() {
                     </div>
                     <div className="bg-white px-5 py-4 rounded-2xl rounded-bl-sm border border-slate-200 shadow-sm flex items-center gap-3">
                         <Loader2 className="animate-spin text-blue-600" size={18} />
-                        <span className="text-sm text-slate-500 font-medium animate-pulse">正在分析数据...</span>
+                        <span className="text-sm text-slate-500 font-medium animate-pulse">{t('chat.analyzing')}</span>
                     </div>
                  </div>
             )}
@@ -487,19 +540,24 @@ function App() {
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="开始询问关于您数据的问题..."
+                        placeholder={t('app.inputPlaceholder')}
                         className="w-full pl-5 pr-14 py-4 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 shadow-lg shadow-slate-100/50 transition-all"
                     />
                     <button 
                         type="submit" 
-                        disabled={isLoading || !input.trim()}
-                        className="absolute right-2 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 shadow-md shadow-blue-200"
+                        disabled={!input.trim() && !isLoading}
+                        className={clsx(
+                            "absolute right-2 p-2.5 text-white rounded-xl transition-all hover:scale-105 active:scale-95 shadow-md",
+                            isLoading
+                                ? "bg-red-500 hover:bg-red-600 shadow-red-200"
+                                : "bg-blue-600 hover:bg-blue-700 shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        )}
                     >
-                        <Send size={18} />
+                        {isLoading ? <Square size={18} fill="currentColor" /> : <Send size={18} />}
                     </button>
                 </div>
                 <div className="text-center mt-2">
-                    <p className="text-xs text-slate-400">AI 可能会犯错，请核实重要信息。</p>
+                    <p className="text-xs text-slate-400">{t('app.disclaimer')}</p>
                 </div>
             </form>
         </div>
@@ -507,33 +565,3 @@ function App() {
     </div>
   );
 }
-
-function MessageSquare({ size, className }) {
-    return (
-        <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width={size} 
-            height={size} 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round" 
-            className={className}
-        >
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        </svg>
-    );
-}
-
-function Brain({ size, className }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"></path>
-            <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"></path>
-        </svg>
-    );
-}
-
-export default App;
