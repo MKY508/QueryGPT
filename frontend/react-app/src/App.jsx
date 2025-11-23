@@ -36,7 +36,7 @@ const api = {
 
       eventSource.onerror = (err) => {
           console.error("EventSource failed:", err);
-          onEvent({ type: 'error', error: 'Connection failed' });
+          onEvent({ type: 'error', data: { error: 'Connection failed' } });
           eventSource.close();
       };
 
@@ -318,23 +318,24 @@ function App() {
                     }
                 } else if (data.type === 'result') {
                     // Update final result
-                    lastMsg.content = parseMessageContent(data.data.result);
-                    lastMsg.visualization = data.data.visualization;
-                    lastMsg.sql = data.data.sql;
-                    lastMsg.execution_time = data.data.execution_time;
-                    lastMsg.rows_count = data.data.rows_count;
-                    // Ensure steps are synced if backend sends them
-                    if (data.data.steps && data.data.steps.length > 0) {
-                         lastMsg.steps = data.data.steps;
+                    if (data.data) {
+                        lastMsg.content = parseMessageContent(data.data.result);
+                        lastMsg.visualization = data.data.visualization;
+                        lastMsg.sql = data.data.sql;
+                        lastMsg.execution_time = data.data.execution_time;
+                        lastMsg.rows_count = data.data.rows_count;
+                        // Ensure steps are synced if backend sends them
+                        if (data.data.steps && data.data.steps.length > 0) {
+                             lastMsg.steps = data.data.steps;
+                        }
+                        if (data.data.conversation_id) {
+                            setConversationId(data.data.conversation_id);
+                        }
                     }
                     lastMsg.isLoading = false;
-
-                    if (data.data.conversation_id) {
-                        setConversationId(data.data.conversation_id);
-                    }
                 } else if (data.type === 'error') {
                     lastMsg.isError = true;
-                    lastMsg.content = data.data.error || 'Unknown error';
+                    lastMsg.content = data.data?.error || 'Unknown error';
                     lastMsg.isLoading = false;
                 } else if (data.type === 'done') {
                     lastMsg.isLoading = false;
