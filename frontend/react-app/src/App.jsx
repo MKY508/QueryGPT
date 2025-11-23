@@ -1,27 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { Send, Settings, Database, History, Trash2, Plus, Loader2, ChevronDown, Box, AlertTriangle, Square, Code, Eye, Brain, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, Settings, Database, History, Trash2, Plus, Loader2, ChevronDown, Box, AlertTriangle, Square, Code, Eye, Brain, MessageSquare, Info } from 'lucide-react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { clsx } from 'clsx';
 import SettingsModal from './components/SettingsModal';
 import ArtifactViewer from './components/ArtifactViewer';
+import AboutModal from './components/AboutModal';
 import { useLanguage } from './contexts/LanguageContext';
 
 // 简单的 API 封装
 const api = {
-  chat: async (message, history = [], options = {}) => {
-    try {
-      const response = await axios.post('/api/chat', {
-        query: message,
-        conversation_id: options.conversationId,
-        model: options.model || 'gpt-4o',
-        use_database: true,
-        language: 'zh' // 强制中文
+  chatStream: async (message, history = [], options = {}, onEvent) => {
+      const { conversationId, model } = options;
+      const params = new URLSearchParams({
+          query: message,
+          model: model || 'gpt-4o',
+          use_database: 'true',
+          language: 'zh',
+          conversation_id: conversationId || ''
       });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || error;
-    }
+
+      const eventSource = new EventSource(`/api/chat/stream?${params.toString()}`);
+
+      eventSource.onmessage = (event) => {
+          try {
+              const data = JSON.parse(event.data);
+              onEvent(data);
+              if (data.type === 'done' || data.type === 'error') {
+                  eventSource.close();
+              }
+          } catch (e) {
+              console.error("Failed to parse event", e);
+          }
+      };
+
+      eventSource.onerror = (err) => {
+          console.error("EventSource failed:", err);
+          onEvent({ type: 'error', error: 'Connection failed' });
+          eventSource.close();
+      };
+
+      return eventSource;
   },
   stop: async (conversationId) => {
      return axios.post('/api/stop_query', { conversation_id: conversationId });
@@ -49,6 +68,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [conversations, setConversations] = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   
   // 模型选择状态
   const [models, setModels] = useState([]);
@@ -57,6 +77,7 @@ function App() {
   const [showDevMode, setShowDevMode] = useState(false);
 
   const messagesEndRef = React.useRef(null);
+  const eventSourceRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -113,14 +134,13 @@ function App() {
   const parseMessageContent = (content) => {
     if (typeof content !== 'string') return JSON.stringify(content);
     
-    // 尝试解析 JSON 字符串（处理 raw_output, dual_view 等）
+    // 尝试解析 JSON 字符串
     try {
         if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
             const parsed = JSON.parse(content);
             
-            // 处理 raw_output 数组格式 (如: [{"type": "console", ...}])
+            // 处理 raw_output
             if (Array.isArray(parsed)) {
-                // 提取所有文本内容并拼接
                 return parsed
                     .filter(item => item.content)
                     .map(item => item.content)
@@ -139,7 +159,6 @@ function App() {
                 }
                 return parsed.data;
             }
-            // 如果是普通 JSON 对象，保持原样或提取 content
             if (parsed.content) return parsed.content;
         }
     } catch (e) {
@@ -154,7 +173,6 @@ function App() {
       setIsLoading(true);
       const data = await api.getConversation(id);
       
-      // 处理后端可能返回的嵌套结构 {success: true, conversation: {...}}
       const conversationData = data.conversation || data;
       
       if (!conversationData || !conversationData.messages) {
@@ -169,16 +187,21 @@ function App() {
         let sql = null;
         let visualization = null;
         let steps = [];
+        let execution_time = null;
+        let rows_count = null;
 
-        // 提取执行详情
-        if (msg.execution) { // 注意：后端使用的是 execution 字段
+        if (msg.execution) {
             sql = msg.execution.sql;
             visualization = msg.execution.visualization;
             steps = msg.execution.steps || [];
-        } else if (msg.execution_details) { // 兼容旧数据
+            execution_time = msg.execution.execution_time;
+            rows_count = msg.execution.rows_affected;
+        } else if (msg.execution_details) {
             sql = msg.execution_details.sql;
             visualization = msg.execution_details.visualization;
             steps = msg.execution_details.steps || [];
+            execution_time = msg.execution_details.execution_time;
+            rows_count = msg.execution_details.rows_affected;
         }
 
         return {
@@ -186,13 +209,14 @@ function App() {
             content: content,
             sql: sql,
             visualization: visualization,
-            steps: steps
+            steps: steps,
+            execution_time,
+            rows_count
         };
       });
 
       setMessages(formattedMessages);
       
-      // 移动端自动关闭侧边栏
       if (window.innerWidth < 768) {
         setSidebarOpen(false);
       }
@@ -231,8 +255,21 @@ function App() {
         // Handle Stop
         if (conversationId) {
             try {
+                if (eventSourceRef.current) {
+                    eventSourceRef.current.close();
+                }
                 await api.stop(conversationId);
-                setIsLoading(false); // Optimistically stop loading
+                // 更新最后一条消息为中断状态
+                setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMsg = newMessages[newMessages.length - 1];
+                    if (lastMsg && lastMsg.role === 'assistant') {
+                        lastMsg.isError = true;
+                        lastMsg.content = lastMsg.content || '已中断';
+                    }
+                    return newMessages;
+                });
+                setIsLoading(false);
             } catch (err) {
                 console.error("Failed to stop", err);
             }
@@ -243,60 +280,84 @@ function App() {
     if (!input.trim()) return;
 
     const userMsg = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMsg]);
+    const botMsgPlaceholder = {
+        role: 'assistant',
+        content: '',
+        steps: [],
+        isLoading: true
+    };
+
+    // 立即更新UI
+    setMessages(prev => [...prev, userMsg, botMsgPlaceholder]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
 
     try {
-      const data = await api.chat(input, messages, { 
-        conversationId,
-        model: currentModel
-      });
-      
-      if (data.success) {
-        setConversationId(data.conversation_id);
-        
-        const botMsg = { 
-          role: 'assistant', 
-          content: parseMessageContent(data.result), // 使用解析逻辑
-          sql: data.sql,
-          visualization: data.visualization,
-          steps: data.steps 
-        };
-        
-        // 处理双视图数据格式 (冗余检查，防止 data.result 已经是对象)
-        if (data.result?.type === 'dual_view') {
-            botMsg.content = data.result.data.content;
-        }
+        const eventSource = await api.chatStream(currentInput, messages, {
+            conversationId,
+            model: currentModel
+        }, (data) => {
+            setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMsgIndex = newMessages.length - 1;
+                const lastMsg = { ...newMessages[lastMsgIndex] }; // Clone last message
 
-        setMessages(prev => [...prev, botMsg]);
-        loadHistory();
-      } else if (data.interrupted) {
-        const botMsg = {
-            role: 'assistant',
-            content: data.partial_result || '已中断',
-            isError: true,
-            steps: [{ index: '!', summary: '用户中断查询', isError: true }]
-        };
-        setMessages(prev => [...prev, botMsg]);
-      } else {
-        // 如果是数据库连接错误，尝试在步骤中显示
-        const errorMsg = data.error || '未知错误';
-        const isConnectionError = errorMsg.includes('connect') || errorMsg.includes('Unknown MySQL server') || errorMsg.includes('Access denied');
+                if (lastMsg.role !== 'assistant') return prev; // Should not happen
 
-        const botMsg = {
-            role: 'assistant',
-            content: isConnectionError ? '数据库连接失败，请检查配置。' : `出错了: ${errorMsg}`,
-            isError: true,
-            steps: isConnectionError ? [{ index: '!', summary: `连接失败: ${errorMsg}`, isError: true }] : []
-        };
+                if (data.type === 'progress') {
+                    // Update steps
+                     // Avoid duplicates
+                    const exists = lastMsg.steps.find(s => s.summary === data.data.message);
+                    if (!exists) {
+                        lastMsg.steps = [...lastMsg.steps, {
+                            index: lastMsg.steps.length + 1,
+                            summary: data.data.message,
+                            stage: data.data.stage
+                        }];
+                    }
+                } else if (data.type === 'result') {
+                    // Update final result
+                    lastMsg.content = parseMessageContent(data.data.result);
+                    lastMsg.visualization = data.data.visualization;
+                    lastMsg.sql = data.data.sql;
+                    lastMsg.execution_time = data.data.execution_time;
+                    lastMsg.rows_count = data.data.rows_count;
+                    // Ensure steps are synced if backend sends them
+                    if (data.data.steps && data.data.steps.length > 0) {
+                         lastMsg.steps = data.data.steps;
+                    }
+                    lastMsg.isLoading = false;
 
-        setMessages(prev => [...prev, botMsg]);
-      }
+                    if (data.data.conversation_id) {
+                        setConversationId(data.data.conversation_id);
+                    }
+                } else if (data.type === 'error') {
+                    lastMsg.isError = true;
+                    lastMsg.content = data.data.error || 'Unknown error';
+                    lastMsg.isLoading = false;
+                } else if (data.type === 'done') {
+                    lastMsg.isLoading = false;
+                    loadHistory();
+                }
+
+                newMessages[lastMsgIndex] = lastMsg;
+                return newMessages;
+            });
+        });
+
+        eventSourceRef.current = eventSource;
+
     } catch (err) {
-        setMessages(prev => [...prev, { role: 'assistant', content: `请求失败: ${err.message || '未知错误'}`, isError: true }]);
-    } finally {
-      setIsLoading(false);
+        setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            lastMsg.isError = true;
+            lastMsg.content = `请求失败: ${err.message || '未知错误'}`;
+            lastMsg.isLoading = false;
+            return newMessages;
+        });
+        setIsLoading(false);
     }
   };
 
@@ -307,12 +368,13 @@ function App() {
 
   const handleModelUpdate = () => {
     loadModels();
-    loadConfig(); // Reload config to apply theme changes if any
+    loadConfig();
   };
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-white">
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onModelUpdate={handleModelUpdate} />
+      <AboutModal isOpen={aboutOpen} onClose={() => setAboutOpen(false)} />
 
       {/* Sidebar */}
       <div className={clsx("bg-slate-900 text-slate-300 flex-shrink-0 transition-all duration-300 flex flex-col border-r border-slate-800 overflow-hidden", sidebarOpen ? "w-64" : "w-0")}>
@@ -353,12 +415,18 @@ function App() {
             ))}
         </div>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-slate-800 space-y-1">
             <button 
                 onClick={() => setSettingsOpen(true)}
                 className="flex items-center gap-3 text-sm w-full p-2 hover:bg-slate-800 rounded-lg transition-colors"
             >
                 <Settings size={18} /> {t('sidebar.settings')}
+            </button>
+            <button
+                onClick={() => setAboutOpen(true)}
+                className="flex items-center gap-3 text-sm w-full p-2 hover:bg-slate-800 rounded-lg transition-colors"
+            >
+                <Info size={18} /> {t('sidebar.about') || "About"}
             </button>
         </div>
       </div>
@@ -460,8 +528,9 @@ function App() {
                             ? "bg-blue-600 text-white rounded-br-sm" 
                             : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm"
                     )}>
-                        {/* Thinking Steps */}
-                        {msg.steps && msg.steps.length > 0 && (
+
+                        {/* Thinking Steps (Show if Dev Mode or (User Mode and currently loading)) */}
+                        {(showDevMode || msg.isLoading) && msg.steps && msg.steps.length > 0 && (
                             <div className="mb-4 space-y-2">
                                 {showDevMode ? (
                                     // Developer Mode: Show all steps detailed
@@ -485,10 +554,10 @@ function App() {
                                         </div>
                                     ))
                                 ) : (
-                                    // User Mode: Show simple summary
-                                    <div className="flex items-center gap-2 text-xs text-slate-500 italic">
+                                    // User Mode (Loading only): Show simple summary
+                                    <div className="flex items-center gap-2 text-xs text-slate-500 italic animate-pulse">
                                         <Brain size={12} />
-                                        <span>{t('chat.stepsCompleted').replace('{count}', msg.steps.length)}</span>
+                                        <span>{t('chat.stepsCompleted').replace('{count}', msg.steps.length) || "Thinking..."}</span>
                                     </div>
                                 )}
                             </div>
@@ -504,7 +573,8 @@ function App() {
                             </div>
                         )}
 
-                        {!msg.isError && (
+                        {/* Main Content (Markdown) */}
+                        {!msg.isError && msg.content && (
                             <ReactMarkdown
                                 className="prose prose-sm max-w-none dark:prose-invert prose-p:leading-relaxed prose-pre:bg-slate-800 prose-pre:text-slate-100"
                                 components={{
@@ -518,36 +588,44 @@ function App() {
                             </ReactMarkdown>
                         )}
                         
-                        {msg.sql && showDevMode && (
-                            <div className="mt-4">
-                                <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
-                                    <Database size={12} /> {t('chat.executingSql')}
-                                </div>
-                                <div className="bg-slate-900 text-slate-200 p-3 rounded-lg text-xs font-mono overflow-x-auto border border-slate-800 shadow-inner">
-                                    {msg.sql}
-                                </div>
+                        {/* Developer Mode: SQL & Stats */}
+                        {showDevMode && !msg.isLoading && (
+                            <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
+                                {msg.sql && (
+                                    <div>
+                                        <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                                            <Database size={12} /> SQL
+                                        </div>
+                                        <div className="bg-slate-900 text-slate-200 p-3 rounded-lg text-xs font-mono overflow-x-auto border border-slate-800 shadow-inner">
+                                            {msg.sql}
+                                        </div>
+                                    </div>
+                                )}
+                                {(msg.execution_time || msg.rows_count) && (
+                                     <div className="flex gap-4 text-xs text-slate-400 font-mono">
+                                        {msg.execution_time && <span>Time: {msg.execution_time}s</span>}
+                                        {msg.rows_count && <span>Rows: {msg.rows_count}</span>}
+                                     </div>
+                                )}
                             </div>
                         )}
 
-                        {/* Artifacts / Charts */}
+                        {/* Artifacts / Charts (Always visible if present) */}
                         {msg.visualization && (
                             <ArtifactViewer artifacts={msg.visualization} />
                         )}
+
+                        {/* Loading Spinner (during generation, when not showing steps in user mode) */}
+                        {msg.isLoading && !msg.content && !showDevMode && (!msg.steps || msg.steps.length === 0) && (
+                            <div className="flex items-center gap-2 text-slate-400 text-sm mt-2">
+                                <Loader2 className="animate-spin" size={16} />
+                                <span>Generating...</span>
+                            </div>
+                        )}
+
                     </div>
                 </div>
             ))}
-            
-            {isLoading && (
-                 <div className="flex gap-4 max-w-4xl mx-auto">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <Brain size={16} className="text-blue-600" />
-                    </div>
-                    <div className="bg-white px-5 py-4 rounded-2xl rounded-bl-sm border border-slate-200 shadow-sm flex items-center gap-3">
-                        <Loader2 className="animate-spin text-blue-600" size={18} />
-                        <span className="text-sm text-slate-500 font-medium animate-pulse">{t('chat.analyzing')}</span>
-                    </div>
-                 </div>
-            )}
             <div ref={messagesEndRef} />
         </div>
 
