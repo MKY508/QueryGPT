@@ -42,12 +42,12 @@ export default function AboutModal({ isOpen, onClose }) {
                     {t('about.architecture') || "System Architecture"}
                 </h3>
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-600 leading-relaxed">
-                    QueryGPT is a modern data analysis agent powered by LLMs (Large Language Models).
-                    It bridges natural language and database execution using a secure sandboxed interpreter.
+                    QueryGPT 是一个由大语言模型（LLM）驱动的现代数据分析智能体。
+                    它利用安全的沙箱解释器，架起了自然语言与数据库执行之间的桥梁。
                     <ul className="list-disc list-inside mt-2 space-y-1 text-slate-500">
-                        <li><strong>Backend:</strong> Flask + OpenInterpreter (Sandboxed execution)</li>
-                        <li><strong>Frontend:</strong> React + Vite + TailwindCSS</li>
-                        <li><strong>Communication:</strong> SSE Streaming for real-time thinking process</li>
+                        <li><strong>后端：</strong> Flask + OpenInterpreter（沙箱执行环境）</li>
+                        <li><strong>前端：</strong> React + Vite + TailwindCSS</li>
+                        <li><strong>通信：</strong> SSE 流式传输，实时展示思考过程</li>
                     </ul>
                 </div>
             </div>
@@ -56,7 +56,7 @@ export default function AboutModal({ isOpen, onClose }) {
             <div className="space-y-3">
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                     <User size={14} />
-                    {t('about.developer') || "Developer"}
+                    {t('about.developer') || "开发者"}
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center gap-3">
@@ -64,7 +64,7 @@ export default function AboutModal({ isOpen, onClose }) {
                             M
                         </div>
                         <div>
-                            <div className="text-xs text-blue-400 font-medium">Author</div>
+                            <div className="text-xs text-blue-400 font-medium">作者</div>
                             <div className="text-sm font-semibold text-blue-700">MKY</div>
                         </div>
                     </div>
@@ -74,7 +74,7 @@ export default function AboutModal({ isOpen, onClose }) {
                             <Mail size={16} />
                         </div>
                         <div className="overflow-hidden">
-                            <div className="text-xs text-slate-400 font-medium">Email</div>
+                            <div className="text-xs text-slate-400 font-medium">邮箱</div>
                             <div className="text-sm font-semibold text-slate-700 truncate" title="mky369258@gmail.com">mky369258...</div>
                         </div>
                     </a>
@@ -93,7 +93,7 @@ export default function AboutModal({ isOpen, onClose }) {
                     <span className="font-medium">mky508/querygpt</span>
                 </a>
                 <div className="text-center mt-3 text-xs text-slate-400">
-                    Version 0.4.3 • Open Source License
+                    版本 0.4.3 • 开源协议
                 </div>
             </div>
         </div>
