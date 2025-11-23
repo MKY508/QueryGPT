@@ -249,7 +249,8 @@ def chat_stream():
                                 "execution_time": result.get('execution_time'),
                                 "rows_affected": result.get('rows_count'),
                                 "visualization": result.get('visualization'),
-                                "model": result.get('model')
+                                "model": result.get('model'),
+                                "steps": result.get('steps')
                             }
                         if isinstance(assistant_content, dict) and 'content' in assistant_content:
                             content_to_save = json.dumps({"type": "dual_view", "data": assistant_content}, ensure_ascii=False)
@@ -631,7 +632,8 @@ def chat():
                     "execution_time": result.get('execution_time'),
                     "rows_affected": result.get('rows_count'),
                     "visualization": result.get('visualization'),
-                    "model": result.get('model')
+                    "model": result.get('model'),
+                    "steps": result.get('steps')
                 }
             if isinstance(assistant_content, dict) and 'content' in assistant_content:
                 content_to_save = json.dumps({"type": "dual_view", "data": assistant_content}, ensure_ascii=False)
