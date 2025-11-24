@@ -132,6 +132,7 @@ function App() {
   };
 
   const parseMessageContent = (content) => {
+    if (content === null || content === undefined) return '';
     if (typeof content !== 'string') return JSON.stringify(content);
     
     // 尝试解析 JSON 字符串
@@ -142,24 +143,26 @@ function App() {
             // 处理 raw_output
             if (Array.isArray(parsed)) {
                 return parsed
-                    .filter(item => item.content)
+                    .filter(item => item && item.content)
                     .map(item => item.content)
                     .join('\n\n');
             }
             
-            if (parsed.type === 'dual_view') {
-                return parsed.data.content || JSON.stringify(parsed.data);
-            }
-            if (parsed.type === 'raw_output') {
-                if (Array.isArray(parsed.data)) {
-                     return parsed.data
-                        .filter(item => item.content)
-                        .map(item => item.content)
-                        .join('\n\n');
+            if (parsed && typeof parsed === 'object') {
+                if (parsed.type === 'dual_view') {
+                    return parsed.data?.content || JSON.stringify(parsed.data || '');
                 }
-                return parsed.data;
+                if (parsed.type === 'raw_output') {
+                    if (Array.isArray(parsed.data)) {
+                         return parsed.data
+                            .filter(item => item && item.content)
+                            .map(item => item.content)
+                            .join('\n\n');
+                    }
+                    return parsed.data || '';
+                }
+                if (parsed.content) return parsed.content;
             }
-            if (parsed.content) return parsed.content;
         }
     } catch (e) {
         // 解析失败，说明是普通文本
@@ -301,20 +304,27 @@ function App() {
             setMessages(prev => {
                 const newMessages = [...prev];
                 const lastMsgIndex = newMessages.length - 1;
+                // Safety check: ensure we have messages
+                if (lastMsgIndex < 0) return prev;
+
                 const lastMsg = { ...newMessages[lastMsgIndex] }; // Clone last message
 
-                if (lastMsg.role !== 'assistant') return prev; // Should not happen
+                if (lastMsg.role !== 'assistant') return prev;
+
+                // Ensure steps array exists
+                if (!lastMsg.steps) lastMsg.steps = [];
 
                 if (data.type === 'progress') {
-                    // Update steps
-                     // Avoid duplicates
-                    const exists = lastMsg.steps.find(s => s.summary === data.data.message);
-                    if (!exists) {
-                        lastMsg.steps = [...lastMsg.steps, {
-                            index: lastMsg.steps.length + 1,
-                            summary: data.data.message,
-                            stage: data.data.stage
-                        }];
+                    // Update steps (Thinking process)
+                    if (data.data && data.data.message) {
+                        const exists = lastMsg.steps.find(s => s.summary === data.data.message);
+                        if (!exists) {
+                            lastMsg.steps = [...lastMsg.steps, {
+                                index: lastMsg.steps.length + 1,
+                                summary: data.data.message,
+                                stage: data.data.stage
+                            }];
+                        }
                     }
                 } else if (data.type === 'result') {
                     // Update final result
@@ -324,8 +334,8 @@ function App() {
                         lastMsg.sql = data.data.sql;
                         lastMsg.execution_time = data.data.execution_time;
                         lastMsg.rows_count = data.data.rows_count;
-                        // Ensure steps are synced if backend sends them
-                        if (data.data.steps && data.data.steps.length > 0) {
+                        // Sync steps if backend sends a final list
+                        if (data.data.steps && Array.isArray(data.data.steps) && data.data.steps.length > 0) {
                              lastMsg.steps = data.data.steps;
                         }
                         if (data.data.conversation_id) {
@@ -353,9 +363,11 @@ function App() {
         setMessages(prev => {
             const newMessages = [...prev];
             const lastMsg = newMessages[newMessages.length - 1];
-            lastMsg.isError = true;
-            lastMsg.content = `请求失败: ${err.message || '未知错误'}`;
-            lastMsg.isLoading = false;
+            if (lastMsg) {
+                lastMsg.isError = true;
+                lastMsg.content = `请求失败: ${err.message || '未知错误'}`;
+                lastMsg.isLoading = false;
+            }
             return newMessages;
         });
         setIsLoading(false);
@@ -530,37 +542,36 @@ function App() {
                             : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm"
                     )}>
 
-                        {/* Thinking Steps (Show if Dev Mode or (User Mode and currently loading)) */}
-                        {(showDevMode || msg.isLoading) && msg.steps && msg.steps.length > 0 && (
+                        {/* Thinking Steps (Show if Dev Mode) */}
+                        {showDevMode && msg.steps && msg.steps.length > 0 && (
                             <div className="mb-4 space-y-2">
-                                {showDevMode ? (
-                                    // Developer Mode: Show all steps detailed
-                                    msg.steps.map((step, i) => (
-                                        <div
-                                            key={i}
-                                            className={clsx(
-                                                "flex items-start gap-2 text-xs p-2 rounded border transition-all",
-                                                step.isError
-                                                    ? "bg-red-50 text-red-600 border-red-100"
-                                                    : "bg-slate-50 text-slate-500 border-slate-100"
-                                            )}
-                                        >
-                                            <div className={clsx(
-                                                "w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold",
-                                                step.isError ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
-                                            )}>
-                                                {step.index}
-                                            </div>
-                                            <span className={step.isError ? "font-medium" : ""}>{step.summary}</span>
+                                {msg.steps.map((step, i) => (
+                                    <div
+                                        key={i}
+                                        className={clsx(
+                                            "flex items-start gap-2 text-xs p-2 rounded border transition-all",
+                                            step.isError
+                                                ? "bg-red-50 text-red-600 border-red-100"
+                                                : "bg-slate-50 text-slate-500 border-slate-100"
+                                        )}
+                                    >
+                                        <div className={clsx(
+                                            "w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold",
+                                            step.isError ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
+                                        )}>
+                                            {step.index}
                                         </div>
-                                    ))
-                                ) : (
-                                    // User Mode (Loading only): Show simple summary
-                                    <div className="flex items-center gap-2 text-xs text-slate-500 italic animate-pulse">
-                                        <Brain size={12} />
-                                        <span>{t('chat.stepsCompleted').replace('{count}', msg.steps.length) || "Thinking..."}</span>
+                                        <span className={step.isError ? "font-medium" : ""}>{step.summary}</span>
                                     </div>
-                                )}
+                                ))}
+                            </div>
+                        )}
+
+                        {/* User Mode: Simple Loading Indicator */}
+                        {!showDevMode && msg.isLoading && !msg.content && (
+                            <div className="flex items-center gap-2 text-slate-400 text-sm mt-2 mb-2">
+                                <Loader2 className="animate-spin" size={16} />
+                                <span>{t('chat.analyzing') || "正在分析数据..."}</span>
                             </div>
                         )}
 
@@ -616,8 +627,8 @@ function App() {
                             <ArtifactViewer artifacts={msg.visualization} />
                         )}
 
-                        {/* Loading Spinner (during generation, when not showing steps in user mode) */}
-                        {msg.isLoading && !msg.content && !showDevMode && (!msg.steps || msg.steps.length === 0) && (
+                        {/* Dev Mode Loading Spinner */}
+                        {msg.isLoading && !msg.content && showDevMode && (!msg.steps || msg.steps.length === 0) && (
                             <div className="flex items-center gap-2 text-slate-400 text-sm mt-2">
                                 <Loader2 className="animate-spin" size={16} />
                                 <span>Generating...</span>
