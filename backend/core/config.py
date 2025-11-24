@@ -350,7 +350,12 @@ class ConfigLoader:
                 with open(models_path, 'r', encoding='utf-8') as f:
                     models_data = json.load(f)
                 if isinstance(models_data, dict):
-                    models_entries = models_data.get('models', [])
+                    raw_models = models_data.get('models', [])
+                    if isinstance(raw_models, dict):
+                        # 如果 models 是字典，转换为列表
+                        models_entries = list(raw_models.values())
+                    else:
+                        models_entries = raw_models
                 elif isinstance(models_data, list):
                     models_entries = models_data
                 else:

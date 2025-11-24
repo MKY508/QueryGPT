@@ -6,10 +6,12 @@ import os
 import json
 import signal
 import warnings
-from typing import Dict, Any, Optional, Set, List, Tuple
+from typing import Dict, Any, Optional, Set, List, Tuple, Generator, Union
 import logging
 import re
 import shutil
+import time
+from threading import Lock, Thread, Event
 
 warnings.filterwarnings(
     "ignore",
@@ -30,13 +32,6 @@ except ImportError:
     class OpenInterpreter:
         def __init__(self):
             raise NotImplementedError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
-
-# Lazy import to avoid circular dependency
-# from backend.core.config import ConfigLoader
-# from backend.query_clarifier import SmartQueryProcessor  # 已禁用查询澄清器
-import time
-import signal
-from threading import Lock, Thread, Event
 
 # 尝试导入 psutil，如果失败则设置标志
 try:
@@ -117,17 +112,36 @@ class InterpreterManager:
                         self.safe_mode = 'off'
                         self.llm = type('LLM', (), {'api_key': None, 'api_base': None, 'model': None})()
                         self.system_message = ""
-                    def chat(self, prompt):
-                        return [{"role": "assistant", "content": "OK"}]
+                    def chat(self, prompt, stream=False, display=False):
+                        if stream:
+                            # 模拟流式生成
+                            yield {"role": "assistant", "type": "message", "content": "好的，我来帮你分析数据。"}
+                            time.sleep(0.5)
+                            yield {"role": "computer", "type": "code", "format": "python", "content": "import pandas as pd\nprint('Hello')"}
+                            time.sleep(0.5)
+                            yield {"role": "computer", "type": "console", "content": "Hello"}
+                            time.sleep(0.5)
+                            yield {"role": "assistant", "type": "message", "content": "分析完成，这是结论。"}
+                            yield {"role": "assistant", "type": "message", "content": "output.html", "end": True} # 模拟结束
+                        else:
+                            return [{"role": "assistant", "content": "OK"}]
                 return _DummyInterpreter()
             raise RuntimeError("OpenInterpreter未安装。请运行: pip install open-interpreter==0.4.3")
         
         from backend.core.config import ConfigLoader
-        model_name = model_name or self.config.get("current_model", "gpt-4o")
+        # 重新加载配置以确保获取最新状态
+        api_config = ConfigLoader.get_api_config()
+
+        model_name = model_name or api_config.get("default_model", "gpt-4o")
         model_name = ConfigLoader.normalize_model_id(model_name)
-        models_dict = self.config.get("models", {})
+        models_dict = api_config.get("models", {})
         model_config = models_dict.get(model_name) or models_dict.get(ConfigLoader.normalize_model_id(model_name))
         
+        if not model_config:
+            # 尝试使用 self.config 作为后备
+            models_dict = self.config.get("models", {})
+            model_config = models_dict.get(model_name) or models_dict.get(ConfigLoader.normalize_model_id(model_name))
+
         if not model_config:
             raise ValueError(f"模型配置不存在: {model_name}")
         
@@ -155,18 +169,55 @@ class InterpreterManager:
     
     def execute_query(self, query: str, context: Dict[str, Any] = None, 
                      model_name: Optional[str] = None, conversation_id: Optional[str] = None,
-                     stop_checker: Optional[callable] = None, language: str = 'zh') -> Dict[str, Any]:
+                     stop_checker: Optional[callable] = None, language: str = 'zh', stream: bool = False) -> Union[Dict[str, Any], Generator[Dict[str, Any], None, None]]:
         """
-        执行查询并返回结果，支持会话上下文和中断
+        执行查询并返回结果，支持会话上下文和中断。
+        如果 stream=True，返回一个生成器，逐个yield中间步骤和最终结果。
+        """
+        if stream:
+             return self._execute_query_stream(query, context, model_name, conversation_id, stop_checker, language)
+        else:
+            # 非流式调用：消费生成器并返回最终结果
+            generator = self._execute_query_stream(query, context, model_name, conversation_id, stop_checker, language)
+            final_result = None
+            steps = []
+            try:
+                for item in generator:
+                    if item.get('type') == 'result':
+                        final_result = item
+                    elif item.get('type') == 'step':
+                        # 这里可以收集步骤，但对于非流式调用，通常只关心最终结果
+                        pass
+            except Exception as e:
+                logger.error(f"非流式执行出错: {e}")
+                return {
+                    "success": False,
+                    "error": str(e),
+                    "model": model_name or self.config.get("current_model"),
+                    "conversation_id": conversation_id,
+                    "steps": []
+                }
+
+            if final_result:
+                # 提取最终的 response_payload (去除 type: result 包装)
+                return final_result.get('payload', final_result)
+            return {
+                "success": False,
+                "error": "No result returned",
+                "conversation_id": conversation_id
+            }
+
+    def _execute_query_stream(self, query: str, context: Dict[str, Any] = None,
+                     model_name: Optional[str] = None, conversation_id: Optional[str] = None,
+                     stop_checker: Optional[callable] = None, language: str = 'zh') -> Generator[Dict[str, Any], None, None]:
+        """
+        内部流式执行方法
         """
         try:
             context = dict(context or {})
-            # 查询澄清检查已禁用 - 让 OpenInterpreter 自行处理所有查询
-            # 直接使用原始查询，不进行预处理
-            # 创建新的interpreter实例
             interpreter = self.create_interpreter(model_name)
             
-            # 加载prompt配置来设置系统消息
+            # 加载prompt配置
             prompt_config = {}
             config_path = os.path.join(os.path.dirname(__file__), 'prompt_config.json')
             try:
@@ -176,10 +227,9 @@ class InterpreterManager:
             except Exception as e:
                 logger.warning(f"加载prompt配置失败: {e}")
             
-            # 根据路由类型和语言设置系统消息
+            # 设置 Prompt (省略具体内容，与原方法一致)
             lang_key = 'en' if language == 'en' else 'zh'
             route_type = context.get('route_type', 'ANALYSIS')
-
             system_messages = (prompt_config or {}).get('systemMessage', {})
 
             def _apply_prompt(category: str, default_zh: str, default_en: str, log_suffix: str):
@@ -190,22 +240,24 @@ class InterpreterManager:
                     interpreter.system_message = default_zh if lang_key == 'zh' else default_en
                 logger.info(f"使用{category}路由的{log_suffix}")
 
+            # 复用原有的 prompt 设置逻辑
             if route_type == 'QA':
-                default_zh = """
+                _apply_prompt('QA',
+                             """
                 你是一个数据库助手。当用户提问与数据库或分析无关时，请礼貌拒绝：
                 - 明确说明你专注于数据库取数与分析
                 - 引导用户提供具体的表名、指标或时间范围
                 - 不编造答案，只提供诚恳建议
-                """
-                default_en = """
+                """,
+                             """
                 You are a database assistant. When the query is unrelated to databases or analytics:
                 - Politely explain you focus on database retrieval and analysis only
                 - Guide the user to provide table names, metrics, or time ranges
                 - Do not fabricate answers; offer constructive suggestions
-                """
-                _apply_prompt('QA', default_zh, default_en, '礼貌拒绝prompt')
+                """, '礼貌拒绝prompt')
             else:
-                default_zh = """你是一个完整的数据分析 Agent，直接在沙箱中运行 Python 代码以完成用户的数据分析需求。
+                 _apply_prompt('ANALYSIS',
+                              """你是一个完整的数据分析 Agent，直接在沙箱中运行 Python 代码以完成用户的数据分析需求。
 
 **完成标准（缺一不可）：**
 ✓ 生成至少一个 Plotly 图表，保存为 HTML
@@ -237,8 +289,8 @@ class InterpreterManager:
 - [ ] 是否已准备好【开发者视图】（含 SQL/路径）？
 - 如有任一未完成，继续执行而不要结束回复。
 
-如果遇到阻塞问题（连接失败、无数据），明确报告并给出建议，但不要返回半成品。"""
-                default_en = """You are a complete data analysis agent that runs Python code directly in a sandbox to fulfil the user's analytical request.
+如果遇到阻塞问题（连接失败、无数据），明确报告并给出建议，但不要返回半成品。""",
+                              """You are a complete data analysis agent that runs Python code directly in a sandbox to fulfil the user's analytical request.
 
 **Completion criteria (all required):**
 ✓ Generate at least one Plotly chart, saved as HTML
@@ -252,7 +304,7 @@ The entire analysis is one complete task—finish all steps in a single response
 1. Connect to database (using provided credentials)
 2. Self-explore (choose commands based on the database driver)
    - MySQL/Doris: use `SHOW DATABASES;`, `SHOW TABLES;`, `DESCRIBE <table>;`
-   - SQLite: use `PRAGMA database_list;`, `SELECT name FROM sqlite_master WHERE type='table';`, `PRAGMA table_info('<table>');`
+   - SQLite: use `PRAGMA database_list;`、`SELECT name FROM sqlite_master WHERE type='table';`、`PRAGMA table_info('<表名>');`
 3. Write and execute read-only SQL to fetch data
 4. Process with pandas, generate Plotly charts (Chinese titles/legends), save to output/
 5. Output dual-view summary
@@ -270,31 +322,16 @@ You may output `[Step N] brief description` before execution to inform users of 
 - [ ] Have you prepared the "Developer View" (with SQL/paths)?
 - If any is missing, keep working instead of ending the response.
 
-If blocked (connection failure, no data), report clearly and suggest next steps, but don't return a half-finished result."""
-                _apply_prompt('ANALYSIS', default_zh, default_en, '数据分析prompt')
-            
-            # 获取会话历史（如果有）
+If blocked (connection failure, no data), report clearly and suggest next steps, but don't return a half-finished result.""", '数据分析prompt')
+
+            # 注入历史上下文
             conversation_history = None
             if conversation_id:
                 conversation_history = self._get_conversation_history(conversation_id)
-                logger.info(f"[会话上下文] 会话ID: {conversation_id}, 历史消息数: {len(conversation_history) if conversation_history else 0}")
                 if conversation_history:
-                    logger.debug(f"[会话上下文] 最近消息: {conversation_history[-2:] if len(conversation_history) >= 2 else conversation_history}")
-
-                    # 按上下文轮数限制加载到 interpreter 的消息数量
-                    max_rounds_raw = getattr(self, 'max_history_rounds', 3)
-                    try:
-                        max_rounds = int(max_rounds_raw if max_rounds_raw is not None else 3)
-                    except (TypeError, ValueError):
-                        max_rounds = 3
-                    if max_rounds < 0:
-                        max_rounds = 0
-
-                    if max_rounds == 0:
-                        truncated_history = []
-                    else:
-                        max_messages = max_rounds * 2
-                        truncated_history = conversation_history[-max_messages:]
+                    max_rounds = int(getattr(self, 'max_history_rounds', 3) or 3)
+                    max_messages = max_rounds * 2
+                    truncated_history = conversation_history[-max_messages:] if max_rounds > 0 else []
 
                     if not hasattr(interpreter, 'messages') or interpreter.messages is None:
                         interpreter.messages = []
@@ -302,176 +339,177 @@ If blocked (connection failure, no data), report clearly and suggest next steps,
                         interpreter.messages = []
 
                     for msg in truncated_history:
-                        role = msg.get('role') or 'assistant'
                         content = msg.get('content')
-                        if not content:
-                            continue
-                        interpreter.messages.append({
-                            "role": role,
-                            "content": content,
-                            "type": "message"
-                        })
-
-                    logger.info(
-                        "已将 %s 条历史消息注入 interpreter (max_rounds=%s)",
-                        len(interpreter.messages),
-                        max_rounds,
-                    )
-            else:
-                logger.warning("[会话上下文] 未提供会话ID，无法维持对话上下文")
+                        if content:
+                            interpreter.messages.append({
+                                "role": msg.get('role') or 'assistant',
+                                "content": content,
+                                "type": "message"
+                            })
             
-            # 构建简洁的提示词（只包含连接参数和用户问题）
+            # 构建 Prompt
             full_prompt = self._build_prompt_with_context(query, context, conversation_history, language)
-            logger.debug(f"[提示词] 构建的完整提示词长度: {len(full_prompt)} 字符")
-            logger.debug(f"[System Message] 长度: {len(interpreter.system_message)} 字符")
             
-            # 存储当前的interpreter以便停止
+            # 存储 Session
             if conversation_id:
                 with self._session_lock:
-                    # 安全修复：检查缓存大小限制
                     self._cleanup_expired_sessions_locked()
                     self._evict_if_needed_locked()
                     self._session_cache[conversation_id] = interpreter
                     self._session_last_active[conversation_id] = time.time()
             
-            # 执行查询
-            logger.info(f"执行查询: {query[:100]}... (会话ID: {conversation_id})")
-            
-            # 检查是否需要停止
-            if stop_checker and stop_checker():
-                logger.info(f"查询被用户中断: {conversation_id}")
-                return {
-                    "success": False,
-                    "error": "查询被用户中断",
-                    "interrupted": True,
-                    "model": model_name or self.config.get("current_model"),
-                    "conversation_id": conversation_id
-                }
-            
-            # 启动持续进程监控（测试环境禁用以提升速度与兼容性）
+            # 启动监控
             if conversation_id and os.getenv('TESTING', '').lower() != 'true':
                 self._start_process_monitoring(conversation_id)
             
-            # 执行查询（带停止检查）
-            steps = []
+            # 开始流式执行
+            accumulated_result = [] # 收集所有 chunks 以构建最终结果
+            steps_collected = []
+
             try:
-                # 创建一个包装函数来定期检查停止状态
-                result = None
-                error_occurred = False
+                # 使用 interpreter.chat(stream=True)
+                # Open Interpreter 0.2.x+ 支持 stream=True
+                # 如果是模拟器，我们在上面已经 mock 了
+                chunks = interpreter.chat(full_prompt, stream=True, display=False)
                 
-                def execute_with_check():
-                    nonlocal result, error_occurred
-                    try:
-                        result = interpreter.chat(full_prompt)
-                    except KeyboardInterrupt:
-                        logger.info(f"查询被键盘中断: {conversation_id}")
-                        error_occurred = True
-                    except Exception as e:
-                        logger.error(f"执行出错: {e}")
-                        error_occurred = True
-                        result = str(e)
-                
-                # 在单独线程执行，以便能够中断
-                exec_thread = Thread(target=execute_with_check)
-                exec_thread.start()
-                
-                # 等待执行完成或停止信号
-                while exec_thread.is_alive():
+                for chunk in chunks:
                     if stop_checker and stop_checker():
-                        logger.info(f"检测到停止信号，尝试中断执行: {conversation_id}")
-                        
-                        # 尝试中断interpreter
-                        if hasattr(interpreter, 'stop') and callable(interpreter.stop):
-                            interpreter.stop()
-                        
-                        # 终止所有子进程
-                        self._terminate_processes(conversation_id)
-                        
-                        # 等待线程结束
-                        exec_thread.join(timeout=2)
-                        
-                        return {
-                            "success": False,
-                            "error": "查询被用户中断",
-                            "interrupted": True,
-                            "model": model_name or self.config.get("current_model"),
-                            "conversation_id": conversation_id
-                        }
+                         raise KeyboardInterrupt("用户中断")
                     
-                    time.sleep(0.1)  # 每100ms检查一次
+                    accumulated_result.append(chunk)
+
+                    # 分析 chunk 类型并 yield 步骤
+                    step_info = self._analyze_chunk_for_step(chunk)
+                    if step_info:
+                         # 避免重复发送相同的步骤
+                         if not steps_collected or steps_collected[-1]['summary'] != step_info['summary']:
+                            steps_collected.append(step_info)
+                            yield {"type": "step", "step": step_info}
                 
-                exec_thread.join()
-                
-                if error_occurred:
-                    raise Exception(f"执行出错: {result}")
-                try:
-                    steps = self._extract_steps_from_result_payload(result)
-                except Exception as step_err:  # pylint: disable=broad-except
-                    logger.debug("提取思考步骤失败: %s", step_err)
-                    steps = []
-                
+            except KeyboardInterrupt:
+                 logger.info(f"查询被中断: {conversation_id}")
+                 yield {
+                    "type": "result",
+                    "payload": {
+                        "success": False,
+                        "error": "查询被中断",
+                        "interrupted": True,
+                        "model": model_name or self.config.get("current_model"),
+                        "conversation_id": conversation_id
+                    }
+                 }
+                 return
+            except Exception as e:
+                 logger.error(f"执行查询失败: {e}")
+                 yield {
+                    "type": "result",
+                    "payload": {
+                        "success": False,
+                        "error": str(e),
+                        "model": model_name or self.config.get("current_model"),
+                        "conversation_id": conversation_id,
+                        "steps": steps_collected
+                    }
+                 }
+                 return
             finally:
-                # 停止进程监控
                 if conversation_id:
                     self._stop_process_monitoring(conversation_id)
+
+            # 最终处理
+            # 收集 artifacts
+            artifacts = self._collect_generated_artifacts(accumulated_result)
             
-            # 收集生成的文件，并确保在结果中体现
-            artifacts = self._collect_generated_artifacts(result)
-            if artifacts and isinstance(result, list):
-                existing_messages = {item.get('content') for item in result if isinstance(item, dict)}
-                for artifact in artifacts:
+            # 如果有 artifacts，添加到 accumulated_result 以便保存历史
+            if artifacts:
+                 existing_messages = {item.get('content') for item in accumulated_result if isinstance(item, dict)}
+                 for artifact in artifacts:
                     message = (
                         f"生成图表文件: {artifact['filename']}\n"
                         f"访问链接: {artifact['url']}"
                     )
                     if message not in existing_messages:
-                        result.append({
-                            "type": "console",
-                            "content": message
-                        })
-                        existing_messages.add(message)
+                         accumulated_result.append({"type": "console", "content": message})
+                         existing_messages.add(message)
 
-            # 保存到会话历史
+            # 保存历史
             if conversation_id:
-                self._save_to_history(conversation_id, query, result)
+                self._save_to_history(conversation_id, query, accumulated_result)
             
-            # 处理结果
-            response_payload = {
+            # 构建最终结果 Payload
+            result_payload = {
                 "success": True,
-                "result": result,
+                "result": accumulated_result, # OpenInterpreter 返回的是 List[Dict]
                 "model": model_name or self.config.get("current_model"),
                 "conversation_id": conversation_id,
-                "steps": steps
+                "steps": steps_collected
             }
             if artifacts:
-                response_payload["visualization"] = artifacts
-                response_payload.setdefault("artifacts", artifacts)
-            return response_payload
+                result_payload["visualization"] = artifacts
             
-        except KeyboardInterrupt:
-            logger.info(f"查询被中断: {conversation_id}")
-            return {
-                "success": False,
-                "error": "查询被中断",
-                "interrupted": True,
-                "model": model_name or self.config.get("current_model"),
-                "conversation_id": conversation_id
-            }
-        except Exception as e:
-            logger.error(f"执行查询失败: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "model": model_name or self.config.get("current_model"),
-                "conversation_id": conversation_id,
-                "steps": []
-            }
-        finally:
-            # 清理session cache
+            yield {"type": "result", "payload": result_payload}
+
+            # 清理
             if conversation_id:
                 with self._session_lock:
                     self._session_cache.pop(conversation_id, None)
                     self._session_last_active.pop(conversation_id, None)
+
+        except Exception as e:
+            logger.error(f"Setup error in _execute_query_stream: {e}")
+            yield {
+                "type": "result",
+                "payload": {
+                    "success": False,
+                    "error": str(e),
+                    "conversation_id": conversation_id
+                }
+            }
+
+    def _analyze_chunk_for_step(self, chunk: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """分析 chunk 内容，生成前端友好的步骤信息"""
+        if not isinstance(chunk, dict):
+            return None
+
+        role = chunk.get('role')
+        msg_type = chunk.get('type')
+        content = chunk.get('content') or ''
+
+        if not content or not isinstance(content, str):
+            return None
+
+        # 1. 识别代码执行
+        if msg_type == 'code':
+            lang = chunk.get('format', 'code')
+            summary = f"正在编写 {lang} 代码..."
+            if 'import' in content:
+                summary = "正在导入依赖库..."
+            elif 'read_' in content or 'select' in content.lower():
+                summary = "正在读取数据..."
+            elif 'plot' in content or 'fig' in content:
+                summary = "正在生成图表..."
+            return {'summary': summary, 'stage': 'code'}
+
+        # 2. 识别控制台输出/执行
+        if msg_type == 'console':
+            summary = "正在执行代码..."
+            if 'Error' in content:
+                summary = "代码执行出错，正在重试..."
+            return {'summary': summary, 'stage': 'execute'}
+
+        # 3. 识别思考过程 (OpenInterpreter message often contains plan)
+        if role == 'assistant' and msg_type == 'message':
+            # 尝试提取显式的 [Step N] 标记
+            import re
+            step_match = re.match(r'\[(?:步骤|Step)\s*\d+\]\s*(.+)', content)
+            if step_match:
+                return {'summary': step_match.group(1), 'stage': 'plan'}
+
+            # 如果是短文本，可能是思考
+            if len(content) < 50 and 'Here is' not in content:
+                 return {'summary': content, 'stage': 'thought'}
+
+        return None
 
     def _cleanup_expired_sessions_locked(self) -> None:
         """在持有会话锁的情况下清理过期会话。"""
