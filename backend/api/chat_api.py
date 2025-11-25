@@ -258,18 +258,46 @@ def chat_stream():
                         result_payload = event.get('payload', {})
                         result = result_payload
 
-                        # 保存助手响应到历史 (已经在 InterpreterManager 中处理了，这里不需要重复保存)
-                        # 不过 chat_api 原来有这段逻辑，以防万一 InterpreterManager 没有保存成功，或者逻辑有变
-                        # InterpreterManager.execute_query (stream mode) 里已经调用了 _save_to_history
+                        # 提取纯文本结论
+                        final_conclusion = ""
+                        raw_result = result.get('result')
+
+                        if isinstance(raw_result, list):
+                            # 聚合所有非代码的助手消息内容
+                            message_parts = []
+                            for item in raw_result:
+                                if isinstance(item, dict) and item.get('role') == 'assistant' and item.get('type') == 'message':
+                                    content = item.get('content', '')
+                                    if content:
+                                        message_parts.append(str(content))
+
+                            if message_parts:
+                                full_text = "".join(message_parts)
+                                final_conclusion = _sanitize_user_facing_output(full_text)
+
+                        elif isinstance(raw_result, str):
+                            final_conclusion = _sanitize_user_facing_output(raw_result)
+
+                        # 提取SQL（如果result payload没有，尝试从raw result提取）
+                        final_sql = result.get('sql')
+                        if not final_sql and isinstance(raw_result, list):
+                            for item in raw_result:
+                                if isinstance(item, dict) and item.get('type') == 'code' and item.get('format') == 'sql':
+                                    final_sql = item.get('content')
+                                    break # 找到第一个SQL即可
 
                         # 结果事件
                         yield sse_format('result', {
                             'success': result.get('success', False),
-                            'result': result.get('result') or result.get('error'),
+                            'result': final_conclusion or result.get('error') or "分析完成", # 确保是字符串
+                            'raw_result': raw_result, # 保留原始结果以防万一
                             'model': result.get('model'),
                             'conversation_id': conv_id,
                             'steps': result.get('steps', []),
-                            'visualization': result.get('visualization')
+                            'visualization': result.get('visualization'),
+                            'sql': final_sql,
+                            'execution_time': result.get('execution_time'),
+                            'rows_count': result.get('rows_count')
                         })
 
                 if not result:

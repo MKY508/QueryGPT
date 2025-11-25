@@ -133,7 +133,19 @@ function App() {
 
   const parseMessageContent = (content) => {
     if (content === null || content === undefined) return '';
-    if (typeof content !== 'string') return JSON.stringify(content);
+
+    // Handle Array/Object inputs directly
+    if (typeof content === 'object') {
+        if (Array.isArray(content)) {
+             return content
+                .filter(item => item && typeof item === 'object' && item.role !== 'system' && item.type !== 'code') // Filter out code blocks from text view
+                .map(item => item.content || '')
+                .join('\n\n');
+        }
+        return content.content || JSON.stringify(content);
+    }
+
+    if (typeof content !== 'string') return String(content);
     
     // 尝试解析 JSON 字符串
     try {
@@ -143,7 +155,7 @@ function App() {
             // 处理 raw_output
             if (Array.isArray(parsed)) {
                 return parsed
-                    .filter(item => item && item.content)
+                    .filter(item => item && item.content && item.role !== 'system' && item.type !== 'code')
                     .map(item => item.content)
                     .join('\n\n');
             }
@@ -155,7 +167,7 @@ function App() {
                 if (parsed.type === 'raw_output') {
                     if (Array.isArray(parsed.data)) {
                          return parsed.data
-                            .filter(item => item && item.content)
+                            .filter(item => item && item.content && item.role !== 'system' && item.type !== 'code')
                             .map(item => item.content)
                             .join('\n\n');
                     }
@@ -317,6 +329,7 @@ function App() {
                 if (data.type === 'progress') {
                     // Update steps (Thinking process)
                     if (data.data && data.data.message) {
+                        // Avoid duplicates
                         const exists = lastMsg.steps.find(s => s.summary === data.data.message);
                         if (!exists) {
                             lastMsg.steps = [...lastMsg.steps, {
@@ -329,12 +342,20 @@ function App() {
                 } else if (data.type === 'result') {
                     // Update final result
                     if (data.data) {
-                        lastMsg.content = parseMessageContent(data.data.result);
+                        // Use the clean conclusion string provided by backend
+                        // If it's empty, fallback to raw_result parsing
+                        let finalContent = data.data.result;
+                        if (!finalContent && data.data.raw_result) {
+                            finalContent = parseMessageContent(data.data.raw_result);
+                        }
+
+                        lastMsg.content = finalContent;
                         lastMsg.visualization = data.data.visualization;
-                        lastMsg.sql = data.data.sql;
+                        lastMsg.sql = data.data.sql; // Explicit SQL from backend
                         lastMsg.execution_time = data.data.execution_time;
                         lastMsg.rows_count = data.data.rows_count;
-                        // Sync steps if backend sends a final list
+
+                        // Sync steps if backend sends a final list (to ensure completeness)
                         if (data.data.steps && Array.isArray(data.data.steps) && data.data.steps.length > 0) {
                              lastMsg.steps = data.data.steps;
                         }

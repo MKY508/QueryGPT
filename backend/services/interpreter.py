@@ -261,8 +261,7 @@ class InterpreterManager:
 
 **完成标准（缺一不可）：**
 ✓ 生成至少一个 Plotly 图表，保存为 HTML
-✓ 输出【用户视图】：2-3 句业务结论
-✓ 输出【开发者视图】：SQL、耗时、行数、文件路径
+✓ 输出2-3句简洁的业务结论（纯文本，不要包含代码或SQL）
 
 **执行原则：**
 整个分析是一个完整任务，在一次回复中完成所有步骤，不要分段输出或等待下一轮对话。
@@ -274,7 +273,12 @@ class InterpreterManager:
    - SQLite：使用 `PRAGMA database_list;`、`SELECT name FROM sqlite_master WHERE type='table';`、`PRAGMA table_info('<表名>');`
 3. 编写并执行只读 SQL 获取数据
 4. 用 pandas 处理，用 plotly 生成图表（中文标题/图例），保存到 output/
-5. 输出双视图总结
+5. 输出简洁的业务结论
+
+**重要提示：**
+- **不要**输出【用户视图】或【开发者视图】的分隔符。
+- **不要**在最终回复中包含 SQL 或执行细节（系统会自动捕获这些信息用于开发者模式展示）。
+- 只提供最终的业务分析结论。
 
 **数据库适配提示：**
 - 如果上下文提供 `database_driver` 或“方言提示”，必须遵循对应语法。
@@ -285,8 +289,7 @@ class InterpreterManager:
 
 **自检清单（回复前必查）：**
 - [ ] 是否已生成并保存 Plotly HTML？
-- [ ] 是否已准备好【用户视图】总结？
-- [ ] 是否已准备好【开发者视图】（含 SQL/路径）？
+- [ ] 是否已输出简明的业务结论？
 - 如有任一未完成，继续执行而不要结束回复。
 
 如果遇到阻塞问题（连接失败、无数据），明确报告并给出建议，但不要返回半成品。""",
@@ -294,8 +297,7 @@ class InterpreterManager:
 
 **Completion criteria (all required):**
 ✓ Generate at least one Plotly chart, saved as HTML
-✓ Provide "User View": 2-3 sentence business conclusion
-✓ Provide "Developer View": SQL, runtime, row count, file path
+✓ Provide a concise business conclusion (2-3 sentences)
 
 **Execution principle:**
 The entire analysis is one complete task—finish all steps in a single response, not segmented or awaiting the next turn.
@@ -307,7 +309,12 @@ The entire analysis is one complete task—finish all steps in a single response
    - SQLite: use `PRAGMA database_list;`、`SELECT name FROM sqlite_master WHERE type='table';`、`PRAGMA table_info('<表名>');`
 3. Write and execute read-only SQL to fetch data
 4. Process with pandas, generate Plotly charts (Chinese titles/legends), save to output/
-5. Output dual-view summary
+5. Output concise business conclusion
+
+**Important:**
+- Do NOT output "User View" or "Developer View" headers.
+- Do NOT include SQL or execution details in the final text (the system captures these automatically).
+- Only provide the final business analysis.
 
 **Database adaptation:**
 - When `database_driver` or dialect hints are provided, follow them strictly.
@@ -318,8 +325,7 @@ You may output `[Step N] brief description` before execution to inform users of 
 
 **Self-check before responding:**
 - [ ] Have you generated and saved a Plotly HTML?
-- [ ] Have you prepared the "User View" summary?
-- [ ] Have you prepared the "Developer View" (with SQL/paths)?
+- [ ] Have you provided the business conclusion?
 - If any is missing, keep working instead of ending the response.
 
 If blocked (connection failure, no data), report clearly and suggest next steps, but don't return a half-finished result.""", '数据分析prompt')
