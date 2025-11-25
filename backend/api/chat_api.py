@@ -228,55 +228,81 @@ def chat_stream():
                 else:
                     yield sse_format('progress', {'stage': 'analyze', 'message': '正在分析数据与生成图表…'})
 
-                # 执行查询
-                result = interpreter_manager.execute_query(
+                # 执行查询 - 改为流式调用
+                stream_generator = interpreter_manager.execute_query(
                     user_query,
                     context=context,
                     model_name=model_name,
                     conversation_id=conv_id,
                     stop_checker=lambda: _get_stop_status(conv_id),
-                    language=user_language
+                    language=user_language,
+                    stream=True  # 启用流式
                 )
 
-                # 保存助手响应到历史
-                if history_manager and conv_id:
-                    try:
-                        assistant_content = result.get('result', result.get('error', '执行失败'))
-                        execution_details = None
-                        if result.get('success'):
-                            execution_details = {
-                                "sql": result.get('sql'),
-                                "execution_time": result.get('execution_time'),
-                                "rows_affected": result.get('rows_count'),
-                                "visualization": result.get('visualization'),
-                                "model": result.get('model'),
-                                "steps": result.get('steps')
-                            }
-                        if isinstance(assistant_content, dict) and 'content' in assistant_content:
-                            content_to_save = json.dumps({"type": "dual_view", "data": assistant_content}, ensure_ascii=False)
-                        elif isinstance(assistant_content, list):
-                            content_to_save = json.dumps({"type": "raw_output", "data": assistant_content}, ensure_ascii=False)
-                        elif not isinstance(assistant_content, str):
-                            content_to_save = json.dumps(assistant_content, ensure_ascii=False)
-                        else:
-                            content_to_save = assistant_content
-                        history_manager.add_message(
-                            conversation_id=conv_id,
-                            message_type="assistant",
-                            content=content_to_save,
-                            execution_details=execution_details
-                        )
-                    except Exception as exc:
-                        logger.warning(f"保存助手消息到历史失败: {exc}")
+                result = None
 
-                # 结果事件
-                yield sse_format('result', {
-                    'success': result.get('success', False),
-                    'result': result.get('result') or result.get('error'),
-                    'model': result.get('model'),
-                    'conversation_id': conv_id,
-                    'steps': result.get('steps', [])
-                })
+                # 迭代生成器
+                for event in stream_generator:
+                    event_type = event.get('type')
+
+                    if event_type == 'step':
+                        # 发送进度步骤
+                        step_data = event.get('step', {})
+                        yield sse_format('progress', {
+                            'stage': step_data.get('stage', 'thought'),
+                            'message': step_data.get('summary', '')
+                        })
+
+                    elif event_type == 'result':
+                        # 最终结果
+                        result_payload = event.get('payload', {})
+                        result = result_payload
+
+                        # 提取纯文本结论
+                        final_conclusion = ""
+                        raw_result = result.get('result')
+
+                        if isinstance(raw_result, list):
+                            # 聚合所有非代码的助手消息内容
+                            message_parts = []
+                            for item in raw_result:
+                                if isinstance(item, dict) and item.get('role') == 'assistant' and item.get('type') == 'message':
+                                    content = item.get('content', '')
+                                    if content:
+                                        message_parts.append(str(content))
+
+                            if message_parts:
+                                full_text = "".join(message_parts)
+                                final_conclusion = _sanitize_user_facing_output(full_text)
+
+                        elif isinstance(raw_result, str):
+                            final_conclusion = _sanitize_user_facing_output(raw_result)
+
+                        # 提取SQL（如果result payload没有，尝试从raw result提取）
+                        final_sql = result.get('sql')
+                        if not final_sql and isinstance(raw_result, list):
+                            for item in raw_result:
+                                if isinstance(item, dict) and item.get('type') == 'code' and item.get('format') == 'sql':
+                                    final_sql = item.get('content')
+                                    break # 找到第一个SQL即可
+
+                        # 结果事件
+                        yield sse_format('result', {
+                            'success': result.get('success', False),
+                            'result': final_conclusion or result.get('error') or "分析完成", # 确保是字符串
+                            'raw_result': raw_result, # 保留原始结果以防万一
+                            'model': result.get('model'),
+                            'conversation_id': conv_id,
+                            'steps': result.get('steps', []),
+                            'visualization': result.get('visualization'),
+                            'sql': final_sql,
+                            'execution_time': result.get('execution_time'),
+                            'rows_count': result.get('rows_count')
+                        })
+
+                if not result:
+                    # 如果生成器结束但没有结果（异常情况）
+                     yield sse_format('error', {'error': 'Execution finished without result', 'conversation_id': conv_id})
 
                 yield sse_format('done', {'conversation_id': conv_id})
 
@@ -286,6 +312,7 @@ def chat_stream():
                 if interpreter_manager:
                     interpreter_manager.stop_query(conv_id)
             except Exception as e:
+                logger.error(f"Streaming error: {e}")
                 yield sse_format('error', {'error': str(e), 'conversation_id': conv_id})
             finally:
                 services.clear_active_query(conv_id)

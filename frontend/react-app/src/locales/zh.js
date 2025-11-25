@@ -10,6 +10,7 @@ export default {
         recentChats: "最近对话",
         newChat: "新对话",
         settings: "设置",
+        about: "关于",
         delete: "删除",
         unnamed: "未命名对话"
     },

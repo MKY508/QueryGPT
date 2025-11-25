@@ -52,9 +52,8 @@ Database: {conn.get('database', '')}"""
 产出要求（简洁）：
 - 如需可视化，将图表保存到 `output/`（文件名用 ASCII，例如 `sales_by_dept_2025_07.html`），**不要自动打开浏览器/HTML**。
 - **重要**：图表的标题、轴标签、图例等必须使用中文。
-- 文本末尾同时给出：
-  【用户视图】2–4 句业务结论（非技术）
-  【开发者视图】关键 SQL/耗时/行数/产物路径
+- 输出简洁的业务结论（纯文本）。
+- **不要**输出【用户视图】或【开发者视图】头部。
 - （可选）最后一行输出单行 JSON 便于前端解析，例如：
   `{ "ok": true, "view": "iframe_url"|"iframe_srcdoc"|"table-only", "chart_url": "/reports/xxx.html", "chart_html": "<div>...", "summary_user": "...", "summary_dev": "...", "artifacts": ["/abs/path/file1.html"] }`
 """
@@ -222,9 +221,8 @@ result = searcher.search_by_keyword("七折")  # 例如搜索"七折"相关字�
 输出要求：
 - 生成必要的可视化（Plotly），文件名使用 ASCII（如 `sales_by_dept_2025_07.html`），保存到 `output/`。
 - **重要**：图表的标题、轴标签、图例等必须使用中文，让业务人员能够理解。
-- 在文本末尾同时给出：
-  【用户视图】2–4 句业务结论
-  【开发者视图】关键 SQL、样本/行数、耗时、产物路径、潜在问题与建议
+- 输出简洁的业务结论。
+- **不要**输出【用户视图】或【开发者视图】头部。
 - （可选）最后一行输出单行 JSON 供前端解析：`{{"ok": true, "view": "iframe_url"|"iframe_srcdoc"|"table-only", "chart_url": "/reports/xxx.html", "chart_html": "<div>...", "summary_user": "...", "summary_dev": "...", "artifacts": ["/abs/path/file1.html"]}}`
 """
 

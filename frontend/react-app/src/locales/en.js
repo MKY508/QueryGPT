@@ -10,6 +10,7 @@ export default {
         recentChats: "RECENT CHATS",
         newChat: "New Chat",
         settings: "Settings",
+        about: "About",
         delete: "Delete",
         unnamed: "Unnamed Chat"
     },
