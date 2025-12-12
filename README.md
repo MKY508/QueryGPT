@@ -124,6 +124,19 @@ MIT License
 
 ---
 
+## v1 vs v2
+
+| | v1 | v2 |
+|---|---|---|
+| 架构 | Flask 单体 | FastAPI + Next.js 分离 |
+| 部署 | 一键 Render | Render + Vercel |
+| 认证 | 无 | JWT 多用户 |
+| 响应 | 同步 | SSE 流式 |
+
+> 如果只需要简单使用，推荐 [v1 分支](https://github.com/MKY508/QueryGPT/tree/v1)（单容器一键部署）
+
+---
+
 <div align="center">
-  <sub>觉得有用就给个 Star 吧 | 旧版单体架构请切换到 <a href="https://github.com/MKY508/QueryGPT/tree/v1">v1 分支</a></sub>
+  <sub>觉得有用就给个 Star 吧</sub>
 </div>
