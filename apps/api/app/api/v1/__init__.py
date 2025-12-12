@@ -2,7 +2,17 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, chat, connections, export_import, history, models, schema, semantic, user_config
+from app.api.v1 import (
+    auth,
+    chat,
+    connections,
+    export_import,
+    history,
+    models,
+    schema,
+    semantic,
+    user_config,
+)
 
 api_router = APIRouter()
 
