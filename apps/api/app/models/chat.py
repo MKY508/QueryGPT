@@ -125,9 +125,7 @@ class SSEEvent(BaseModel):
         )
 
     @classmethod
-    def python_output(
-        cls, output: str, stream: str = "stdout"
-    ) -> "SSEEvent":
+    def python_output(cls, output: str, stream: str = "stdout") -> "SSEEvent":
         """创建 Python 输出事件"""
         return cls(
             type=SSEEventType.PYTHON_OUTPUT,
@@ -135,9 +133,7 @@ class SSEEvent(BaseModel):
         )
 
     @classmethod
-    def python_image(
-        cls, image: str, format: str = "png"
-    ) -> "SSEEvent":
+    def python_image(cls, image: str, format: str = "png") -> "SSEEvent":
         """创建 Python 图表事件 (base64 编码)"""
         return cls(
             type=SSEEventType.PYTHON_IMAGE,

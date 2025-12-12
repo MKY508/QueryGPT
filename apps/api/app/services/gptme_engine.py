@@ -58,13 +58,16 @@ class GptmeEngine:
     def _get_ipython(self):
         """获取或创建 IPython 实例"""
         if self._ipython is None:
-            from IPython.core.interactiveshell import InteractiveShell
-
             # 获取内置字体路径
             import os
+
+            from IPython.core.interactiveshell import InteractiveShell
+
             font_path = os.path.join(
                 os.path.dirname(os.path.dirname(__file__)),
-                "assets", "fonts", "NotoSansSC-Regular.ttf"
+                "assets",
+                "fonts",
+                "NotoSansSC-Regular.ttf",
             )
 
             self._ipython = InteractiveShell()
@@ -143,7 +146,9 @@ plt.rcParams['font.size'] = 12
         # 移除 SQL 代码块
         content = re.sub(r"```sql\s*[\s\S]*?```", "", content, flags=re.IGNORECASE)
         # 移除 Python 代码块
-        content = re.sub(r"```(?:python|ipython|py)\s*[\s\S]*?```", "", content, flags=re.IGNORECASE)
+        content = re.sub(
+            r"```(?:python|ipython|py)\s*[\s\S]*?```", "", content, flags=re.IGNORECASE
+        )
         # 移除 chart 代码块
         content = re.sub(r"```chart\s*[\s\S]*?```", "", content, flags=re.IGNORECASE)
         # 移除 thinking 标记
@@ -292,21 +297,25 @@ plt.rcParams['font.size'] = 12
             python_images = []
 
             if python_code:
-                print(f"[DEBUG] Executing Python code...")
+                print("[DEBUG] Executing Python code...")
                 yield SSEEvent.progress("executing_python", "正在执行 Python 分析...")
 
                 try:
                     python_output, python_images = await self._execute_python(python_code)
-                    print(f"[DEBUG] Python execution done. Output length: {len(python_output) if python_output else 0}, Images count: {len(python_images)}")
+                    print(
+                        f"[DEBUG] Python execution done. Output length: {len(python_output) if python_output else 0}, Images count: {len(python_images)}"
+                    )
 
                     # 发送 Python 输出
                     if python_output:
-                        print(f"[DEBUG] Sending python_output event...")
+                        print("[DEBUG] Sending python_output event...")
                         yield SSEEvent.python_output(python_output, "stdout")
 
                     # 发送 Python 生成的图表
                     for i, img_base64 in enumerate(python_images):
-                        print(f"[DEBUG] Sending python_image event {i+1}/{len(python_images)}, image size: {len(img_base64)}")
+                        print(
+                            f"[DEBUG] Sending python_image event {i + 1}/{len(python_images)}, image size: {len(img_base64)}"
+                        )
                         yield SSEEvent.python_image(img_base64, "png")
 
                 except Exception as e:
@@ -370,9 +379,7 @@ plt.rcParams['font.size'] = 12
         result = db_manager.execute_query(sql, read_only=True)
         return result.data, result.rows_count
 
-    async def _execute_python(
-        self, code: str, timeout: int = 30
-    ) -> tuple[str | None, list[str]]:
+    async def _execute_python(self, code: str, timeout: int = 30) -> tuple[str | None, list[str]]:
         """
         执行 Python 代码并返回输出和图表
 
