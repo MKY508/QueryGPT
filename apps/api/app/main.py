@@ -2,7 +2,9 @@
 QueryGPT API 主应用
 """
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request
@@ -39,7 +41,7 @@ logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """应用生命周期管理"""
     # 启动时
     logger.info("Starting QueryGPT API", version=settings.APP_VERSION)
@@ -89,7 +91,7 @@ app.add_middleware(
 
 # 全局异常处理
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """全局异常处理"""
     logger.error("Unhandled exception", error=str(exc), path=request.url.path)
     return JSONResponse(
@@ -110,7 +112,7 @@ app.include_router(api_router, prefix="/api/v1")
 
 # 健康检查
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, Any]:
     """健康检查"""
     return {
         "status": "healthy",
@@ -121,7 +123,7 @@ async def health_check():
 
 # 根路由
 @app.get("/")
-async def root():
+async def root() -> dict[str, Any]:
     """根路由"""
     return {
         "name": settings.APP_NAME,
@@ -130,7 +132,7 @@ async def root():
     }
 
 
-def run():
+def run() -> None:
     """运行服务器"""
     import uvicorn
 

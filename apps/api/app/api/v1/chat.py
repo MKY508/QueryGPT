@@ -2,9 +2,11 @@
 
 import asyncio
 from collections.abc import AsyncGenerator
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
@@ -68,21 +70,25 @@ async def chat_stream(
     connection_id: UUID | None = Query(default=None, description="数据库连接 ID"),
     language: str = Query(default="zh", description="语言"),
     db: AsyncSession = Depends(get_db),
-):
+) -> Response:
     """SSE 流式聊天"""
+    # 使用局部变量避免 nonlocal 类型问题
+    current_conversation_id: UUID | None = conversation_id
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        nonlocal conversation_id
+        nonlocal current_conversation_id
 
         # 从 token 获取用户
         try:
             current_user = await get_user_from_token(token, db)
         except HTTPException as e:
-            yield SSEEvent.error("AUTH_ERROR", e.detail).to_sse()
+            detail = e.detail if isinstance(e.detail, str) else str(e.detail)
+            yield SSEEvent.error("AUTH_ERROR", detail).to_sse()
             return
 
         # 创建或获取对话
-        if not conversation_id:
+        conversation: Conversation | None = None
+        if not current_conversation_id:
             conversation = Conversation(
                 user_id=current_user.id,
                 title=query[:50] + ("..." if len(query) > 50 else ""),
@@ -91,17 +97,20 @@ async def chat_stream(
             db.add(conversation)
             await db.commit()
             await db.refresh(conversation)
-            conversation_id = conversation.id
+            current_conversation_id = UUID(str(conversation.id))
         else:
             # 验证对话归属
-            conversation = await db.get(Conversation, conversation_id)
+            conversation = await db.get(Conversation, current_conversation_id)
             if not conversation or conversation.user_id != current_user.id:
                 yield SSEEvent.error("NOT_FOUND", "对话不存在").to_sse()
                 return
 
+        # 此时 conversation_id 一定有值
+        assert current_conversation_id is not None
+
         # 保存用户消息
         user_message = Message(
-            conversation_id=conversation_id,
+            conversation_id=current_conversation_id,
             role="user",
             content=query,
         )
@@ -109,7 +118,7 @@ async def chat_stream(
         await db.commit()
 
         # 标记查询开始
-        query_key = str(conversation_id)
+        query_key = str(current_conversation_id)
         active_queries[query_key] = True
 
         try:
@@ -127,13 +136,13 @@ async def chat_stream(
 
             # 执行查询（流式）
             assistant_content = ""
-            metadata = {}
-            python_output_parts = []
-            python_images = []
+            metadata: dict[str, Any] = {}
+            python_output_parts: list[str] = []
+            python_images: list[str] = []
 
             async for event in execution_service.execute_stream(
                 query=query,
-                conversation_id=conversation_id,
+                conversation_id=current_conversation_id,
                 stop_checker=lambda: not active_queries.get(query_key, False),
             ):
                 yield event.to_sse()
@@ -145,7 +154,7 @@ async def chat_stream(
                         "sql": event.data.get("sql"),
                         "execution_time": event.data.get("execution_time"),
                         "rows_count": event.data.get("rows_count"),
-                        "data": event.data.get("data"),  # 保存查询结果数据
+                        "data": event.data.get("data"),
                     }
                 elif event.type.value == "visualization":
                     metadata["visualization"] = event.data.get("chart")
@@ -162,7 +171,7 @@ async def chat_stream(
 
             # 保存助手消息
             assistant_message = Message(
-                conversation_id=conversation_id,
+                conversation_id=current_conversation_id,
                 role="assistant",
                 content=assistant_content or "分析完成",
                 extra_data=metadata,
@@ -172,7 +181,7 @@ async def chat_stream(
             await db.refresh(assistant_message)
 
             # 发送完成事件
-            yield SSEEvent.done(conversation_id, assistant_message.id).to_sse()
+            yield SSEEvent.done(str(current_conversation_id), str(assistant_message.id)).to_sse()
 
         except asyncio.CancelledError:
             yield SSEEvent.error("CANCELLED", "查询已取消").to_sse()
@@ -191,12 +200,13 @@ async def chat_stream(
     )
 
 
-@router.post("/stop", response_model=APIResponse[dict])
+@router.post("/stop", response_model=APIResponse[dict[str, Any]])
 async def stop_chat(
     request: ChatStopRequest,
     current_user: User = Depends(get_current_user),
-):
+) -> APIResponse[dict[str, Any]]:
     """停止正在执行的查询"""
+    _ = current_user  # 用于验证用户已登录
     query_key = str(request.conversation_id)
 
     if query_key in active_queries:
