@@ -35,6 +35,12 @@ from app.models.history import (
     MessageCreate,
     MessageResponse,
 )
+from app.models.semantic import (
+    SemanticContext,
+    SemanticTermCreate,
+    SemanticTermResponse,
+    SemanticTermUpdate,
+)
 
 __all__ = [
     # Auth
@@ -67,4 +73,9 @@ __all__ = [
     "ConversationSummary",
     "MessageCreate",
     "MessageResponse",
+    # Semantic
+    "SemanticTermCreate",
+    "SemanticTermUpdate",
+    "SemanticTermResponse",
+    "SemanticContext",
 ]

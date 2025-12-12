@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import encryptor
 from app.core.config import settings
-from app.db.tables import Connection, Model, User
-from app.models import SSEEvent
+from app.db.tables import Connection, Model, SemanticTerm, User
+from app.models import SemanticContext, SemanticTermResponse, SSEEvent
 
 logger = structlog.get_logger()
 
@@ -128,6 +128,30 @@ class ExecutionService:
             "database": connection.database_name,
         }
 
+    async def _get_semantic_context(self) -> SemanticContext:
+        """获取语义上下文"""
+        # 查询用户的语义术语（全局 + 当前连接）
+        query = select(SemanticTerm).where(
+            SemanticTerm.user_id == self.user.id,
+            SemanticTerm.is_active.is_(True),
+        )
+
+        # 如果有指定连接，获取全局术语和该连接的术语
+        if self.connection_id:
+            query = query.where(
+                (SemanticTerm.connection_id.is_(None)) | (SemanticTerm.connection_id == self.connection_id)
+            )
+        else:
+            # 只获取全局术语
+            query = query.where(SemanticTerm.connection_id.is_(None))
+
+        result = await self.db.execute(query.order_by(SemanticTerm.term))
+        terms = result.scalars().all()
+
+        return SemanticContext(
+            terms=[SemanticTermResponse.model_validate(t) for t in terms]
+        )
+
     async def execute_stream(
         self,
         query: str,
@@ -150,7 +174,11 @@ class ExecutionService:
             db_config = await self._get_connection_config()
             logger.info(f"DB config: {db_config}")
 
-            system_prompt = self._build_system_prompt(db_config)
+            logger.info("Getting semantic context...")
+            semantic_context = await self._get_semantic_context()
+            logger.info(f"Semantic terms count: {len(semantic_context.terms)}")
+
+            system_prompt = self._build_system_prompt(db_config, semantic_context)
 
             engine = GptmeEngine(
                 model=model_config.get("model"),
@@ -171,7 +199,9 @@ class ExecutionService:
             logger.exception(f"Error in execute_stream: {e}")
             yield SSEEvent.error("EXECUTION_ERROR", str(e))
 
-    def _build_system_prompt(self, db_config: dict[str, Any] | None) -> str:
+    def _build_system_prompt(
+        self, db_config: dict[str, Any] | None, semantic_context: SemanticContext | None = None
+    ) -> str:
         """构建系统提示"""
         if self.language == "zh":
             base_prompt = """你是 QueryGPT 数据分析助手，负责帮助用户查询和分析数据库数据。
@@ -200,5 +230,10 @@ Follow these rules:
 - 数据库: {db_config["database"]}
 """
             base_prompt += db_info
+
+        # 注入语义上下文
+        if semantic_context and semantic_context.terms:
+            semantic_prompt = semantic_context.to_prompt(self.language)
+            base_prompt += f"\n{semantic_prompt}\n"
 
         return base_prompt

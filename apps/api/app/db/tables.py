@@ -34,6 +34,9 @@ class User(Base, UUIDMixin, TimestampMixin):
     conversations: Mapped[list["Conversation"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    semantic_terms: Mapped[list["SemanticTerm"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Connection(Base, UUIDMixin, TimestampMixin):
@@ -142,3 +145,28 @@ class RefreshToken(Base, UUIDMixin):
     expires_at: Mapped[datetime] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     revoked_at: Mapped[datetime | None] = mapped_column()
+
+
+class SemanticTerm(Base, UUIDMixin, TimestampMixin):
+    """语义术语表 - 业务术语字典"""
+
+    __tablename__ = "semantic_terms"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    connection_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("connections.id", ondelete="CASCADE")
+    )
+    term: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    expression: Mapped[str] = mapped_column(Text, nullable=False)
+    term_type: Mapped[str] = mapped_column(
+        String(20), default="metric"
+    )  # metric, dimension, filter, alias
+    description: Mapped[str | None] = mapped_column(Text)
+    examples: Mapped[list[str]] = mapped_column(JSON, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # 关系
+    user: Mapped["User"] = relationship(back_populates="semantic_terms")
+    connection: Mapped["Connection | None"] = relationship()

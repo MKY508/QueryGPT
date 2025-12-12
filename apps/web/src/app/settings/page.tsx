@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User } from "lucide-react";
+import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { ModelSettings } from "@/components/settings/ModelSettings";
 import { ConnectionSettings } from "@/components/settings/ConnectionSettings";
 import { PreferencesSettings } from "@/components/settings/PreferencesSettings";
+import { SemanticSettings } from "@/components/settings/SemanticSettings";
 import { cn } from "@/lib/utils";
 
-type TabType = "models" | "connections" | "preferences";
+type TabType = "models" | "connections" | "semantic" | "preferences";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("models");
@@ -30,6 +31,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: "models" as TabType, label: "AI 模型", icon: Brain },
     { id: "connections" as TabType, label: "数据库连接", icon: Database },
+    { id: "semantic" as TabType, label: "语义层", icon: BookOpen },
     { id: "preferences" as TabType, label: "偏好设置", icon: User },
   ];
 
@@ -79,6 +81,7 @@ export default function SettingsPage() {
           <main className="flex-1 bg-background rounded-xl border border-border p-6">
             {activeTab === "models" && <ModelSettings />}
             {activeTab === "connections" && <ConnectionSettings />}
+            {activeTab === "semantic" && <SemanticSettings />}
             {activeTab === "preferences" && <PreferencesSettings />}
           </main>
         </div>
