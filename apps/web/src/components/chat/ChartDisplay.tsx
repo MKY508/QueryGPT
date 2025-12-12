@@ -67,7 +67,7 @@ export function ChartDisplay({
 
   if (!data || data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-48 bg-slate-50 rounded-lg text-slate-400">
+      <div className="flex items-center justify-center h-48 bg-secondary rounded-lg text-muted-foreground">
         暂无数据
       </div>
     );
@@ -78,18 +78,19 @@ export function ChartDisplay({
       case "bar":
         return (
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis
               dataKey={keys.x}
               tick={{ fontSize: 12 }}
-              stroke="#94a3b8"
+              className="stroke-muted-foreground"
             />
-            <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+            <YAxis tick={{ fontSize: 12 }} className="stroke-muted-foreground" />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#fff",
-                border: "1px solid #e2e8f0",
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
                 borderRadius: "8px",
+                color: "hsl(var(--foreground))",
               }}
             />
             <Legend />
@@ -107,18 +108,19 @@ export function ChartDisplay({
       case "line":
         return (
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis
               dataKey={keys.x}
               tick={{ fontSize: 12 }}
-              stroke="#94a3b8"
+              className="stroke-muted-foreground"
             />
-            <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+            <YAxis tick={{ fontSize: 12 }} className="stroke-muted-foreground" />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#fff",
-                border: "1px solid #e2e8f0",
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
                 borderRadius: "8px",
+                color: "hsl(var(--foreground))",
               }}
             />
             <Legend />
@@ -165,9 +167,10 @@ export function ChartDisplay({
             </Pie>
             <Tooltip
               contentStyle={{
-                backgroundColor: "#fff",
-                border: "1px solid #e2e8f0",
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
                 borderRadius: "8px",
+                color: "hsl(var(--foreground))",
               }}
             />
             <Legend />
@@ -177,9 +180,9 @@ export function ChartDisplay({
       default:
         return (
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey={keys.x} tick={{ fontSize: 12 }} stroke="#94a3b8" />
-            <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis dataKey={keys.x} tick={{ fontSize: 12 }} className="stroke-muted-foreground" />
+            <YAxis tick={{ fontSize: 12 }} className="stroke-muted-foreground" />
             <Tooltip />
             <Bar dataKey={keys.y} fill={COLORS[0]} />
           </BarChart>
@@ -188,9 +191,9 @@ export function ChartDisplay({
   };
 
   return (
-    <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200">
+    <div className="mt-4 p-4 bg-card rounded-lg border border-border">
       {title && (
-        <h4 className="text-sm font-medium text-slate-700 mb-3">{title}</h4>
+        <h4 className="text-sm font-medium text-foreground mb-3">{title}</h4>
       )}
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">

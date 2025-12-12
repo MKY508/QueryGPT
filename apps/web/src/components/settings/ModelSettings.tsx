@@ -171,14 +171,14 @@ export function ModelSettings() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">AI 模型配置</h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <h2 className="text-lg font-semibold text-foreground">AI 模型配置</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             配置用于数据分析的 AI 模型
           </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
         >
           <Plus size={16} />
           添加模型
@@ -187,9 +187,9 @@ export function ModelSettings() {
 
       {/* 错误提示 */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-          <span className="text-sm text-red-600">{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center justify-between">
+          <span className="text-sm text-destructive">{error}</span>
+          <button onClick={() => setError(null)} className="text-destructive/60 hover:text-destructive">
             <X size={16} />
           </button>
         </div>
@@ -199,19 +199,19 @@ export function ModelSettings() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200"
+          className="mb-6 p-4 bg-secondary rounded-lg border border-border"
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-slate-900">
+            <h3 className="font-medium text-foreground">
               {editingId ? "编辑模型" : "添加模型"}
             </h3>
-            <button type="button" onClick={resetForm} className="text-slate-400 hover:text-slate-600">
+            <button type="button" onClick={resetForm} className="text-muted-foreground hover:text-foreground">
               <X size={18} />
             </button>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 名称
               </label>
               <input
@@ -220,13 +220,13 @@ export function ModelSettings() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder="例如: GPT-4o"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 提供商
               </label>
               <select
@@ -234,7 +234,7 @@ export function ModelSettings() {
                 onChange={(e) =>
                   setFormData({ ...formData, provider: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
               >
                 {PROVIDERS.map((p) => (
                   <option key={p.value} value={p.value}>
@@ -244,7 +244,7 @@ export function ModelSettings() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 模型 ID
               </label>
               <input
@@ -253,13 +253,13 @@ export function ModelSettings() {
                 onChange={(e) =>
                   setFormData({ ...formData, model_id: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder="例如: gpt-4o, claude-3-opus"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Base URL (可选)
               </label>
               <input
@@ -268,13 +268,13 @@ export function ModelSettings() {
                 onChange={(e) =>
                   setFormData({ ...formData, base_url: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder="https://api.openai.com/v1"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                API Key {editingId && <span className="text-slate-400 font-normal">(留空则不修改)</span>}
+              <label className="block text-sm font-medium text-foreground mb-1">
+                API Key {editingId && <span className="text-muted-foreground font-normal">(留空则不修改)</span>}
               </label>
               <input
                 type="password"
@@ -282,7 +282,7 @@ export function ModelSettings() {
                 onChange={(e) =>
                   setFormData({ ...formData, api_key: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder={editingId ? "••••••••" : "sk-..."}
               />
             </div>
@@ -294,9 +294,9 @@ export function ModelSettings() {
                   onChange={(e) =>
                     setFormData({ ...formData, is_default: e.target.checked })
                   }
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-primary rounded focus:ring-ring"
                 />
-                <span className="text-sm text-slate-700">设为默认模型</span>
+                <span className="text-sm text-foreground">设为默认模型</span>
               </label>
             </div>
           </div>
@@ -304,14 +304,14 @@ export function ModelSettings() {
             <button
               type="button"
               onClick={resetForm}
-              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
+              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg transition-colors text-sm"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm"
             >
               {isSubmitting && (
                 <Loader2 size={16} className="animate-spin" />
@@ -325,29 +325,29 @@ export function ModelSettings() {
       {/* 模型列表 */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-slate-400" size={24} />
+          <Loader2 className="animate-spin text-muted-foreground" size={24} />
         </div>
       ) : models && models.length > 0 ? (
         <div className="space-y-3">
           {models.map((model) => (
             <div
               key={model.id}
-              className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
+              className="flex items-center justify-between p-4 bg-secondary rounded-lg border border-border"
             >
               <div className="flex items-center gap-3">
                 {model.is_default && (
                   <Star size={16} className="text-yellow-500 fill-yellow-500" />
                 )}
                 <div>
-                  <div className="font-medium text-slate-900">{model.name}</div>
-                  <div className="text-sm text-slate-500">
+                  <div className="font-medium text-foreground">{model.name}</div>
+                  <div className="text-sm text-muted-foreground">
                     {model.provider} / {model.model_id}
                   </div>
                   {testResult?.id === model.id && (
                     <div
                       className={cn(
                         "flex items-center gap-1 text-sm mt-1",
-                        testResult.success ? "text-green-600" : "text-red-600"
+                        testResult.success ? "text-green-600" : "text-destructive"
                       )}
                     >
                       {testResult.success ? (
@@ -357,7 +357,7 @@ export function ModelSettings() {
                       )}
                       {testResult.message}
                       {testResult.responseTime && (
-                        <span className="text-slate-400 ml-1">
+                        <span className="text-muted-foreground ml-1">
                           ({testResult.responseTime}ms)
                         </span>
                       )}
@@ -369,7 +369,7 @@ export function ModelSettings() {
                 <button
                   onClick={() => testMutation.mutate(model.id)}
                   disabled={testMutation.isPending}
-                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                   title="测试连接"
                 >
                   {testMutation.isPending && testMutation.variables === model.id ? (
@@ -380,7 +380,7 @@ export function ModelSettings() {
                 </button>
                 <button
                   onClick={() => handleEdit(model)}
-                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                   title="编辑"
                 >
                   <Pencil size={16} />
@@ -388,7 +388,7 @@ export function ModelSettings() {
                 <button
                   onClick={() => handleDelete(model.id)}
                   disabled={deleteMutation.isPending}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                   title="删除"
                 >
                   <Trash2 size={16} />
@@ -398,7 +398,7 @@ export function ModelSettings() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 text-slate-500">
+        <div className="text-center py-12 text-muted-foreground">
           <p>暂无模型配置</p>
           <p className="text-sm mt-1">点击上方按钮添加第一个模型</p>
         </div>

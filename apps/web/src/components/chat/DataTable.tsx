@@ -103,16 +103,16 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
   }
 
   return (
-    <div className="mt-4 bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <div className="mt-4 bg-card rounded-lg border border-border overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
-        <div className="text-sm text-slate-600">
+      <div className="flex items-center justify-between px-4 py-3 bg-secondary border-b border-border">
+        <div className="text-sm text-foreground">
           {title || `查询结果`}
-          <span className="text-slate-400 ml-2">({data.length} 行)</span>
+          <span className="text-muted-foreground ml-2">({data.length} 行)</span>
         </div>
         <button
           onClick={exportCSV}
-          className="flex items-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors"
         >
           <Download size={14} />
           导出 CSV
@@ -123,20 +123,20 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
+            <tr className="bg-secondary border-b border-border">
               {columns.map((col) => (
                 <th
                   key={col}
                   onClick={() => handleSort(col)}
-                  className="px-4 py-3 text-left font-medium text-slate-700 cursor-pointer hover:bg-slate-100 transition-colors whitespace-nowrap"
+                  className="px-4 py-3 text-left font-medium text-foreground cursor-pointer hover:bg-muted transition-colors whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1">
                     {col}
                     {sortColumn === col && (
                       sortDirection === "asc" ? (
-                        <ChevronUp size={14} className="text-blue-500" />
+                        <ChevronUp size={14} className="text-primary" />
                       ) : (
-                        <ChevronDown size={14} className="text-blue-500" />
+                        <ChevronDown size={14} className="text-primary" />
                       )
                     )}
                   </div>
@@ -149,18 +149,18 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
               <tr
                 key={rowIndex}
                 className={cn(
-                  "border-b border-slate-100 hover:bg-slate-50 transition-colors",
-                  rowIndex % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                  "border-b border-border/50 hover:bg-muted/50 transition-colors",
+                  rowIndex % 2 === 0 ? "bg-background" : "bg-secondary/30"
                 )}
               >
                 {columns.map((col) => (
                   <td
                     key={col}
-                    className="px-4 py-2.5 text-slate-600 whitespace-nowrap max-w-xs truncate"
+                    className="px-4 py-2.5 text-muted-foreground whitespace-nowrap max-w-xs truncate"
                     title={String(row[col] ?? "")}
                   >
                     {row[col] === null || row[col] === undefined ? (
-                      <span className="text-slate-300 italic">NULL</span>
+                      <span className="text-muted-foreground/50 italic">NULL</span>
                     ) : (
                       String(row[col])
                     )}
@@ -174,22 +174,22 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200">
-          <div className="text-sm text-slate-500">
+        <div className="flex items-center justify-between px-4 py-3 bg-secondary border-t border-border">
+          <div className="text-sm text-muted-foreground">
             第 {currentPage} / {totalPages} 页
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1 text-sm border border-border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               上一页
             </button>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 text-sm border border-slate-300 rounded hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1 text-sm border border-border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               下一页
             </button>

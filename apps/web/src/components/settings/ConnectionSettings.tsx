@@ -165,8 +165,8 @@ export function ConnectionSettings() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-slate-900">数据库连接</h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <h2 className="text-lg font-semibold text-foreground">数据库连接</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             配置要查询的数据库连接
           </p>
         </div>
@@ -175,7 +175,7 @@ export function ConnectionSettings() {
             resetForm();
             setShowForm(true);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
         >
           <Plus size={16} />
           添加连接
@@ -186,14 +186,14 @@ export function ConnectionSettings() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200"
+          className="mb-6 p-4 bg-secondary rounded-lg border border-border"
         >
-          <h3 className="text-sm font-medium text-slate-900 mb-4">
+          <h3 className="text-sm font-medium text-foreground mb-4">
             {editingId ? "编辑连接" : "添加连接"}
           </h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 连接名称
               </label>
               <input
@@ -202,19 +202,19 @@ export function ConnectionSettings() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder="例如: 生产数据库"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 数据库类型
               </label>
               <select
                 value={formData.driver}
                 onChange={(e) => handleDriverChange(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
               >
                 {DRIVERS.map((d) => (
                   <option key={d.value} value={d.value}>
@@ -226,7 +226,7 @@ export function ConnectionSettings() {
             {formData.driver !== "sqlite" && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     主机地址
                   </label>
                   <input
@@ -235,13 +235,13 @@ export function ConnectionSettings() {
                     onChange={(e) =>
                       setFormData({ ...formData, host: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="localhost"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     端口
                   </label>
                   <input
@@ -250,14 +250,14 @@ export function ConnectionSettings() {
                     onChange={(e) =>
                       setFormData({ ...formData, port: parseInt(e.target.value) })
                     }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                     required
                   />
                 </div>
               </>
             )}
             <div className={formData.driver === "sqlite" ? "col-span-2" : ""}>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 {formData.driver === "sqlite" ? "数据库文件路径" : "数据库名"}
               </label>
               <input
@@ -266,7 +266,7 @@ export function ConnectionSettings() {
                 onChange={(e) =>
                   setFormData({ ...formData, database: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder={formData.driver === "sqlite" ? "/path/to/database.db" : "mydb"}
                 required
               />
@@ -274,7 +274,7 @@ export function ConnectionSettings() {
             {formData.driver !== "sqlite" && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     用户名
                   </label>
                   <input
@@ -283,16 +283,16 @@ export function ConnectionSettings() {
                     onChange={(e) =>
                       setFormData({ ...formData, username: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder="root"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     密码
                     {editingId && (
-                      <span className="text-slate-400 font-normal ml-2">
+                      <span className="text-muted-foreground font-normal ml-2">
                         （留空保持不变）
                       </span>
                     )}
@@ -303,7 +303,7 @@ export function ConnectionSettings() {
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                     placeholder={editingId ? "留空保持原密码" : "••••••••"}
                   />
                 </div>
@@ -317,9 +317,9 @@ export function ConnectionSettings() {
                   onChange={(e) =>
                     setFormData({ ...formData, is_default: e.target.checked })
                   }
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-primary rounded focus:ring-ring"
                 />
-                <span className="text-sm text-slate-700">设为默认连接</span>
+                <span className="text-sm text-foreground">设为默认连接</span>
               </label>
             </div>
           </div>
@@ -327,14 +327,14 @@ export function ConnectionSettings() {
             <button
               type="button"
               onClick={resetForm}
-              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
+              className="px-4 py-2 text-muted-foreground hover:bg-muted rounded-lg transition-colors text-sm"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={addMutation.isPending || updateMutation.isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm"
             >
               {(addMutation.isPending || updateMutation.isPending) && (
                 <Loader2 size={16} className="animate-spin" />
@@ -348,29 +348,29 @@ export function ConnectionSettings() {
       {/* 连接列表 */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-slate-400" size={24} />
+          <Loader2 className="animate-spin text-muted-foreground" size={24} />
         </div>
       ) : connections && connections.length > 0 ? (
         <div className="space-y-3">
           {connections.map((conn) => (
             <div
               key={conn.id}
-              className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
+              className="flex items-center justify-between p-4 bg-secondary rounded-lg border border-border"
             >
               <div className="flex items-center gap-3">
                 {conn.is_default && (
                   <Star size={16} className="text-yellow-500 fill-yellow-500" />
                 )}
                 <div>
-                  <div className="font-medium text-slate-900">{conn.name}</div>
-                  <div className="text-sm text-slate-500">
+                  <div className="font-medium text-foreground">{conn.name}</div>
+                  <div className="text-sm text-muted-foreground">
                     {conn.driver}://{conn.username}@{conn.host}:{conn.port}/{conn.database_name}
                   </div>
                   {testResult?.id === conn.id && (
                     <div
                       className={cn(
                         "flex items-center gap-1 text-sm mt-1",
-                        testResult.success ? "text-green-600" : "text-red-600"
+                        testResult.success ? "text-green-600" : "text-destructive"
                       )}
                     >
                       {testResult.success ? (
@@ -387,7 +387,7 @@ export function ConnectionSettings() {
                 <button
                   onClick={() => testMutation.mutate(conn.id)}
                   disabled={testMutation.isPending}
-                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                   title="测试连接"
                 >
                   {testMutation.isPending && testMutation.variables === conn.id ? (
@@ -398,7 +398,7 @@ export function ConnectionSettings() {
                 </button>
                 <button
                   onClick={() => handleEdit(conn)}
-                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                   title="编辑"
                 >
                   <Pencil size={16} />
@@ -406,7 +406,7 @@ export function ConnectionSettings() {
                 <button
                   onClick={() => handleDelete(conn.id)}
                   disabled={deleteMutation.isPending}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                   title="删除"
                 >
                   <Trash2 size={16} />
@@ -416,7 +416,7 @@ export function ConnectionSettings() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 text-slate-500">
+        <div className="text-center py-12 text-muted-foreground">
           <p>暂无数据库连接</p>
           <p className="text-sm mt-1">点击上方按钮添加第一个连接</p>
         </div>

@@ -24,7 +24,7 @@ export function SqlHighlight({ code, showCopy = true }: SqlHighlightProps) {
       {showCopy && (
         <button
           onClick={handleCopy}
-          className="absolute right-2 top-2 p-1.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute right-2 top-2 p-1.5 bg-secondary hover:bg-muted rounded text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
           title="复制代码"
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}

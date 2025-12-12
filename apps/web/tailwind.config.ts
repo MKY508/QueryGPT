@@ -6,6 +6,16 @@ const config: Config = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  // 保留动态生成的主题类
+  safelist: [
+    "theme-dawn",
+    "theme-midnight",
+    "theme-monet",
+    "theme-vangogh",
+    "theme-sakura",
+    "theme-forest",
+    "theme-aurora",
+  ],
   darkMode: "class",
   theme: {
     extend: {

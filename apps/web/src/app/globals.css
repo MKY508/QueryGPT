@@ -3,8 +3,14 @@
 @tailwind utilities;
 
 @layer base {
+  /* 默认变量 */
+  :root {
+    --radius: 0.5rem;
+  }
+
   /* 晨曦 - 默认浅色主题 */
-  :root, .theme-dawn {
+  :root,
+  html.theme-dawn {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -24,11 +30,10 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
   }
 
   /* 深夜 - 深色主题 */
-  .theme-midnight {
+  html.theme-midnight {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -51,7 +56,7 @@
   }
 
   /* 莫奈 - 印象派蓝绿色调 */
-  .theme-monet {
+  html.theme-monet {
     --background: 195 30% 96%;
     --foreground: 200 50% 15%;
     --card: 195 25% 98%;
@@ -74,7 +79,7 @@
   }
 
   /* 梵高 - 星夜深蓝金黄 */
-  .theme-vangogh {
+  html.theme-vangogh {
     --background: 220 40% 12%;
     --foreground: 45 90% 85%;
     --card: 220 35% 15%;
@@ -97,7 +102,7 @@
   }
 
   /* 樱花 - 日式粉色 */
-  .theme-sakura {
+  html.theme-sakura {
     --background: 350 30% 97%;
     --foreground: 340 30% 20%;
     --card: 350 25% 99%;
@@ -120,7 +125,7 @@
   }
 
   /* 森林 - 自然绿色 */
-  .theme-forest {
+  html.theme-forest {
     --background: 150 20% 96%;
     --foreground: 150 40% 15%;
     --card: 150 15% 98%;
@@ -143,7 +148,7 @@
   }
 
   /* 极光 - 北欧深色 */
-  .theme-aurora {
+  html.theme-aurora {
     --background: 230 25% 10%;
     --foreground: 180 60% 90%;
     --card: 230 22% 13%;

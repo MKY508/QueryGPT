@@ -12,7 +12,7 @@ export default function Home() {
   // 如果未登录，显示登录页面
   if (!isAuthenticated) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-slate-800">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-primary/5 to-primary/20">
         <div className="w-full max-w-md p-8 bg-background rounded-2xl shadow-xl border border-border">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-foreground">QueryGPT</h1>
@@ -61,7 +61,7 @@ function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">{error}</div>
+        <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">{error}</div>
       )}
       <div>
         <label className="block text-sm font-medium text-foreground mb-1">邮箱</label>
