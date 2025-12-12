@@ -47,9 +47,12 @@ export function ChartDisplay({
 }: ChartDisplayProps) {
   // 自动检测数据键
   const keys = useMemo(() => {
-    if (!data || data.length === 0) return { x: xKey, y: yKey };
+    if (!data || data.length === 0) return { x: xKey, y: yKey, allNumberKeys: [] };
 
     const firstItem = data[0];
+    if (!firstItem || typeof firstItem !== "object") {
+      return { x: xKey, y: yKey, allNumberKeys: [] };
+    }
     const allKeys = Object.keys(firstItem);
 
     // 尝试找到合适的 x 和 y 键

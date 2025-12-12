@@ -27,7 +27,7 @@ export function PreferencesSettings() {
   const { data: config, isLoading } = useQuery({
     queryKey: ["user-config"],
     queryFn: async () => {
-      const response = await api.get("/api/v1/config/config");
+      const response = await api.get("/api/v1/config");
       return response.data.data as UserConfig;
     },
   });
@@ -35,7 +35,7 @@ export function PreferencesSettings() {
   // 更新配置
   const updateMutation = useMutation({
     mutationFn: async (data: UserConfig) => {
-      const response = await api.put("/api/v1/config/config", data);
+      const response = await api.put("/api/v1/config", data);
       return response.data;
     },
     onSuccess: () => {
