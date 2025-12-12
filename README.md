@@ -2,7 +2,7 @@
 
   <img src="docs/images/logo.png" width="400" alt="QueryGPT">
 
-  <p>自然语言数据库查询助手 - v2 重构版</p>
+  <p>自然语言数据库查询助手chatbi - v2 重构版</p>
 
   [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
   [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
@@ -33,12 +33,12 @@ v2 是完全重构版本，前后端分离架构：
 
 ## 功能
 
-- 🗣️ **自然语言查询** - 用中文描述需求，AI 自动生成 SQL
-- 📊 **语义层** - 定义业务术语（如"月活用户"、"GMV"），AI 自动理解并转换为 SQL 表达式
-- ⚡ **SSE 流式响应** - 实时显示思考过程，支持多轮问答
-- 📈 **数据可视化** - Plotly 图表嵌入前端展示
-- 👥 **多租户** - 多用户、多模型、多数据库支持
-- 🎯 **开箱即用** - 内置 SQLite 示例数据库
+-  **自然语言查询** - 用中文描述需求，AI 自动生成 SQL
+-  **语义层** - 定义业务术语（如"月活用户"、"GMV"），AI 自动理解并转换为 SQL 表达式
+-  **SSE 流式响应** - 实时显示思考过程，支持多轮问答
+-  **数据可视化** - Plotly 图表嵌入前端展示
+-  **多租户** - 多用户、多模型、多数据库支持
+-  **开箱即用** - 内置 SQLite 示例数据库
 
 ### 语义层特性
 
