@@ -1,7 +1,6 @@
 """
 QueryGPT API 主应用
 """
-import logging
 from contextlib import asynccontextmanager
 
 import structlog

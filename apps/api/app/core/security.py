@@ -7,11 +7,14 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import structlog
 from cryptography.fernet import Fernet
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
+
+logger = structlog.get_logger()
 
 # 密码哈希上下文 - 使用 argon2 (更安全，无长度限制)
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
@@ -99,9 +102,6 @@ class Encryptor:
 
     def __init__(self, key: str | None = None):
         import base64
-        import logging
-
-        logger = logging.getLogger(__name__)
 
         if key is None:
             key = settings.ENCRYPTION_KEY

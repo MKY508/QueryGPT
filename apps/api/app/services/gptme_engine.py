@@ -8,8 +8,12 @@ import re
 import time
 from typing import Any, AsyncGenerator, Callable
 
+import structlog
+
 from app.core.config import settings
 from app.models import SSEEvent
+
+logger = structlog.get_logger()
 
 
 class GptmeEngine:
@@ -37,9 +41,7 @@ class GptmeEngine:
         """
         执行查询并流式返回结果
         """
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"GptmeEngine.execute called with model={self.model}, query={query[:50]}...")
+        logger.info("GptmeEngine.execute called", model=self.model, query_preview=query[:50])
 
         try:
             # 设置环境变量
@@ -48,7 +50,7 @@ class GptmeEngine:
                 logger.info("API key set")
             if self.base_url:
                 os.environ["OPENAI_BASE_URL"] = self.base_url
-                logger.info(f"Base URL set to {self.base_url}")
+                logger.info("Base URL set", base_url=self.base_url)
 
             logger.info("Yielding initializing event...")
             yield SSEEvent.progress("initializing", "正在初始化 AI 引擎...")

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Save } from "lucide-react";
 import { api } from "@/lib/api/client";
+import { useThemeStore } from "@/lib/stores/theme";
 
 interface UserConfig {
   language: string;
@@ -21,6 +22,7 @@ export function PreferencesSettings() {
   });
   const [hasChanges, setHasChanges] = useState(false);
   const queryClient = useQueryClient();
+  const setTheme = useThemeStore((state) => state.setTheme);
 
   // 获取当前配置
   const { data: config, isLoading } = useQuery({
@@ -53,6 +55,10 @@ export function PreferencesSettings() {
   const handleChange = (key: keyof UserConfig, value: string | number) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
+    // 主题更改时立即应用，让用户可以预览效果
+    if (key === "theme") {
+      setTheme(value as "light" | "dark" | "system");
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {

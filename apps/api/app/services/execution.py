@@ -5,6 +5,7 @@ AI 执行服务
 from typing import Any, AsyncGenerator, Callable
 from uuid import UUID
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,8 @@ from app.core import encryptor
 from app.core.config import settings
 from app.db.tables import Connection, Model, User
 from app.models import SSEEvent
+
+logger = structlog.get_logger()
 
 
 class ExecutionService:
@@ -130,15 +133,12 @@ class ExecutionService:
         stop_checker: Callable[[], bool] | None = None,
     ) -> AsyncGenerator[SSEEvent, None]:
         """流式执行查询"""
-        import logging
-        logger = logging.getLogger(__name__)
-
         try:
             from app.services.gptme_engine import GptmeEngine
 
             logger.info("Getting model config...")
             model_config = await self._get_model_config()
-            logger.info(f"Model config: {model_config.get('model')}, base_url: {model_config.get('base_url')}")
+            logger.info("Model config loaded", model=model_config.get("model"), base_url=model_config.get("base_url"))
 
             logger.info("Getting connection config...")
             db_config = await self._get_connection_config()
