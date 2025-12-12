@@ -87,26 +87,20 @@ QueryGPT v2 是对原版的**完全重构**，采用现代化的前后端分离�
 <table>
   <tr>
     <td align="center">
-      <img src="docs/images/main-interface.png" width="100%" alt="主界面"/>
-      <b>主界面</b>
+      <img src="docs/images/login.png" width="100%" alt="登录界面"/>
+      <b>登录与账号管理</b>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/images/agent-thinking.png" width="100%" alt="AI 思考过程"/>
-      <b>AI 思考过程</b>
+      <img src="docs/images/chat.png" width="100%" alt="对话界面"/>
+      <b>AI 对话与数据分析</b>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/images/data-visualization.png" width="100%" alt="数据可视化"/>
-      <b>数据可视化</b>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="docs/images/model-management.png" width="100%" alt="模型管理"/>
-      <b>模型管理配置</b>
+      <img src="docs/images/settings.png" width="100%" alt="设置界面"/>
+      <b>设置界面</b>
     </td>
   </tr>
 </table>
