@@ -51,8 +51,8 @@ function LoginForm() {
       } else {
         await login(email, password);
       }
-    } catch (err: unknown) {
-      setError(err.message || "操作失败");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "操作失败");
     } finally {
       setLoading(false);
     }

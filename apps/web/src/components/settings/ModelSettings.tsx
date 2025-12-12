@@ -74,8 +74,9 @@ export function ModelSettings() {
       queryClient.invalidateQueries({ queryKey: ["models"] });
       resetForm();
     },
-    onError: (err: unknown) => {
-      setError(err.response?.data?.error?.message || "添加模型失败，请检查配置");
+    onError: (err) => {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
+      setError(axiosErr.response?.data?.error?.message || "添加模型失败，请检查配置");
     },
   });
 
@@ -89,8 +90,9 @@ export function ModelSettings() {
       queryClient.invalidateQueries({ queryKey: ["models"] });
       resetForm();
     },
-    onError: (err: unknown) => {
-      setError(err.response?.data?.error?.message || "更新模型失败，请检查配置");
+    onError: (err) => {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
+      setError(axiosErr.response?.data?.error?.message || "更新模型失败，请检查配置");
     },
   });
 
@@ -102,8 +104,9 @@ export function ModelSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["models"] });
     },
-    onError: (err: unknown) => {
-      setError(err.response?.data?.error?.message || "删除模型失败");
+    onError: (err) => {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
+      setError(axiosErr.response?.data?.error?.message || "删除模型失败");
     },
   });
 
@@ -122,8 +125,9 @@ export function ModelSettings() {
       });
       setTimeout(() => setTestResult(null), 5000);
     },
-    onError: (err: unknown) => {
-      setError(err.response?.data?.error?.message || "测试失败");
+    onError: (err) => {
+      const axiosErr = err as { response?: { data?: { error?: { message?: string } } } };
+      setError(axiosErr.response?.data?.error?.message || "测试失败");
     },
   });
 
