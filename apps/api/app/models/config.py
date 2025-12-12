@@ -141,19 +141,17 @@ class UserConfig(BaseModel):
     """用户配置"""
 
     language: Literal["zh", "en"] = "zh"
-    theme: Literal["light", "dark", "system"] = "light"
+    theme: str = "dawn"  # 主题: dawn, midnight, monet, vangogh, sakura, forest, aurora
     default_model_id: UUID | None = None
     default_connection_id: UUID | None = None
-    view_mode: Literal["user", "developer"] = "user"
-    context_rounds: int = Field(default=3, ge=0, le=10)
+    context_rounds: int = Field(default=5, ge=1, le=20)
 
 
 class UserConfigUpdate(BaseModel):
     """更新用户配置"""
 
     language: Literal["zh", "en"] | None = None
-    theme: Literal["light", "dark", "system"] | None = None
+    theme: str | None = None
     default_model_id: UUID | None = None
     default_connection_id: UUID | None = None
-    view_mode: Literal["user", "developer"] | None = None
-    context_rounds: int | None = Field(default=None, ge=0, le=10)
+    context_rounds: int | None = Field(default=None, ge=1, le=20)

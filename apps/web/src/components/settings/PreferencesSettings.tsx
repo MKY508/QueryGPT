@@ -2,27 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Check } from "lucide-react";
 import { api } from "@/lib/api/client";
-import { useThemeStore } from "@/lib/stores/theme";
+import { useThemeStore, THEMES, ThemeId } from "@/lib/stores/theme";
+import { cn } from "@/lib/utils";
 
 interface UserConfig {
   language: string;
   theme: string;
-  view_mode: string;
   context_rounds: number;
 }
 
 export function PreferencesSettings() {
   const [formData, setFormData] = useState<UserConfig>({
     language: "zh",
-    theme: "light",
-    view_mode: "user",
-    context_rounds: 3,
+    theme: "dawn",
+    context_rounds: 5,
   });
   const [hasChanges, setHasChanges] = useState(false);
   const queryClient = useQueryClient();
-  const setTheme = useThemeStore((state) => state.setTheme);
+  const { theme: currentTheme, setTheme } = useThemeStore();
 
   // 获取当前配置
   const { data: config, isLoading } = useQuery({
@@ -48,17 +47,31 @@ export function PreferencesSettings() {
   // 同步服务器配置到表单
   useEffect(() => {
     if (config) {
-      setFormData(config);
+      setFormData({
+        ...config,
+        context_rounds: config.context_rounds || 5,
+      });
+      // 同步主题到 store
+      if (config.theme && config.theme in THEMES) {
+        setTheme(config.theme as ThemeId);
+      }
     }
-  }, [config]);
+  }, [config, setTheme]);
+
+  // 同步当前主题到表单
+  useEffect(() => {
+    setFormData((prev) => ({ ...prev, theme: currentTheme }));
+  }, [currentTheme]);
 
   const handleChange = (key: keyof UserConfig, value: string | number) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
-    // 主题更改时立即应用，让用户可以预览效果
-    if (key === "theme") {
-      setTheme(value as "light" | "dark" | "system");
-    }
+  };
+
+  const handleThemeChange = (themeId: ThemeId) => {
+    setTheme(themeId);
+    setFormData((prev) => ({ ...prev, theme: themeId }));
+    setHasChanges(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -83,7 +96,7 @@ export function PreferencesSettings() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-8">
         {/* 语言设置 */}
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
@@ -104,53 +117,34 @@ export function PreferencesSettings() {
 
         {/* 主题设置 */}
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
+          <label className="block text-sm font-medium text-foreground mb-3">
             界面主题
           </label>
-          <div className="flex gap-3">
-            {[
-              { value: "light", label: "浅色" },
-              { value: "dark", label: "深色" },
-              { value: "system", label: "跟随系统" },
-            ].map((option) => (
-              <label
-                key={option.value}
-                className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition-colors ${
-                  formData.theme === option.value
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-input text-foreground hover:border-muted-foreground"
-                }`}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {Object.entries(THEMES).map(([id, theme]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => handleThemeChange(id as ThemeId)}
+                className={cn(
+                  "relative p-4 border rounded-xl text-left transition-all hover:shadow-md",
+                  currentTheme === id
+                    ? "border-primary bg-primary/5 ring-2 ring-primary"
+                    : "border-input hover:border-primary/50"
+                )}
               >
-                <input
-                  type="radio"
-                  name="theme"
-                  value={option.value}
-                  checked={formData.theme === option.value}
-                  onChange={(e) => handleChange("theme", e.target.value)}
-                  className="sr-only"
-                />
-                {option.label}
-              </label>
+                {currentTheme === id && (
+                  <div className="absolute top-2 right-2">
+                    <Check size={16} className="text-primary" />
+                  </div>
+                )}
+                <div className="font-medium text-foreground">{theme.name}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {theme.description}
+                </div>
+              </button>
             ))}
           </div>
-        </div>
-
-        {/* 视图模式 */}
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
-            默认视图模式
-          </label>
-          <select
-            value={formData.view_mode}
-            onChange={(e) => handleChange("view_mode", e.target.value)}
-            className="w-full max-w-xs px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-          >
-            <option value="user">用户模式 (简洁)</option>
-            <option value="developer">开发者模式 (详细)</option>
-          </select>
-          <p className="text-sm text-muted-foreground mt-1">
-            开发者模式会显示更多技术细节
-          </p>
         </div>
 
         {/* 上下文轮数 */}
@@ -161,15 +155,15 @@ export function PreferencesSettings() {
           <input
             type="number"
             min={1}
-            max={10}
+            max={20}
             value={formData.context_rounds}
             onChange={(e) =>
-              handleChange("context_rounds", parseInt(e.target.value))
+              handleChange("context_rounds", parseInt(e.target.value) || 5)
             }
             className="w-24 px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           />
           <p className="text-sm text-muted-foreground mt-1">
-            AI 会记住最近 {formData.context_rounds} 轮对话作为上下文
+            AI 会记住最近 {formData.context_rounds} 轮对话作为上下文（1-20）
           </p>
         </div>
 
@@ -189,6 +183,9 @@ export function PreferencesSettings() {
           </button>
           {updateMutation.isSuccess && (
             <p className="text-sm text-green-600 dark:text-green-400 mt-2">设置已保存</p>
+          )}
+          {updateMutation.isError && (
+            <p className="text-sm text-red-600 dark:text-red-400 mt-2">保存失败，请重试</p>
           )}
         </div>
       </form>

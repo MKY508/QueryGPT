@@ -482,11 +482,10 @@ async def get_config(
     return APIResponse.ok(
         data=UserConfig(
             language=settings.get("language", "zh"),
-            theme=settings.get("theme", "light"),
+            theme=settings.get("theme", "dawn"),
             default_model_id=settings.get("default_model_id"),
             default_connection_id=settings.get("default_connection_id"),
-            view_mode=settings.get("view_mode", "user"),
-            context_rounds=settings.get("context_rounds", 3),
+            context_rounds=settings.get("context_rounds", 5),
         )
     )
 

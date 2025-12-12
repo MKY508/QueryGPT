@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /* 晨曦 - 默认浅色主题 */
+  :root, .theme-dawn {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -26,7 +27,8 @@
     --radius: 0.5rem;
   }
 
-  .dark {
+  /* 深夜 - 深色主题 */
+  .theme-midnight {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -46,6 +48,121 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+  }
+
+  /* 莫奈 - 印象派蓝绿色调 */
+  .theme-monet {
+    --background: 195 30% 96%;
+    --foreground: 200 50% 15%;
+    --card: 195 25% 98%;
+    --card-foreground: 200 50% 15%;
+    --popover: 195 25% 98%;
+    --popover-foreground: 200 50% 15%;
+    --primary: 195 70% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 170 30% 90%;
+    --secondary-foreground: 200 50% 15%;
+    --muted: 180 20% 92%;
+    --muted-foreground: 200 25% 45%;
+    --accent: 160 40% 85%;
+    --accent-foreground: 200 50% 15%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 195 25% 88%;
+    --input: 195 25% 88%;
+    --ring: 195 70% 45%;
+  }
+
+  /* 梵高 - 星夜深蓝金黄 */
+  .theme-vangogh {
+    --background: 220 40% 12%;
+    --foreground: 45 90% 85%;
+    --card: 220 35% 15%;
+    --card-foreground: 45 90% 85%;
+    --popover: 220 35% 15%;
+    --popover-foreground: 45 90% 85%;
+    --primary: 45 90% 55%;
+    --primary-foreground: 220 40% 12%;
+    --secondary: 220 30% 22%;
+    --secondary-foreground: 45 80% 80%;
+    --muted: 220 25% 20%;
+    --muted-foreground: 45 40% 60%;
+    --accent: 35 80% 50%;
+    --accent-foreground: 220 40% 12%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 30% 25%;
+    --input: 220 30% 25%;
+    --ring: 45 90% 55%;
+  }
+
+  /* 樱花 - 日式粉色 */
+  .theme-sakura {
+    --background: 350 30% 97%;
+    --foreground: 340 30% 20%;
+    --card: 350 25% 99%;
+    --card-foreground: 340 30% 20%;
+    --popover: 350 25% 99%;
+    --popover-foreground: 340 30% 20%;
+    --primary: 340 70% 65%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 350 30% 92%;
+    --secondary-foreground: 340 30% 20%;
+    --muted: 350 20% 94%;
+    --muted-foreground: 340 20% 45%;
+    --accent: 330 50% 88%;
+    --accent-foreground: 340 30% 20%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 350 25% 90%;
+    --input: 350 25% 90%;
+    --ring: 340 70% 65%;
+  }
+
+  /* 森林 - 自然绿色 */
+  .theme-forest {
+    --background: 150 20% 96%;
+    --foreground: 150 40% 15%;
+    --card: 150 15% 98%;
+    --card-foreground: 150 40% 15%;
+    --popover: 150 15% 98%;
+    --popover-foreground: 150 40% 15%;
+    --primary: 150 50% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 140 25% 90%;
+    --secondary-foreground: 150 40% 15%;
+    --muted: 145 18% 92%;
+    --muted-foreground: 150 20% 45%;
+    --accent: 130 35% 85%;
+    --accent-foreground: 150 40% 15%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 20% 88%;
+    --input: 150 20% 88%;
+    --ring: 150 50% 40%;
+  }
+
+  /* 极光 - 北欧深色 */
+  .theme-aurora {
+    --background: 230 25% 10%;
+    --foreground: 180 60% 90%;
+    --card: 230 22% 13%;
+    --card-foreground: 180 60% 90%;
+    --popover: 230 22% 13%;
+    --popover-foreground: 180 60% 90%;
+    --primary: 160 70% 50%;
+    --primary-foreground: 230 25% 10%;
+    --secondary: 230 20% 18%;
+    --secondary-foreground: 180 50% 85%;
+    --muted: 230 18% 16%;
+    --muted-foreground: 180 30% 60%;
+    --accent: 280 60% 60%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 230 20% 20%;
+    --input: 230 20% 20%;
+    --ring: 160 70% 50%;
   }
 }
 

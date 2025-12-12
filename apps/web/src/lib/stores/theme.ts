@@ -3,65 +3,52 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-type Theme = "light" | "dark" | "system";
+// 主题定义
+export const THEMES = {
+  dawn: { id: "dawn", name: "晨曦", description: "清新明亮的浅色主题" },
+  midnight: { id: "midnight", name: "深夜", description: "经典深色主题" },
+  monet: { id: "monet", name: "莫奈", description: "印象派蓝绿色调" },
+  vangogh: { id: "vangogh", name: "梵高", description: "星夜深蓝金黄" },
+  sakura: { id: "sakura", name: "樱花", description: "日式粉色" },
+  forest: { id: "forest", name: "森林", description: "自然绿色" },
+  aurora: { id: "aurora", name: "极光", description: "北欧深色" },
+} as const;
+
+export type ThemeId = keyof typeof THEMES;
 
 interface ThemeState {
-  theme: Theme;
-  resolvedTheme: "light" | "dark";
-  setTheme: (theme: Theme) => void;
+  theme: ThemeId;
+  setTheme: (theme: ThemeId) => void;
   initTheme: () => void;
 }
 
-// 获取系统主题
-const getSystemTheme = (): "light" | "dark" => {
-  if (typeof window === "undefined") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-};
-
 // 应用主题到 HTML
-const applyTheme = (theme: "light" | "dark") => {
+const applyTheme = (theme: ThemeId) => {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  if (theme === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
+
+  // 移除所有主题类
+  Object.keys(THEMES).forEach((t) => {
+    root.classList.remove(`theme-${t}`);
+  });
+
+  // 添加新主题类
+  root.classList.add(`theme-${theme}`);
 };
 
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
-      theme: "light",
-      resolvedTheme: "light",
+      theme: "dawn",
 
-      setTheme: (theme: Theme) => {
-        const resolvedTheme = theme === "system" ? getSystemTheme() : theme;
-        applyTheme(resolvedTheme);
-        set({ theme, resolvedTheme });
+      setTheme: (theme: ThemeId) => {
+        applyTheme(theme);
+        set({ theme });
       },
 
       initTheme: () => {
         const { theme } = get();
-        const resolvedTheme = theme === "system" ? getSystemTheme() : theme;
-        applyTheme(resolvedTheme);
-        set({ resolvedTheme });
-
-        // 监听系统主题变化
-        if (typeof window !== "undefined") {
-          const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-          const handleChange = () => {
-            const currentTheme = get().theme;
-            if (currentTheme === "system") {
-              const newResolved = getSystemTheme();
-              applyTheme(newResolved);
-              set({ resolvedTheme: newResolved });
-            }
-          };
-          mediaQuery.addEventListener("change", handleChange);
-        }
+        applyTheme(theme);
       },
     }),
     {
