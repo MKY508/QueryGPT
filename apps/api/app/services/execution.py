@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import encryptor
 from app.core.config import settings
-from app.db.tables import Connection, Model, SemanticTerm, User
+from app.db.tables import Connection, Message, Model, SemanticTerm, User
 from app.models import SemanticContext, SemanticTermResponse, SSEEvent
 
 logger = structlog.get_logger()
@@ -152,6 +152,35 @@ class ExecutionService:
             terms=[SemanticTermResponse.model_validate(t) for t in terms]
         )
 
+    async def _get_conversation_history(
+        self, conversation_id: UUID, limit: int = 10
+    ) -> list[dict[str, str]]:
+        """获取对话历史消息
+
+        Args:
+            conversation_id: 对话 ID
+            limit: 最大消息数量（最近的 N 条）
+
+        Returns:
+            消息列表 [{"role": "user/assistant", "content": "..."}]
+        """
+        result = await self.db.execute(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(limit)
+        )
+        messages = result.scalars().all()
+
+        # 反转顺序，使最早的消息在前
+        history = []
+        for msg in reversed(messages):
+            if msg.role in ("user", "assistant") and msg.content:
+                history.append({"role": msg.role, "content": msg.content})
+
+        logger.info(f"Loaded {len(history)} history messages for conversation {conversation_id}")
+        return history
+
     async def execute_stream(
         self,
         query: str,
@@ -178,6 +207,10 @@ class ExecutionService:
             semantic_context = await self._get_semantic_context()
             logger.info(f"Semantic terms count: {len(semantic_context.terms)}")
 
+            # 加载对话历史（不包括当前查询，因为当前查询还未保存）
+            logger.info("Getting conversation history...")
+            history = await self._get_conversation_history(conversation_id, limit=10)
+
             system_prompt = self._build_system_prompt(db_config, semantic_context)
 
             engine = GptmeEngine(
@@ -191,6 +224,7 @@ class ExecutionService:
                 query=query,
                 system_prompt=system_prompt,
                 db_config=db_config,
+                history=history,
                 stop_checker=stop_checker,
             ):
                 logger.info(f"Yielding event: {event.type}")
@@ -208,18 +242,50 @@ class ExecutionService:
 
 请遵循以下规则：
 1. 只生成只读 SQL（SELECT、SHOW、DESCRIBE）
-2. 使用 pandas 处理数据
-3. 使用 plotly 生成可视化图表
-4. 用中文回复用户
+2. 用中文回复用户
+3. 如果查询结果适合可视化，在回复末尾添加图表配置（使用 ```chart 代码块）：
+
+```chart
+{
+  "type": "bar",
+  "title": "图表标题",
+  "xKey": "x轴字段名",
+  "yKeys": ["y轴字段名1", "y轴字段名2"]
+}
+```
+
+图表类型选择指南：
+- bar: 比较不同类别的数值（如各地区销售额）
+- line: 展示趋势变化（如月度增长）
+- pie: 展示占比分布（如市场份额）
+- area: 展示累积趋势
+
+注意：只有当数据适合可视化时才添加图表配置，简单的单值查询不需要图表。
 """
         else:
             base_prompt = """You are QueryGPT data analysis assistant, helping users query and analyze database data.
 
 Follow these rules:
 1. Only generate read-only SQL (SELECT, SHOW, DESCRIBE)
-2. Use pandas for data processing
-3. Use plotly for visualization
-4. Reply in English
+2. Reply in English
+3. If query results are suitable for visualization, add chart config at the end (using ```chart code block):
+
+```chart
+{
+  "type": "bar",
+  "title": "Chart Title",
+  "xKey": "x_axis_field",
+  "yKeys": ["y_axis_field1", "y_axis_field2"]
+}
+```
+
+Chart type guide:
+- bar: Compare values across categories
+- line: Show trends over time
+- pie: Show proportions/percentages
+- area: Show cumulative trends
+
+Note: Only add chart config when data is suitable for visualization.
 """
 
         if db_config:

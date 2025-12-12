@@ -38,10 +38,18 @@ class GptmeEngine:
         query: str,
         system_prompt: str,
         db_config: dict[str, Any] | None = None,
+        history: list[dict[str, str]] | None = None,
         stop_checker: Callable[[], bool] | None = None,
     ) -> AsyncGenerator[SSEEvent, None]:
         """
         执行查询并流式返回结果
+
+        Args:
+            query: 用户查询
+            system_prompt: 系统提示
+            db_config: 数据库配置
+            history: 对话历史消息列表 [{"role": "user/assistant", "content": "..."}]
+            stop_checker: 停止检查函数
         """
         logger.info("GptmeEngine.execute called", model=self.model, query_preview=query[:50])
 
@@ -62,6 +70,7 @@ class GptmeEngine:
                 query=query,
                 system_prompt=system_prompt,
                 db_config=db_config,
+                history=history,
                 stop_checker=stop_checker,
             ):
                 yield event
@@ -74,6 +83,7 @@ class GptmeEngine:
         query: str,
         system_prompt: str,
         db_config: dict[str, Any] | None = None,
+        history: list[dict[str, str]] | None = None,
         stop_checker: Callable[[], bool] | None = None,
     ) -> AsyncGenerator[SSEEvent, None]:
         """使用 LiteLLM 执行查询"""
@@ -87,6 +97,14 @@ class GptmeEngine:
             if db_config:
                 db_context = self._build_db_context(db_config)
                 messages.append({"role": "system", "content": db_context})
+
+            # 添加对话历史（不包括当前查询，因为当前查询会单独添加）
+            if history:
+                # 过滤掉最后一条用户消息（如果和当前查询相同）
+                for msg in history:
+                    if msg.get("role") in ("user", "assistant") and msg.get("content"):
+                        messages.append({"role": msg["role"], "content": msg["content"]})
+                logger.info(f"Added {len(history)} history messages to context")
 
             messages.append({"role": "user", "content": query})
 
@@ -117,7 +135,6 @@ class GptmeEngine:
             data = None
             rows_count = None
             execution_time = None
-            visualization = None
 
             if sql_code and db_config:
                 yield SSEEvent.progress("executing", "正在执行 SQL 查询...")
@@ -126,26 +143,40 @@ class GptmeEngine:
                 try:
                     data, rows_count = await self._execute_sql(sql_code, db_config)
                     execution_time = time.time() - start_time
-
-                    # 尝试生成可视化
-                    if data and len(data) > 0:
-                        visualization = self._generate_visualization(data, query)
                 except Exception as e:
                     full_content += f"\n\n⚠️ SQL 执行错误: {str(e)}"
 
+            # 从 AI 输出中提取图表配置
+            chart_config = self._extract_chart_config(full_content)
+
+            # 移除图表配置代码块，使输出更干净
+            clean_content = re.sub(r"```chart\s*\n?[\s\S]*?\n?```", "", full_content).strip()
+
             yield SSEEvent.result(
-                content=full_content,
+                content=clean_content,
                 sql=sql_code,
                 data=data,
                 rows_count=rows_count,
                 execution_time=execution_time,
             )
 
-            if visualization:
-                yield SSEEvent.visualization(
-                    chart_type=visualization.get("type", "bar"),
-                    chart_data=visualization.get("data", {}),
-                )
+            # 如果 AI 提供了图表配置且有数据，生成可视化
+            if chart_config and data and len(data) > 0:
+                # 构建图表数据
+                visualization = self._build_chart_from_config(chart_config, data)
+                if visualization:
+                    yield SSEEvent.visualization(
+                        chart_type=visualization.get("type", "bar"),
+                        chart_data=visualization,
+                    )
+            elif data and len(data) > 0:
+                # 如果 AI 没有提供图表配置，使用后备的自动生成逻辑
+                visualization = self._generate_visualization(data, query)
+                if visualization:
+                    yield SSEEvent.visualization(
+                        chart_type=visualization.get("type", "bar"),
+                        chart_data=visualization.get("data", {}),
+                    )
 
         except Exception as e:
             yield SSEEvent.error("LITELLM_ERROR", str(e))
@@ -160,8 +191,66 @@ class GptmeEngine:
         result = db_manager.execute_query(sql, read_only=True)
         return result.data, result.rows_count
 
+    def _build_chart_from_config(
+        self, config: dict, data: list[dict]
+    ) -> dict | None:
+        """根据 AI 提供的配置构建图表数据
+
+        Args:
+            config: AI 生成的图表配置 {"type", "title", "xKey", "yKeys"}
+            data: SQL 查询结果数据
+
+        Returns:
+            完整的图表配置，包含数据
+        """
+        if not data or len(data) == 0:
+            return None
+
+        chart_type = config.get("type", "bar")
+        title = config.get("title", "")
+        x_key = config.get("xKey")
+        y_keys = config.get("yKeys", [])
+
+        columns = list(data[0].keys())
+
+        # 如果 AI 没有指定 xKey，使用第一列
+        if not x_key or x_key not in columns:
+            x_key = columns[0]
+
+        # 如果 AI 没有指定 yKeys，自动检测数值列
+        if not y_keys:
+            for col in columns:
+                if col != x_key:
+                    try:
+                        float(data[0][col])
+                        y_keys.append(col)
+                    except (ValueError, TypeError):
+                        pass
+
+        if not y_keys:
+            return None
+
+        # 构建图表数据
+        chart_data = []
+        for row in data[:50]:  # 限制最多 50 条数据
+            item = {"name": str(row.get(x_key, ""))}
+            for y_key in y_keys:
+                try:
+                    item[y_key] = float(row.get(y_key, 0))
+                except (ValueError, TypeError):
+                    item[y_key] = 0
+            chart_data.append(item)
+
+        return {
+            "type": chart_type,
+            "title": title,
+            "data": chart_data,
+            "xKey": "name",
+            "yKeys": y_keys,
+        }
+
     def _generate_visualization(self, data: list[dict], query: str) -> dict | None:
-        """根据数据和查询生成可视化配置"""
+        """根据数据和查询自动生成可视化配置（后备方案）"""
         if not data or len(data) == 0:
             return None
 
@@ -242,6 +331,36 @@ class GptmeEngine:
         select_match = re.search(r"(SELECT\s+[\s\S]*?(?:;|$))", content, re.IGNORECASE)
         if select_match:
             return select_match.group(1).strip().rstrip(";") + ";"
+
+        return None
+
+    def _extract_chart_config(self, content: str) -> dict | None:
+        """从 AI 输出中提取图表配置
+
+        Args:
+            content: AI 输出的完整内容
+
+        Returns:
+            图表配置字典，如果没有找到则返回 None
+        """
+        import json
+
+        # 匹配 ```chart ... ``` 代码块
+        pattern = r"```chart\s*\n?([\s\S]*?)\n?```"
+        match = re.search(pattern, content, re.IGNORECASE)
+
+        if match:
+            try:
+                config_str = match.group(1).strip()
+                config = json.loads(config_str)
+
+                # 验证必要字段
+                if "type" in config:
+                    logger.info(f"Extracted chart config: type={config.get('type')}")
+                    return config
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse chart config: {e}")
+                return None
 
         return None
 
