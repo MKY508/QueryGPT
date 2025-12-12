@@ -25,12 +25,12 @@ export default function SettingsPage() {
     }
   }, [isAuthenticated, router]);
 
+  // 用于 SchemaSettings 的连接 ID 状态 - 必须在条件返回之前
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+
   if (!isAuthenticated) {
     return null;
   }
-
-  // 用于 SchemaSettings 的连接 ID 状态
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
 
   const tabs = [
     { id: "models" as TabType, label: "AI 模型", icon: Brain },

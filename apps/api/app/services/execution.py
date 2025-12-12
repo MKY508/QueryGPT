@@ -14,7 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import encryptor
 from app.core.config import settings
 from app.db.tables import Connection, Message, Model, SemanticTerm, TableRelationship, User
-from app.models import RelationshipContext, SemanticContext, SemanticTermResponse, SSEEvent, TableRelationshipResponse
+from app.models import (
+    RelationshipContext,
+    SemanticContext,
+    SemanticTermResponse,
+    SSEEvent,
+    TableRelationshipResponse,
+)
 
 logger = structlog.get_logger()
 

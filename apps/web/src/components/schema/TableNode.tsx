@@ -24,7 +24,7 @@ function TableNodeComponent({ data }: TableNodeProps) {
 
       {/* 列列表 */}
       <div className="max-h-[300px] overflow-y-auto">
-        {table.columns.map((column: ColumnInfo, index: number) => (
+        {table.columns.map((column: ColumnInfo) => (
           <div
             key={column.name}
             className="relative px-3 py-1.5 text-xs border-b border-border/50 last:border-b-0 hover:bg-muted/50 flex items-center justify-between"

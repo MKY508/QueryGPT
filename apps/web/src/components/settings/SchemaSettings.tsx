@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ReactFlow,
@@ -31,13 +31,12 @@ interface SchemaSettingsProps {
 }
 
 const nodeTypes: NodeTypes = {
-  tableNode: TableNode as any,
+  tableNode: TableNode,
 };
 
 export function SchemaSettings({ connectionId }: SchemaSettingsProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-  const [pendingConnection, setPendingConnection] = useState<Connection | null>(null);
   const queryClient = useQueryClient();
 
   // 获取 Schema 信息
@@ -70,7 +69,6 @@ export function SchemaSettings({ connectionId }: SchemaSettingsProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["relationships", connectionId] });
-      setPendingConnection(null);
     },
   });
 
@@ -167,7 +165,7 @@ export function SchemaSettings({ connectionId }: SchemaSettingsProps) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
         <Database size={48} className="mb-4 opacity-50" />
-        <p>请先在"数据库连接"中选择一个连接</p>
+        <p>请先在「数据库连接」中选择一个连接</p>
       </div>
     );
   }

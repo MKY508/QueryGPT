@@ -148,43 +148,43 @@ async def get_schema(
 
 
 def _parse_schema_info(schema_info: str) -> list[TableInfo]:
-    """解析 schema_info 字符串为结构化数据"""
+    """解析 schema_info 字符串为结构化数据
+
+    输入格式: "- table_name: col1 (type1), col2 (type2), ..."
+    """
     tables = []
-    current_table = None
-    columns = []
 
     for line in schema_info.strip().split("\n"):
         line = line.strip()
-        if not line:
+        if not line or not line.startswith("-"):
             continue
 
-        # 检测表名行 (格式: "表名 tablename:" 或 "tablename:")
-        if line.endswith(":"):
-            if current_table and columns:
-                tables.append(TableInfo(name=current_table, columns=columns))
-            # 提取表名
-            table_match = re.match(r"(?:表\s+)?(\w+):", line)
-            if table_match:
-                current_table = table_match.group(1)
-                columns = []
-        elif current_table and line.startswith("-"):
-            # 解析列信息 (格式: "- column_name (TYPE)")
-            col_match = re.match(r"-\s*(\w+)\s*\(([^)]+)\)", line)
-            if col_match:
-                col_name = col_match.group(1)
-                col_type = col_match.group(2)
-                columns.append(
-                    ColumnInfo(
-                        name=col_name,
-                        data_type=col_type,
-                        is_primary_key=col_name.lower() == "id",
-                        is_foreign_key=col_name.lower().endswith("_id"),
-                    )
-                )
+        # 解析格式: "- table_name: col1 (type1), col2 (type2), ..."
+        match = re.match(r"-\s*(\w+):\s*(.+)", line)
+        if not match:
+            continue
 
-    # 添加最后一个表
-    if current_table and columns:
-        tables.append(TableInfo(name=current_table, columns=columns))
+        table_name = match.group(1)
+        columns_str = match.group(2)
+
+        # 解析列信息
+        columns = []
+        # 匹配 "col_name (type)" 模式
+        col_pattern = r"(\w+)\s*\(([^)]+)\)"
+        for col_match in re.finditer(col_pattern, columns_str):
+            col_name = col_match.group(1)
+            col_type = col_match.group(2)
+            columns.append(
+                ColumnInfo(
+                    name=col_name,
+                    data_type=col_type,
+                    is_primary_key=col_name.lower() == "id",
+                    is_foreign_key=col_name.lower().endswith("_id") and col_name.lower() != "id",
+                )
+            )
+
+        if columns:
+            tables.append(TableInfo(name=table_name, columns=columns))
 
     return tables
 
