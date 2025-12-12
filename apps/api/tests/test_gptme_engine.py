@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.gptme_engine import GptmeEngine, BLOCKED_PATTERNS
+from app.services.gptme_engine import BLOCKED_PATTERNS, GptmeEngine
 
 
 class TestGptmeEngine:

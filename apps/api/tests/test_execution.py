@@ -1,11 +1,12 @@
 """Tests for execution.py"""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
+
+from app.models import RelationshipContext, SemanticContext
 from app.services.execution import ExecutionService
-from app.models import SemanticContext, RelationshipContext
 
 
 class TestExecutionService:
@@ -130,6 +131,7 @@ class TestSemanticContext:
     def test_to_prompt_zh(self):
         """Test Chinese prompt generation"""
         from datetime import datetime
+
         from app.models import SemanticTermResponse
 
         term = SemanticTermResponse(
@@ -150,6 +152,7 @@ class TestSemanticContext:
     def test_to_prompt_en(self):
         """Test English prompt generation"""
         from datetime import datetime
+
         from app.models import SemanticTermResponse
 
         term = SemanticTermResponse(
@@ -178,6 +181,7 @@ class TestRelationshipContext:
     def test_to_prompt_zh(self):
         """Test Chinese prompt generation"""
         from datetime import datetime
+
         from app.models import TableRelationshipResponse
 
         rel = TableRelationshipResponse(
@@ -201,6 +205,7 @@ class TestRelationshipContext:
     def test_to_prompt_en(self):
         """Test English prompt generation"""
         from datetime import datetime
+
         from app.models import TableRelationshipResponse
 
         rel = TableRelationshipResponse(
