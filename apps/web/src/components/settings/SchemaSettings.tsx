@@ -242,7 +242,7 @@ export function SchemaSettings({ connectionId }: SchemaSettingsProps) {
       )}
 
       {/* React Flow 画布 */}
-      <div className="flex-1 min-h-[400px] border border-border rounded-lg overflow-hidden bg-muted/20">
+      <div className="border border-border rounded-lg overflow-hidden bg-muted/20" style={{ width: '100%', height: '500px' }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
