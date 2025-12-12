@@ -41,10 +41,89 @@ detect_os() {
 
 # 检查命令是否存在
 check_command() {
-    if ! command -v "$1" &> /dev/null; then
-        return 1
+    command -v "$1" &> /dev/null
+}
+
+# 激活 Python 虚拟环境
+activate_venv() {
+    if [ "$OS" = "windows" ]; then
+        source "$SCRIPT_DIR/apps/api/.venv/Scripts/activate"
+    else
+        source "$SCRIPT_DIR/apps/api/.venv/bin/activate"
     fi
-    return 0
+}
+
+# 检查端口是否被占用
+check_port() {
+    local port=$1
+    local pid=""
+
+    if [ "$OS" = "macos" ]; then
+        pid=$(lsof -ti:$port 2>/dev/null || true)
+    else
+        pid=$(lsof -ti:$port 2>/dev/null || ss -tlnp 2>/dev/null | grep ":$port " | grep -oP 'pid=\K\d+' || true)
+    fi
+
+    if [ -n "$pid" ]; then
+        echo "$pid"
+        return 0
+    fi
+    return 1
+}
+
+# 检查所有需要的端口
+check_ports() {
+    local has_conflict=false
+
+    # 检查后端端口 8000
+    if pid=$(check_port 8000); then
+        warn "端口 8000 已被占用 (PID: $pid)"
+        echo -e "  ${YELLOW}→ 终止占用进程: kill -9 $pid${NC}"
+        has_conflict=true
+    fi
+
+    # 检查前端端口 3000
+    if pid=$(check_port 3000); then
+        warn "端口 3000 已被占用 (PID: $pid)"
+        echo -e "  ${YELLOW}→ 终止占用进程: kill -9 $pid${NC}"
+        has_conflict=true
+    fi
+
+    if [ "$has_conflict" = true ]; then
+        echo ""
+        read -p "是否自动终止占用进程? [y/N] " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+            lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+            sleep 1
+            success "已终止占用进程"
+        else
+            error "请手动终止占用进程后重试"
+        fi
+    fi
+}
+
+# 打开浏览器
+open_browser() {
+    local url="http://localhost:3000"
+
+    info "正在打开浏览器..."
+
+    case "$OS" in
+        macos)
+            open "$url" 2>/dev/null || true
+            ;;
+        linux)
+            xdg-open "$url" 2>/dev/null || sensible-browser "$url" 2>/dev/null || true
+            ;;
+        wsl)
+            cmd.exe /c start "$url" 2>/dev/null || true
+            ;;
+        windows)
+            start "$url" 2>/dev/null || true
+            ;;
+    esac
 }
 
 # 检查依赖
@@ -99,12 +178,7 @@ setup_python_env() {
         $PYTHON_CMD -m venv .venv
     fi
 
-    # 激活虚拟环境
-    if [ "$OS" = "windows" ]; then
-        source .venv/Scripts/activate
-    else
-        source .venv/bin/activate
-    fi
+    activate_venv
 
     # 安装依赖
     info "安装 Python 依赖..."
@@ -207,13 +281,7 @@ start_backend() {
     info "启动后端服务..."
 
     cd "$SCRIPT_DIR/apps/api"
-
-    # 激活虚拟环境
-    if [ "$OS" = "windows" ]; then
-        source .venv/Scripts/activate
-    else
-        source .venv/bin/activate
-    fi
+    activate_venv
 
     # 后台启动
     nohup $PYTHON_CMD -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > "$SCRIPT_DIR/logs/backend.log" 2>&1 &
@@ -381,6 +449,7 @@ main() {
             # 完整启动流程
             detect_os
             check_dependencies
+            check_ports
             setup_python_env
             setup_node_env
             setup_env_files
@@ -391,6 +460,7 @@ main() {
             start_frontend
             sleep 3
             show_status
+            open_browser
             ;;
         *)
             error "未知命令: $1\n运行 './start.sh help' 查看帮助"

@@ -27,10 +27,12 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  isHydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => void;
   refreshAccessToken: () => Promise<void>;
+  setHydrated: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -40,6 +42,9 @@ export const useAuthStore = create<AuthState>()(
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      isHydrated: false,
+
+      setHydrated: () => set({ isHydrated: true }),
 
       login: async (email: string, password: string) => {
         try {
@@ -137,6 +142,9 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHydrated();
+      },
     }
   )
 );

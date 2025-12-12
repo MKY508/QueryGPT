@@ -7,7 +7,16 @@ import { useAuthStore } from "@/lib/stores/auth";
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, isHydrated } = useAuthStore();
+
+  // 等待 hydration 完成，避免闪烁
+  if (!isHydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="animate-pulse text-muted-foreground">加载中...</div>
+      </div>
+    );
+  }
 
   // 如果未登录，显示登录页面
   if (!isAuthenticated) {

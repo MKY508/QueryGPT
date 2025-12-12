@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Play, Pencil } from "lucide-react";
+import { Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Play, Pencil, Download, Upload } from "lucide-react";
+import { ImportConfigDialog } from "./ImportConfigDialog";
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,10 @@ interface ConnectionSettingsProps {
 export function ConnectionSettings({ onSelectConnection }: ConnectionSettingsProps) {
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [importDialogConnection, setImportDialogConnection] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const handleSelectConnection = (id: string) => {
     setSelectedId(id);
@@ -159,6 +164,30 @@ export function ConnectionSettings({ onSelectConnection }: ConnectionSettingsPro
   const handleDelete = (id: string) => {
     if (confirm("确定要删除这个数据库连接吗？")) {
       deleteMutation.mutate(id);
+    }
+  };
+
+  // 导出配置
+  const handleExport = async (conn: Connection) => {
+    try {
+      const response = await api.get(`/api/v1/config/connections/${conn.id}/export`);
+      const exportData = response.data.data;
+
+      // 创建下载
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `querygpt-config-${conn.name}-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("导出失败:", error);
+      alert("导出失败，请重试");
     }
   };
 
@@ -399,9 +428,39 @@ export function ConnectionSettings({ onSelectConnection }: ConnectionSettingsPro
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {/* 备份/恢复按钮组 */}
+                <div className="flex items-center border border-border rounded-lg overflow-hidden mr-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExport(conn);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors border-r border-border"
+                    title="导出此连接的表关系、语义术语、布局等配置"
+                  >
+                    <Download size={14} />
+                    <span>备份</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImportDialogConnection({ id: conn.id, name: conn.name });
+                    }}
+                    className="flex items-center gap-1 px-2 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                    title="从备份文件恢复配置"
+                  >
+                    <Upload size={14} />
+                    <span>恢复</span>
+                  </button>
+                </div>
+
+                {/* 其他操作按钮 */}
                 <button
-                  onClick={() => testMutation.mutate(conn.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    testMutation.mutate(conn.id);
+                  }}
                   disabled={testMutation.isPending}
                   className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                   title="测试连接"
@@ -413,14 +472,20 @@ export function ConnectionSettings({ onSelectConnection }: ConnectionSettingsPro
                   )}
                 </button>
                 <button
-                  onClick={() => handleEdit(conn)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEdit(conn);
+                  }}
                   className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                   title="编辑"
                 >
                   <Pencil size={16} />
                 </button>
                 <button
-                  onClick={() => handleDelete(conn.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(conn.id);
+                  }}
                   disabled={deleteMutation.isPending}
                   className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                   title="删除"
@@ -437,6 +502,14 @@ export function ConnectionSettings({ onSelectConnection }: ConnectionSettingsPro
           <p className="text-sm mt-1">点击上方按钮添加第一个连接</p>
         </div>
       )}
+
+      {/* 导入配置对话框 */}
+      <ImportConfigDialog
+        connectionId={importDialogConnection?.id || ""}
+        connectionName={importDialogConnection?.name || ""}
+        isOpen={!!importDialogConnection}
+        onClose={() => setImportDialogConnection(null)}
+      />
     </div>
   );
 }

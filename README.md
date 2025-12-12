@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="docs/images/logo.png" width="400" alt="QueryGPT">
+  <img src="docs/images/logo.svg" width="400" alt="QueryGPT">
 
   <p>自然语言数据库查询助手chatbi - v2 重构版</p>
 

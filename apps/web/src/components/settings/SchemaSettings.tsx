@@ -633,8 +633,8 @@ function SchemaSettingsInner({ connectionId }: SchemaSettingsProps) {
 
       {/* 建议列表 */}
       {schemaInfo?.suggestions && schemaInfo.suggestions.length > 0 && (
-        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-sm font-medium mb-2">
+        <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+          <div className="flex items-center gap-2 text-primary text-sm font-medium mb-2">
             <Lightbulb size={14} />
             检测到可能的关系
           </div>

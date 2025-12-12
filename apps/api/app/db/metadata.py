@@ -339,6 +339,51 @@ class LayoutRepository:
         )
 
     @staticmethod
+    def list_layouts_full(user_id: UUID, connection_id: UUID) -> list[dict]:
+        """获取用户的所有布局（完整数据，用于导出）"""
+        with get_metadata_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM schema_layouts
+                WHERE user_id = ? AND connection_id = ?
+                ORDER BY is_default DESC, name ASC
+                """,
+                (str(user_id), str(connection_id)),
+            )
+            rows = cursor.fetchall()
+            return [LayoutRepository._parse_json_fields(dict(row)) for row in rows]
+
+    @staticmethod
+    def get_layout_by_name(user_id: UUID, connection_id: UUID, name: str) -> dict | None:
+        """根据名称获取布局"""
+        with get_metadata_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM schema_layouts
+                WHERE user_id = ? AND connection_id = ? AND name = ?
+                """,
+                (str(user_id), str(connection_id), name),
+            )
+            row = cursor.fetchone()
+            return LayoutRepository._parse_json_fields(dict(row)) if row else None
+
+    @staticmethod
+    def delete_all_layouts(user_id: UUID, connection_id: UUID) -> int:
+        """删除指定连接的所有布局（用于导入时的 replace 模式）"""
+        with get_metadata_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                DELETE FROM schema_layouts
+                WHERE user_id = ? AND connection_id = ?
+                """,
+                (str(user_id), str(connection_id)),
+            )
+            return cursor.rowcount
+
+    @staticmethod
     def layout_name_exists(
         user_id: UUID, connection_id: UUID, name: str, exclude_id: UUID | None = None
     ) -> bool:

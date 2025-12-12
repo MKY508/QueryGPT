@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen, GitBranch } from "lucide-react";
+import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen, GitBranch, Info } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/stores/auth";
 import { api } from "@/lib/api/client";
@@ -110,6 +110,17 @@ export default function SettingsPage() {
                 </li>
               ))}
             </ul>
+
+            {/* 关于链接 */}
+            <div className="mt-6 pt-6 border-t border-border">
+              <button
+                onClick={() => router.push("/about")}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <Info size={18} />
+                关于
+              </button>
+            </div>
           </nav>
 
           {/* Content */}
