@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -16,9 +16,14 @@ export default function SettingsPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
 
-  // 未登录重定向
+  // 未登录重定向 - 使用 useEffect 避免渲染时调用 setState
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push("/");
+    }
+  }, [isAuthenticated, router]);
+
   if (!isAuthenticated) {
-    router.push("/");
     return null;
   }
 
@@ -29,19 +34,19 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      <header className="bg-background border-b border-border sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center gap-4">
           <button
             onClick={() => router.push("/")}
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
+            className="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
           >
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-2">
-            <SettingsIcon size={20} className="text-slate-600" />
-            <h1 className="text-lg font-semibold text-slate-900">设置</h1>
+            <SettingsIcon size={20} className="text-muted-foreground" />
+            <h1 className="text-lg font-semibold text-foreground">设置</h1>
           </div>
         </div>
       </header>
@@ -58,8 +63,8 @@ export default function SettingsPage() {
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
                       activeTab === tab.id
-                        ? "bg-blue-50 text-blue-700 font-medium"
-                        : "text-slate-600 hover:bg-slate-100"
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:bg-muted"
                     )}
                   >
                     <tab.icon size={18} />
@@ -71,7 +76,7 @@ export default function SettingsPage() {
           </nav>
 
           {/* Content */}
-          <main className="flex-1 bg-white rounded-xl border border-slate-200 p-6">
+          <main className="flex-1 bg-background rounded-xl border border-border p-6">
             {activeTab === "models" && <ModelSettings />}
             {activeTab === "connections" && <ConnectionSettings />}
             {activeTab === "preferences" && <PreferencesSettings />}

@@ -167,17 +167,17 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
   const selectedModel = models?.find((m) => m.id === selectedModelId);
 
   return (
-    <div className="flex-1 flex flex-col h-full relative bg-slate-50/50">
+    <div className="flex-1 flex flex-col h-full relative bg-background">
       {/* Header */}
-      <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-sm flex items-center px-4 justify-between sticky top-0 z-10">
+      <header className="h-16 border-b border-border bg-background/80 backdrop-blur-sm flex items-center px-4 justify-between sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <button
             onClick={onToggleSidebar}
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-600"
+            className="p-2 hover:bg-muted rounded-lg text-muted-foreground"
           >
             <History size={20} />
           </button>
-          <span className="text-sm text-slate-500">QueryGPT v2</span>
+          <span className="text-sm text-muted-foreground">QueryGPT v2</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -188,17 +188,17 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
                 setShowConnectionDropdown(!showConnectionDropdown);
                 setShowModelDropdown(false);
               }}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-muted hover:bg-muted/80 rounded-lg transition-colors"
             >
-              <Database size={14} className="text-slate-500" />
-              <span className="text-slate-700 max-w-[120px] truncate">
+              <Database size={14} className="text-muted-foreground" />
+              <span className="text-foreground max-w-[120px] truncate">
                 {selectedConnection?.name || "选择数据库"}
               </span>
-              <ChevronDown size={14} className="text-slate-400" />
+              <ChevronDown size={14} className="text-muted-foreground" />
             </button>
 
             {showConnectionDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50">
+              <div className="absolute right-0 top-full mt-1 w-64 bg-background border border-border rounded-lg shadow-lg py-1 z-50">
                 {connections && connections.length > 0 ? (
                   connections.map((conn) => (
                     <button
@@ -208,27 +208,27 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
                         setShowConnectionDropdown(false);
                       }}
                       className={cn(
-                        "w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center justify-between",
-                        conn.id === selectedConnectionId && "bg-blue-50 text-blue-600"
+                        "w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center justify-between text-foreground",
+                        conn.id === selectedConnectionId && "bg-primary/10 text-primary"
                       )}
                     >
                       <div>
                         <div className="font-medium">{conn.name}</div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs text-muted-foreground">
                           {conn.driver} - {conn.database_name}
                         </div>
                       </div>
                       {conn.is_default && (
-                        <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">默认</span>
+                        <span className="text-xs bg-muted px-1.5 py-0.5 rounded">默认</span>
                       )}
                     </button>
                   ))
                 ) : (
-                  <div className="px-3 py-4 text-center text-sm text-slate-400">
+                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">
                     <p>暂无数据库连接</p>
                     <span
                       onClick={() => router.push("/settings")}
-                      className="text-blue-500 hover:underline mt-1 inline-block cursor-pointer"
+                      className="text-primary hover:underline mt-1 inline-block cursor-pointer"
                     >
                       去添加
                     </span>
@@ -245,17 +245,17 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
                 setShowModelDropdown(!showModelDropdown);
                 setShowConnectionDropdown(false);
               }}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-muted hover:bg-muted/80 rounded-lg transition-colors"
             >
-              <Brain size={14} className="text-slate-500" />
-              <span className="text-slate-700 max-w-[100px] truncate">
+              <Brain size={14} className="text-muted-foreground" />
+              <span className="text-foreground max-w-[100px] truncate">
                 {selectedModel?.name || "选择模型"}
               </span>
-              <ChevronDown size={14} className="text-slate-400" />
+              <ChevronDown size={14} className="text-muted-foreground" />
             </button>
 
             {showModelDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-50">
+              <div className="absolute right-0 top-full mt-1 w-56 bg-background border border-border rounded-lg shadow-lg py-1 z-50">
                 {models && models.length > 0 ? (
                   models.map((model) => (
                     <button
@@ -265,27 +265,27 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
                         setShowModelDropdown(false);
                       }}
                       className={cn(
-                        "w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center justify-between",
-                        model.id === selectedModelId && "bg-blue-50 text-blue-600"
+                        "w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center justify-between text-foreground",
+                        model.id === selectedModelId && "bg-primary/10 text-primary"
                       )}
                     >
                       <div>
                         <div className="font-medium">{model.name}</div>
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs text-muted-foreground">
                           {model.provider} / {model.model_id}
                         </div>
                       </div>
                       {model.is_default && (
-                        <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">默认</span>
+                        <span className="text-xs bg-muted px-1.5 py-0.5 rounded">默认</span>
                       )}
                     </button>
                   ))
                 ) : (
-                  <div className="px-3 py-4 text-center text-sm text-slate-400">
+                  <div className="px-3 py-4 text-center text-sm text-muted-foreground">
                     <p>暂无模型配置</p>
                     <span
                       onClick={() => router.push("/settings")}
-                      className="text-blue-500 hover:underline mt-1 inline-block cursor-pointer"
+                      className="text-primary hover:underline mt-1 inline-block cursor-pointer"
                     >
                       去添加
                     </span>
@@ -298,7 +298,7 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
           {/* 设置按钮 */}
           <Link
             href="/settings"
-            className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+            className="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
           >
             <Settings size={18} />
           </Link>
@@ -309,20 +309,20 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
         {messages.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-slate-400">
-            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-6">
-              <Database size={32} className="text-slate-400" />
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+            <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6">
+              <Database size={32} className="text-muted-foreground" />
             </div>
-            <h2 className="text-xl font-semibold text-slate-700 mb-2">
+            <h2 className="text-xl font-semibold text-foreground mb-2">
               欢迎使用 QueryGPT
             </h2>
-            <p className="text-slate-500 max-w-md text-center">
+            <p className="text-muted-foreground max-w-md text-center">
               用自然语言查询数据库，获取数据分析和可视化结果
             </p>
 
             {/* 当前选择提示 */}
             {selectedConnection && (
-              <div className="mt-4 px-4 py-2 bg-blue-50 rounded-lg text-sm text-blue-600">
+              <div className="mt-4 px-4 py-2 bg-primary/10 rounded-lg text-sm text-primary">
                 当前数据库: {selectedConnection.name} ({selectedConnection.driver})
               </div>
             )}
@@ -337,7 +337,7 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
                 <button
                   key={q}
                   onClick={() => setInput(q)}
-                  className="p-4 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:border-blue-300 hover:shadow-md transition-all text-left"
+                  className="p-4 bg-background border border-border rounded-xl text-sm text-foreground hover:border-primary/50 hover:shadow-md transition-all text-left"
                 >
                   {q}
                 </button>
@@ -355,8 +355,8 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
             )}
           >
             {msg.role === "assistant" && (
-              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 mt-1">
-                <Brain size={16} className="text-blue-600" />
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                <Brain size={16} className="text-primary" />
               </div>
             )}
 
@@ -364,24 +364,24 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
               className={cn(
                 "rounded-2xl px-5 py-3.5 max-w-[85%] shadow-sm",
                 msg.role === "user"
-                  ? "bg-blue-600 text-white rounded-br-sm"
-                  : "bg-white text-slate-800 border border-slate-200 rounded-bl-sm"
+                  ? "bg-primary text-primary-foreground rounded-br-sm"
+                  : "bg-background text-foreground border border-border rounded-bl-sm"
               )}
             >
               {msg.isLoading ? (
-                <div className="flex items-center gap-2 text-slate-400 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Loader2 className="animate-spin" size={16} />
                   <span>{msg.status || "正在分析..."}</span>
                 </div>
               ) : (
-                <ReactMarkdown className="prose prose-sm max-w-none">
+                <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
                   {msg.content}
                 </ReactMarkdown>
               )}
 
               {msg.sql && (
-                <div className="mt-4 pt-4 border-t border-slate-100">
-                  <div className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                     <Database size={12} /> SQL 查询
                   </div>
                   <SqlHighlight code={msg.sql} />
@@ -406,7 +406,7 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-white border-t border-slate-200 relative z-20">
+      <div className="p-4 bg-background border-t border-border relative z-20">
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto relative">
           <div className="relative flex items-center">
             <input
@@ -414,7 +414,7 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="输入你的问题，例如：查询上月销售额..."
-              className="w-full pl-5 pr-14 py-4 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 shadow-lg shadow-slate-100/50 transition-all"
+              className="w-full pl-5 pr-14 py-4 rounded-2xl border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary shadow-lg shadow-black/5 transition-all"
             />
             <button
               type="submit"
@@ -422,8 +422,8 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
               className={cn(
                 "absolute right-2 p-2.5 text-white rounded-xl transition-all hover:scale-105 active:scale-95 shadow-md",
                 isLoading
-                  ? "bg-red-500 hover:bg-red-600 shadow-red-200"
-                  : "bg-blue-600 hover:bg-blue-700 shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  ? "bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
+                  : "bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
               )}
             >
               {isLoading ? (
@@ -434,7 +434,7 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
             </button>
           </div>
           <div className="text-center mt-2">
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               QueryGPT 可能会产生错误，请验证重要信息
             </p>
           </div>

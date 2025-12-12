@@ -69,7 +69,7 @@ export function PreferencesSettings() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="animate-spin text-slate-400" size={24} />
+        <Loader2 className="animate-spin text-muted-foreground" size={24} />
       </div>
     );
   }
@@ -77,8 +77,8 @@ export function PreferencesSettings() {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-slate-900">偏好设置</h2>
-        <p className="text-sm text-slate-500 mt-1">
+        <h2 className="text-lg font-semibold text-foreground">偏好设置</h2>
+        <p className="text-sm text-muted-foreground mt-1">
           自定义您的使用体验
         </p>
       </div>
@@ -86,25 +86,25 @@ export function PreferencesSettings() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 语言设置 */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             界面语言
           </label>
           <select
             value={formData.language}
             onChange={(e) => handleChange("language", e.target.value)}
-            className="w-full max-w-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full max-w-xs px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           >
             <option value="zh">中文</option>
             <option value="en">English</option>
           </select>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             AI 回复也将使用此语言
           </p>
         </div>
 
         {/* 主题设置 */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             界面主题
           </label>
           <div className="flex gap-3">
@@ -117,8 +117,8 @@ export function PreferencesSettings() {
                 key={option.value}
                 className={`flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer transition-colors ${
                   formData.theme === option.value
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-300 hover:border-slate-400"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-input text-foreground hover:border-muted-foreground"
                 }`}
               >
                 <input
@@ -137,25 +137,25 @@ export function PreferencesSettings() {
 
         {/* 视图模式 */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             默认视图模式
           </label>
           <select
             value={formData.view_mode}
             onChange={(e) => handleChange("view_mode", e.target.value)}
-            className="w-full max-w-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full max-w-xs px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           >
             <option value="user">用户模式 (简洁)</option>
             <option value="developer">开发者模式 (详细)</option>
           </select>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             开发者模式会显示更多技术细节
           </p>
         </div>
 
         {/* 上下文轮数 */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label className="block text-sm font-medium text-foreground mb-2">
             对话上下文轮数
           </label>
           <input
@@ -166,19 +166,19 @@ export function PreferencesSettings() {
             onChange={(e) =>
               handleChange("context_rounds", parseInt(e.target.value))
             }
-            className="w-24 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-24 px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           />
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             AI 会记住最近 {formData.context_rounds} 轮对话作为上下文
           </p>
         </div>
 
         {/* 保存按钮 */}
-        <div className="pt-4 border-t border-slate-200">
+        <div className="pt-4 border-t border-border">
           <button
             type="submit"
             disabled={!hasChanges || updateMutation.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
           >
             {updateMutation.isPending ? (
               <Loader2 size={16} className="animate-spin" />
@@ -188,7 +188,7 @@ export function PreferencesSettings() {
             保存设置
           </button>
           {updateMutation.isSuccess && (
-            <p className="text-sm text-green-600 mt-2">设置已保存</p>
+            <p className="text-sm text-green-600 dark:text-green-400 mt-2">设置已保存</p>
           )}
         </div>
       </form>
