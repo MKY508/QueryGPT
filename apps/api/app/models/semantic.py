@@ -77,6 +77,8 @@ class SemanticContext(BaseModel):
                 lines.append(f"  {term.description}")
             if term.examples:
                 examples_str = ", ".join(f'"{e}"' for e in term.examples[:3])
-                lines.append(f"  示例: {examples_str}" if language == "zh" else f"  Examples: {examples_str}")
+                lines.append(
+                    f"  示例: {examples_str}" if language == "zh" else f"  Examples: {examples_str}"
+                )
 
         return "\n".join(lines)

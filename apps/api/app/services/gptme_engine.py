@@ -200,9 +200,7 @@ class GptmeEngine:
         result = db_manager.execute_query(sql, read_only=True)
         return result.data, result.rows_count
 
-    def _build_chart_from_config(
-        self, config: dict, data: list[dict]
-    ) -> dict | None:
+    def _build_chart_from_config(self, config: dict, data: list[dict]) -> dict | None:
         """根据 AI 提供的配置构建图表数据
 
         Args:

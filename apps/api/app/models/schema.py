@@ -109,7 +109,11 @@ class RelationshipContext(BaseModel):
             return ""
 
         if language == "zh":
-            lines = ["## 表关系定义", "以下是预定义的表关系，生成多表查询时请使用这些 JOIN 条件：", ""]
+            lines = [
+                "## 表关系定义",
+                "以下是预定义的表关系，生成多表查询时请使用这些 JOIN 条件：",
+                "",
+            ]
         else:
             lines = [
                 "## Table Relationships",

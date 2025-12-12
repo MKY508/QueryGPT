@@ -187,12 +187,8 @@ class TableRelationship(Base, UUIDMixin, TimestampMixin):
     source_column: Mapped[str] = mapped_column(String(100), nullable=False)
     target_table: Mapped[str] = mapped_column(String(100), nullable=False)
     target_column: Mapped[str] = mapped_column(String(100), nullable=False)
-    relationship_type: Mapped[str] = mapped_column(
-        String(10), default="1:N"
-    )  # 1:1, 1:N, N:1, N:M
-    join_type: Mapped[str] = mapped_column(
-        String(20), default="LEFT"
-    )  # LEFT, INNER, RIGHT, FULL
+    relationship_type: Mapped[str] = mapped_column(String(10), default="1:N")  # 1:1, 1:N, N:1, N:M
+    join_type: Mapped[str] = mapped_column(String(20), default="LEFT")  # LEFT, INNER, RIGHT, FULL
     description: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

@@ -96,6 +96,8 @@ export function SchemaSettings({ connectionId }: SchemaSettingsProps) {
 
   // 构建节点和边
   useEffect(() => {
+    console.log("schemaInfo:", schemaInfo);
+    console.log("tables:", schemaInfo?.tables);
     if (!schemaInfo?.tables) return;
 
     // 创建表节点

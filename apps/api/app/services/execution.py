@@ -145,7 +145,8 @@ class ExecutionService:
         # 如果有指定连接，获取全局术语和该连接的术语
         if self.connection_id:
             query = query.where(
-                (SemanticTerm.connection_id.is_(None)) | (SemanticTerm.connection_id == self.connection_id)
+                (SemanticTerm.connection_id.is_(None))
+                | (SemanticTerm.connection_id == self.connection_id)
             )
         else:
             # 只获取全局术语
@@ -154,9 +155,7 @@ class ExecutionService:
         result = await self.db.execute(query.order_by(SemanticTerm.term))
         terms = result.scalars().all()
 
-        return SemanticContext(
-            terms=[SemanticTermResponse.model_validate(t) for t in terms]
-        )
+        return SemanticContext(terms=[SemanticTermResponse.model_validate(t) for t in terms])
 
     async def _get_relationship_context(self, max_relationships: int = 15) -> RelationshipContext:
         """获取表关系上下文
@@ -245,7 +244,9 @@ class ExecutionService:
             logger.info("Getting conversation history...")
             history = await self._get_conversation_history(conversation_id, limit=10)
 
-            system_prompt = self._build_system_prompt(db_config, semantic_context, relationship_context)
+            system_prompt = self._build_system_prompt(
+                db_config, semantic_context, relationship_context
+            )
 
             engine = GptmeEngine(
                 model=model_config.get("model"),

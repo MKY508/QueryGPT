@@ -95,13 +95,9 @@ def _detect_relationships(tables: list[TableInfo]) -> list[RelationshipSuggestio
 
                 if matched_table and matched_table != table.name:
                     # 检查目标表是否有 id 列
-                    target_table_info = next(
-                        (t for t in tables if t.name == matched_table), None
-                    )
+                    target_table_info = next((t for t in tables if t.name == matched_table), None)
                     if target_table_info:
-                        has_id = any(
-                            c.name.lower() == "id" for c in target_table_info.columns
-                        )
+                        has_id = any(c.name.lower() == "id" for c in target_table_info.columns)
                         if has_id:
                             suggestions.append(
                                 RelationshipSuggestion(
@@ -137,9 +133,7 @@ async def get_schema(
         # 自动检测关系
         suggestions = _detect_relationships(tables)
 
-        return APIResponse.ok(
-            data=SchemaInfo(tables=tables, suggestions=suggestions)
-        )
+        return APIResponse.ok(data=SchemaInfo(tables=tables, suggestions=suggestions))
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -210,9 +204,7 @@ async def get_relationships(
     )
     relationships = result.scalars().all()
 
-    return APIResponse.ok(
-        data=[TableRelationshipResponse.model_validate(r) for r in relationships]
-    )
+    return APIResponse.ok(data=[TableRelationshipResponse.model_validate(r) for r in relationships])
 
 
 @router.post(
