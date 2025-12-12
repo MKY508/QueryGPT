@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Star, Loader2, Pencil, X } from "lucide-react";
+import { Plus, Trash2, Star, Loader2, Pencil, X, Play, CheckCircle, XCircle } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +47,12 @@ export function ModelSettings() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<ModelFormData>(initialFormData);
   const [error, setError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{
+    id: string;
+    success: boolean;
+    message: string;
+    responseTime?: number;
+  } | null>(null);
   const queryClient = useQueryClient();
 
   // 获取模型列表
@@ -98,6 +104,26 @@ export function ModelSettings() {
     },
     onError: (err: any) => {
       setError(err.response?.data?.error?.message || "删除模型失败");
+    },
+  });
+
+  // 测试模型
+  const testMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post(`/api/v1/config/models/${id}/test`);
+      return { id, ...response.data.data };
+    },
+    onSuccess: (data) => {
+      setTestResult({
+        id: data.id,
+        success: data.success,
+        message: data.message,
+        responseTime: data.response_time_ms,
+      });
+      setTimeout(() => setTestResult(null), 5000);
+    },
+    onError: (err: any) => {
+      setError(err.response?.data?.error?.message || "测试失败");
     },
   });
 
@@ -317,9 +343,41 @@ export function ModelSettings() {
                   <div className="text-sm text-slate-500">
                     {model.provider} / {model.model_id}
                   </div>
+                  {testResult?.id === model.id && (
+                    <div
+                      className={cn(
+                        "flex items-center gap-1 text-sm mt-1",
+                        testResult.success ? "text-green-600" : "text-red-600"
+                      )}
+                    >
+                      {testResult.success ? (
+                        <CheckCircle size={14} />
+                      ) : (
+                        <XCircle size={14} />
+                      )}
+                      {testResult.message}
+                      {testResult.responseTime && (
+                        <span className="text-slate-400 ml-1">
+                          ({testResult.responseTime}ms)
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                <button
+                  onClick={() => testMutation.mutate(model.id)}
+                  disabled={testMutation.isPending}
+                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="测试连接"
+                >
+                  {testMutation.isPending && testMutation.variables === model.id ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Play size={16} />
+                  )}
+                </button>
                 <button
                   onClick={() => handleEdit(model)}
                   className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"

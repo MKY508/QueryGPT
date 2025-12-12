@@ -16,6 +16,7 @@ from app.models import (
     ConnectionTest,
     ModelCreate,
     ModelResponse,
+    ModelTest,
     UserConfig,
 )
 
@@ -140,6 +141,88 @@ async def delete_model(
     await db.commit()
 
     return APIResponse.ok(message="模型已删除")
+
+
+@router.post("/models/{model_id}/test", response_model=APIResponse[ModelTest])
+async def test_model(
+    model_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """测试模型 API Key"""
+    import time
+
+    result = await db.execute(
+        select(Model).where(Model.id == model_id, Model.user_id == current_user.id)
+    )
+    model = result.scalar_one_or_none()
+
+    if not model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模型不存在")
+
+    # 解密 API Key
+    api_key = None
+    if model.api_key_encrypted:
+        api_key = encryptor.decrypt(model.api_key_encrypted)
+
+    if not api_key:
+        return APIResponse.ok(
+            data=ModelTest(
+                success=False,
+                message="未配置 API Key",
+            )
+        )
+
+    try:
+        import litellm
+
+        start_time = time.time()
+
+        # 构建模型名称
+        model_name = model.model_id
+        if model.provider == "openai":
+            model_name = f"openai/{model.model_id}"
+        elif model.provider == "anthropic":
+            model_name = f"anthropic/{model.model_id}"
+        elif model.provider == "deepseek":
+            model_name = f"deepseek/{model.model_id}"
+
+        # 发送简单测试请求
+        response = await litellm.acompletion(
+            model=model_name,
+            messages=[{"role": "user", "content": "Hi"}],
+            max_tokens=5,
+            api_key=api_key,
+            api_base=model.base_url,
+            timeout=10,
+        )
+
+        elapsed_ms = int((time.time() - start_time) * 1000)
+
+        return APIResponse.ok(
+            data=ModelTest(
+                success=True,
+                model_name=response.model if hasattr(response, "model") else model.model_id,
+                response_time_ms=elapsed_ms,
+                message="连接成功",
+            )
+        )
+
+    except Exception as e:
+        error_msg = str(e)
+        if "authentication" in error_msg.lower() or "api key" in error_msg.lower():
+            error_msg = "API Key 无效"
+        elif "timeout" in error_msg.lower():
+            error_msg = "请求超时"
+        elif "connection" in error_msg.lower():
+            error_msg = "连接失败，请检查网络或 Base URL"
+
+        return APIResponse.ok(
+            data=ModelTest(
+                success=False,
+                message=f"测试失败: {error_msg}",
+            )
+        )
 
 
 # ===== 数据库连接管理 =====
@@ -314,6 +397,54 @@ async def test_connection(
                 message=f"连接失败: {str(e)}",
             )
         )
+
+
+@router.put("/connections/{connection_id}", response_model=APIResponse[ConnectionResponse])
+async def update_connection(
+    connection_id: UUID,
+    conn_in: ConnectionCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新数据库连接"""
+    result = await db.execute(
+        select(Connection).where(
+            Connection.id == connection_id, Connection.user_id == current_user.id
+        )
+    )
+    connection = result.scalar_one_or_none()
+
+    if not connection:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="连接不存在")
+
+    # 如果设为默认，取消其他默认
+    if conn_in.is_default and not connection.is_default:
+        other_result = await db.execute(
+            select(Connection).where(
+                Connection.user_id == current_user.id, Connection.is_default == True
+            )
+        )
+        for c in other_result.scalars():
+            c.is_default = False
+
+    # 更新字段
+    connection.name = conn_in.name
+    connection.driver = conn_in.driver
+    connection.host = conn_in.host
+    connection.port = conn_in.port
+    connection.username = conn_in.username
+    connection.database_name = conn_in.database
+    connection.is_default = conn_in.is_default
+    connection.extra_options = conn_in.extra_options or {}
+
+    # 只有提供了新密码才更新
+    if conn_in.password:
+        connection.password_encrypted = encryptor.encrypt(conn_in.password)
+
+    await db.commit()
+    await db.refresh(connection)
+
+    return APIResponse.ok(data=ConnectionResponse.model_validate(connection), message="连接已更新")
 
 
 @router.delete("/connections/{connection_id}", response_model=APIResponse[dict])

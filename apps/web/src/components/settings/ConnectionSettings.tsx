@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Play } from "lucide-react";
+import { Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Play, Pencil } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
@@ -35,23 +35,26 @@ const DRIVERS = [
   { value: "sqlite", label: "SQLite", defaultPort: 0 },
 ];
 
+const defaultFormData: ConnectionFormData = {
+  name: "",
+  driver: "mysql",
+  host: "localhost",
+  port: 3306,
+  database: "",
+  username: "",
+  password: "",
+  is_default: false,
+};
+
 export function ConnectionSettings() {
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{
     id: string;
     success: boolean;
     message: string;
   } | null>(null);
-  const [formData, setFormData] = useState<ConnectionFormData>({
-    name: "",
-    driver: "mysql",
-    host: "localhost",
-    port: 3306,
-    database: "",
-    username: "",
-    password: "",
-    is_default: false,
-  });
+  const [formData, setFormData] = useState<ConnectionFormData>(defaultFormData);
   const queryClient = useQueryClient();
 
   // 获取连接列表
@@ -71,19 +74,27 @@ export function ConnectionSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["connections"] });
-      setShowForm(false);
-      setFormData({
-        name: "",
-        driver: "mysql",
-        host: "localhost",
-        port: 3306,
-        database: "",
-        username: "",
-        password: "",
-        is_default: false,
-      });
+      resetForm();
     },
   });
+
+  // 更新连接
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ConnectionFormData }) => {
+      const response = await api.put(`/api/v1/config/connections/${id}`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["connections"] });
+      resetForm();
+    },
+  });
+
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setFormData(defaultFormData);
+  };
 
   // 删除连接
   const deleteMutation = useMutation({
@@ -113,7 +124,26 @@ export function ConnectionSettings() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addMutation.mutate(formData);
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, data: formData });
+    } else {
+      addMutation.mutate(formData);
+    }
+  };
+
+  const handleEdit = (conn: Connection) => {
+    setEditingId(conn.id);
+    setFormData({
+      name: conn.name,
+      driver: conn.driver,
+      host: conn.host,
+      port: conn.port,
+      database: conn.database_name,
+      username: conn.username,
+      password: "", // 密码不回显，留空表示不修改
+      is_default: conn.is_default,
+    });
+    setShowForm(true);
   };
 
   const handleDelete = (id: string) => {
@@ -141,7 +171,10 @@ export function ConnectionSettings() {
           </p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            resetForm();
+            setShowForm(true);
+          }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
         >
           <Plus size={16} />
@@ -149,12 +182,15 @@ export function ConnectionSettings() {
         </button>
       </div>
 
-      {/* 添加表单 */}
+      {/* 添加/编辑表单 */}
       {showForm && (
         <form
           onSubmit={handleSubmit}
           className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200"
         >
+          <h3 className="text-sm font-medium text-slate-900 mb-4">
+            {editingId ? "编辑连接" : "添加连接"}
+          </h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -187,38 +223,42 @@ export function ConnectionSettings() {
                 ))}
               </select>
             </div>
-            <div>
+            {formData.driver !== "sqlite" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    主机地址
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.host}
+                    onChange={(e) =>
+                      setFormData({ ...formData, host: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="localhost"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    端口
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.port}
+                    onChange={(e) =>
+                      setFormData({ ...formData, port: parseInt(e.target.value) })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </>
+            )}
+            <div className={formData.driver === "sqlite" ? "col-span-2" : ""}>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                主机地址
-              </label>
-              <input
-                type="text"
-                value={formData.host}
-                onChange={(e) =>
-                  setFormData({ ...formData, host: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="localhost"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                端口
-              </label>
-              <input
-                type="number"
-                value={formData.port}
-                onChange={(e) =>
-                  setFormData({ ...formData, port: parseInt(e.target.value) })
-                }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                数据库名
+                {formData.driver === "sqlite" ? "数据库文件路径" : "数据库名"}
               </label>
               <input
                 type="text"
@@ -227,39 +267,48 @@ export function ConnectionSettings() {
                   setFormData({ ...formData, database: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="mydb"
+                placeholder={formData.driver === "sqlite" ? "/path/to/database.db" : "mydb"}
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                用户名
-              </label>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) =>
-                  setFormData({ ...formData, username: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="root"
-                required
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                密码
-              </label>
-              <input
-                type="password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="••••••••"
-              />
-            </div>
+            {formData.driver !== "sqlite" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    用户名
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.username}
+                    onChange={(e) =>
+                      setFormData({ ...formData, username: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="root"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    密码
+                    {editingId && (
+                      <span className="text-slate-400 font-normal ml-2">
+                        （留空保持不变）
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={editingId ? "留空保持原密码" : "••••••••"}
+                  />
+                </div>
+              </>
+            )}
             <div className="col-span-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -277,20 +326,20 @@ export function ConnectionSettings() {
           <div className="flex justify-end gap-2 mt-4">
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={resetForm}
               className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
             >
               取消
             </button>
             <button
               type="submit"
-              disabled={addMutation.isPending}
+              disabled={addMutation.isPending || updateMutation.isPending}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
             >
-              {addMutation.isPending && (
+              {(addMutation.isPending || updateMutation.isPending) && (
                 <Loader2 size={16} className="animate-spin" />
               )}
-              保存
+              {editingId ? "更新" : "保存"}
             </button>
           </div>
         </form>
@@ -346,6 +395,13 @@ export function ConnectionSettings() {
                   ) : (
                     <Play size={16} />
                   )}
+                </button>
+                <button
+                  onClick={() => handleEdit(conn)}
+                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="编辑"
+                >
+                  <Pencil size={16} />
                 </button>
                 <button
                   onClick={() => handleDelete(conn.id)}

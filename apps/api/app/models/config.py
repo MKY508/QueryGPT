@@ -104,6 +104,15 @@ class ConnectionTest(BaseModel):
     message: str
 
 
+class ModelTest(BaseModel):
+    """模型测试结果"""
+
+    success: bool
+    model_name: str | None = None
+    response_time_ms: int | None = None
+    message: str
+
+
 class DatabaseSchema(BaseModel):
     """数据库结构"""
 
