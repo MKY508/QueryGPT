@@ -5,7 +5,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import PostgresDsn, computed_field
+from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,7 +31,20 @@ class Settings(BaseSettings):
     WORKERS: int = 1
 
     # ===== 数据库配置 =====
-    DATABASE_URL: PostgresDsn = "postgresql+asyncpg://postgres:postgres@localhost:5432/querygpt"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/querygpt"
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """验证数据库 URL 格式"""
+        valid_prefixes = (
+            "postgresql://", "postgresql+asyncpg://",
+            "sqlite://", "sqlite+aiosqlite://",
+            "mysql://", "mysql+aiomysql://",
+        )
+        if not any(v.startswith(p) for p in valid_prefixes):
+            raise ValueError(f"DATABASE_URL 必须以以下前缀开头: {valid_prefixes}")
+        return v
 
     # ===== Redis 配置 (可选) =====
     REDIS_URL: str | None = None

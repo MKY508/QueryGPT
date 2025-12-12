@@ -26,7 +26,7 @@ describe("Auth Store", () => {
 
     expect(state.user).toBeNull();
     expect(state.isAuthenticated).toBe(false);
-    expect(state.isLoading).toBe(false);
+    expect(state.accessToken).toBeNull();
   });
 
   it("should have login function", async () => {
