@@ -25,22 +25,22 @@
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/images/chat.png" alt="对话界面"/>
-      <b>对话</b>
+      <img src="docs/images/chat.png" width="100%" alt="对话界面"/>
+      <br/><b>对话</b>
     </td>
     <td align="center" width="50%">
-      <img src="docs/images/schema.png" alt="表关系"/>
-      <b>表关系</b>
+      <img src="docs/images/schema.png" width="100%" alt="表关系"/>
+      <br/><b>表关系</b>
     </td>
   </tr>
   <tr>
-    <td align="center">
-      <img src="docs/images/login.png" alt="登录"/>
-      <b>登录</b>
+    <td align="center" width="50%">
+      <img src="docs/images/login.png" width="100%" alt="登录"/>
+      <br/><b>登录</b>
     </td>
-    <td align="center">
-      <img src="docs/images/semantic.png" alt="语义层"/>
-      <b>语义层</b>
+    <td align="center" width="50%">
+      <img src="docs/images/semantic.png" width="100%" alt="语义层"/>
+      <br/><b>语义层</b>
     </td>
   </tr>
 </table>
