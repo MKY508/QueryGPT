@@ -109,11 +109,17 @@ export function createEventSource(
   return eventSource;
 }
 
+// SSE 事件类型
+interface SSEEvent {
+  type: string;
+  data: Record<string, unknown>;
+}
+
 // 更安全的 SSE 实现 - 使用 fetch API
 export async function* createSecureEventStream(
   url: string,
   params: Record<string, string>
-): AsyncGenerator<{ type: string; data: any }> {
+): AsyncGenerator<SSEEvent> {
   const searchParams = new URLSearchParams(params);
   const fullUrl = `${API_URL}${url}?${searchParams.toString()}`;
   const token = getAccessToken();

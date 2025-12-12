@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { api, createEventSource } from "@/lib/api/client";
+import type { DataRow, Visualization, APIMessage } from "@/lib/types/api";
+import { getErrorMessage } from "@/lib/types/api";
 
 interface Message {
   role: "user" | "assistant" | "system";
@@ -7,12 +9,8 @@ interface Message {
   isLoading?: boolean;
   status?: string;
   sql?: string;
-  visualization?: {
-    type?: "bar" | "line" | "pie" | "area";
-    data?: any[];
-    title?: string;
-  };
-  data?: Record<string, any>[];
+  visualization?: Visualization;
+  data?: DataRow[];
 }
 
 interface ChatState {
@@ -155,14 +153,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
         eventSource.close();
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const { messages } = get();
       const lastIndex = messages.length - 1;
 
       set({
         messages: messages.map((msg, idx) =>
           idx === lastIndex
-            ? { ...msg, content: `请求失败: ${error.message}`, isLoading: false }
+            ? { ...msg, content: `请求失败: ${getErrorMessage(error)}`, isLoading: false }
             : msg
         ),
         isLoading: false,
@@ -212,7 +210,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await api.get(`/api/v1/conversations/${id}`);
       const conversation = response.data.data;
 
-      const messages: Message[] = conversation.messages.map((msg: any) => ({
+      const messages: Message[] = conversation.messages.map((msg: APIMessage) => ({
         role: msg.role,
         content: msg.content,
         sql: msg.metadata?.sql,

@@ -1,6 +1,19 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { AxiosError } from "axios";
 import { api } from "@/lib/api/client";
+
+/** Pydantic 验证错误项 */
+interface ValidationErrorItem {
+  msg: string;
+  loc: string[];
+  type: string;
+}
+
+/** API 错误响应 */
+interface APIErrorResponse {
+  detail: string | ValidationErrorItem[];
+}
 
 interface User {
   id: string;
@@ -44,10 +57,12 @@ export const useAuthStore = create<AuthState>()(
             user: userResponse.data.data,
             isAuthenticated: true,
           });
-        } catch (error: any) {
-          const detail = error.response?.data?.detail;
-          if (typeof detail === "string") {
-            throw new Error(detail);
+        } catch (error) {
+          if (error instanceof AxiosError) {
+            const detail = (error.response?.data as APIErrorResponse)?.detail;
+            if (typeof detail === "string") {
+              throw new Error(detail);
+            }
           }
           throw new Error("登录失败，请检查邮箱和密码");
         }
@@ -68,15 +83,16 @@ export const useAuthStore = create<AuthState>()(
             user,
             isAuthenticated: true,
           });
-        } catch (error: any) {
-          // 解析验证错误
-          const detail = error.response?.data?.detail;
-          if (Array.isArray(detail)) {
-            // Pydantic 验证错误格式
-            const msg = detail.map((d: any) => d.msg).join("; ");
-            throw new Error(msg || "注册失败");
-          } else if (typeof detail === "string") {
-            throw new Error(detail);
+        } catch (error) {
+          if (error instanceof AxiosError) {
+            const detail = (error.response?.data as APIErrorResponse)?.detail;
+            if (Array.isArray(detail)) {
+              // Pydantic 验证错误格式
+              const msg = detail.map((d: ValidationErrorItem) => d.msg).join("; ");
+              throw new Error(msg || "注册失败");
+            } else if (typeof detail === "string") {
+              throw new Error(detail);
+            }
           }
           throw new Error("注册失败，请稍后重试");
         }

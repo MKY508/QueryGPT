@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Plus, MessageSquare, Trash2, Settings, LogOut, Database, Loader2 } from "lucide-react";
 import { api } from "@/lib/api/client";
+import type { ConversationListItem } from "@/lib/types/api";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useChatStore } from "@/lib/stores/chat";
 import { cn } from "@/lib/utils";
@@ -117,7 +118,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
         <div className="text-xs font-medium text-muted-foreground uppercase px-2 mb-2 mt-2">
           最近对话
         </div>
-        {conversations.map((chat: any, index: number) => (
+        {conversations.map((chat: ConversationListItem, index: number) => (
           <div
             key={chat.id}
             ref={index === conversations.length - 1 ? lastItemRef : null}

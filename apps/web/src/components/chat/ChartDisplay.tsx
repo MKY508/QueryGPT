@@ -17,9 +17,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+import type { ChartDataPoint } from "@/lib/types/api";
+
 interface ChartDisplayProps {
   type: "bar" | "line" | "pie" | "area";
-  data: any[];
+  data: ChartDataPoint[];
   xKey?: string;
   yKey?: string;
   title?: string;

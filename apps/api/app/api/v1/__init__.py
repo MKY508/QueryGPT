@@ -1,7 +1,7 @@
 """API v1 路由"""
 from fastapi import APIRouter
 
-from app.api.v1 import auth, chat, config, history
+from app.api.v1 import auth, chat, connections, history, models, user_config
 
 api_router = APIRouter()
 
@@ -9,4 +9,6 @@ api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["认证"])
 api_router.include_router(chat.router, prefix="/chat", tags=["聊天"])
 api_router.include_router(history.router, prefix="/conversations", tags=["历史记录"])
-api_router.include_router(config.router, prefix="/config", tags=["配置"])
+api_router.include_router(models.router, prefix="/config", tags=["模型配置"])
+api_router.include_router(connections.router, prefix="/config", tags=["数据库连接"])
+api_router.include_router(user_config.router, tags=["用户配置"])

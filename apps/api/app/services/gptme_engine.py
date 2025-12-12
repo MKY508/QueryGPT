@@ -12,6 +12,7 @@ import structlog
 
 from app.core.config import settings
 from app.models import SSEEvent
+from app.services.database import create_database_manager
 
 logger = structlog.get_logger()
 
@@ -154,67 +155,9 @@ class GptmeEngine:
         db_config: dict[str, Any],
     ) -> tuple[list[dict] | None, int | None]:
         """执行 SQL 查询"""
-        driver = db_config.get("driver", "mysql")
-
-        # 安全检查：只允许 SELECT 语句
-        sql_upper = sql.strip().upper()
-        if not sql_upper.startswith(("SELECT", "SHOW", "DESCRIBE", "EXPLAIN")):
-            raise ValueError("只允许执行只读查询 (SELECT, SHOW, DESCRIBE, EXPLAIN)")
-
-        if driver == "mysql":
-            import pymysql
-
-            conn = pymysql.connect(
-                host=db_config.get("host", "localhost"),
-                port=db_config.get("port", 3306),
-                user=db_config.get("user", "root"),
-                password=db_config.get("password", ""),
-                database=db_config.get("database", ""),
-                cursorclass=pymysql.cursors.DictCursor,
-            )
-            try:
-                with conn.cursor() as cursor:
-                    cursor.execute(sql)
-                    data = cursor.fetchall()
-                    return list(data), len(data)
-            finally:
-                conn.close()
-
-        elif driver == "postgresql":
-            import psycopg2
-            import psycopg2.extras
-
-            conn = psycopg2.connect(
-                host=db_config.get("host", "localhost"),
-                port=db_config.get("port", 5432),
-                user=db_config.get("user", "postgres"),
-                password=db_config.get("password", ""),
-                database=db_config.get("database", ""),
-            )
-            try:
-                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                    cursor.execute(sql)
-                    data = cursor.fetchall()
-                    return [dict(row) for row in data], len(data)
-            finally:
-                conn.close()
-
-        elif driver == "sqlite":
-            import sqlite3
-
-            conn = sqlite3.connect(db_config.get("database", ":memory:"))
-            conn.row_factory = sqlite3.Row
-            try:
-                cursor = conn.cursor()
-                cursor.execute(sql)
-                rows = cursor.fetchall()
-                data = [dict(row) for row in rows]
-                return data, len(data)
-            finally:
-                conn.close()
-
-        else:
-            raise ValueError(f"不支持的数据库类型: {driver}")
+        db_manager = create_database_manager(db_config)
+        result = db_manager.execute_query(sql, read_only=True)
+        return result.data, result.rows_count
 
     def _generate_visualization(self, data: list[dict], query: str) -> dict | None:
         """根据数据和查询生成可视化配置"""
@@ -286,81 +229,8 @@ class GptmeEngine:
 
     def _get_schema_info(self, db_config: dict[str, Any]) -> str:
         """获取数据库表结构信息"""
-        driver = db_config.get("driver", "mysql")
-        schema_parts = []
-
-        try:
-            if driver == "sqlite":
-                import sqlite3
-                conn = sqlite3.connect(db_config.get("database", ":memory:"))
-                cursor = conn.cursor()
-
-                # 获取所有表
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
-                tables = cursor.fetchall()
-
-                for (table_name,) in tables:
-                    cursor.execute(f"PRAGMA table_info({table_name})")
-                    columns = cursor.fetchall()
-                    col_info = ", ".join([f"{col[1]} ({col[2]})" for col in columns])
-                    schema_parts.append(f"- {table_name}: {col_info}")
-
-                conn.close()
-
-            elif driver == "mysql":
-                import pymysql
-                conn = pymysql.connect(
-                    host=db_config.get("host", "localhost"),
-                    port=db_config.get("port", 3306),
-                    user=db_config.get("user", "root"),
-                    password=db_config.get("password", ""),
-                    database=db_config.get("database", ""),
-                )
-                cursor = conn.cursor()
-                cursor.execute("SHOW TABLES")
-                tables = cursor.fetchall()
-
-                for (table_name,) in tables:
-                    cursor.execute(f"DESCRIBE {table_name}")
-                    columns = cursor.fetchall()
-                    col_info = ", ".join([f"{col[0]} ({col[1]})" for col in columns])
-                    schema_parts.append(f"- {table_name}: {col_info}")
-
-                conn.close()
-
-            elif driver == "postgresql":
-                import psycopg2
-                conn = psycopg2.connect(
-                    host=db_config.get("host", "localhost"),
-                    port=db_config.get("port", 5432),
-                    user=db_config.get("user", "postgres"),
-                    password=db_config.get("password", ""),
-                    database=db_config.get("database", ""),
-                )
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT table_name FROM information_schema.tables
-                    WHERE table_schema = 'public'
-                """)
-                tables = cursor.fetchall()
-
-                for (table_name,) in tables:
-                    # 使用参数化查询防止 SQL 注入
-                    cursor.execute("""
-                        SELECT column_name, data_type
-                        FROM information_schema.columns
-                        WHERE table_name = %s
-                    """, (table_name,))
-                    columns = cursor.fetchall()
-                    col_info = ", ".join([f"{col[0]} ({col[1]})" for col in columns])
-                    schema_parts.append(f"- {table_name}: {col_info}")
-
-                conn.close()
-
-        except Exception as e:
-            return f"无法获取表结构: {str(e)}"
-
-        return "\n".join(schema_parts) if schema_parts else "无表结构信息"
+        db_manager = create_database_manager(db_config)
+        return db_manager.get_schema_info()
 
     def _extract_sql(self, content: str) -> str | None:
         """从内容中提取 SQL 代码"""

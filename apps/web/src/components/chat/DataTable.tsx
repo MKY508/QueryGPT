@@ -4,8 +4,10 @@ import { useState, useMemo } from "react";
 import { ChevronUp, ChevronDown, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import type { DataRow } from "@/lib/types/api";
+
 interface DataTableProps {
-  data: Record<string, any>[];
+  data: DataRow[];
   title?: string;
   maxRows?: number;
 }
