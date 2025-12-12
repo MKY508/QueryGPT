@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1 import auth, chat, connections, history, models, semantic, user_config
+from app.api.v1 import auth, chat, connections, history, models, schema, semantic, user_config
 
 api_router = APIRouter()
 
@@ -13,4 +13,5 @@ api_router.include_router(history.router, prefix="/conversations", tags=["历史
 api_router.include_router(models.router, prefix="/config", tags=["模型配置"])
 api_router.include_router(connections.router, prefix="/config", tags=["数据库连接"])
 api_router.include_router(semantic.router, prefix="/config", tags=["语义层"])
+api_router.include_router(schema.router, tags=["表关系"])
 api_router.include_router(user_config.router, tags=["用户配置"])

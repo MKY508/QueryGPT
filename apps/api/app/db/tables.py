@@ -170,3 +170,32 @@ class SemanticTerm(Base, UUIDMixin, TimestampMixin):
     # 关系
     user: Mapped["User"] = relationship(back_populates="semantic_terms")
     connection: Mapped["Connection | None"] = relationship()
+
+
+class TableRelationship(Base, UUIDMixin, TimestampMixin):
+    """表关系定义 - 用于多表 JOIN"""
+
+    __tablename__ = "table_relationships"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    connection_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("connections.id", ondelete="CASCADE"), nullable=False
+    )
+    source_table: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_column: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_table: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_column: Mapped[str] = mapped_column(String(100), nullable=False)
+    relationship_type: Mapped[str] = mapped_column(
+        String(10), default="1:N"
+    )  # 1:1, 1:N, N:1, N:M
+    join_type: Mapped[str] = mapped_column(
+        String(20), default="LEFT"
+    )  # LEFT, INNER, RIGHT, FULL
+    description: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # 关系
+    user: Mapped["User"] = relationship()
+    connection: Mapped["Connection"] = relationship()

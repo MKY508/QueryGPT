@@ -46,8 +46,18 @@ const defaultFormData: ConnectionFormData = {
   is_default: false,
 };
 
-export function ConnectionSettings() {
+interface ConnectionSettingsProps {
+  onSelectConnection?: (id: string | null) => void;
+}
+
+export function ConnectionSettings({ onSelectConnection }: ConnectionSettingsProps) {
   const [showForm, setShowForm] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const handleSelectConnection = (id: string) => {
+    setSelectedId(id);
+    onSelectConnection?.(id);
+  };
   const [editingId, setEditingId] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{
     id: string;
@@ -355,7 +365,13 @@ export function ConnectionSettings() {
           {connections.map((conn) => (
             <div
               key={conn.id}
-              className="flex items-center justify-between p-4 bg-secondary rounded-lg border border-border"
+              onClick={() => handleSelectConnection(conn.id)}
+              className={cn(
+                "flex items-center justify-between p-4 bg-secondary rounded-lg border cursor-pointer transition-colors",
+                selectedId === conn.id
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/50"
+              )}
             >
               <div className="flex items-center gap-3">
                 {conn.is_default && (

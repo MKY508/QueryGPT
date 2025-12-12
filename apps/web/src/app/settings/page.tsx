@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen } from "lucide-react";
+import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen, GitBranch } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/auth";
 import { ModelSettings } from "@/components/settings/ModelSettings";
 import { ConnectionSettings } from "@/components/settings/ConnectionSettings";
 import { PreferencesSettings } from "@/components/settings/PreferencesSettings";
 import { SemanticSettings } from "@/components/settings/SemanticSettings";
+import { SchemaSettings } from "@/components/settings/SchemaSettings";
 import { cn } from "@/lib/utils";
 
-type TabType = "models" | "connections" | "semantic" | "preferences";
+type TabType = "models" | "connections" | "schema" | "semantic" | "preferences";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("models");
@@ -28,9 +29,13 @@ export default function SettingsPage() {
     return null;
   }
 
+  // 用于 SchemaSettings 的连接 ID 状态
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+
   const tabs = [
     { id: "models" as TabType, label: "AI 模型", icon: Brain },
     { id: "connections" as TabType, label: "数据库连接", icon: Database },
+    { id: "schema" as TabType, label: "表关系", icon: GitBranch },
     { id: "semantic" as TabType, label: "语义层", icon: BookOpen },
     { id: "preferences" as TabType, label: "偏好设置", icon: User },
   ];
@@ -80,7 +85,8 @@ export default function SettingsPage() {
           {/* Content */}
           <main className="flex-1 bg-background rounded-xl border border-border p-6">
             {activeTab === "models" && <ModelSettings />}
-            {activeTab === "connections" && <ConnectionSettings />}
+            {activeTab === "connections" && <ConnectionSettings onSelectConnection={setSelectedConnectionId} />}
+            {activeTab === "schema" && <SchemaSettings connectionId={selectedConnectionId} />}
             {activeTab === "semantic" && <SemanticSettings />}
             {activeTab === "preferences" && <PreferencesSettings />}
           </main>

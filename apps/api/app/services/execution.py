@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import encryptor
 from app.core.config import settings
-from app.db.tables import Connection, Message, Model, SemanticTerm, User
-from app.models import SemanticContext, SemanticTermResponse, SSEEvent
+from app.db.tables import Connection, Message, Model, SemanticTerm, TableRelationship, User
+from app.models import RelationshipContext, SemanticContext, SemanticTermResponse, SSEEvent, TableRelationshipResponse
 
 logger = structlog.get_logger()
 
@@ -152,6 +152,30 @@ class ExecutionService:
             terms=[SemanticTermResponse.model_validate(t) for t in terms]
         )
 
+    async def _get_relationship_context(self, max_relationships: int = 15) -> RelationshipContext:
+        """获取表关系上下文
+
+        Args:
+            max_relationships: 最大注入关系数量，防止超过 token 限制
+        """
+        if not self.connection_id:
+            return RelationshipContext(relationships=[])
+
+        result = await self.db.execute(
+            select(TableRelationship)
+            .where(
+                TableRelationship.user_id == self.user.id,
+                TableRelationship.connection_id == self.connection_id,
+                TableRelationship.is_active.is_(True),
+            )
+            .limit(max_relationships)  # 限制数量
+        )
+        relationships = result.scalars().all()
+
+        return RelationshipContext(
+            relationships=[TableRelationshipResponse.model_validate(r) for r in relationships]
+        )
+
     async def _get_conversation_history(
         self, conversation_id: UUID, limit: int = 10
     ) -> list[dict[str, str]]:
@@ -207,11 +231,15 @@ class ExecutionService:
             semantic_context = await self._get_semantic_context()
             logger.info(f"Semantic terms count: {len(semantic_context.terms)}")
 
+            logger.info("Getting relationship context...")
+            relationship_context = await self._get_relationship_context()
+            logger.info(f"Relationships count: {len(relationship_context.relationships)}")
+
             # 加载对话历史（不包括当前查询，因为当前查询还未保存）
             logger.info("Getting conversation history...")
             history = await self._get_conversation_history(conversation_id, limit=10)
 
-            system_prompt = self._build_system_prompt(db_config, semantic_context)
+            system_prompt = self._build_system_prompt(db_config, semantic_context, relationship_context)
 
             engine = GptmeEngine(
                 model=model_config.get("model"),
@@ -234,7 +262,10 @@ class ExecutionService:
             yield SSEEvent.error("EXECUTION_ERROR", str(e))
 
     def _build_system_prompt(
-        self, db_config: dict[str, Any] | None, semantic_context: SemanticContext | None = None
+        self,
+        db_config: dict[str, Any] | None,
+        semantic_context: SemanticContext | None = None,
+        relationship_context: RelationshipContext | None = None,
     ) -> str:
         """构建系统提示"""
         if self.language == "zh":
@@ -301,5 +332,10 @@ Note: Only add chart config when data is suitable for visualization.
         if semantic_context and semantic_context.terms:
             semantic_prompt = semantic_context.to_prompt(self.language)
             base_prompt += f"\n{semantic_prompt}\n"
+
+        # 注入表关系上下文
+        if relationship_context and relationship_context.relationships:
+            relationship_prompt = relationship_context.to_prompt(self.language)
+            base_prompt += f"\n{relationship_prompt}\n"
 
         return base_prompt

@@ -35,6 +35,17 @@ from app.models.history import (
     MessageCreate,
     MessageResponse,
 )
+from app.models.schema import (
+    ColumnInfo,
+    RelationshipContext,
+    RelationshipSuggestion,
+    SchemaInfo,
+    TableInfo,
+    TableRelationshipBatchCreate,
+    TableRelationshipCreate,
+    TableRelationshipResponse,
+    TableRelationshipUpdate,
+)
 from app.models.semantic import (
     SemanticContext,
     SemanticTermCreate,
@@ -78,4 +89,14 @@ __all__ = [
     "SemanticTermUpdate",
     "SemanticTermResponse",
     "SemanticContext",
+    # Schema
+    "ColumnInfo",
+    "TableInfo",
+    "SchemaInfo",
+    "TableRelationshipCreate",
+    "TableRelationshipUpdate",
+    "TableRelationshipResponse",
+    "TableRelationshipBatchCreate",
+    "RelationshipSuggestion",
+    "RelationshipContext",
 ]
