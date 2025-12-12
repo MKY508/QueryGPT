@@ -1,0 +1,54 @@
+[project]
+name = "querygpt-api"
+version = "2.0.0"
+description = "QueryGPT API Server"
+requires-python = ">=3.11"
+
+dependencies = [
+    # Web Framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sse-starlette>=2.1.0",
+
+    # Database
+    "sqlalchemy[asyncio]>=2.0.30",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
+
+    # Validation & Settings
+    "pydantic[email]>=2.7.0",
+    "pydantic-settings>=2.2.0",
+
+    # AI & LLM
+    "gptme>=0.30.0",
+    "litellm>=1.40.0",
+
+    # Auth
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[argon2]>=1.7.4",
+    "argon2-cffi>=23.1.0",
+    "python-multipart>=0.0.9",
+
+    # Data Processing
+    "pandas>=2.2.0",
+    "plotly>=5.22.0",
+
+    # Database Drivers
+    "pymysql>=1.1.0",
+    "psycopg2-binary>=2.9.9",
+
+    # Utils
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.0",
+    "structlog>=24.1.0",
+]
+
+[project.scripts]
+querygpt-api = "app.main:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,370 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Trash2, Star, Loader2, CheckCircle, XCircle, Play } from "lucide-react";
+import { api } from "@/lib/api/client";
+import { cn } from "@/lib/utils";
+
+interface Connection {
+  id: string;
+  name: string;
+  driver: string;
+  host: string;
+  port: number;
+  database_name: string;
+  username: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+interface ConnectionFormData {
+  name: string;
+  driver: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  is_default: boolean;
+}
+
+const DRIVERS = [
+  { value: "mysql", label: "MySQL", defaultPort: 3306 },
+  { value: "postgresql", label: "PostgreSQL", defaultPort: 5432 },
+  { value: "sqlite", label: "SQLite", defaultPort: 0 },
+];
+
+export function ConnectionSettings() {
+  const [showForm, setShowForm] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    id: string;
+    success: boolean;
+    message: string;
+  } | null>(null);
+  const [formData, setFormData] = useState<ConnectionFormData>({
+    name: "",
+    driver: "mysql",
+    host: "localhost",
+    port: 3306,
+    database: "",
+    username: "",
+    password: "",
+    is_default: false,
+  });
+  const queryClient = useQueryClient();
+
+  // 获取连接列表
+  const { data: connections, isLoading } = useQuery({
+    queryKey: ["connections"],
+    queryFn: async () => {
+      const response = await api.get("/api/v1/config/connections");
+      return response.data.data as Connection[];
+    },
+  });
+
+  // 添加连接
+  const addMutation = useMutation({
+    mutationFn: async (data: ConnectionFormData) => {
+      const response = await api.post("/api/v1/config/connections", data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["connections"] });
+      setShowForm(false);
+      setFormData({
+        name: "",
+        driver: "mysql",
+        host: "localhost",
+        port: 3306,
+        database: "",
+        username: "",
+        password: "",
+        is_default: false,
+      });
+    },
+  });
+
+  // 删除连接
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/api/v1/config/connections/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["connections"] });
+    },
+  });
+
+  // 测试连接
+  const testMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post(`/api/v1/config/connections/${id}/test`);
+      return { id, ...response.data.data };
+    },
+    onSuccess: (data) => {
+      setTestResult({
+        id: data.id,
+        success: data.connected,
+        message: data.message,
+      });
+      setTimeout(() => setTestResult(null), 5000);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    addMutation.mutate(formData);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("确定要删除这个数据库连接吗？")) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const handleDriverChange = (driver: string) => {
+    const driverInfo = DRIVERS.find((d) => d.value === driver);
+    setFormData({
+      ...formData,
+      driver,
+      port: driverInfo?.defaultPort || 3306,
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">数据库连接</h2>
+          <p className="text-sm text-slate-500 mt-1">
+            配置要查询的数据库连接
+          </p>
+        </div>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+        >
+          <Plus size={16} />
+          添加连接
+        </button>
+      </div>
+
+      {/* 添加表单 */}
+      {showForm && (
+        <form
+          onSubmit={handleSubmit}
+          className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200"
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                连接名称
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="例如: 生产数据库"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                数据库类型
+              </label>
+              <select
+                value={formData.driver}
+                onChange={(e) => handleDriverChange(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {DRIVERS.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                主机地址
+              </label>
+              <input
+                type="text"
+                value={formData.host}
+                onChange={(e) =>
+                  setFormData({ ...formData, host: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="localhost"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                端口
+              </label>
+              <input
+                type="number"
+                value={formData.port}
+                onChange={(e) =>
+                  setFormData({ ...formData, port: parseInt(e.target.value) })
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                数据库名
+              </label>
+              <input
+                type="text"
+                value={formData.database}
+                onChange={(e) =>
+                  setFormData({ ...formData, database: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="mydb"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                用户名
+              </label>
+              <input
+                type="text"
+                value={formData.username}
+                onChange={(e) =>
+                  setFormData({ ...formData, username: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="root"
+                required
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                密码
+              </label>
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.is_default}
+                  onChange={(e) =>
+                    setFormData({ ...formData, is_default: e.target.checked })
+                  }
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-slate-700">设为默认连接</span>
+              </label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors text-sm"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={addMutation.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
+            >
+              {addMutation.isPending && (
+                <Loader2 size={16} className="animate-spin" />
+              )}
+              保存
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* 连接列表 */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="animate-spin text-slate-400" size={24} />
+        </div>
+      ) : connections && connections.length > 0 ? (
+        <div className="space-y-3">
+          {connections.map((conn) => (
+            <div
+              key={conn.id}
+              className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
+            >
+              <div className="flex items-center gap-3">
+                {conn.is_default && (
+                  <Star size={16} className="text-yellow-500 fill-yellow-500" />
+                )}
+                <div>
+                  <div className="font-medium text-slate-900">{conn.name}</div>
+                  <div className="text-sm text-slate-500">
+                    {conn.driver}://{conn.username}@{conn.host}:{conn.port}/{conn.database_name}
+                  </div>
+                  {testResult?.id === conn.id && (
+                    <div
+                      className={cn(
+                        "flex items-center gap-1 text-sm mt-1",
+                        testResult.success ? "text-green-600" : "text-red-600"
+                      )}
+                    >
+                      {testResult.success ? (
+                        <CheckCircle size={14} />
+                      ) : (
+                        <XCircle size={14} />
+                      )}
+                      {testResult.message}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => testMutation.mutate(conn.id)}
+                  disabled={testMutation.isPending}
+                  className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="测试连接"
+                >
+                  {testMutation.isPending && testMutation.variables === conn.id ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Play size={16} />
+                  )}
+                </button>
+                <button
+                  onClick={() => handleDelete(conn.id)}
+                  disabled={deleteMutation.isPending}
+                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="删除"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 text-slate-500">
+          <p>暂无数据库连接</p>
+          <p className="text-sm mt-1">点击上方按钮添加第一个连接</p>
+        </div>
+      )}
+    </div>
+  );
+}
