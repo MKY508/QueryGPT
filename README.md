@@ -20,36 +20,6 @@
 - **多用户** - JWT 认证，数据隔离
 - **开箱即用** - 内置示例数据库
 
-## 一键部署
-
-无需本地环境，3 分钟完成：
-
-### Step 1: 部署后端
-
-[![Deploy Backend](https://img.shields.io/badge/部署后端-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
-
-1. 点击按钮，用 GitHub 登录 Render
-2. 点击 "Create New Resources"
-3. 等待部署完成，复制生成的 URL
-
-### Step 2: 部署前端
-
-[![Deploy Frontend](https://img.shields.io/badge/部署前端-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FMKY508%2FQueryGPT&root-directory=apps/web&env=NEXT_PUBLIC_API_URL&envDescription=填入Step1获取的后端URL&project-name=querygpt-web)
-
-1. 点击按钮，用 GitHub 登录 Vercel
-2. 在 `NEXT_PUBLIC_API_URL` 填入 Step 1 的后端 URL
-3. 点击 "Deploy"
-
-### Step 3: 开始使用
-
-1. 访问前端 URL，注册账号
-2. 进入设置页面，添加 AI API Key（OpenAI/Anthropic/DeepSeek）
-3. 开始查询
-
-> 免费额度: Render 750h/月，Vercel 无限制
-
----
-
 ## 截图
 
 <table>
@@ -108,6 +78,36 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ---
 
+## 一键部署
+
+无需本地环境，3 分钟完成：
+
+### Step 1: 部署后端
+
+[![Deploy Backend](https://img.shields.io/badge/部署后端-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
+
+1. 点击按钮，用 GitHub 登录 Render
+2. 点击 "Create New Resources"
+3. 等待部署完成，复制生成的 URL
+
+### Step 2: 部署前端
+
+[![Deploy Frontend](https://img.shields.io/badge/部署前端-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FMKY508%2FQueryGPT&root-directory=apps/web&env=NEXT_PUBLIC_API_URL&envDescription=填入Step1获取的后端URL&project-name=querygpt-web)
+
+1. 点击按钮，用 GitHub 登录 Vercel
+2. 在 `NEXT_PUBLIC_API_URL` 填入 Step 1 的后端 URL
+3. 点击 "Deploy"
+
+### Step 3: 开始使用
+
+1. 访问前端 URL，注册账号
+2. 进入设置页面，添加 AI API Key（OpenAI/Anthropic/DeepSeek）
+3. 开始查询
+
+> 免费额度: Render 750h/月，Vercel 无限制
+
+---
+
 ## 技术栈
 
 | 后端 | 前端 |
@@ -115,12 +115,6 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | FastAPI | Next.js 15 |
 | SQLAlchemy 2.0 | React 19 |
 | gptme + LiteLLM | TypeScript |
-
----
-
-## 许可证
-
-MIT License
 
 ---
 
@@ -134,6 +128,12 @@ MIT License
 | 响应 | 同步 | SSE 流式 |
 
 > 如果只需要简单使用，推荐 [v1 分支](https://github.com/MKY508/QueryGPT/tree/v1)（单容器一键部署）
+
+---
+
+## 许可证
+
+MIT License
 
 ---
 
