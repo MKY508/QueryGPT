@@ -129,3 +129,55 @@ class RelationshipContext(BaseModel):
             )
 
         return "\n".join(lines)
+
+
+# ===== 布局配置 =====
+
+
+class SchemaLayoutCreate(BaseModel):
+    """创建布局"""
+
+    name: str = Field(..., min_length=1, max_length=100)
+    is_default: bool = False
+    layout_data: dict[str, dict] = {}  # {table_name: {x, y}}
+    visible_tables: list[str] | None = None
+
+
+class SchemaLayoutUpdate(BaseModel):
+    """更新布局"""
+
+    name: str | None = Field(None, min_length=1, max_length=100)
+    is_default: bool | None = None
+    layout_data: dict[str, dict] | None = None
+    visible_tables: list[str] | None = None
+    zoom: float | None = Field(None, ge=0.1, le=4.0)
+    viewport_x: float | None = None
+    viewport_y: float | None = None
+
+
+class SchemaLayoutResponse(BaseModel):
+    """布局响应"""
+
+    id: UUID
+    connection_id: UUID
+    name: str
+    is_default: bool
+    layout_data: dict[str, dict]
+    visible_tables: list[str] | None
+    zoom: float
+    viewport_x: float
+    viewport_y: float
+
+    class Config:
+        from_attributes = True
+
+
+class SchemaLayoutListItem(BaseModel):
+    """布局列表项（简化版）"""
+
+    id: UUID
+    name: str
+    is_default: bool
+
+    class Config:
+        from_attributes = True

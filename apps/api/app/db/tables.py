@@ -195,3 +195,7 @@ class TableRelationship(Base, UUIDMixin, TimestampMixin):
     # 关系
     user: Mapped["User"] = relationship()
     connection: Mapped["Connection"] = relationship()
+
+
+# SchemaLayout 已移至独立的 SQLite 元数据库 (app/db/metadata.py)
+# 不再使用主数据库存储布局配置

@@ -10,12 +10,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core import encryptor
 from app.db import get_db
+from app.db.metadata import LayoutRepository
 from app.db.tables import Connection, TableRelationship, User
 from app.models import (
     APIResponse,
     ColumnInfo,
     RelationshipSuggestion,
     SchemaInfo,
+    SchemaLayoutCreate,
+    SchemaLayoutListItem,
+    SchemaLayoutResponse,
+    SchemaLayoutUpdate,
     TableInfo,
     TableRelationshipBatchCreate,
     TableRelationshipCreate,
@@ -330,3 +335,176 @@ async def delete_relationship(
     await db.commit()
 
     return APIResponse.ok(message="关系删除成功")
+
+
+# ===== 布局管理 API (使用独立 SQLite 元数据库) =====
+
+
+@router.get(
+    "/{connection_id}/layouts",
+    response_model=APIResponse[list[SchemaLayoutListItem]],
+)
+async def get_layouts(
+    connection_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取所有布局列表"""
+    await _get_connection(connection_id, current_user, db)
+
+    layouts = LayoutRepository.list_layouts(current_user.id, connection_id)
+
+    return APIResponse.ok(data=[SchemaLayoutListItem(**layout) for layout in layouts])
+
+
+@router.post(
+    "/{connection_id}/layouts",
+    response_model=APIResponse[SchemaLayoutResponse],
+)
+async def create_layout(
+    connection_id: UUID,
+    data: SchemaLayoutCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """创建新布局"""
+    await _get_connection(connection_id, current_user, db)
+
+    # 检查名称是否重复
+    if LayoutRepository.layout_name_exists(current_user.id, connection_id, data.name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"布局名称 '{data.name}' 已存在",
+        )
+
+    layout = LayoutRepository.create_layout(
+        user_id=current_user.id,
+        connection_id=connection_id,
+        name=data.name,
+        is_default=data.is_default,
+        layout_data=data.layout_data,
+        visible_tables=data.visible_tables,
+    )
+
+    return APIResponse.ok(
+        data=SchemaLayoutResponse(**layout),
+        message="布局创建成功",
+    )
+
+
+@router.get(
+    "/{connection_id}/layouts/{layout_id}",
+    response_model=APIResponse[SchemaLayoutResponse],
+)
+async def get_layout(
+    connection_id: UUID,
+    layout_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取单个布局"""
+    await _get_connection(connection_id, current_user, db)
+
+    layout = LayoutRepository.get_layout(layout_id, current_user.id)
+
+    if not layout:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="布局不存在",
+        )
+
+    return APIResponse.ok(data=SchemaLayoutResponse(**layout))
+
+
+@router.put(
+    "/{connection_id}/layouts/{layout_id}",
+    response_model=APIResponse[SchemaLayoutResponse],
+)
+async def update_layout(
+    connection_id: UUID,
+    layout_id: UUID,
+    data: SchemaLayoutUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新布局"""
+    await _get_connection(connection_id, current_user, db)
+
+    # 检查布局是否存在
+    existing = LayoutRepository.get_layout(layout_id, current_user.id)
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="布局不存在",
+        )
+
+    # 检查名称是否重复
+    if data.name and data.name != existing["name"]:
+        if LayoutRepository.layout_name_exists(
+            current_user.id, connection_id, data.name, layout_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"布局名称 '{data.name}' 已存在",
+            )
+
+    layout = LayoutRepository.update_layout(
+        layout_id=layout_id,
+        user_id=current_user.id,
+        connection_id=connection_id,
+        **data.model_dump(exclude_none=True),
+    )
+
+    return APIResponse.ok(
+        data=SchemaLayoutResponse(**layout),
+        message="布局更新成功",
+    )
+
+
+@router.delete(
+    "/{connection_id}/layouts/{layout_id}",
+    response_model=APIResponse,
+)
+async def delete_layout(
+    connection_id: UUID,
+    layout_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除布局"""
+    await _get_connection(connection_id, current_user, db)
+
+    if not LayoutRepository.delete_layout(layout_id, current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="布局不存在",
+        )
+
+    return APIResponse.ok(message="布局删除成功")
+
+
+@router.post(
+    "/{connection_id}/layouts/{layout_id}/duplicate",
+    response_model=APIResponse[SchemaLayoutResponse],
+)
+async def duplicate_layout(
+    connection_id: UUID,
+    layout_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """复制布局"""
+    await _get_connection(connection_id, current_user, db)
+
+    new_layout = LayoutRepository.duplicate_layout(layout_id, current_user.id)
+
+    if not new_layout:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="布局不存在",
+        )
+
+    return APIResponse.ok(
+        data=SchemaLayoutResponse(**new_layout),
+        message="布局复制成功",
+    )

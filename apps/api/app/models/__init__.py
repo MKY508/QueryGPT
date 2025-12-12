@@ -40,6 +40,10 @@ from app.models.schema import (
     RelationshipContext,
     RelationshipSuggestion,
     SchemaInfo,
+    SchemaLayoutCreate,
+    SchemaLayoutListItem,
+    SchemaLayoutResponse,
+    SchemaLayoutUpdate,
     TableInfo,
     TableRelationshipBatchCreate,
     TableRelationshipCreate,
@@ -99,4 +103,9 @@ __all__ = [
     "TableRelationshipBatchCreate",
     "RelationshipSuggestion",
     "RelationshipContext",
+    # Layout
+    "SchemaLayoutCreate",
+    "SchemaLayoutUpdate",
+    "SchemaLayoutResponse",
+    "SchemaLayoutListItem",
 ]

@@ -53,3 +53,40 @@ export interface TableRelationshipCreate {
   join_type?: "LEFT" | "INNER" | "RIGHT" | "FULL";
   description?: string;
 }
+
+// ===== 布局类型 =====
+
+export interface SchemaLayout {
+  id: string;
+  connection_id: string;
+  name: string;
+  is_default: boolean;
+  layout_data: Record<string, { x: number; y: number }>;
+  visible_tables: string[] | null;
+  zoom: number;
+  viewport_x: number;
+  viewport_y: number;
+}
+
+export interface SchemaLayoutListItem {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
+
+export interface SchemaLayoutCreate {
+  name: string;
+  is_default?: boolean;
+  layout_data?: Record<string, { x: number; y: number }>;
+  visible_tables?: string[] | null;
+}
+
+export interface SchemaLayoutUpdate {
+  name?: string;
+  is_default?: boolean;
+  layout_data?: Record<string, { x: number; y: number }>;
+  visible_tables?: string[] | null;
+  zoom?: number;
+  viewport_x?: number;
+  viewport_y?: number;
+}

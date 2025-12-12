@@ -34,7 +34,7 @@ function TableNodeComponent({ data }: TableNodeProps) {
               type="source"
               position={Position.Left}
               id={`${column.name}-left`}
-              className="!w-2 !h-2 !bg-primary !border-primary"
+              className="!w-3 !h-3 !bg-primary !border-2 !border-primary-foreground hover:!w-4 hover:!h-4 hover:!bg-primary/80 transition-all cursor-crosshair"
               style={{ top: "50%" }}
             />
 
@@ -55,7 +55,7 @@ function TableNodeComponent({ data }: TableNodeProps) {
               type="target"
               position={Position.Right}
               id={`${column.name}-right`}
-              className="!w-2 !h-2 !bg-primary !border-primary"
+              className="!w-3 !h-3 !bg-primary !border-2 !border-primary-foreground hover:!w-4 hover:!h-4 hover:!bg-primary/80 transition-all cursor-crosshair"
               style={{ top: "50%" }}
             />
           </div>
