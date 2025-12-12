@@ -14,7 +14,7 @@ interface DataTableProps {
 
 type SortDirection = "asc" | "desc" | null;
 
-export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
+export function DataTable({ data, title, _maxRows = 100 }: DataTableProps) {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [currentPage, setCurrentPage] = useState(1);

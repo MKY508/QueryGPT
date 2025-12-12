@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Plus, MessageSquare, Trash2, Settings, LogOut, Database, Loader2 } from "lucide-react";
@@ -17,7 +17,7 @@ interface SidebarProps {
 
 const PAGE_SIZE = 20;
 
-export function Sidebar({ isOpen, onToggle }: SidebarProps) {
+export function Sidebar({ isOpen, onToggle: _onToggle }: SidebarProps) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const { currentConversationId, setCurrentConversation, clearConversation } = useChatStore();

@@ -38,7 +38,7 @@ interface ChatAreaProps {
 const STORAGE_KEY_CONNECTION = "querygpt-selected-connection";
 const STORAGE_KEY_MODEL = "querygpt-selected-model";
 
-export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
+export function ChatArea({ _sidebarOpen, onToggleSidebar }: ChatAreaProps) {
   const router = useRouter();
   const [input, setInput] = useState("");
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);

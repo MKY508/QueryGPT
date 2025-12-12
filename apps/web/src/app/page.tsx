@@ -51,7 +51,7 @@ function LoginForm() {
       } else {
         await login(email, password);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(err.message || "操作失败");
     } finally {
       setLoading(false);
