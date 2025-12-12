@@ -29,9 +29,14 @@ dependencies = [
     "argon2-cffi>=23.1.0",
     "python-multipart>=0.0.9",
 
-    # Data Processing
+    # Data Processing & Analysis
     "pandas>=2.2.0",
+    "numpy>=1.26.0",
     "plotly>=5.22.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+    "scikit-learn>=1.4.0",
+    "scipy>=1.12.0",
 
     # Database Drivers
     "pymysql>=1.1.0",

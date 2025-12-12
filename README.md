@@ -22,28 +22,25 @@
 
 ## 截图
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <img src="docs/images/chat.png" width="100%" alt="对话界面"/>
-      <br/><b>对话</b>
-    </td>
-    <td align="center" width="50%">
-      <img src="docs/images/schema.png" width="100%" alt="表关系"/>
-      <br/><b>表关系</b>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="50%">
-      <img src="docs/images/login.png" width="100%" alt="登录"/>
-      <br/><b>登录</b>
-    </td>
-    <td align="center" width="50%">
-      <img src="docs/images/semantic.png" width="100%" alt="语义层"/>
-      <br/><b>语义层</b>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/images/chat.png" width="80%" alt="对话界面"/>
+  <br/><b>对话</b>
+</p>
+
+<p align="center">
+  <img src="docs/images/schema.png" width="80%" alt="表关系"/>
+  <br/><b>表关系</b>
+</p>
+
+<p align="center">
+  <img src="docs/images/login.png" width="80%" alt="登录"/>
+  <br/><b>登录</b>
+</p>
+
+<p align="center">
+  <img src="docs/images/semantic.png" width="80%" alt="语义层"/>
+  <br/><b>语义层</b>
+</p>
 
 ---
 

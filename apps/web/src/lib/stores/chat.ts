@@ -8,9 +8,12 @@ interface Message {
   content: string;
   isLoading?: boolean;
   status?: string;
+  thinkingStage?: string; // 思考阶段
   sql?: string;
   visualization?: Visualization;
   data?: DataRow[];
+  pythonOutput?: string; // Python 输出
+  pythonImages?: string[]; // Python 图表 (base64)
 }
 
 interface ChatState {
@@ -101,12 +104,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
                   : msg
               ),
             });
+          } else if (data.type === "thinking") {
+            // 更新思考阶段
+            set({
+              messages: messages.map((msg, idx) =>
+                idx === lastIndex
+                  ? { ...msg, thinkingStage: data.data.stage, status: data.data.stage }
+                  : msg
+              ),
+            });
           } else if (data.type === "visualization") {
             // 更新可视化
             set({
               messages: messages.map((msg, idx) =>
                 idx === lastIndex
                   ? { ...msg, visualization: data.data.chart }
+                  : msg
+              ),
+            });
+          } else if (data.type === "python_output") {
+            // 更新 Python 输出
+            set({
+              messages: messages.map((msg, idx) =>
+                idx === lastIndex
+                  ? {
+                      ...msg,
+                      pythonOutput: (msg.pythonOutput || "") + data.data.output,
+                    }
+                  : msg
+              ),
+            });
+          } else if (data.type === "python_image") {
+            // 添加 Python 图表
+            set({
+              messages: messages.map((msg, idx) =>
+                idx === lastIndex
+                  ? {
+                      ...msg,
+                      pythonImages: [...(msg.pythonImages || []), data.data.image],
+                    }
                   : msg
               ),
             });

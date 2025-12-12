@@ -11,8 +11,11 @@ class SSEEventType(str, Enum):
     """SSE 事件类型"""
 
     PROGRESS = "progress"
+    THINKING = "thinking"  # 思考阶段
     RESULT = "result"
     VISUALIZATION = "visualization"
+    PYTHON_OUTPUT = "python_output"  # Python 输出
+    PYTHON_IMAGE = "python_image"  # Python 图表
     ERROR = "error"
     DONE = "done"
 
@@ -111,6 +114,34 @@ class SSEEvent(BaseModel):
                 "conversation_id": str(conversation_id),
                 "message_id": str(message_id) if message_id else None,
             },
+        )
+
+    @classmethod
+    def thinking(cls, stage: str, detail: str | None = None) -> "SSEEvent":
+        """创建思考阶段事件"""
+        return cls(
+            type=SSEEventType.THINKING,
+            data={"stage": stage, "detail": detail},
+        )
+
+    @classmethod
+    def python_output(
+        cls, output: str, stream: str = "stdout"
+    ) -> "SSEEvent":
+        """创建 Python 输出事件"""
+        return cls(
+            type=SSEEventType.PYTHON_OUTPUT,
+            data={"output": output, "stream": stream},
+        )
+
+    @classmethod
+    def python_image(
+        cls, image: str, format: str = "png"
+    ) -> "SSEEvent":
+        """创建 Python 图表事件 (base64 编码)"""
+        return cls(
+            type=SSEEventType.PYTHON_IMAGE,
+            data={"image": image, "format": format},
         )
 
 

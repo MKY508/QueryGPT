@@ -371,12 +371,43 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
               {msg.isLoading ? (
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Loader2 className="animate-spin" size={16} />
-                  <span>{msg.status || "正在分析..."}</span>
+                  <span>{msg.thinkingStage || msg.status || "正在分析..."}</span>
                 </div>
               ) : (
                 <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
                   {msg.content}
                 </ReactMarkdown>
+              )}
+
+              {/* Python 输出 */}
+              {msg.pythonOutput && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">
+                    Python 输出
+                  </div>
+                  <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">
+                    {msg.pythonOutput}
+                  </pre>
+                </div>
+              )}
+
+              {/* Python 图表 */}
+              {msg.pythonImages && msg.pythonImages.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">
+                    分析图表
+                  </div>
+                  <div className="space-y-4">
+                    {msg.pythonImages.map((img, imgIdx) => (
+                      <img
+                        key={imgIdx}
+                        src={`data:image/png;base64,${img}`}
+                        alt={`分析图表 ${imgIdx + 1}`}
+                        className="max-w-full rounded-lg border border-border"
+                      />
+                    ))}
+                  </div>
+                </div>
               )}
 
               {msg.sql && (

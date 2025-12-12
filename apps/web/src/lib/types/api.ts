@@ -52,11 +52,32 @@ export interface SSEDoneData {
   conversation_id?: string;
 }
 
+/** SSE 思考阶段事件数据 */
+export interface SSEThinkingData {
+  stage: string;
+  detail?: string;
+}
+
+/** SSE Python 输出事件数据 */
+export interface SSEPythonOutputData {
+  output: string;
+  stream: "stdout" | "stderr";
+}
+
+/** SSE Python 图表事件数据 */
+export interface SSEPythonImageData {
+  image: string; // base64 编码
+  format: "png" | "jpeg";
+}
+
 /** SSE 事件联合类型 */
 export type SSEEventData =
   | { type: "progress"; data: SSEProgressData }
+  | { type: "thinking"; data: SSEThinkingData }
   | { type: "result"; data: SSEResultData }
   | { type: "visualization"; data: SSEVisualizationData }
+  | { type: "python_output"; data: SSEPythonOutputData }
+  | { type: "python_image"; data: SSEPythonImageData }
   | { type: "error"; data: SSEErrorData }
   | { type: "done"; data: SSEDoneData };
 
