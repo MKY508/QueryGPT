@@ -4,6 +4,8 @@
 """
 
 import json
+import logging
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
@@ -11,8 +13,25 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-# 元数据库文件路径
-METADATA_DB_PATH = Path(__file__).parent.parent.parent.parent / "data" / "metadata.db"
+logger = logging.getLogger(__name__)
+
+# 允许更新的字段白名单（防止 SQL 注入）
+ALLOWED_UPDATE_FIELDS = {
+    "name",
+    "layout_data",
+    "visible_tables",
+    "is_default",
+    "zoom",
+    "viewport_x",
+    "viewport_y",
+}
+
+# 元数据库文件路径（支持环境变量覆盖）
+METADATA_DB_PATH = Path(
+    os.getenv(
+        "METADATA_DB_PATH", str(Path(__file__).parent.parent.parent.parent / "data" / "metadata.db")
+    )
+)
 
 
 def _ensure_db_dir():
@@ -34,6 +53,10 @@ def get_metadata_db():
     try:
         yield conn
         conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Database error: {e}")
+        raise
     finally:
         conn.close()
 
@@ -68,6 +91,18 @@ def init_metadata_db():
             ON schema_layouts(user_id, connection_id)
         """)
 
+        # 为默认布局查询创建索引
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_layouts_default
+            ON schema_layouts(user_id, connection_id, is_default)
+        """)
+
+        # 为单个布局查询创建索引
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_layouts_id_user
+            ON schema_layouts(id, user_id)
+        """)
+
         conn.commit()
 
 
@@ -94,6 +129,26 @@ class LayoutRepository:
             return cursor.fetchall()
 
     @staticmethod
+    def _parse_json_fields(row: dict) -> dict:
+        """安全解析 JSON 字段"""
+        if not row:
+            return row
+        try:
+            row["layout_data"] = json.loads(row["layout_data"] or "{}")
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"Failed to parse layout_data: {e}")
+            row["layout_data"] = {}
+        try:
+            row["visible_tables"] = (
+                json.loads(row["visible_tables"]) if row["visible_tables"] else None
+            )
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"Failed to parse visible_tables: {e}")
+            row["visible_tables"] = None
+        row["is_default"] = bool(row.get("is_default", 0))
+        return row
+
+    @staticmethod
     def get_layout(layout_id: UUID, user_id: UUID) -> dict | None:
         """获取单个布局"""
         with get_metadata_db() as conn:
@@ -106,14 +161,7 @@ class LayoutRepository:
                 (str(layout_id), str(user_id)),
             )
             row = cursor.fetchone()
-            if row:
-                # 解析 JSON 字段
-                row["layout_data"] = json.loads(row["layout_data"] or "{}")
-                row["visible_tables"] = (
-                    json.loads(row["visible_tables"]) if row["visible_tables"] else None
-                )
-                row["is_default"] = bool(row["is_default"])
-            return row
+            return LayoutRepository._parse_json_fields(row) if row else None
 
     @staticmethod
     def get_default_layout(user_id: UUID, connection_id: UUID) -> dict | None:
@@ -128,13 +176,7 @@ class LayoutRepository:
                 (str(user_id), str(connection_id)),
             )
             row = cursor.fetchone()
-            if row:
-                row["layout_data"] = json.loads(row["layout_data"] or "{}")
-                row["visible_tables"] = (
-                    json.loads(row["visible_tables"]) if row["visible_tables"] else None
-                )
-                row["is_default"] = bool(row["is_default"])
-            return row
+            return LayoutRepository._parse_json_fields(row) if row else None
 
     @staticmethod
     def create_layout(
@@ -190,12 +232,16 @@ class LayoutRepository:
         connection_id: UUID | None = None,
         **kwargs,
     ) -> dict | None:
-        """更新布局"""
-        # 构建更新字段
+        """更新布局（使用白名单防止 SQL 注入）"""
+        # 构建更新字段（只允许白名单中的字段）
         updates = []
         values = []
 
         for key, value in kwargs.items():
+            # 安全检查：只允许白名单中的字段
+            if key not in ALLOWED_UPDATE_FIELDS:
+                logger.warning(f"Attempted to update disallowed field: {key}")
+                continue
             if value is not None:
                 if key == "layout_data":
                     updates.append("layout_data = ?")
@@ -206,7 +252,8 @@ class LayoutRepository:
                 elif key == "is_default":
                     updates.append("is_default = ?")
                     values.append(1 if value else 0)
-                else:
+                elif key in ("name", "zoom", "viewport_x", "viewport_y"):
+                    # 这些字段直接使用参数化查询
                     updates.append(f"{key} = ?")
                     values.append(value)
 

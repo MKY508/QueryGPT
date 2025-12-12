@@ -189,6 +189,15 @@ function SchemaSettingsInner({ connectionId }: SchemaSettingsProps) {
     },
   });
 
+  // 清理 timeout 防止内存泄漏
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // 自动选择默认布局
   useEffect(() => {
     if (layouts && layouts.length > 0 && !selectedLayoutId) {
