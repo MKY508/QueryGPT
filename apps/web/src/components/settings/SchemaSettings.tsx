@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ReactFlow,
@@ -95,7 +95,7 @@ export function SchemaSettings({ connectionId }: SchemaSettingsProps) {
   };
 
   // 构建节点和边
-  useMemo(() => {
+  useEffect(() => {
     if (!schemaInfo?.tables) return;
 
     // 创建表节点

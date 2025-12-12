@@ -3,13 +3,21 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen, GitBranch } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/stores/auth";
+import { api } from "@/lib/api/client";
 import { ModelSettings } from "@/components/settings/ModelSettings";
 import { ConnectionSettings } from "@/components/settings/ConnectionSettings";
 import { PreferencesSettings } from "@/components/settings/PreferencesSettings";
 import { SemanticSettings } from "@/components/settings/SemanticSettings";
 import { SchemaSettings } from "@/components/settings/SchemaSettings";
 import { cn } from "@/lib/utils";
+
+interface Connection {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
 
 type TabType = "models" | "connections" | "schema" | "semantic" | "preferences";
 
@@ -27,6 +35,28 @@ export default function SettingsPage() {
 
   // 用于 SchemaSettings 的连接 ID 状态 - 必须在条件返回之前
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+
+  // 获取连接列表，自动选择默认连接
+  const { data: connections } = useQuery({
+    queryKey: ["connections"],
+    queryFn: async () => {
+      const response = await api.get("/api/v1/config/connections");
+      return response.data.data as Connection[];
+    },
+    enabled: isAuthenticated,
+  });
+
+  // 自动选择默认连接
+  useEffect(() => {
+    if (connections && connections.length > 0 && !selectedConnectionId) {
+      const defaultConn = connections.find((c) => c.is_default);
+      if (defaultConn) {
+        setSelectedConnectionId(defaultConn.id);
+      } else {
+        setSelectedConnectionId(connections[0].id);
+      }
+    }
+  }, [connections, selectedConnectionId]);
 
   if (!isAuthenticated) {
     return null;
