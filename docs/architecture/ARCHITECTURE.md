@@ -376,32 +376,49 @@ main ─────────────────────────
 
 ## 8. 迁移计划
 
-### Phase 1: 基础设施 (Week 1)
+### Phase 1: 基础设施 ✅
 - [x] 创建项目结构
-- [ ] 设置 FastAPI 框架
-- [ ] 定义数据模型
-- [ ] 数据库迁移脚本
+- [x] 设置 FastAPI 框架
+- [x] 定义数据模型 (SQLAlchemy 2.0)
+- [x] 数据库迁移脚本 (Alembic)
 
-### Phase 2: 核心功能 (Week 2)
-- [ ] 用户认证
-- [ ] gptme 集成
-- [ ] 聊天 API (SSE)
-- [ ] 历史记录
+### Phase 2: 核心功能 ✅
+- [x] 用户认证 (JWT + OAuth2)
+- [x] gptme 集成 (GptmeEngine)
+- [x] 聊天 API (SSE 流式响应)
+- [x] 历史记录 (对话/消息 CRUD)
 
-### Phase 3: 前端 (Week 3)
-- [ ] Next.js 项目
-- [ ] 核心组件
-- [ ] API 集成
-- [ ] 状态管理
+### Phase 3: 前端 ✅
+- [x] Next.js 15 项目 (App Router)
+- [x] 核心组件 (ChatArea, Sidebar, DataTable, ChartDisplay)
+- [x] API 集成 (Axios + SSE)
+- [x] 状态管理 (Zustand + TanStack Query)
 
-### Phase 4: 完善 (Week 4)
-- [ ] 模型管理
-- [ ] 数据库连接管理
-- [ ] 国际化
-- [ ] 主题切换
+### Phase 4: 完善 🔄
+- [x] 模型管理 (CRUD + 测试连接)
+- [x] 数据库连接管理 (MySQL/PostgreSQL/SQLite)
+- [ ] 国际化 (next-intl)
+- [x] 主题切换 (7 个艺术主题)
 
-### Phase 5: 部署 (Week 5)
-- [ ] Docker 配置
-- [ ] CI/CD
-- [ ] 文档完善
-- [ ] 数据迁移脚本
+### Phase 5: 部署 🔄
+- [x] Docker 配置 (docker-compose + Dockerfile)
+- [ ] CI/CD (GitHub Actions)
+- [x] 文档完善 (API/架构文档)
+- [x] 示例数据库 (demo_db.py)
+
+## 9. 待开发功能
+
+### 高优先级
+- [ ] 国际化 (i18n) - 中英文切换
+- [ ] CI/CD 流水线 - 自动测试/部署
+- [ ] 单元测试覆盖 - pytest + vitest
+
+### 中优先级
+- [ ] 提示词模板管理
+- [ ] 查询结果导出 (CSV/Excel)
+- [ ] 对话分享功能
+
+### 低优先级
+- [ ] Mobile App (React Native)
+- [ ] CLI Tool
+- [ ] Redis 缓存集成
