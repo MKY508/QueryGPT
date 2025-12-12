@@ -45,3 +45,4 @@ logs/
 # Build
 *.egg
 *.whl
+CLAUDE.md
