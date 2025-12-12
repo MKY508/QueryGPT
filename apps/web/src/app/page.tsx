@@ -44,10 +44,11 @@ export default function Home() {
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login, register } = useAuthStore();
+  const { login, register, setRememberLogin } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +56,9 @@ function LoginForm() {
     setError("");
 
     try {
+      // 设置记住登录状态
+      setRememberLogin(rememberMe);
+
       if (isRegister) {
         await register(email, password);
       } else {
@@ -98,6 +102,20 @@ function LoginForm() {
           <p className="text-xs text-muted-foreground mt-1">至少 8 位，需包含字母和数字</p>
         )}
       </div>
+      {!isRegister && (
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="rememberMe"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="w-4 h-4 text-primary border-input rounded focus:ring-primary"
+          />
+          <label htmlFor="rememberMe" className="ml-2 text-sm text-muted-foreground">
+            记住登录状态
+          </label>
+        </div>
+      )}
       <button
         type="submit"
         disabled={loading}

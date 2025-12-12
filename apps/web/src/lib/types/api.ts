@@ -95,6 +95,8 @@ export interface MessageMetadata {
   sql?: string;
   visualization?: Visualization;
   data?: DataRow[];
+  python_output?: string;
+  python_images?: string[];
 }
 
 /** API 返回的消息 */

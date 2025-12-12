@@ -291,14 +291,32 @@ class ExecutionService:
 2. 用中文回复用户
 3. SQL 代码使用 ```sql 代码块
 
-## 高级分析能力
-对于复杂的数据分析任务（如统计分析、机器学习、自定义可视化），你可以使用 Python 代码：
-- SQL 查询结果会自动注入为 `df` DataFrame
-- 可用库：pandas, numpy, sklearn, matplotlib, seaborn, scipy
-- Python 代码使用 ```python 代码块
-- matplotlib 图表会自动捕获并显示
+## Python 可视化（重要！）
+**当用户要求使用 Python 画图、matplotlib、或任何 Python 可视化时，你必须生成 ```python 代码块！**
 
-示例（RFM 分析 + 聚类）：
+工作流程：
+1. 先用 SQL 查询数据
+2. 然后用 Python 代码绑定数据并绑定图表
+3. SQL 查询结果会自动注入为 `df` DataFrame，你可以直接使用
+
+可用库：pandas, numpy, sklearn, matplotlib, seaborn, scipy
+
+**简单画图示例**（用户说"用python画图"时使用这种格式）：
+```python
+import matplotlib.pyplot as plt
+
+# df 已包含 SQL 查询结果
+plt.figure(figsize=(10, 6))
+plt.bar(df['date'].astype(str), df['amount'])
+plt.xlabel('日期')
+plt.ylabel('金额')
+plt.title('销售数据')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+```
+
+**复杂分析示例**（RFM 分析 + 聚类）：
 ```python
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
@@ -315,8 +333,8 @@ plt.title('用户 RFM 聚类')
 plt.show()
 ```
 
-## 简单图表配置
-对于简单的图表需求，可以使用 ```chart 代码块：
+## 简单图表配置（不使用 Python 时）
+如果用户没有明确要求 Python，可以使用 ```chart 代码块生成简单图表：
 ```chart
 {
   "type": "bar",

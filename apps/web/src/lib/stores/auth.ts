@@ -28,11 +28,13 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   isHydrated: boolean;
+  rememberLogin: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => void;
   refreshAccessToken: () => Promise<void>;
   setHydrated: () => void;
+  setRememberLogin: (remember: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -43,8 +45,10 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       isAuthenticated: false,
       isHydrated: false,
+      rememberLogin: true,
 
       setHydrated: () => set({ isHydrated: true }),
+      setRememberLogin: (remember: boolean) => set({ rememberLogin: remember }),
 
       login: async (email: string, password: string) => {
         try {
@@ -136,12 +140,21 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "querygpt-auth",
-      partialize: (state) => ({
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
+      partialize: (state) => {
+        // 如果不记住登录，只保存 rememberLogin 状态，不保存认证信息
+        if (!state.rememberLogin) {
+          return {
+            rememberLogin: state.rememberLogin,
+          };
+        }
+        return {
+          accessToken: state.accessToken,
+          refreshToken: state.refreshToken,
+          user: state.user,
+          isAuthenticated: state.isAuthenticated,
+          rememberLogin: state.rememberLogin,
+        };
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHydrated();
       },

@@ -60,17 +60,49 @@ class GptmeEngine:
         if self._ipython is None:
             from IPython.core.interactiveshell import InteractiveShell
 
+            # 获取内置字体路径
+            import os
+            font_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "assets", "fonts", "NotoSansSC-Regular.ttf"
+            )
+
             self._ipython = InteractiveShell()
-            # 预导入常用数据分析库
+            # 预导入常用数据分析库，配置中文字体
+            font_loaded = os.path.exists(font_path)
+            if font_loaded:
+                logger.info(f"Loading bundled font: {font_path}")
+            else:
+                logger.warning(f"Bundled font not found: {font_path}, falling back to system fonts")
+
             self._ipython.run_cell(
-                """
+                f"""
 import pandas as pd
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # 非交互式后端
 import matplotlib.pyplot as plt
-plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+import matplotlib.font_manager as fm
+import os
+
+# 使用项目内置的思源黑体（Noto Sans SC）- 跨平台通用
+font_path = r'{font_path}'
+if os.path.exists(font_path):
+    fm.fontManager.addfont(font_path)
+    plt.rcParams['font.family'] = 'Noto Sans SC'
+else:
+    # 回退到系统字体
+    import platform
+    system = platform.system()
+    if system == 'Darwin':
+        plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang SC', 'Heiti SC']
+    elif system == 'Windows':
+        plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei']
+    else:
+        plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'DejaVu Sans']
+
 plt.rcParams['axes.unicode_minus'] = False
+plt.rcParams['font.size'] = 12
 """,
                 silent=True,
             )
@@ -105,6 +137,20 @@ plt.rcParams['axes.unicode_minus'] = False
         if python_match:
             return python_match.group(1).strip()
         return None
+
+    def _clean_content_for_display(self, content: str) -> str:
+        """清理输出内容，移除代码块，只保留纯文本总结"""
+        # 移除 SQL 代码块
+        content = re.sub(r"```sql\s*[\s\S]*?```", "", content, flags=re.IGNORECASE)
+        # 移除 Python 代码块
+        content = re.sub(r"```(?:python|ipython|py)\s*[\s\S]*?```", "", content, flags=re.IGNORECASE)
+        # 移除 chart 代码块
+        content = re.sub(r"```chart\s*[\s\S]*?```", "", content, flags=re.IGNORECASE)
+        # 移除 thinking 标记
+        content = re.sub(r"\[thinking:\s*[^\]]+\]", "", content)
+        # 清理多余空行
+        content = re.sub(r"\n{3,}", "\n\n", content)
+        return content.strip()
 
     async def execute(
         self,
@@ -213,6 +259,14 @@ plt.rcParams['axes.unicode_minus'] = False
             sql_code = self._extract_sql(full_content)
             python_code = self._extract_python(full_content)
 
+            # 调试日志 - 使用 print 确保输出
+            print(f"[DEBUG] Full AI content length: {len(full_content)}")
+            print(f"[DEBUG] SQL code extracted: {bool(sql_code)}")
+            print(f"[DEBUG] Python code extracted: {bool(python_code)}")
+            print(f"[DEBUG] Full content preview: {full_content[:500]}...")
+            if python_code:
+                print(f"[DEBUG] Python code preview: {python_code[:200]}...")
+
             # 如果有 SQL 和数据库配置，尝试执行
             data = None
             rows_count = None
@@ -238,28 +292,32 @@ plt.rcParams['axes.unicode_minus'] = False
             python_images = []
 
             if python_code:
+                print(f"[DEBUG] Executing Python code...")
                 yield SSEEvent.progress("executing_python", "正在执行 Python 分析...")
 
                 try:
                     python_output, python_images = await self._execute_python(python_code)
+                    print(f"[DEBUG] Python execution done. Output length: {len(python_output) if python_output else 0}, Images count: {len(python_images)}")
 
                     # 发送 Python 输出
                     if python_output:
+                        print(f"[DEBUG] Sending python_output event...")
                         yield SSEEvent.python_output(python_output, "stdout")
 
                     # 发送 Python 生成的图表
-                    for img_base64 in python_images:
+                    for i, img_base64 in enumerate(python_images):
+                        print(f"[DEBUG] Sending python_image event {i+1}/{len(python_images)}, image size: {len(img_base64)}")
                         yield SSEEvent.python_image(img_base64, "png")
 
                 except Exception as e:
+                    print(f"[DEBUG] Python execution error: {e}")
                     yield SSEEvent.python_output(f"⚠️ Python 执行错误: {str(e)}", "stderr")
 
             # 从 AI 输出中提取图表配置
             chart_config = self._extract_chart_config(full_content)
 
-            # 移除图表配置和思考标记，使输出更干净
-            clean_content = re.sub(r"```chart\s*\n?[\s\S]*?\n?```", "", full_content).strip()
-            clean_content = re.sub(r"\[thinking:\s*[^\]]+\]", "", clean_content).strip()
+            # 清理输出内容，只保留纯文本总结
+            clean_content = self._clean_content_for_display(full_content)
 
             yield SSEEvent.result(
                 content=clean_content,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Square, History, Loader2, Database, Brain, ChevronDown, Settings } from "lucide-react";
+import { Send, Square, History, Loader2, Database, Brain, ChevronDown, Settings, Code, Table2, RefreshCw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useChatStore } from "@/lib/stores/chat";
@@ -38,6 +38,42 @@ interface ChatAreaProps {
 const STORAGE_KEY_CONNECTION = "querygpt-selected-connection";
 const STORAGE_KEY_MODEL = "querygpt-selected-model";
 
+// 可折叠的技术细节组件
+function CollapsibleDetail({
+  title,
+  icon,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <div className="mt-3 border border-border rounded-lg overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2 flex items-center justify-between bg-muted/50 hover:bg-muted text-sm transition-colors"
+      >
+        <span className="flex items-center gap-2 text-muted-foreground">
+          {icon}
+          {title}
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn(
+            "text-muted-foreground transition-transform",
+            isOpen && "rotate-180"
+          )}
+        />
+      </button>
+      {isOpen && <div className="p-3 border-t border-border">{children}</div>}
+    </div>
+  );
+}
+
 export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAreaProps) {
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -51,7 +87,7 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
   const connectionDropdownRef = useRef<HTMLDivElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
-  const { messages, isLoading, sendMessage, stopGeneration } = useChatStore();
+  const { messages, isLoading, sendMessage, stopGeneration, retryMessage } = useChatStore();
 
   // 客户端初始化：从 localStorage 读取保存的选择
   useEffect(() => {
@@ -379,46 +415,39 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
                 </ReactMarkdown>
               )}
 
-              {/* Python 输出 */}
-              {msg.pythonOutput && (
-                <div className="mt-4 pt-4 border-t border-border">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">
-                    Python 输出
+              {/* 错误状态 + 重试按钮 */}
+              {msg.hasError && (
+                <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-destructive flex-1">
+                      {msg.errorMessage || "执行出错"}
+                    </span>
+                    <button
+                      onClick={() => retryMessage(idx)}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors flex-shrink-0"
+                    >
+                      <RefreshCw size={14} />
+                      重试
+                    </button>
                   </div>
-                  <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">
-                    {msg.pythonOutput}
-                  </pre>
                 </div>
               )}
 
-              {/* Python 图表 */}
+              {/* Python 图表 - 直接显示 */}
               {msg.pythonImages && msg.pythonImages.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-border">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">
-                    分析图表
-                  </div>
-                  <div className="space-y-4">
-                    {msg.pythonImages.map((img, imgIdx) => (
-                      <img
-                        key={imgIdx}
-                        src={`data:image/png;base64,${img}`}
-                        alt={`分析图表 ${imgIdx + 1}`}
-                        className="max-w-full rounded-lg border border-border"
-                      />
-                    ))}
-                  </div>
+                <div className="mt-4 space-y-4">
+                  {msg.pythonImages.map((img, imgIdx) => (
+                    <img
+                      key={imgIdx}
+                      src={`data:image/png;base64,${img}`}
+                      alt={`分析图表 ${imgIdx + 1}`}
+                      className="max-w-full rounded-lg border border-border"
+                    />
+                  ))}
                 </div>
               )}
 
-              {msg.sql && (
-                <div className="mt-4 pt-4 border-t border-border">
-                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <Database size={12} /> SQL 查询
-                  </div>
-                  <SqlHighlight code={msg.sql} />
-                </div>
-              )}
-
+              {/* 内置图表 - 直接显示 */}
               {msg.visualization && (
                 <ChartDisplay
                   type={msg.visualization.type || "bar"}
@@ -427,8 +456,28 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
                 />
               )}
 
+              {/* 技术细节 - 折叠显示 */}
+              {msg.sql && (
+                <CollapsibleDetail title="SQL 查询" icon={<Database size={14} />}>
+                  <SqlHighlight code={msg.sql} />
+                </CollapsibleDetail>
+              )}
+
+              {msg.pythonOutput && (
+                <CollapsibleDetail title="Python 输出" icon={<Code size={14} />}>
+                  <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto whitespace-pre-wrap">
+                    {msg.pythonOutput}
+                  </pre>
+                </CollapsibleDetail>
+              )}
+
               {msg.data && Array.isArray(msg.data) && msg.data.length > 0 && (
-                <DataTable data={msg.data} />
+                <CollapsibleDetail
+                  title={`查询结果 (${msg.data.length} 行)`}
+                  icon={<Table2 size={14} />}
+                >
+                  <DataTable data={msg.data} />
+                </CollapsibleDetail>
               )}
             </div>
           </div>

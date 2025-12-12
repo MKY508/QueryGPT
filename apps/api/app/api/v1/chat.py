@@ -128,6 +128,8 @@ async def chat_stream(
             # 执行查询（流式）
             assistant_content = ""
             metadata = {}
+            python_output_parts = []
+            python_images = []
 
             async for event in execution_service.execute_stream(
                 query=query,
@@ -147,6 +149,16 @@ async def chat_stream(
                     }
                 elif event.type.value == "visualization":
                     metadata["visualization"] = event.data.get("chart")
+                elif event.type.value == "python_output":
+                    python_output_parts.append(event.data.get("output", ""))
+                elif event.type.value == "python_image":
+                    python_images.append(event.data.get("image", ""))
+
+            # 保存 Python 输出和图表
+            if python_output_parts:
+                metadata["python_output"] = "".join(python_output_parts)
+            if python_images:
+                metadata["python_images"] = python_images
 
             # 保存助手消息
             assistant_message = Message(

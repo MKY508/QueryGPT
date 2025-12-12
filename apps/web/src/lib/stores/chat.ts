@@ -14,6 +14,11 @@ interface Message {
   data?: DataRow[];
   pythonOutput?: string; // Python 输出
   pythonImages?: string[]; // Python 图表 (base64)
+  // 错误状态
+  hasError?: boolean;
+  errorMessage?: string;
+  canRetry?: boolean;
+  originalQuery?: string; // 用于重试
 }
 
 interface ChatState {
@@ -21,11 +26,14 @@ interface ChatState {
   currentConversationId: string | null;
   isLoading: boolean;
   eventSource: EventSource | null;
+  lastConnectionId: string | null; // 保存上次使用的连接 ID
+  lastModelId: string | null; // 保存上次使用的模型 ID
   sendMessage: (query: string, connectionId?: string | null, modelId?: string | null) => Promise<void>;
   stopGeneration: () => void;
   setCurrentConversation: (id: string) => void;
   clearConversation: () => void;
   loadConversation: (id: string) => Promise<void>;
+  retryMessage: (messageIndex: number) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -33,8 +41,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   currentConversationId: null,
   isLoading: false,
   eventSource: null,
+  lastConnectionId: null,
+  lastModelId: null,
 
   sendMessage: async (query: string, connectionId?: string | null, modelId?: string | null) => {
+    // 保存连接信息用于重试
+    if (connectionId) set({ lastConnectionId: connectionId });
+    if (modelId) set({ lastModelId: modelId });
     const { currentConversationId } = get();
 
     // 添加用户消息
@@ -147,19 +160,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
               ),
             });
           } else if (data.type === "error") {
-            // 错误
+            // 错误 - 显示错误状态和重试按钮
             set({
               messages: messages.map((msg, idx) =>
                 idx === lastIndex
                   ? {
                       ...msg,
-                      content: `错误: ${data.data.message}`,
+                      content: msg.content || "",
+                      hasError: true,
+                      errorMessage: data.data.message,
+                      canRetry: true,
+                      originalQuery: query,
                       isLoading: false,
                       status: undefined,
                     }
                   : msg
               ),
               isLoading: false,
+              eventSource: null,
             });
             eventSource.close();
           } else if (data.type === "done") {
@@ -167,7 +185,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             if (data.data.conversation_id) {
               set({ currentConversationId: data.data.conversation_id });
             }
-            set({ isLoading: false });
+            set({ isLoading: false, eventSource: null });
             eventSource.close();
           }
         } catch (e) {
@@ -175,18 +193,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
       };
 
-      eventSource.onerror = () => {
-        const { messages } = get();
+      eventSource.onerror = (error) => {
+        console.error("SSE connection error", error);
+        const { messages, isLoading: currentLoading } = get();
         const lastIndex = messages.length - 1;
 
-        set({
-          messages: messages.map((msg, idx) =>
-            idx === lastIndex && msg.isLoading
-              ? { ...msg, content: "连接失败", isLoading: false }
-              : msg
-          ),
-          isLoading: false,
-        });
+        // 只有在还在加载状态时才处理错误
+        if (currentLoading) {
+          set({
+            messages: messages.map((msg, idx) =>
+              idx === lastIndex && msg.isLoading
+                ? {
+                    ...msg,
+                    content: msg.content || "",
+                    hasError: true,
+                    errorMessage: "连接中断，请重试",
+                    canRetry: true,
+                    originalQuery: query,
+                    isLoading: false,
+                    status: undefined,
+                  }
+                : msg
+            ),
+            isLoading: false,
+            eventSource: null,
+          });
+        }
         eventSource.close();
       };
     } catch (error: unknown) {
@@ -252,11 +284,44 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sql: msg.metadata?.sql,
         visualization: msg.metadata?.visualization,
         data: msg.metadata?.data,
+        pythonOutput: msg.metadata?.python_output,
+        pythonImages: msg.metadata?.python_images,
       }));
 
       set({ messages, currentConversationId: id });
     } catch (error) {
       console.error("Failed to load conversation", error);
     }
+  },
+
+  retryMessage: async (messageIndex: number) => {
+    const { messages, lastConnectionId, lastModelId } = get();
+    const errorMsg = messages[messageIndex];
+
+    // 检查是否可以重试
+    if (!errorMsg?.canRetry || !errorMsg.originalQuery) {
+      console.error("Cannot retry this message");
+      return;
+    }
+
+    const query = errorMsg.originalQuery;
+
+    // 移除错误消息（保留用户消息）
+    // 找到对应的用户消息索引（应该是 messageIndex - 1）
+    const userMsgIndex = messageIndex - 1;
+    if (userMsgIndex >= 0 && messages[userMsgIndex]?.role === "user") {
+      // 移除用户消息和错误的助手消息
+      set({
+        messages: messages.slice(0, userMsgIndex),
+      });
+    } else {
+      // 只移除错误消息
+      set({
+        messages: messages.slice(0, messageIndex),
+      });
+    }
+
+    // 重新发送
+    await get().sendMessage(query, lastConnectionId, lastModelId);
   },
 }));

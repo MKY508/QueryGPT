@@ -15,31 +15,26 @@
 
 - **自然语言查询** - 用中文描述需求，AI 自动生成 SQL 并执行
 - **数据可视化** - 查询结果自动生成图表
-- **语义层** - 定义业务术语（如"月活用户"），AI 自动理解
-- **流式响应** - 实时显示 AI 思考过程
+- **Python 分析** - 支持 matplotlib/sklearn，说"用 python 画图"即可触发
+- **语义层** - 定义业务术语，AI 自动理解
 - **多用户** - JWT 认证，数据隔离
-- **开箱即用** - 内置示例数据库
 
 ## 截图
 
 <p align="center">
-  <img src="docs/images/chat.png" width="80%" alt="对话界面"/>
-  <br/><b>对话</b>
-</p>
-
-<p align="center">
-  <img src="docs/images/schema.png" width="80%" alt="表关系"/>
-  <br/><b>表关系</b>
-</p>
-
-<p align="center">
   <img src="docs/images/login.png" width="80%" alt="登录"/>
-  <br/><b>登录</b>
+</p>
+
+<p align="center">
+  <img src="docs/images/chat.png" width="80%" alt="对话界面"/>
 </p>
 
 <p align="center">
   <img src="docs/images/semantic.png" width="80%" alt="语义层"/>
-  <br/><b>语义层</b>
+</p>
+
+<p align="center">
+  <img src="docs/images/schema.png" width="80%" alt="表关系"/>
 </p>
 
 ---
