@@ -79,7 +79,15 @@ class SSEEvent(BaseModel):
         """创建可视化事件"""
         return cls(
             type=SSEEventType.VISUALIZATION,
-            data={"chart": {"type": chart_type, "data": chart_data}},
+            data={
+                "chart": {
+                    "type": chart_type,
+                    "data": chart_data.get("data", []),
+                    "xKey": chart_data.get("xKey"),
+                    "yKeys": chart_data.get("yKeys"),
+                    "title": chart_data.get("title"),
+                }
+            },
         )
 
     @classmethod

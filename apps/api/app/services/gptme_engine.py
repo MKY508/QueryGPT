@@ -167,7 +167,12 @@ class GptmeEngine:
                 if visualization:
                     yield SSEEvent.visualization(
                         chart_type=visualization.get("type", "bar"),
-                        chart_data=visualization,
+                        chart_data={
+                            "data": visualization.get("data", []),
+                            "xKey": visualization.get("xKey"),
+                            "yKeys": visualization.get("yKeys"),
+                            "title": visualization.get("title"),
+                        },
                     )
             elif data and len(data) > 0:
                 # 如果 AI 没有提供图表配置，使用后备的自动生成逻辑
@@ -175,7 +180,11 @@ class GptmeEngine:
                 if visualization:
                     yield SSEEvent.visualization(
                         chart_type=visualization.get("type", "bar"),
-                        chart_data=visualization.get("data", {}),
+                        chart_data={
+                            "data": visualization.get("data", []),
+                            "xKey": visualization.get("xKey"),
+                            "yKeys": visualization.get("yKeys"),
+                        },
                     )
 
         except Exception as e:
