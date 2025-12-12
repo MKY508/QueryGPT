@@ -2,9 +2,11 @@
 数据库连接管理器
 统一管理 MySQL、PostgreSQL、SQLite 的连接和查询
 """
+
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import Any
 
 import structlog
 
@@ -14,6 +16,7 @@ logger = structlog.get_logger()
 @dataclass
 class DatabaseConfig:
     """数据库连接配置"""
+
     driver: str  # mysql, postgresql, sqlite
     host: str = "localhost"
     port: int | None = None
@@ -43,6 +46,7 @@ class DatabaseConfig:
 @dataclass
 class ConnectionTestResult:
     """连接测试结果"""
+
     connected: bool
     version: str | None = None
     tables_count: int | None = None
@@ -52,6 +56,7 @@ class ConnectionTestResult:
 @dataclass
 class QueryResult:
     """查询结果"""
+
     data: list[dict[str, Any]]
     rows_count: int
 
@@ -86,6 +91,7 @@ class DatabaseManager:
         """创建数据库连接"""
         if self.config.driver == "mysql":
             import pymysql
+
             return pymysql.connect(
                 host=self.config.host,
                 port=self.config.get_port(),
@@ -97,6 +103,7 @@ class DatabaseManager:
 
         elif self.config.driver == "postgresql":
             import psycopg2
+
             return psycopg2.connect(
                 host=self.config.host,
                 port=self.config.get_port(),
@@ -107,6 +114,7 @@ class DatabaseManager:
 
         elif self.config.driver == "sqlite":
             import sqlite3
+
             conn = sqlite3.connect(self.config.database)
             conn.row_factory = sqlite3.Row
             return conn
@@ -185,6 +193,7 @@ class DatabaseManager:
 
         elif self.config.driver == "postgresql":
             import psycopg2.extras
+
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 cursor.execute(sql)
                 return [dict(row) for row in cursor.fetchall()]
@@ -247,17 +256,23 @@ class DatabaseManager:
                 cursor.execute(
                     "SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns "
                     "WHERE table_schema = DATABASE() AND table_name = %s",
-                    (table_name,)
+                    (table_name,),
                 )
-                return [{"name": row["COLUMN_NAME"], "type": row["DATA_TYPE"]} for row in cursor.fetchall()]
+                return [
+                    {"name": row["COLUMN_NAME"], "type": row["DATA_TYPE"]}
+                    for row in cursor.fetchall()
+                ]
 
         elif self.config.driver == "postgresql":
             with conn.cursor() as cursor:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT column_name, data_type
                     FROM information_schema.columns
                     WHERE table_name = %s
-                """, (table_name,))
+                """,
+                    (table_name,),
+                )
                 return [{"name": row[0], "type": row[1]} for row in cursor.fetchall()]
 
         elif self.config.driver == "sqlite":

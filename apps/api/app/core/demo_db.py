@@ -3,6 +3,7 @@
 创建一个包含销售、产品、客户等数据的 SQLite 示例数据库，
 用于演示 QueryGPT 的查询和可视化功能。
 """
+
 import random
 import sqlite3
 from datetime import datetime, timedelta
@@ -36,7 +37,23 @@ REGIONS = ["华东", "华南", "华北", "西南", "华中"]
 
 # 客户姓名（示例）
 FIRST_NAMES = ["张", "李", "王", "刘", "陈", "杨", "黄", "赵", "周", "吴"]
-LAST_NAMES = ["伟", "芳", "娜", "敏", "静", "丽", "强", "磊", "军", "洋", "勇", "艳", "杰", "涛", "明"]
+LAST_NAMES = [
+    "伟",
+    "芳",
+    "娜",
+    "敏",
+    "静",
+    "丽",
+    "强",
+    "磊",
+    "军",
+    "洋",
+    "勇",
+    "艳",
+    "杰",
+    "涛",
+    "明",
+]
 
 # 订单状态
 ORDER_STATUSES = ["已完成", "已发货", "处理中", "已取消"]
@@ -79,10 +96,12 @@ def init_demo_database() -> str:
         _insert_orders(cursor)
 
         conn.commit()
-        logger.info("Demo database created successfully",
-                   products=len(PRODUCTS),
-                   customers=100,
-                   path=str(DEMO_DB_PATH))
+        logger.info(
+            "Demo database created successfully",
+            products=len(PRODUCTS),
+            customers=100,
+            path=str(DEMO_DB_PATH),
+        )
 
     except Exception as e:
         conn.rollback()
@@ -158,8 +177,7 @@ def _create_tables(cursor: sqlite3.Cursor) -> None:
 def _insert_products(cursor: sqlite3.Cursor) -> None:
     """插入产品数据"""
     cursor.executemany(
-        "INSERT INTO products (name, category, price, cost) VALUES (?, ?, ?, ?)",
-        PRODUCTS
+        "INSERT INTO products (name, category, price, cost) VALUES (?, ?, ?, ?)", PRODUCTS
     )
 
 
@@ -171,14 +189,13 @@ def _insert_customers(cursor: sqlite3.Cursor) -> None:
     for i in range(100):
         name = random.choice(FIRST_NAMES) + random.choice(LAST_NAMES)
         region = random.choice(REGIONS)
-        email = f"user{i+1}@example.com"
+        email = f"user{i + 1}@example.com"
         # 随机注册日期（过去一年内）
         registered_at = base_date + timedelta(days=random.randint(0, 365))
         customers.append((name, region, email, registered_at.strftime("%Y-%m-%d")))
 
     cursor.executemany(
-        "INSERT INTO customers (name, region, email, registered_at) VALUES (?, ?, ?, ?)",
-        customers
+        "INSERT INTO customers (name, region, email, registered_at) VALUES (?, ?, ?, ?)", customers
     )
 
 
@@ -228,20 +245,22 @@ def _insert_sales(cursor: sqlite3.Cursor) -> None:
             # 随机地区
             region = random.choice(REGIONS)
 
-            sales.append((
-                sale_date.strftime("%Y-%m-%d"),
-                product_id,
-                customer_id,
-                quantity,
-                unit_price,
-                amount,
-                region
-            ))
+            sales.append(
+                (
+                    sale_date.strftime("%Y-%m-%d"),
+                    product_id,
+                    customer_id,
+                    quantity,
+                    unit_price,
+                    amount,
+                    region,
+                )
+            )
 
     cursor.executemany(
         """INSERT INTO sales (date, product_id, customer_id, quantity, unit_price, amount, region)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        sales
+        sales,
     )
 
 
@@ -253,7 +272,7 @@ def _insert_orders(cursor: sqlite3.Cursor) -> None:
     for i in range(200):
         # 随机日期（过去6个月）
         order_date = today - timedelta(days=random.randint(0, 180))
-        order_no = f"ORD{order_date.strftime('%Y%m%d')}{i+1:04d}"
+        order_no = f"ORD{order_date.strftime('%Y%m%d')}{i + 1:04d}"
         customer_id = random.randint(1, 100)
         total_amount = random.uniform(1000, 50000)
 
@@ -268,18 +287,14 @@ def _insert_orders(cursor: sqlite3.Cursor) -> None:
         else:
             status = "已取消"
 
-        orders.append((
-            order_no,
-            order_date.strftime("%Y-%m-%d"),
-            customer_id,
-            round(total_amount, 2),
-            status
-        ))
+        orders.append(
+            (order_no, order_date.strftime("%Y-%m-%d"), customer_id, round(total_amount, 2), status)
+        )
 
     cursor.executemany(
         """INSERT INTO orders (order_no, order_date, customer_id, total_amount, status)
            VALUES (?, ?, ?, ?, ?)""",
-        orders
+        orders,
     )
 
 

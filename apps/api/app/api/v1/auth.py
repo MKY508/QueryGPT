@@ -1,17 +1,18 @@
 """认证 API"""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.core import create_access_token, create_refresh_token, get_password_hash, verify_password
 from app.core.config import settings
 from app.core.demo_db import get_demo_db_path
 from app.db import get_db
 from app.db.tables import Connection, User
 from app.models import APIResponse, Token, UserCreate, UserLogin, UserResponse
-from app.api.deps import get_current_user
 
 router = APIRouter()
 

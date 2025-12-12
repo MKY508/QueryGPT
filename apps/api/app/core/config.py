@@ -2,6 +2,7 @@
 应用配置管理
 使用 Pydantic Settings 管理环境变量和配置
 """
+
 from functools import lru_cache
 from typing import Literal
 
@@ -38,9 +39,12 @@ class Settings(BaseSettings):
     def validate_database_url(cls, v: str) -> str:
         """验证数据库 URL 格式"""
         valid_prefixes = (
-            "postgresql://", "postgresql+asyncpg://",
-            "sqlite://", "sqlite+aiosqlite://",
-            "mysql://", "mysql+aiomysql://",
+            "postgresql://",
+            "postgresql+asyncpg://",
+            "sqlite://",
+            "sqlite+aiosqlite://",
+            "mysql://",
+            "mysql+aiomysql://",
         )
         if not any(v.startswith(p) for p in valid_prefixes):
             raise ValueError(f"DATABASE_URL 必须以以下前缀开头: {valid_prefixes}")
@@ -61,9 +65,9 @@ class Settings(BaseSettings):
     # ===== CORS 配置 =====
     CORS_ORIGINS_STR: str = "http://localhost:3000,http://127.0.0.1:3000"
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
-    def CORS_ORIGINS(self) -> list[str]:
+    def cors_origins(self) -> list[str]:
         """解析 CORS origins 为列表"""
         return [origin.strip() for origin in self.CORS_ORIGINS_STR.split(",") if origin.strip()]
 

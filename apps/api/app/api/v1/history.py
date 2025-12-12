@@ -1,4 +1,5 @@
 """历史记录 API"""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -40,7 +41,7 @@ async def list_conversations(
     )
 
     if favorites:
-        query = query.where(Conversation.is_favorite == True)
+        query = query.where(Conversation.is_favorite)
 
     if q:
         query = query.where(Conversation.title.ilike(f"%{q}%"))

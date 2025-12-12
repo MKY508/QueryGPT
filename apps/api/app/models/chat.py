@@ -1,4 +1,5 @@
 """聊天相关模型"""
+
 from enum import Enum
 from typing import Any, Literal
 from uuid import UUID
@@ -38,6 +39,7 @@ class SSEEvent(BaseModel):
     def to_sse(self) -> dict:
         """转换为 SSE 格式 (返回字典，由 sse_starlette 自动序列化)"""
         import json
+
         # sse_starlette 期望 {"data": ...} 格式
         # data 的值会被自动序列化为 JSON
         payload = {"type": self.type.value, "data": self.data}

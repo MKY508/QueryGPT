@@ -2,11 +2,12 @@
 gptme 执行引擎封装
 使用 LiteLLM 进行 AI 调用，支持 SQL 执行和结果捕获
 """
-import json
+
 import os
 import re
 import time
-from typing import Any, AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable
+from typing import Any
 
 import structlog
 
@@ -214,7 +215,7 @@ class GptmeEngine:
         return f"""
 数据库连接信息:
 - 类型: {driver}
-- 数据库: {db_config.get('database', '')}
+- 数据库: {db_config.get("database", "")}
 
 数据库表结构:
 {schema_info}
@@ -234,17 +235,13 @@ class GptmeEngine:
 
     def _extract_sql(self, content: str) -> str | None:
         """从内容中提取 SQL 代码"""
-        sql_match = re.search(r'```sql\s*([\s\S]*?)```', content, re.IGNORECASE)
+        sql_match = re.search(r"```sql\s*([\s\S]*?)```", content, re.IGNORECASE)
         if sql_match:
             return sql_match.group(1).strip()
 
-        select_match = re.search(
-            r'(SELECT\s+[\s\S]*?(?:;|$))',
-            content,
-            re.IGNORECASE
-        )
+        select_match = re.search(r"(SELECT\s+[\s\S]*?(?:;|$))", content, re.IGNORECASE)
         if select_match:
-            return select_match.group(1).strip().rstrip(';') + ';'
+            return select_match.group(1).strip().rstrip(";") + ";"
 
         return None
 

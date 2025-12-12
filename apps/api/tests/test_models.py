@@ -1,4 +1,5 @@
 """Model configuration API tests"""
+
 import pytest
 from httpx import AsyncClient
 

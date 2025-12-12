@@ -1,4 +1,5 @@
 """API v1 路由"""
+
 from fastapi import APIRouter
 
 from app.api.v1 import auth, chat, connections, history, models, user_config

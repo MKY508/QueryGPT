@@ -1,4 +1,5 @@
 """数据库连接管理 API"""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -40,9 +41,7 @@ async def create_connection(
     # 如果设为默认，取消其他默认
     if conn_in.is_default:
         result = await db.execute(
-            select(Connection).where(
-                Connection.user_id == current_user.id, Connection.is_default == True
-            )
+            select(Connection).where(Connection.user_id == current_user.id, Connection.is_default)
         )
         for c in result.scalars():
             c.is_default = False
@@ -137,9 +136,7 @@ async def update_connection(
     # 如果设为默认，取消其他默认
     if conn_in.is_default and not connection.is_default:
         other_result = await db.execute(
-            select(Connection).where(
-                Connection.user_id == current_user.id, Connection.is_default == True
-            )
+            select(Connection).where(Connection.user_id == current_user.id, Connection.is_default)
         )
         for c in other_result.scalars():
             c.is_default = False

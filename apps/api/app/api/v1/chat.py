@@ -1,12 +1,13 @@
 """聊天 API"""
+
 import asyncio
-from typing import AsyncGenerator
-from uuid import UUID, uuid4
+from collections.abc import AsyncGenerator
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
-from sse_starlette.sse import EventSourceResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import get_current_user
 from app.core import decode_token

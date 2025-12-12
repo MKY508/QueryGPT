@@ -1,4 +1,5 @@
 """数据库表定义"""
+
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -24,9 +25,15 @@ class User(Base, UUIDMixin, TimestampMixin):
     settings: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     # 关系
-    connections: Mapped[list["Connection"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    models: Mapped[list["Model"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    conversations: Mapped[list["Conversation"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    connections: Mapped[list["Connection"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    models: Mapped[list["Model"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    conversations: Mapped[list["Conversation"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Connection(Base, UUIDMixin, TimestampMixin):
@@ -34,7 +41,9 @@ class Connection(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "connections"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     driver: Mapped[str] = mapped_column(String(20), nullable=False)  # mysql, postgresql, sqlite
     host: Mapped[str | None] = mapped_column(String(255))
@@ -54,7 +63,9 @@ class Model(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "models"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     provider: Mapped[str] = mapped_column(String(50), nullable=False)  # openai, anthropic, ollama
     model_id: Mapped[str] = mapped_column(String(100), nullable=False)  # gpt-4o, claude-3-5-sonnet
@@ -73,17 +84,30 @@ class Conversation(Base, UUIDMixin, TimestampMixin):
 
     __tablename__ = "conversations"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    connection_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL"))
-    model_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL"))
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    connection_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL")
+    )
+    model_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
+    )
     title: Mapped[str | None] = mapped_column(String(200))
-    status: Mapped[str] = mapped_column(String(20), default="active", index=True)  # active, completed, error
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", index=True
+    )  # active, completed, error
     is_favorite: Mapped[bool] = mapped_column(Boolean, default=False)
     extra_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
     # 关系
     user: Mapped["User"] = relationship(back_populates="conversations")
-    messages: Mapped[list["Message"]] = relationship(back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at"
+    )
 
 
 class Message(Base, UUIDMixin):
@@ -91,7 +115,12 @@ class Message(Base, UUIDMixin):
 
     __tablename__ = "messages"
 
-    conversation_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # user, assistant, system
     content: Mapped[str] = mapped_column(Text, nullable=False)
     extra_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -106,7 +135,9 @@ class RefreshToken(Base, UUIDMixin):
 
     __tablename__ = "refresh_tokens"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     token_hash: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

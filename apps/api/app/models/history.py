@@ -1,4 +1,5 @@
 """历史记录相关模型"""
+
 from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
@@ -101,13 +102,15 @@ class ConversationResponse(BaseModel):
             # ORM 对象 - 手动转换每个消息
             messages = []
             for msg in data.messages:
-                messages.append({
-                    "id": msg.id,
-                    "role": msg.role,
-                    "content": msg.content,
-                    "metadata": msg.extra_data,
-                    "created_at": msg.created_at,
-                })
+                messages.append(
+                    {
+                        "id": msg.id,
+                        "role": msg.role,
+                        "content": msg.content,
+                        "metadata": msg.extra_data,
+                        "created_at": msg.created_at,
+                    }
+                )
             return {
                 "id": data.id,
                 "title": data.title,

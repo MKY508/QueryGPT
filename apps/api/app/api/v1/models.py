@@ -1,4 +1,5 @@
 """模型配置管理 API"""
+
 import time
 from uuid import UUID
 
@@ -38,12 +39,9 @@ async def create_model(
     """添加模型配置"""
     # 如果设为默认，取消其他默认
     if model_in.is_default:
-        await db.execute(
-            select(Model)
-            .where(Model.user_id == current_user.id, Model.is_default == True)
-        )
+        await db.execute(select(Model).where(Model.user_id == current_user.id, Model.is_default))
         result = await db.execute(
-            select(Model).where(Model.user_id == current_user.id, Model.is_default == True)
+            select(Model).where(Model.user_id == current_user.id, Model.is_default)
         )
         for m in result.scalars():
             m.is_default = False
@@ -89,7 +87,7 @@ async def update_model(
     # 如果设为默认，取消其他默认
     if model_in.is_default and not model.is_default:
         other_result = await db.execute(
-            select(Model).where(Model.user_id == current_user.id, Model.is_default == True)
+            select(Model).where(Model.user_id == current_user.id, Model.is_default)
         )
         for m in other_result.scalars():
             m.is_default = False

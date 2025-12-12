@@ -1,4 +1,5 @@
 """通用响应模型"""
+
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field

@@ -1,4 +1,5 @@
 """配置相关模型"""
+
 from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID

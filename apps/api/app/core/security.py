@@ -4,7 +4,8 @@
 - JWT Token 生成和验证
 - 数据加密
 """
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -37,11 +38,9 @@ def create_access_token(
 ) -> str:
     """创建访问令牌"""
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        expire = datetime.now(UTC) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode = {
         "sub": str(subject),
@@ -65,11 +64,9 @@ def create_refresh_token(
 ) -> str:
     """创建刷新令牌"""
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS
-        )
+        expire = datetime.now(UTC) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
 
     to_encode = {
         "sub": str(subject),
@@ -115,6 +112,7 @@ class Encryptor:
             try:
                 # 使用 key 的 SHA256 哈希作为 Fernet key（需要 base64 编码的 32 字节）
                 import hashlib
+
                 key_hash = hashlib.sha256(key.encode()).digest()
                 fernet_key = base64.urlsafe_b64encode(key_hash)
                 self._fernet = Fernet(fernet_key)

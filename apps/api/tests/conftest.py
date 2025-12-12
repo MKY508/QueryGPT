@@ -1,4 +1,5 @@
 """Pytest fixtures for API tests"""
+
 import asyncio
 from collections.abc import AsyncGenerator, Generator
 
@@ -9,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.security import create_access_token
+from app.db import get_db
 from app.db.tables import Base
 from app.main import app
-from app.db import get_db
-from app.core.security import create_access_token
 
 # 测试数据库 URL
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -45,9 +46,7 @@ async def async_engine():
 @pytest.fixture(scope="function")
 async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
     """Create database session for each test"""
-    async_session = sessionmaker(
-        async_engine, class_=AsyncSession, expire_on_commit=False
-    )
+    async_session = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
         yield session
 
@@ -55,15 +54,13 @@ async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture(scope="function")
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create test client with overridden database"""
+
     async def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()

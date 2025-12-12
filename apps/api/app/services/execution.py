@@ -2,7 +2,9 @@
 AI 执行服务
 使用 gptme 作为执行引擎
 """
-from typing import Any, AsyncGenerator, Callable
+
+from collections.abc import AsyncGenerator, Callable
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -59,7 +61,7 @@ class ExecutionService:
             result = await self.db.execute(
                 select(Model).where(
                     Model.user_id == self.user.id,
-                    Model.is_default == True,
+                    Model.is_default,
                 )
             )
             model = result.scalar_one_or_none()
@@ -101,7 +103,7 @@ class ExecutionService:
             result = await self.db.execute(
                 select(Connection).where(
                     Connection.user_id == self.user.id,
-                    Connection.is_default == True,
+                    Connection.is_default,
                 )
             )
             connection = result.scalar_one_or_none()
@@ -138,7 +140,11 @@ class ExecutionService:
 
             logger.info("Getting model config...")
             model_config = await self._get_model_config()
-            logger.info("Model config loaded", model=model_config.get("model"), base_url=model_config.get("base_url"))
+            logger.info(
+                "Model config loaded",
+                model=model_config.get("model"),
+                base_url=model_config.get("base_url"),
+            )
 
             logger.info("Getting connection config...")
             db_config = await self._get_connection_config()
@@ -189,9 +195,9 @@ Follow these rules:
         if db_config:
             db_info = f"""
 数据库连接信息:
-- 类型: {db_config['driver']}
-- 主机: {db_config['host']}:{db_config['port']}
-- 数据库: {db_config['database']}
+- 类型: {db_config["driver"]}
+- 主机: {db_config["host"]}:{db_config["port"]}
+- 数据库: {db_config["database"]}
 """
             base_prompt += db_info
 

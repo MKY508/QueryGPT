@@ -1,4 +1,5 @@
 """API 依赖注入"""
+
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
