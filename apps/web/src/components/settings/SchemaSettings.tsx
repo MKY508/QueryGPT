@@ -181,7 +181,7 @@ export function SchemaSettings({ connectionId }: SchemaSettingsProps) {
   }
 
   return (
-    <div className="h-[600px] flex flex-col">
+    <div className="min-h-[600px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-foreground">表关系配置</h2>
@@ -244,7 +244,7 @@ export function SchemaSettings({ connectionId }: SchemaSettingsProps) {
       )}
 
       {/* React Flow 画布 */}
-      <div className="flex-1 border border-border rounded-lg overflow-hidden">
+      <div className="flex-1 min-h-[400px] border border-border rounded-lg overflow-hidden bg-muted/20">
         <ReactFlow
           nodes={nodes}
           edges={edges}
