@@ -72,8 +72,14 @@ v2 是完全重构版本，前后端分离架构：
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/images/settings.png" width="100%" alt="设置界面"/>
-      <b>设置</b>
+      <img src="docs/images/schema.png" width="100%" alt="表关系配置"/>
+      <b>表关系配置</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/images/semantic.png" width="100%" alt="语义层配置"/>
+      <b>语义层配置</b>
     </td>
   </tr>
 </table>
