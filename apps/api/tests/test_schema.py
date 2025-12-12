@@ -330,7 +330,7 @@ async def test_delete_layout(client: AsyncClient):
         headers={"Authorization": f"Bearer {token}"},
     )
     layouts = list_response.json()["data"]
-    assert not any(l["id"] == layout_id for l in layouts)
+    assert not any(layout["id"] == layout_id for layout in layouts)
 
 
 @pytest.mark.asyncio

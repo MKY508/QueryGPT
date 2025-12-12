@@ -2,9 +2,6 @@
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db.tables import Conversation, Message
 
 
 async def get_auth_token(client: AsyncClient) -> str:
