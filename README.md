@@ -11,10 +11,12 @@
 
   > 📢 **需要旧版？** 请切换到 [v1 分支](https://github.com/MKY508/QueryGPT/tree/v1)
 
-  ### 一键部署
+  ### 一键部署 (免费)
 
-  [![Deploy Frontend to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FMKY508%2FQueryGPT&root-directory=apps/web&env=NEXT_PUBLIC_API_URL&envDescription=Backend%20API%20URL&envLink=https%3A%2F%2Fgithub.com%2FMKY508%2FQueryGPT%23%E9%85%8D%E7%BD%AE&project-name=querygpt-web&repository-name=querygpt)
-  [![Deploy Backend to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
+  [![Deploy Backend](https://img.shields.io/badge/1.%20部署后端-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
+  [![Deploy Frontend](https://img.shields.io/badge/2.%20部署前端-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FMKY508%2FQueryGPT&root-directory=apps/web&env=NEXT_PUBLIC_API_URL&envDescription=填入上一步获取的后端URL&project-name=querygpt-web)
+
+  <sub>👆 先点左边部署后端，获取 URL 后再点右边部署前端</sub>
 
 </div>
 
@@ -91,7 +93,38 @@ v2 是完全重构版本，前后端分离架构：
 
 ---
 
-## 快速开始
+## 云端部署 (推荐)
+
+无需本地环境，3 分钟完成部署：
+
+### Step 1: 部署后端 (Render)
+
+1. 点击上方 **"1. 部署后端"** 按钮
+2. 使用 GitHub 登录 Render
+3. 点击 **"Create New Resources"**
+4. 等待部署完成 (约 2-3 分钟)
+5. 复制生成的 URL，如 `https://querygpt-api-xxxx.onrender.com`
+
+### Step 2: 部署前端 (Vercel)
+
+1. 点击上方 **"2. 部署前端"** 按钮
+2. 使用 GitHub 登录 Vercel
+3. 在 `NEXT_PUBLIC_API_URL` 填入 Step 1 的后端 URL
+4. 点击 **"Deploy"**
+5. 部署完成后访问生成的前端 URL
+
+### Step 3: 配置 AI 模型
+
+1. 访问前端 URL，注册账号
+2. 进入 **设置 → 模型配置**
+3. 添加 OpenAI/Anthropic/DeepSeek 等 API Key
+4. 开始使用！
+
+> 💡 **免费额度**: Render 750h/月，Vercel 无限制
+
+---
+
+## 本地开发
 
 需要 Python 3.11+、Node.js 18+
 
