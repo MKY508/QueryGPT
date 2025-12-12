@@ -24,6 +24,7 @@ from app.models.config import (
     ConnectionTest,
     ModelCreate,
     ModelResponse,
+    ModelTest,
     UserConfig,
 )
 from app.models.history import (
@@ -54,6 +55,7 @@ __all__ = [
     # Config
     "ModelCreate",
     "ModelResponse",
+    "ModelTest",
     "ConnectionCreate",
     "ConnectionResponse",
     "ConnectionTest",

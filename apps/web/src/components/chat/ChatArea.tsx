@@ -11,6 +11,7 @@ import { SqlHighlight } from "./SqlHighlight";
 import { ChartDisplay } from "./ChartDisplay";
 import { DataTable } from "./DataTable";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Connection {
   id: string;
@@ -38,6 +39,7 @@ const STORAGE_KEY_CONNECTION = "querygpt-selected-connection";
 const STORAGE_KEY_MODEL = "querygpt-selected-model";
 
 export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
+  const router = useRouter();
   const [input, setInput] = useState("");
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -46,6 +48,8 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const prevIsLoadingRef = useRef(false);
+  const connectionDropdownRef = useRef<HTMLDivElement>(null);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { messages, isLoading, sendMessage, stopGeneration } = useChatStore();
 
@@ -56,6 +60,21 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
     if (savedConnection) setSelectedConnectionId(savedConnection);
     if (savedModel) setSelectedModelId(savedModel);
     setIsInitialized(true);
+  }, []);
+
+  // 点击外部关闭下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (connectionDropdownRef.current && !connectionDropdownRef.current.contains(event.target as Node)) {
+        setShowConnectionDropdown(false);
+      }
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target as Node)) {
+        setShowModelDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // 当对话完成时刷新历史记录列表
@@ -163,7 +182,7 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
 
         <div className="flex items-center gap-3">
           {/* 数据库连接选择器 */}
-          <div className="relative">
+          <div className="relative" ref={connectionDropdownRef}>
             <button
               onClick={() => {
                 setShowConnectionDropdown(!showConnectionDropdown);
@@ -207,12 +226,12 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
                 ) : (
                   <div className="px-3 py-4 text-center text-sm text-slate-400">
                     <p>暂无数据库连接</p>
-                    <Link
-                      href="/settings"
-                      className="text-blue-500 hover:underline mt-1 inline-block"
+                    <span
+                      onClick={() => router.push("/settings")}
+                      className="text-blue-500 hover:underline mt-1 inline-block cursor-pointer"
                     >
                       去添加
-                    </Link>
+                    </span>
                   </div>
                 )}
               </div>
@@ -220,7 +239,7 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
           </div>
 
           {/* 模型选择器 */}
-          <div className="relative">
+          <div className="relative" ref={modelDropdownRef}>
             <button
               onClick={() => {
                 setShowModelDropdown(!showModelDropdown);
@@ -264,12 +283,12 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
                 ) : (
                   <div className="px-3 py-4 text-center text-sm text-slate-400">
                     <p>暂无模型配置</p>
-                    <Link
-                      href="/settings"
-                      className="text-blue-500 hover:underline mt-1 inline-block"
+                    <span
+                      onClick={() => router.push("/settings")}
+                      className="text-blue-500 hover:underline mt-1 inline-block cursor-pointer"
                     >
                       去添加
-                    </Link>
+                    </span>
                   </div>
                 )}
               </div>
@@ -286,16 +305,6 @@ export function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
         </div>
       </header>
 
-      {/* 点击外部关闭下拉菜单 */}
-      {(showConnectionDropdown || showModelDropdown) && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => {
-            setShowConnectionDropdown(false);
-            setShowModelDropdown(false);
-          }}
-        />
-      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
