@@ -1,0 +1,27 @@
+# Render Blueprint - 一键部署后端
+# https://render.com/docs/blueprint-spec
+
+services:
+  # 后端 API 服务
+  - type: web
+    name: querygpt-api
+    runtime: python
+    region: singapore  # 亚洲区域，可改为 oregon 等
+    plan: free
+    rootDir: apps/api
+    buildCommand: pip install -e ".[dev]"
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./data/querygpt.db
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: "3.11"
+    disk:
+      name: data
+      mountPath: /opt/render/project/src/apps/api/data
+      sizeGB: 1

@@ -39,19 +39,19 @@ jobs:
         run: mypy app --ignore-missing-imports
         continue-on-error: true
 
-      - name: Run tests
-        run: pytest tests/ -v --cov=app --cov-report=xml
+      - name: Run tests with coverage
+        run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=term --cov-fail-under=60
         env:
-          DATABASE_URL: sqlite+aiosqlite:///./test.db
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
           JWT_SECRET_KEY: test-secret-key-for-ci
           ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz
 
-      - name: Upload coverage
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           file: apps/api/coverage.xml
           flags: backend
-        continue-on-error: true
+          fail_ci_if_error: false
 
   # 前端测试
   frontend:

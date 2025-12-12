@@ -11,6 +11,11 @@
 
   > 📢 **需要旧版？** 请切换到 [v1 分支](https://github.com/MKY508/QueryGPT/tree/v1)
 
+  ### 一键部署
+
+  [![Deploy Frontend to Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FMKY508%2FQueryGPT&root-directory=apps/web&env=NEXT_PUBLIC_API_URL&envDescription=Backend%20API%20URL&envLink=https%3A%2F%2Fgithub.com%2FMKY508%2FQueryGPT%23%E9%85%8D%E7%BD%AE&project-name=querygpt-web&repository-name=querygpt)
+  [![Deploy Backend to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/MKY508/QueryGPT)
+
 </div>
 
 ---
