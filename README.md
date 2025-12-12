@@ -118,16 +118,9 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ---
 
-## v1 vs v2
+## 旧版
 
-| | v1 | v2 |
-|---|---|---|
-| 架构 | Flask 单体 | FastAPI + Next.js 分离 |
-| 部署 | 一键 Render | Render + Vercel |
-| 认证 | 无 | JWT 多用户 |
-| 响应 | 同步 | SSE 流式 |
-
-> 如果只需要简单使用，推荐 [v1 分支](https://github.com/MKY508/QueryGPT/tree/v1)（单容器一键部署）
+v1 是旧版单体架构，已停止维护，仅供参考：[v1 分支](https://github.com/MKY508/QueryGPT/tree/v1)
 
 ---
 
