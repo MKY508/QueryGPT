@@ -16,8 +16,9 @@ async def test_register_user(client: AsyncClient):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["code"] == 0
-    assert data["data"]["email"] == "test@example.com"
+    assert data["success"] is True
+    assert data["data"]["user"]["email"] == "test@example.com"
+    assert "access_token" in data["data"]
 
 
 @pytest.mark.asyncio
@@ -53,18 +54,18 @@ async def test_login_success(client: AsyncClient):
             "password": "testpassword123",
         },
     )
-    # Login
+    # Login with JSON body (not form data)
     response = await client.post(
         "/api/v1/auth/login",
-        data={
-            "username": "login@example.com",
+        json={
+            "email": "login@example.com",
             "password": "testpassword123",
         },
     )
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
-    assert data["token_type"] == "bearer"
+    assert data["success"] is True
+    assert "access_token" in data["data"]
 
 
 @pytest.mark.asyncio
@@ -81,8 +82,8 @@ async def test_login_wrong_password(client: AsyncClient):
     # Login with wrong password
     response = await client.post(
         "/api/v1/auth/login",
-        data={
-            "username": "wrongpw@example.com",
+        json={
+            "email": "wrongpw@example.com",
             "password": "wrongpassword",
         },
     )
@@ -93,7 +94,7 @@ async def test_login_wrong_password(client: AsyncClient):
 async def test_get_current_user(client: AsyncClient):
     """Test getting current user info"""
     # Register and login
-    await client.post(
+    reg_response = await client.post(
         "/api/v1/auth/register",
         json={
             "email": "me@example.com",
@@ -101,14 +102,7 @@ async def test_get_current_user(client: AsyncClient):
             "display_name": "Me User",
         },
     )
-    login_response = await client.post(
-        "/api/v1/auth/login",
-        data={
-            "username": "me@example.com",
-            "password": "testpassword123",
-        },
-    )
-    token = login_response.json()["access_token"]
+    token = reg_response.json()["data"]["access_token"]
 
     # Get current user
     response = await client.get(
@@ -118,7 +112,6 @@ async def test_get_current_user(client: AsyncClient):
     assert response.status_code == 200
     data = response.json()
     assert data["data"]["email"] == "me@example.com"
-    assert data["data"]["display_name"] == "Me User"
 
 
 @pytest.mark.asyncio

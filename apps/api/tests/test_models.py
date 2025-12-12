@@ -3,37 +3,33 @@ import pytest
 from httpx import AsyncClient
 
 
-async def get_auth_token(client: AsyncClient) -> str:
+async def get_auth_token(client: AsyncClient, email: str = "model@example.com") -> str:
     """Helper to register and get auth token"""
-    await client.post(
-        "/api/v1/auth/register",
-        json={"email": "model@example.com", "password": "testpassword123"},
-    )
     response = await client.post(
-        "/api/v1/auth/login",
-        data={"username": "model@example.com", "password": "testpassword123"},
+        "/api/v1/auth/register",
+        json={"email": email, "password": "testpassword123"},
     )
-    return response.json()["access_token"]
+    return response.json()["data"]["access_token"]
 
 
 @pytest.mark.asyncio
 async def test_list_models_empty(client: AsyncClient):
     """Test listing models when none exist"""
-    token = await get_auth_token(client)
+    token = await get_auth_token(client, "list@example.com")
     response = await client.get(
         "/api/v1/config/models",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["code"] == 0
+    assert data["success"] is True
     assert data["data"] == []
 
 
 @pytest.mark.asyncio
 async def test_create_model(client: AsyncClient):
     """Test creating a model configuration"""
-    token = await get_auth_token(client)
+    token = await get_auth_token(client, "create@example.com")
     response = await client.post(
         "/api/v1/config/models",
         headers={"Authorization": f"Bearer {token}"},
@@ -47,7 +43,7 @@ async def test_create_model(client: AsyncClient):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["code"] == 0
+    assert data["success"] is True
     assert data["data"]["name"] == "GPT-4"
     assert data["data"]["provider"] == "openai"
     assert data["data"]["is_default"] is True
@@ -56,7 +52,7 @@ async def test_create_model(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_update_model(client: AsyncClient):
     """Test updating a model configuration"""
-    token = await get_auth_token(client)
+    token = await get_auth_token(client, "update@example.com")
     # Create model
     create_response = await client.post(
         "/api/v1/config/models",
@@ -89,7 +85,7 @@ async def test_update_model(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_delete_model(client: AsyncClient):
     """Test deleting a model configuration"""
-    token = await get_auth_token(client)
+    token = await get_auth_token(client, "delete@example.com")
     # Create model
     create_response = await client.post(
         "/api/v1/config/models",
