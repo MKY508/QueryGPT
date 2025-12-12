@@ -338,14 +338,19 @@ plt.rcParams['axes.unicode_minus'] = False
 
     def _execute_python_sync(self, code: str) -> tuple[str | None, list[str]]:
         """同步执行 Python 代码"""
+        import traceback
+
         import matplotlib.pyplot as plt
 
         ipython = self._get_ipython()
 
-        # 捕获输出
+        # 捕获 stdout 和 stderr
         stdout_capture = io.StringIO()
+        stderr_capture = io.StringIO()
         old_stdout = sys.stdout
+        old_stderr = sys.stderr
         sys.stdout = stdout_capture
+        sys.stderr = stderr_capture
 
         images = []
 
@@ -355,6 +360,12 @@ plt.rcParams['axes.unicode_minus'] = False
 
             # 获取输出
             stdout_output = stdout_capture.getvalue()
+            stderr_output = stderr_capture.getvalue()
+
+            # 合并输出
+            output = stdout_output
+            if stderr_output:
+                output += f"\n[stderr]: {stderr_output}"
 
             # 检查是否有 matplotlib 图表
             if plt.get_fignums():
@@ -367,14 +378,28 @@ plt.rcParams['axes.unicode_minus'] = False
                     images.append(img_base64)
                 plt.close("all")
 
-            # 如果有执行错误，添加到输出
+            # 如果有执行错误，添加详细信息
             if result.error_in_exec:
-                stdout_output += f"\n错误: {result.error_in_exec}"
+                error_msg = "".join(
+                    traceback.format_exception(
+                        type(result.error_in_exec),
+                        result.error_in_exec,
+                        result.error_in_exec.__traceback__,
+                    )
+                )
+                output += f"\n执行错误:\n{error_msg}"
+            elif result.error_before_exec:
+                output += f"\n语法错误: {result.error_before_exec}"
 
-            return stdout_output if stdout_output else None, images
+            return output if output else None, images
+
+        except Exception:
+            error_msg = traceback.format_exc()
+            return f"Python 执行异常:\n{error_msg}", []
 
         finally:
             sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
     def _build_chart_from_config(self, config: dict, data: list[dict]) -> dict | None:
         """根据 AI 提供的配置构建图表数据
