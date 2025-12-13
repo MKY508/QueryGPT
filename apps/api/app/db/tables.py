@@ -37,6 +37,9 @@ class User(Base, UUIDMixin, TimestampMixin):
     semantic_terms: Mapped[list["SemanticTerm"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    prompts: Mapped[list["Prompt"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Connection(Base, UUIDMixin, TimestampMixin):
@@ -195,6 +198,29 @@ class TableRelationship(Base, UUIDMixin, TimestampMixin):
     # 关系
     user: Mapped["User"] = relationship()
     connection: Mapped["Connection"] = relationship()
+
+
+class Prompt(Base, UUIDMixin, TimestampMixin):
+    """提示词模板表 - 用户自定义 System Prompt"""
+
+    __tablename__ = "prompts"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # 是否为当前激活版本
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否为用户默认提示词
+    parent_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("prompts.id", ondelete="SET NULL")
+    )
+
+    # 关系
+    user: Mapped["User"] = relationship(back_populates="prompts")
+    parent: Mapped["Prompt | None"] = relationship(remote_side="Prompt.id")
 
 
 # SchemaLayout 已移至独立的 SQLite 元数据库 (app/db/metadata.py)

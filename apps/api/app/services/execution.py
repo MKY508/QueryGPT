@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import encryptor
 from app.core.config import settings
-from app.db.tables import Connection, Message, Model, SemanticTerm, TableRelationship, User
+from app.db.tables import Connection, Message, Model, Prompt, SemanticTerm, TableRelationship, User
 from app.models import (
     RelationshipContext,
     SemanticContext,
@@ -181,6 +181,18 @@ class ExecutionService:
             relationships=[TableRelationshipResponse.model_validate(r) for r in relationships]
         )
 
+    async def _get_user_prompt(self) -> str | None:
+        """获取用户自定义提示词"""
+        result = await self.db.execute(
+            select(Prompt).where(
+                Prompt.user_id == self.user.id,
+                Prompt.is_default.is_(True),
+                Prompt.is_active.is_(True),
+            )
+        )
+        prompt = result.scalar_one_or_none()
+        return prompt.content if prompt else None
+
     async def _get_conversation_history(
         self, conversation_id: UUID, limit: int = 10
     ) -> list[dict[str, str]]:
@@ -240,12 +252,17 @@ class ExecutionService:
             relationship_context = await self._get_relationship_context()
             logger.info(f"Relationships count: {len(relationship_context.relationships)}")
 
+            # 获取用户自定义提示词
+            logger.info("Getting user prompt...")
+            user_prompt = await self._get_user_prompt()
+            logger.info(f"User prompt: {'custom' if user_prompt else 'default'}")
+
             # 加载对话历史（不包括当前查询，因为当前查询还未保存）
             logger.info("Getting conversation history...")
             history = await self._get_conversation_history(conversation_id, limit=10)
 
             system_prompt = self._build_system_prompt(
-                db_config, semantic_context, relationship_context
+                db_config, semantic_context, relationship_context, user_prompt
             )
 
             engine = GptmeEngine(
@@ -273,9 +290,13 @@ class ExecutionService:
         db_config: dict[str, Any] | None,
         semantic_context: SemanticContext | None = None,
         relationship_context: RelationshipContext | None = None,
+        user_prompt: str | None = None,
     ) -> str:
         """构建系统提示"""
-        if self.language == "zh":
+        # 如果用户有自定义提示词，使用自定义提示词作为基础
+        if user_prompt:
+            base_prompt = user_prompt
+        elif self.language == "zh":
             base_prompt = """你是 QueryGPT 数据分析助手，负责帮助用户查询和分析数据库数据。
 
 ## 思考过程

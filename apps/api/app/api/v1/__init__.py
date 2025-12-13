@@ -9,6 +9,7 @@ from app.api.v1 import (
     export_import,
     history,
     models,
+    prompts,
     schema,
     semantic,
     user_config,
@@ -26,3 +27,4 @@ api_router.include_router(export_import.router, prefix="/config", tags=["配置�
 api_router.include_router(semantic.router, prefix="/config", tags=["语义层"])
 api_router.include_router(schema.router, tags=["表关系"])
 api_router.include_router(user_config.router, tags=["用户配置"])
+api_router.include_router(prompts.router, prefix="/prompts", tags=["提示词"])

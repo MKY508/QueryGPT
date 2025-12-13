@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen, GitBranch, Info } from "lucide-react";
+import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen, GitBranch, Info, MessageSquare } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/lib/stores/auth";
 import { api } from "@/lib/api/client";
@@ -11,6 +11,7 @@ import { ConnectionSettings } from "@/components/settings/ConnectionSettings";
 import { PreferencesSettings } from "@/components/settings/PreferencesSettings";
 import { SemanticSettings } from "@/components/settings/SemanticSettings";
 import { SchemaSettings } from "@/components/settings/SchemaSettings";
+import { PromptSettings } from "@/components/settings/PromptSettings";
 import { cn } from "@/lib/utils";
 
 interface Connection {
@@ -19,7 +20,7 @@ interface Connection {
   is_default: boolean;
 }
 
-type TabType = "models" | "connections" | "schema" | "semantic" | "preferences";
+type TabType = "models" | "connections" | "schema" | "semantic" | "prompts" | "preferences";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("models");
@@ -67,6 +68,7 @@ export default function SettingsPage() {
     { id: "connections" as TabType, label: "数据库连接", icon: Database },
     { id: "schema" as TabType, label: "表关系", icon: GitBranch },
     { id: "semantic" as TabType, label: "语义层", icon: BookOpen },
+    { id: "prompts" as TabType, label: "提示词", icon: MessageSquare },
     { id: "preferences" as TabType, label: "偏好设置", icon: User },
   ];
 
@@ -129,6 +131,7 @@ export default function SettingsPage() {
             {activeTab === "connections" && <ConnectionSettings onSelectConnection={setSelectedConnectionId} />}
             {activeTab === "schema" && <SchemaSettings connectionId={selectedConnectionId} />}
             {activeTab === "semantic" && <SemanticSettings />}
+            {activeTab === "prompts" && <PromptSettings />}
             {activeTab === "preferences" && <PreferencesSettings />}
           </main>
         </div>

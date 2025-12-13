@@ -161,3 +161,43 @@ export function getErrorMessage(error: unknown): string {
   }
   return "未知错误";
 }
+
+// ===== 提示词类型 =====
+
+/** 提示词 */
+export interface Prompt {
+  id: string;
+  name: string;
+  content: string;
+  description?: string;
+  version: number;
+  is_active: boolean;
+  is_default: boolean;
+  parent_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+/** 提示词版本 */
+export interface PromptVersion {
+  id: string;
+  name: string;
+  version: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+/** 创建提示词请求 */
+export interface PromptCreate {
+  name: string;
+  content: string;
+  description?: string;
+  is_default?: boolean;
+}
+
+/** 更新提示词请求 */
+export interface PromptUpdate {
+  name?: string;
+  content?: string;
+  description?: string;
+}
