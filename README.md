@@ -120,8 +120,8 @@ v1 是旧版单体架构，已停止维护，仅供参考：[v1 分支](https://
 
 MIT License
 
----
+允许二改，本项目有完备的ci可以帮助测试　　　　　-
 
 <div align="center">
-  <sub>觉得有用就给个 Star 吧</sub>
+  <sub>觉得有用就给个 Star ⭐ 吧</sub>
 </div>
