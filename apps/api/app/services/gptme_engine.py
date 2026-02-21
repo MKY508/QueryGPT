@@ -3,6 +3,7 @@ gptme 执行引擎封装
 使用 LiteLLM 进行 AI 调用，支持 SQL 和 Python 代码执行
 """
 
+import ast
 import asyncio
 import base64
 import io
@@ -21,21 +22,154 @@ from app.services.database import create_database_manager
 
 logger = structlog.get_logger()
 
-# Python 执行安全检查 - 阻止危险操作
-BLOCKED_PATTERNS = [
-    r"import\s+os\b",
-    r"import\s+subprocess",
-    r"import\s+sys\b",
-    r"from\s+os\s+import",
-    r"from\s+subprocess\s+import",
-    r"open\s*\(",
-    r"exec\s*\(",
-    r"eval\s*\(",
-    r"__import__",
-    r"compile\s*\(",
-    r"globals\s*\(",
-    r"locals\s*\(",
-]
+# Python 沙箱安全 - 禁止的模块和函数
+# 使用 AST 分析而不是简单的正则匹配，防止绕过
+BLOCKED_MODULES = frozenset({
+    "os",
+    "sys",
+    "subprocess",
+    "socket",
+    "requests",
+    "urllib",
+    "http",
+    "ftplib",
+    "telnetlib",
+    "smtplib",
+    "poplib",
+    "imaplib",
+    "nntplib",
+    "sqlite3",
+    "bdb",
+    "pdb",
+    "pydoc",
+    "webbrowser",
+    "idlelib",
+    "tkinter",
+    "ctypes",
+    "multiprocessing",
+    "concurrent",
+    "threading",
+    "_thread",
+    "multiprocessing",
+    "signal",
+    "posix",
+    "nt",
+    "pwd",
+    "grp",
+    "spwd",
+    "crypt",
+    "termios",
+    "tty",
+    "pty",
+    "fcntl",
+    "mmap",
+    "resource",
+    "nis",
+    "syslog",
+    "commands",
+})
+
+BLOCKED_BUILTINS = frozenset({
+    "__import__",
+    "open",
+    "exec",
+    "eval",
+    "compile",
+    "globals",
+    "locals",
+    "vars",
+    "dir",
+    "getattr",
+    "setattr",
+    "delattr",
+    "hasattr",
+    "input",
+    "raw_input",
+    "reload",
+    "breakpoint",
+    "exit",
+    "quit",
+    "copyright",
+    "credits",
+    "license",
+    "help",
+})
+
+
+class PythonSecurityAnalyzer(ast.NodeVisitor):
+    """Python 代码安全分析器 - 使用 AST 检测危险操作"""
+
+    def __init__(self):
+        self.violations: list[str] = []
+        self._in_attribute_chain = False
+
+    def visit_Import(self, node: ast.Import) -> None:
+        """检查 import 语句"""
+        for alias in node.names:
+            module_name = alias.name.split(".")[0]
+            if module_name in BLOCKED_MODULES:
+                self.violations.append(f"禁止导入模块: {alias.name}")
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """检查 from ... import 语句"""
+        if node.module:
+            module_name = node.module.split(".")[0]
+            if module_name in BLOCKED_MODULES:
+                self.violations.append(f"禁止从模块导入: {node.module}")
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        """检查函数调用"""
+        if isinstance(node.func, ast.Name):
+            # 直接调用如: eval(...), exec(...)
+            if node.func.id in BLOCKED_BUILTINS:
+                self.violations.append(f"禁止使用危险函数: {node.func.id}")
+        elif isinstance(node.func, ast.Attribute):
+            # 方法调用如: os.system(...)
+            if self._is_blocked_attribute_chain(node.func):
+                self.violations.append(f"禁止调用危险方法")
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        """检查属性访问"""
+        # 检测访问 __builtins__ 等危险属性
+        if node.attr in ("__builtins__", "__globals__", "__locals__", "__code__"):
+            self.violations.append(f"禁止访问危险属性: {node.attr}")
+        self.generic_visit(node)
+
+    def _is_blocked_attribute_chain(self, node: ast.Attribute) -> bool:
+        """检查属性链是否指向禁止的模块"""
+        # 向上遍历属性链，如: os.path.join -> os
+        parts = []
+        current = node
+        while isinstance(current, ast.Attribute):
+            parts.append(current.attr)
+            current = current.value
+        if isinstance(current, ast.Name):
+            parts.append(current.id)
+            root = current.id
+            if root in BLOCKED_MODULES:
+                return True
+        return False
+
+    @classmethod
+    def analyze(cls, code: str) -> tuple[bool, list[str]]:
+        """
+        分析 Python 代码的安全性
+
+        Returns:
+            (is_safe, violations)
+        """
+        try:
+            tree = ast.parse(code)
+        except SyntaxError as e:
+            return False, [f"语法错误: {e}"]
+
+        analyzer = cls()
+        analyzer.visit(tree)
+
+        return len(analyzer.violations) == 0, analyzer.violations
 
 
 class GptmeEngine:
@@ -121,10 +255,10 @@ plt.rcParams['font.size'] = 12
         logger.info(f"Injected SQL data as '{name}' DataFrame with {len(data)} rows")
 
     def _validate_python_code(self, code: str) -> tuple[bool, str | None]:
-        """验证 Python 代码安全性"""
-        for pattern in BLOCKED_PATTERNS:
-            if re.search(pattern, code, re.IGNORECASE):
-                return False, f"检测到不安全的操作: {pattern}"
+        """验证 Python 代码安全性 - 使用 AST 分析"""
+        is_safe, violations = PythonSecurityAnalyzer.analyze(code)
+        if not is_safe:
+            return False, f"检测到不安全的操作: {'; '.join(violations)}"
         return True, None
 
     def _parse_thinking(self, content: str) -> list[str]:
@@ -178,14 +312,8 @@ plt.rcParams['font.size'] = 12
         logger.info("GptmeEngine.execute called", model=self.model, query_preview=query[:50])
 
         try:
-            # 设置环境变量
-            if self.api_key:
-                os.environ["OPENAI_API_KEY"] = self.api_key
-                logger.info("API key set")
-            if self.base_url:
-                os.environ["OPENAI_BASE_URL"] = self.base_url
-                logger.info("Base URL set", base_url=self.base_url)
-
+            # API key 和 base_url 直接传递给 litellm.acompletion
+            # 不再设置全局环境变量，避免多用户环境下的污染
             logger.info("Yielding initializing event...")
             yield SSEEvent.progress("initializing", "正在初始化 AI 引擎...")
 
@@ -264,13 +392,13 @@ plt.rcParams['font.size'] = 12
             sql_code = self._extract_sql(full_content)
             python_code = self._extract_python(full_content)
 
-            # 调试日志 - 使用 print 确保输出
-            print(f"[DEBUG] Full AI content length: {len(full_content)}")
-            print(f"[DEBUG] SQL code extracted: {bool(sql_code)}")
-            print(f"[DEBUG] Python code extracted: {bool(python_code)}")
-            print(f"[DEBUG] Full content preview: {full_content[:500]}...")
-            if python_code:
-                print(f"[DEBUG] Python code preview: {python_code[:200]}...")
+            # 调试日志
+            logger.debug(
+                "AI content extracted",
+                content_length=len(full_content),
+                has_sql=bool(sql_code),
+                has_python=bool(python_code),
+            )
 
             # 如果有 SQL 和数据库配置，尝试执行
             data = None
@@ -297,29 +425,34 @@ plt.rcParams['font.size'] = 12
             python_images = []
 
             if python_code:
-                print("[DEBUG] Executing Python code...")
+                logger.debug("Executing Python code")
                 yield SSEEvent.progress("executing_python", "正在执行 Python 分析...")
 
                 try:
                     python_output, python_images = await self._execute_python(python_code)
-                    print(
-                        f"[DEBUG] Python execution done. Output length: {len(python_output) if python_output else 0}, Images count: {len(python_images)}"
+                    logger.debug(
+                        "Python execution completed",
+                        output_length=len(python_output) if python_output else 0,
+                        images_count=len(python_images),
                     )
 
                     # 发送 Python 输出
                     if python_output:
-                        print("[DEBUG] Sending python_output event...")
+                        logger.debug("Sending python_output event")
                         yield SSEEvent.python_output(python_output, "stdout")
 
                     # 发送 Python 生成的图表
                     for i, img_base64 in enumerate(python_images):
-                        print(
-                            f"[DEBUG] Sending python_image event {i + 1}/{len(python_images)}, image size: {len(img_base64)}"
+                        logger.debug(
+                            "Sending python_image event",
+                            index=i + 1,
+                            total=len(python_images),
+                            image_size=len(img_base64),
                         )
                         yield SSEEvent.python_image(img_base64, "png")
 
                 except Exception as e:
-                    print(f"[DEBUG] Python execution error: {e}")
+                    logger.error("Python execution error", error=str(e))
                     yield SSEEvent.python_output(f"⚠️ Python 执行错误: {str(e)}", "stderr")
 
             # 从 AI 输出中提取图表配置

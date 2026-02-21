@@ -2,10 +2,10 @@
 
 import asyncio
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,14 +25,26 @@ active_queries: dict[str, bool] = {}
 
 
 async def get_user_from_token(
-    token: str | None,
+    authorization: str | None,
     db: AsyncSession,
 ) -> User:
-    """从 token 获取用户 (支持 SSE 的 query param 认证)"""
-    if not token:
+    """从 Authorization header 获取用户 (支持 SSE 认证)"""
+    if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="未提供认证信息",
+        )
+
+    # 支持 "Bearer <token>" 格式或直接传 token
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    else:
+        token = authorization.strip()
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="未提供认证令牌",
         )
 
     payload = decode_token(token)
@@ -64,23 +76,23 @@ async def get_user_from_token(
 @router.get("/stream")
 async def chat_stream(
     query: str = Query(..., min_length=1, max_length=10000, description="查询内容"),
-    token: str = Query(..., description="访问令牌"),
     model: str | None = Query(default=None, description="模型 ID"),
     conversation_id: UUID | None = Query(default=None, description="对话 ID"),
     connection_id: UUID | None = Query(default=None, description="数据库连接 ID"),
     language: str = Query(default="zh", description="语言"),
+    authorization: Annotated[str | None, Header()] = None,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """SSE 流式聊天"""
+    """SSE 流式聊天 - 使用 Authorization header 传递 token"""
     # 使用局部变量避免 nonlocal 类型问题
     current_conversation_id: UUID | None = conversation_id
 
     async def event_generator() -> AsyncGenerator[str, None]:
         nonlocal current_conversation_id
 
-        # 从 token 获取用户
+        # 从 Authorization header 获取用户
         try:
-            current_user = await get_user_from_token(token, db)
+            current_user = await get_user_from_token(authorization, db)
         except HTTPException as e:
             detail = e.detail if isinstance(e.detail, str) else str(e.detail)
             yield SSEEvent.error("AUTH_ERROR", detail).to_sse()
