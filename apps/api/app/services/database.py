@@ -195,34 +195,46 @@ class DatabaseManager:
 
         # 1. 检查多语句（包含分号）
         # 允许在语句末尾有分号，但不允许在中间
-        sql_without_trailing_semicolon = sql_clean.rstrip(';')
-        if ';' in sql_without_trailing_semicolon:
+        sql_without_trailing_semicolon = sql_clean.rstrip(";")
+        if ";" in sql_without_trailing_semicolon:
             raise ValueError("禁止执行多语句查询")
 
         # 2. 检查 SQL 注释（可能被用来隐藏恶意代码）
         # 匹配 -- 注释和 /* */ 注释
-        if re.search(r'--|/\*|\*/', sql_clean):
+        if re.search(r"--|/\*|\*/", sql_clean):
             raise ValueError("禁止在查询中使用 SQL 注释")
 
         # 3. 检查危险关键字（即使它们在注释或字符串中）
         dangerous_keywords = [
-            'DROP', 'DELETE', 'INSERT', 'UPDATE', 'CREATE',
-            'ALTER', 'TRUNCATE', 'REPLACE', 'MERGE', 'GRANT',
-            'REVOKE', 'COMMIT', 'ROLLBACK', 'EXEC', 'EXECUTE'
+            "DROP",
+            "DELETE",
+            "INSERT",
+            "UPDATE",
+            "CREATE",
+            "ALTER",
+            "TRUNCATE",
+            "REPLACE",
+            "MERGE",
+            "GRANT",
+            "REVOKE",
+            "COMMIT",
+            "ROLLBACK",
+            "EXEC",
+            "EXECUTE",
         ]
 
         # 简单的词法分析，将 SQL 分解为单词
         # 移除字符串字面量（用单引号或双引号包围的内容）
-        sql_without_strings = re.sub(r"'[^']*'|\"[^\"]*\"", '', sql_clean)
-        words = re.findall(r'\b[A-Z_]+\b', sql_without_strings.upper())
+        sql_without_strings = re.sub(r"'[^']*'|\"[^\"]*\"", "", sql_clean)
+        words = re.findall(r"\b[A-Z_]+\b", sql_without_strings.upper())
 
         for word in words:
             if word in dangerous_keywords:
                 raise ValueError(f"检测到危险关键字: {word}")
 
         # 4. 检查开头关键字（必须是只读操作）
-        first_word = words[0] if words else ''
-        allowed_prefixes = ('SELECT', 'SHOW', 'DESCRIBE', 'EXPLAIN', 'WITH')
+        first_word = words[0] if words else ""
+        allowed_prefixes = ("SELECT", "SHOW", "DESCRIBE", "EXPLAIN", "WITH")
 
         if not first_word.startswith(allowed_prefixes):
             raise ValueError("只允许执行只读查询 (SELECT, SHOW, DESCRIBE, EXPLAIN, WITH)")
@@ -308,30 +320,142 @@ class DatabaseManager:
             return False
 
         # 必须以字母或下划线开头，后续只能包含字母数字下划线
-        if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', identifier):
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", identifier):
             return False
 
         # 检查 SQLite 关键字
         sqlite_keywords = {
-            'ABORT', 'ACTION', 'ADD', 'AFTER', 'ALL', 'ALTER', 'ANALYZE', 'AND',
-            'AS', 'ASC', 'ATTACH', 'AUTOINCREMENT', 'BEFORE', 'BEGIN', 'BETWEEN',
-            'BY', 'CASCADE', 'CASE', 'CAST', 'CHECK', 'COLLATE', 'COLUMN', 'COMMIT',
-            'CONFLICT', 'CONSTRAINT', 'CREATE', 'CROSS', 'CURRENT', 'CURRENT_DATE',
-            'CURRENT_TIME', 'CURRENT_TIMESTAMP', 'DATABASE', 'DEFAULT', 'DEFERRABLE',
-            'DEFERRED', 'DELETE', 'DESC', 'DETACH', 'DISTINCT', 'DO', 'DROP',
-            'EACH', 'ELSE', 'END', 'ESCAPE', 'EXCEPT', 'EXCLUSIVE', 'EXISTS',
-            'EXPLAIN', 'FAIL', 'FILTER', 'FOLLOWING', 'FOR', 'FOREIGN', 'FROM',
-            'FULL', 'GLOB', 'GROUP', 'HAVING', 'IF', 'IGNORE', 'IMMEDIATE', 'IN',
-            'INDEX', 'INDEXED', 'INITIALLY', 'INNER', 'INSERT', 'INSTEAD', 'INTERSECT',
-            'INTO', 'IS', 'ISNULL', 'JOIN', 'KEY', 'LEFT', 'LIKE', 'LIMIT', 'MATCH',
-            'NATURAL', 'NO', 'NOT', 'NOTNULL', 'NULL', 'OF', 'OFFSET', 'ON', 'OR',
-            'ORDER', 'OUTER', 'PLAN', 'PRAGMA', 'PRIMARY', 'QUERY', 'RAISE',
-            'RANGE', 'RECURSIVE', 'REFERENCES', 'REGEXP', 'REINDEX', 'RELEASE',
-            'RENAME', 'REPLACE', 'RESTRICT', 'RIGHT', 'ROLLBACK', 'ROW',
-            'ROWS', 'SAVEPOINT', 'SELECT', 'SET', 'TABLE', 'TEMP', 'TEMPORARY',
-            'THEN', 'TO', 'TRANSACTION', 'TRIGGER', 'UNION', 'UNIQUE', 'UPDATE',
-            'USING', 'VACUUM', 'VALUES', 'VIEW', 'VIRTUAL', 'WHEN', 'WHERE',
-            'WINDOW', 'WITH', 'WITHOUT'
+            "ABORT",
+            "ACTION",
+            "ADD",
+            "AFTER",
+            "ALL",
+            "ALTER",
+            "ANALYZE",
+            "AND",
+            "AS",
+            "ASC",
+            "ATTACH",
+            "AUTOINCREMENT",
+            "BEFORE",
+            "BEGIN",
+            "BETWEEN",
+            "BY",
+            "CASCADE",
+            "CASE",
+            "CAST",
+            "CHECK",
+            "COLLATE",
+            "COLUMN",
+            "COMMIT",
+            "CONFLICT",
+            "CONSTRAINT",
+            "CREATE",
+            "CROSS",
+            "CURRENT",
+            "CURRENT_DATE",
+            "CURRENT_TIME",
+            "CURRENT_TIMESTAMP",
+            "DATABASE",
+            "DEFAULT",
+            "DEFERRABLE",
+            "DEFERRED",
+            "DELETE",
+            "DESC",
+            "DETACH",
+            "DISTINCT",
+            "DO",
+            "DROP",
+            "EACH",
+            "ELSE",
+            "END",
+            "ESCAPE",
+            "EXCEPT",
+            "EXCLUSIVE",
+            "EXISTS",
+            "EXPLAIN",
+            "FAIL",
+            "FILTER",
+            "FOLLOWING",
+            "FOR",
+            "FOREIGN",
+            "FROM",
+            "FULL",
+            "GLOB",
+            "GROUP",
+            "HAVING",
+            "IF",
+            "IGNORE",
+            "IMMEDIATE",
+            "IN",
+            "INDEX",
+            "INDEXED",
+            "INITIALLY",
+            "INNER",
+            "INSERT",
+            "INSTEAD",
+            "INTERSECT",
+            "INTO",
+            "IS",
+            "ISNULL",
+            "JOIN",
+            "KEY",
+            "LEFT",
+            "LIKE",
+            "LIMIT",
+            "MATCH",
+            "NATURAL",
+            "NO",
+            "NOT",
+            "NOTNULL",
+            "NULL",
+            "OF",
+            "OFFSET",
+            "ON",
+            "OR",
+            "ORDER",
+            "OUTER",
+            "PLAN",
+            "PRAGMA",
+            "PRIMARY",
+            "QUERY",
+            "RAISE",
+            "RANGE",
+            "RECURSIVE",
+            "REFERENCES",
+            "REGEXP",
+            "REINDEX",
+            "RELEASE",
+            "RENAME",
+            "REPLACE",
+            "RESTRICT",
+            "RIGHT",
+            "ROLLBACK",
+            "ROW",
+            "ROWS",
+            "SAVEPOINT",
+            "SELECT",
+            "SET",
+            "TABLE",
+            "TEMP",
+            "TEMPORARY",
+            "THEN",
+            "TO",
+            "TRANSACTION",
+            "TRIGGER",
+            "UNION",
+            "UNIQUE",
+            "UPDATE",
+            "USING",
+            "VACUUM",
+            "VALUES",
+            "VIEW",
+            "VIRTUAL",
+            "WHEN",
+            "WHERE",
+            "WINDOW",
+            "WITH",
+            "WITHOUT",
         }
 
         if identifier.upper() in sqlite_keywords:
