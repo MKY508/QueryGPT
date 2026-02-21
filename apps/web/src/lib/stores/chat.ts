@@ -91,7 +91,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         params,
         controller.signal
       )) {
-        const data = event.data as { type: string; data: Record<string, unknown> };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = event.data as { type: string; data: any };
         const { messages } = get();
         const lastIndex = messages.length - 1;
 
