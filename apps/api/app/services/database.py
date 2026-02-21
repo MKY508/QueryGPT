@@ -192,7 +192,6 @@ class DatabaseManager:
 
         # 去除首尾空白并标准化
         sql_clean = sql.strip()
-        sql_upper = sql_clean.upper()
 
         # 1. 检查多语句（包含分号）
         # 允许在语句末尾有分号，但不允许在中间

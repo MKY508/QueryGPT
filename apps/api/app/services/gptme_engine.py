@@ -128,7 +128,7 @@ class PythonSecurityAnalyzer(ast.NodeVisitor):
         elif isinstance(node.func, ast.Attribute):
             # 方法调用如: os.system(...)
             if self._is_blocked_attribute_chain(node.func):
-                self.violations.append(f"禁止调用危险方法")
+                self.violations.append("禁止调用危险方法")
         self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:

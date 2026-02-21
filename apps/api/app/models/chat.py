@@ -1,13 +1,13 @@
 """聊天相关模型"""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
-class SSEEventType(str, Enum):
+class SSEEventType(StrEnum):
     """SSE 事件类型"""
 
     PROGRESS = "progress"
@@ -20,7 +20,7 @@ class SSEEventType(str, Enum):
     DONE = "done"
 
 
-class ProgressStage(str, Enum):
+class ProgressStage(StrEnum):
     """进度阶段"""
 
     START = "start"
