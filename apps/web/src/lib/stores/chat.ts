@@ -91,7 +91,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         params,
         controller.signal
       )) {
-        const data = event.data;
+        const data = event.data as { type: string; data: Record<string, unknown> };
         const { messages } = get();
         const lastIndex = messages.length - 1;
 
