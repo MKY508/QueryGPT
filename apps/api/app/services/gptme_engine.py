@@ -193,8 +193,6 @@ class GptmeEngine:
         """获取或创建 IPython 实例"""
         if self._ipython is None:
             # 获取内置字体路径
-            import os
-
             from IPython.core.interactiveshell import InteractiveShell
 
             font_path = os.path.join(
