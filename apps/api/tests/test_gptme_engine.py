@@ -1,7 +1,5 @@
 """Tests for gptme_engine.py"""
 
-import pytest
-
 from app.services.gptme_engine import GptmeEngine, PythonSecurityAnalyzer
 
 
