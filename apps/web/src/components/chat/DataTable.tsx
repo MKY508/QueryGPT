@@ -14,7 +14,7 @@ interface DataTableProps {
 
 type SortDirection = "asc" | "desc" | null;
 
-export function DataTable({ data, title, maxRows: _maxRows = 100 }: DataTableProps) {
+export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -28,9 +28,10 @@ export function DataTable({ data, title, maxRows: _maxRows = 100 }: DataTablePro
 
   // 排序数据
   const sortedData = useMemo(() => {
-    if (!data || !sortColumn || !sortDirection) return data;
+    const truncated = data?.slice(0, maxRows) ?? data;
+    if (!truncated || !sortColumn || !sortDirection) return truncated;
 
-    return [...data].sort((a, b) => {
+    return [...truncated].sort((a, b) => {
       const aVal = a[sortColumn];
       const bVal = b[sortColumn];
 

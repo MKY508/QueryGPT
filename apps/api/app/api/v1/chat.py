@@ -21,6 +21,10 @@ from app.services.execution import ExecutionService
 router = APIRouter()
 
 # 活跃查询追踪
+# 注意：此字典仅在单进程/单实例环境中有效。
+# 多 worker（uvicorn --workers N）或多实例（水平扩展）部署时，
+# /chat/stop 无法跨进程终止查询。
+# 生产环境建议改用 Redis（如 aioredis set/get）实现跨进程共享状态。
 active_queries: dict[str, bool] = {}
 
 

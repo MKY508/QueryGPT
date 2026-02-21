@@ -11,17 +11,24 @@ services:
     rootDir: apps/api
     buildCommand: pip install -e ".[dev]"
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        value: sqlite+aiosqlite:///./data/querygpt.db
+        fromDatabase:
+          name: querygpt-db
+          property: connectionString
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: ENCRYPTION_KEY
         generateValue: true
       - key: PYTHON_VERSION
         value: "3.11"
-    disk:
-      name: data
-      mountPath: /opt/render/project/src/apps/api/data
-      sizeGB: 1
+      - key: ENVIRONMENT
+        value: production
+
+# PostgreSQL 数据库（Render 提供免费实例）
+databases:
+  - name: querygpt-db
+    databaseName: querygpt
+    plan: free
+    region: singapore

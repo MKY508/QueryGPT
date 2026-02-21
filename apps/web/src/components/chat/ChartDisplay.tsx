@@ -6,6 +6,8 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   PieChart,
   Pie,
   Cell,
@@ -147,6 +149,48 @@ export function ChartDisplay({
               />
             )}
           </LineChart>
+        );
+
+      case "area":
+        return (
+          <AreaChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <XAxis
+              dataKey={keys.x}
+              tick={{ fontSize: 12 }}
+              className="stroke-muted-foreground"
+            />
+            <YAxis tick={{ fontSize: 12 }} className="stroke-muted-foreground" />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: "8px",
+                color: "hsl(var(--foreground))",
+              }}
+            />
+            <Legend />
+            {keys.allNumberKeys?.map((key, index) => (
+              <Area
+                key={key}
+                type="monotone"
+                dataKey={key}
+                stroke={COLORS[index % COLORS.length]}
+                fill={COLORS[index % COLORS.length]}
+                fillOpacity={0.2}
+                strokeWidth={2}
+              />
+            )) || (
+              <Area
+                type="monotone"
+                dataKey={keys.y}
+                stroke={COLORS[0]}
+                fill={COLORS[0]}
+                fillOpacity={0.2}
+                strokeWidth={2}
+              />
+            )}
+          </AreaChart>
         );
 
       case "pie":
