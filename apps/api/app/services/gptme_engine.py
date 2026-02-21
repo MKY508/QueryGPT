@@ -143,7 +143,7 @@ class PythonSecurityAnalyzer(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _is_blocked_attribute_chain(self, node: ast.Attribute) -> bool:
-        """检查属性链是否指向禁止的模块"""
+        """检查属性链是否指向禁止的模块或危险对象"""
         # 向上遍历属性链，如: os.path.join -> os
         parts = []
         current = node
@@ -153,7 +153,11 @@ class PythonSecurityAnalyzer(ast.NodeVisitor):
         if isinstance(current, ast.Name):
             parts.append(current.id)
             root = current.id
+            # 检查是否是禁止的模块
             if root in BLOCKED_MODULES:
+                return True
+            # 检查是否是危险对象如 __builtins__
+            if root in ("__builtins__", "__globals__", "__locals__"):
                 return True
         return False
 

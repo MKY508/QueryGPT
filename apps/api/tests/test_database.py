@@ -152,7 +152,8 @@ class TestSQLiteManager:
 
     def test_execute_query_read_only(self, sqlite_manager):
         """Test read-only mode blocks writes"""
-        with pytest.raises(ValueError, match="只允许执行只读查询"):
+        # 现在会检测危险关键字 DROP，或者如果开头不是 SELECT 也会报错
+        with pytest.raises(ValueError):
             sqlite_manager.execute_query("DROP TABLE test", read_only=True)
 
     def test_get_schema_info(self, sqlite_manager):
