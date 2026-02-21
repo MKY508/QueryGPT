@@ -234,9 +234,8 @@ class DatabaseManager:
 
         # 4. 检查开头关键字（必须是只读操作）
         first_word = words[0] if words else ""
-        allowed_prefixes = ("SELECT", "SHOW", "DESCRIBE", "EXPLAIN", "WITH")
 
-        if not first_word.startswith(allowed_prefixes):
+        if first_word not in self.READ_ONLY_PREFIXES:
             raise ValueError("只允许执行只读查询 (SELECT, SHOW, DESCRIBE, EXPLAIN, WITH)")
 
     def _execute_sql(self, conn: Any, sql: str) -> list[dict[str, Any]]:

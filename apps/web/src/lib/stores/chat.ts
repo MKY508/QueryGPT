@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { api, createEventSource } from "@/lib/api/client";
+import { api, createSecureEventStream } from "@/lib/api/client";
 import type { DataRow, Visualization, APIMessage } from "@/lib/types/api";
 import { getErrorMessage } from "@/lib/types/api";
 
@@ -25,7 +25,7 @@ interface ChatState {
   messages: Message[];
   currentConversationId: string | null;
   isLoading: boolean;
-  eventSource: EventSource | null;
+  abortController: AbortController | null;
   lastConnectionId: string | null; // 保存上次使用的连接 ID
   lastModelId: string | null; // 保存上次使用的模型 ID
   sendMessage: (query: string, connectionId?: string | null, modelId?: string | null) => Promise<void>;
@@ -40,7 +40,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   currentConversationId: null,
   isLoading: false,
-  eventSource: null,
+  abortController: null,
   lastConnectionId: null,
   lastModelId: null,
 
@@ -83,164 +83,98 @@ export const useChatStore = create<ChatState>((set, get) => ({
         params.model = modelId;
       }
 
-      const eventSource = createEventSource("/api/v1/chat/stream", params);
-      set({ eventSource });
+      const controller = new AbortController();
+      set({ abortController: controller });
 
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          const { messages } = get();
-          const lastIndex = messages.length - 1;
-
-          if (data.type === "progress") {
-            // 更新状态
-            set({
-              messages: messages.map((msg, idx) =>
-                idx === lastIndex
-                  ? { ...msg, status: data.data.message }
-                  : msg
-              ),
-            });
-          } else if (data.type === "result") {
-            // 更新结果
-            set({
-              messages: messages.map((msg, idx) =>
-                idx === lastIndex
-                  ? {
-                      ...msg,
-                      content: data.data.content || "",
-                      sql: data.data.sql,
-                      data: data.data.data,
-                      isLoading: false,
-                      status: undefined,
-                    }
-                  : msg
-              ),
-            });
-          } else if (data.type === "thinking") {
-            // 更新思考阶段
-            set({
-              messages: messages.map((msg, idx) =>
-                idx === lastIndex
-                  ? { ...msg, thinkingStage: data.data.stage, status: data.data.stage }
-                  : msg
-              ),
-            });
-          } else if (data.type === "visualization") {
-            // 更新可视化
-            set({
-              messages: messages.map((msg, idx) =>
-                idx === lastIndex
-                  ? { ...msg, visualization: data.data.chart }
-                  : msg
-              ),
-            });
-          } else if (data.type === "python_output") {
-            // 更新 Python 输出
-            set({
-              messages: messages.map((msg, idx) =>
-                idx === lastIndex
-                  ? {
-                      ...msg,
-                      pythonOutput: (msg.pythonOutput || "") + data.data.output,
-                    }
-                  : msg
-              ),
-            });
-          } else if (data.type === "python_image") {
-            // 添加 Python 图表
-            set({
-              messages: messages.map((msg, idx) =>
-                idx === lastIndex
-                  ? {
-                      ...msg,
-                      pythonImages: [...(msg.pythonImages || []), data.data.image],
-                    }
-                  : msg
-              ),
-            });
-          } else if (data.type === "error") {
-            // 错误 - 显示错误状态和重试按钮
-            set({
-              messages: messages.map((msg, idx) =>
-                idx === lastIndex
-                  ? {
-                      ...msg,
-                      content: msg.content || "",
-                      hasError: true,
-                      errorMessage: data.data.message,
-                      canRetry: true,
-                      originalQuery: query,
-                      isLoading: false,
-                      status: undefined,
-                    }
-                  : msg
-              ),
-              isLoading: false,
-              eventSource: null,
-            });
-            eventSource.close();
-          } else if (data.type === "done") {
-            // 完成
-            if (data.data.conversation_id) {
-              set({ currentConversationId: data.data.conversation_id });
-            }
-            set({ isLoading: false, eventSource: null });
-            eventSource.close();
-          }
-        } catch (e) {
-          console.error("Failed to parse event", e);
-        }
-      };
-
-      eventSource.onerror = (error) => {
-        console.error("SSE connection error", error);
-        const { messages, isLoading: currentLoading } = get();
+      for await (const event of createSecureEventStream(
+        "/api/v1/chat/stream",
+        params,
+        controller.signal
+      )) {
+        const data = event.data;
+        const { messages } = get();
         const lastIndex = messages.length - 1;
 
-        // 只有在还在加载状态时才处理错误
-        if (currentLoading) {
+        if (data.type === "progress") {
+          set({ messages: messages.map((msg, idx) =>
+            idx === lastIndex ? { ...msg, status: data.data.message } : msg
+          )});
+        } else if (data.type === "result") {
+          set({ messages: messages.map((msg, idx) =>
+            idx === lastIndex ? {
+              ...msg,
+              content: data.data.content || "",
+              sql: data.data.sql,
+              data: data.data.data,
+              isLoading: false,
+              status: undefined,
+            } : msg
+          )});
+        } else if (data.type === "thinking") {
+          set({ messages: messages.map((msg, idx) =>
+            idx === lastIndex ? { ...msg, thinkingStage: data.data.stage, status: data.data.stage } : msg
+          )});
+        } else if (data.type === "visualization") {
+          set({ messages: messages.map((msg, idx) =>
+            idx === lastIndex ? { ...msg, visualization: data.data.chart } : msg
+          )});
+        } else if (data.type === "python_output") {
+          set({ messages: messages.map((msg, idx) =>
+            idx === lastIndex ? { ...msg, pythonOutput: (msg.pythonOutput || "") + data.data.output } : msg
+          )});
+        } else if (data.type === "python_image") {
+          set({ messages: messages.map((msg, idx) =>
+            idx === lastIndex ? { ...msg, pythonImages: [...(msg.pythonImages || []), data.data.image] } : msg
+          )});
+        } else if (data.type === "error") {
+          const { messages: cur } = get();
+          const last = cur.length - 1;
           set({
-            messages: messages.map((msg, idx) =>
-              idx === lastIndex && msg.isLoading
-                ? {
-                    ...msg,
-                    content: msg.content || "",
-                    hasError: true,
-                    errorMessage: "连接中断，请重试",
-                    canRetry: true,
-                    originalQuery: query,
-                    isLoading: false,
-                    status: undefined,
-                  }
-                : msg
-            ),
-            isLoading: false,
-            eventSource: null,
+            messages: cur.map((msg, idx) => idx === last ? {
+              ...msg, content: msg.content || "",
+              hasError: true, errorMessage: data.data.message,
+              canRetry: true, originalQuery: query,
+              isLoading: false, status: undefined,
+            } : msg),
+            isLoading: false, abortController: null,
           });
+          return;
+        } else if (data.type === "done") {
+          if (data.data.conversation_id) {
+            set({ currentConversationId: data.data.conversation_id });
+          }
+          set({ isLoading: false, abortController: null });
+          return;
         }
-        eventSource.close();
-      };
+      }
+      // generator 正常结束（流关闭）
+      set({ isLoading: false, abortController: null });
     } catch (error: unknown) {
+      // AbortError = 用户主动停止，静默处理
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
       const { messages } = get();
       const lastIndex = messages.length - 1;
-
       set({
         messages: messages.map((msg, idx) =>
-          idx === lastIndex
-            ? { ...msg, content: `请求失败: ${getErrorMessage(error)}`, isLoading: false }
-            : msg
+          idx === lastIndex ? {
+            ...msg, content: msg.content || "",
+            hasError: true, errorMessage: getErrorMessage(error),
+            canRetry: true, originalQuery: query,
+            isLoading: false, status: undefined,
+          } : msg
         ),
-        isLoading: false,
+        isLoading: false, abortController: null,
       });
     }
   },
 
   stopGeneration: () => {
-    const { eventSource, currentConversationId } = get();
+    const { abortController, currentConversationId } = get();
 
-    if (eventSource) {
-      eventSource.close();
+    if (abortController) {
+      abortController.abort();
     }
 
     if (currentConversationId) {
@@ -257,7 +191,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           : msg
       ),
       isLoading: false,
-      eventSource: null,
+      abortController: null,
     });
   },
 

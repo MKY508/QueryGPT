@@ -118,7 +118,8 @@ interface SSEEvent {
 // 更安全的 SSE 实现 - 使用 fetch API
 export async function* createSecureEventStream(
   url: string,
-  params: Record<string, string>
+  params: Record<string, string>,
+  signal?: AbortSignal
 ): AsyncGenerator<SSEEvent> {
   const searchParams = new URLSearchParams(params);
   const fullUrl = `${API_URL}${url}?${searchParams.toString()}`;
@@ -130,6 +131,7 @@ export async function* createSecureEventStream(
       Authorization: `Bearer ${token}`,
       Accept: "text/event-stream",
     },
+    signal,
   });
 
   if (!response.ok) {
