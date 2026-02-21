@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.gptme_engine import BLOCKED_PATTERNS, GptmeEngine
+from app.services.gptme_engine import GptmeEngine, PythonSecurityAnalyzer
 
 
 class TestGptmeEngine:
@@ -315,19 +315,69 @@ class TestGptmeEngine:
         assert "sales" in chart["yKeys"] or "profit" in chart["yKeys"]
 
 
-class TestBlockedPatterns:
-    """Test blocked patterns list"""
+class TestPythonSecurityAnalyzer:
+    """Test PythonSecurityAnalyzer"""
 
-    def test_blocked_patterns_exist(self):
-        """Test that blocked patterns are defined"""
-        assert len(BLOCKED_PATTERNS) > 0
+    def test_analyze_safe_code(self):
+        """Test that safe code passes analysis"""
+        safe_codes = [
+            "import pandas as pd\ndf.head()",
+            "import matplotlib.pyplot as plt\nplt.show()",
+            "x = 1 + 2",
+            "print('hello')",
+            "df['col'].mean()",
+            "import numpy as np\narr = np.array([1, 2, 3])",
+        ]
 
-    def test_blocked_patterns_are_valid_regex(self):
-        """Test that all blocked patterns are valid regex"""
-        import re
+        for code in safe_codes:
+            is_safe, violations = PythonSecurityAnalyzer.analyze(code)
+            assert is_safe, f"Code should be safe: {code}, violations: {violations}"
+            assert len(violations) == 0
 
-        for pattern in BLOCKED_PATTERNS:
-            try:
-                re.compile(pattern)
-            except re.error:
-                pytest.fail(f"Invalid regex pattern: {pattern}")
+    def test_analyze_unsafe_imports(self):
+        """Test detection of unsafe imports"""
+        unsafe_codes = [
+            ("import os", "os"),
+            ("import sys", "sys"),
+            ("import subprocess", "subprocess"),
+            ("from os import listdir", "os"),
+            ("from subprocess import run", "subprocess"),
+        ]
+
+        for code, expected_module in unsafe_codes:
+            is_safe, violations = PythonSecurityAnalyzer.analyze(code)
+            assert not is_safe, f"Code should be unsafe: {code}"
+            assert any(expected_module in v for v in violations)
+
+    def test_analyze_unsafe_builtins(self):
+        """Test detection of unsafe builtin functions"""
+        unsafe_codes = [
+            "exec('print(1)')",
+            "eval('1+1')",
+            "open('file.txt', 'w')",
+            "globals()",
+            "locals()",
+        ]
+
+        for code in unsafe_codes:
+            is_safe, violations = PythonSecurityAnalyzer.analyze(code)
+            assert not is_safe, f"Code should be unsafe: {code}"
+
+    def test_analyze_dangerous_attributes(self):
+        """Test detection of dangerous attribute access"""
+        unsafe_codes = [
+            "__builtins__.__import__('os')",
+            "func.__globals__",
+            "func.__locals__",
+        ]
+
+        for code in unsafe_codes:
+            is_safe, violations = PythonSecurityAnalyzer.analyze(code)
+            assert not is_safe, f"Code should be unsafe: {code}"
+
+    def test_analyze_syntax_error(self):
+        """Test handling of syntax errors"""
+        is_safe, violations = PythonSecurityAnalyzer.analyze("import os")
+        # This should not raise an exception
+        assert isinstance(is_safe, bool)
+        assert isinstance(violations, list)
