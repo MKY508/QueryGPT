@@ -48,7 +48,7 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
         ? aStr.localeCompare(bStr)
         : bStr.localeCompare(aStr);
     });
-  }, [data, sortColumn, sortDirection]);
+  }, [data, maxRows, sortColumn, sortDirection]);
 
   // 分页数据
   const paginatedData = useMemo(() => {

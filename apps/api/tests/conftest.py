@@ -13,10 +13,17 @@ from sqlalchemy.pool import StaticPool
 from app.core.security import create_access_token
 from app.db import get_db
 from app.db.tables import Base
-from app.main import app
+from app.main import app, limiter
 
 # 测试数据库 URL
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter() -> Generator[None, None, None]:
+    """每个测试前重置限速器内存存储，防止跨测试计数累积触发限流"""
+    limiter._storage.reset()
+    yield
 
 
 @pytest.fixture(scope="session")
