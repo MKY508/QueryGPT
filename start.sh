@@ -71,37 +71,15 @@ check_port() {
     return 1
 }
 
-# 检查所有需要的端口
+# 检查所有需要的端口（自动终止冲突进程，无需交互）
 check_ports() {
-    local has_conflict=false
-
-    # 检查后端端口 8000
-    if pid=$(check_port 8000); then
-        warn "端口 8000 已被占用 (PID: $pid)"
-        echo -e "  ${YELLOW}→ 终止占用进程: kill -9 $pid${NC}"
-        has_conflict=true
-    fi
-
-    # 检查前端端口 3000
-    if pid=$(check_port 3000); then
-        warn "端口 3000 已被占用 (PID: $pid)"
-        echo -e "  ${YELLOW}→ 终止占用进程: kill -9 $pid${NC}"
-        has_conflict=true
-    fi
-
-    if [ "$has_conflict" = true ]; then
-        echo ""
-        read -p "是否自动终止占用进程? [y/N] " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            lsof -ti:8000 | xargs kill -9 2>/dev/null || true
-            lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-            sleep 1
-            success "已终止占用进程"
-        else
-            error "请手动终止占用进程后重试"
+    for port in 8000 3000; do
+        if pid=$(lsof -ti:$port 2>/dev/null); then
+            warn "端口 $port 已占用 (PID: $pid)，自动终止..."
+            kill -9 $pid 2>/dev/null || true
         fi
-    fi
+    done
+    sleep 1
 }
 
 # 打开浏览器
@@ -126,6 +104,21 @@ open_browser() {
     esac
 }
 
+# 智能 Python 版本选择（优先 3.11，确保 >= 3.11）
+find_python() {
+    for candidate in python3.11 python3.12 python3.13 python3.14 python3 python; do
+        if command -v "$candidate" &>/dev/null; then
+            local ver
+            ver=$($candidate -c "import sys; print(sys.version_info >= (3,11))" 2>/dev/null)
+            if [ "$ver" = "True" ]; then
+                PYTHON_CMD="$candidate"
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+
 # 检查依赖
 check_dependencies() {
     info "检查依赖..."
@@ -137,13 +130,11 @@ check_dependencies() {
         warn "Docker 未安装 - 需要手动配置 PostgreSQL"
     fi
 
-    # Python
-    if check_command python3; then
-        PYTHON_CMD="python3"
-    elif check_command python; then
-        PYTHON_CMD="python"
+    # Python（优先 3.11，确保 >= 3.11）
+    if ! find_python; then
+        missing+=("python3 (>=3.11)")
     else
-        missing+=("python3")
+        info "使用 Python: $PYTHON_CMD ($($PYTHON_CMD --version 2>&1))"
     fi
 
     # Node.js
@@ -276,6 +267,90 @@ start_database() {
     warn "数据库启动超时，请检查 Docker 日志"
 }
 
+# 确保 aiosqlite 已安装
+ensure_aiosqlite() {
+    if ! "$SCRIPT_DIR/apps/api/.venv/bin/python" -c "import aiosqlite" 2>/dev/null; then
+        info "安装 SQLite 驱动 aiosqlite..."
+        "$SCRIPT_DIR/apps/api/.venv/bin/pip" install aiosqlite -q
+    fi
+}
+
+# 切换为 SQLite 数据库
+switch_to_sqlite() {
+    local sqlite_url="sqlite+aiosqlite:///./data/querygpt.db"
+    mkdir -p apps/api/data
+    sed -i.bak "s|^DATABASE_URL=.*|DATABASE_URL=${sqlite_url}|" apps/api/.env
+    rm -f apps/api/.env.bak
+    success "已切换为 SQLite: $sqlite_url"
+    ensure_aiosqlite
+}
+
+# 检测数据库连通性，必要时自动回退 SQLite
+check_database_connection() {
+    local db_url
+    db_url=$(grep "^DATABASE_URL=" apps/api/.env 2>/dev/null | cut -d= -f2-)
+
+    if [ -z "$db_url" ]; then
+        warn "未找到 DATABASE_URL 配置，跳过数据库连接检测"
+        return 0
+    fi
+
+    # 已经是 SQLite，确保驱动已安装
+    if [[ "$db_url" == sqlite* ]]; then
+        ensure_aiosqlite
+        return 0
+    fi
+
+    info "检测 PostgreSQL 连通性..."
+    # 将 SQLAlchemy URL 格式转换为 asyncpg 可用格式
+    local pg_url="${db_url/postgresql+asyncpg:\/\//postgresql:\/\/}"
+
+    if "$SCRIPT_DIR/apps/api/.venv/bin/python" -c "
+import asyncio, asyncpg
+async def test():
+    conn = await asyncpg.connect('${pg_url}', timeout=3)
+    await conn.close()
+asyncio.run(test())
+" 2>/dev/null; then
+        success "PostgreSQL 连接正常"
+    else
+        warn "PostgreSQL 不可达，自动切换为 SQLite..."
+        switch_to_sqlite
+    fi
+}
+
+# 等待后端就绪（健康检查轮询，最多 20 秒）
+wait_for_backend() {
+    info "等待后端就绪..."
+    for i in $(seq 1 20); do
+        if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+            echo ""
+            success "后端已就绪 ✓"
+            return 0
+        fi
+        sleep 1
+        printf "."
+    done
+    echo ""
+    error "后端启动失败！最后 20 行日志：\n$(tail -20 "$SCRIPT_DIR/logs/backend.log" 2>/dev/null || echo '无日志')"
+}
+
+# 等待前端就绪（轮询，最多 40 秒）
+wait_for_frontend() {
+    info "等待前端就绪..."
+    for i in $(seq 1 40); do
+        if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+            echo ""
+            success "前端已就绪 ✓"
+            return 0
+        fi
+        sleep 1
+        printf "."
+    done
+    echo ""
+    warn "前端启动超时，请手动访问 http://localhost:3000"
+}
+
 # 启动后端
 start_backend() {
     info "启动后端服务..."
@@ -283,8 +358,8 @@ start_backend() {
     cd "$SCRIPT_DIR/apps/api"
     activate_venv
 
-    # 后台启动
-    nohup $PYTHON_CMD -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > "$SCRIPT_DIR/logs/backend.log" 2>&1 &
+    # 后台启动（显式使用 venv 内的 Python，避免解析到系统解释器）
+    nohup "$SCRIPT_DIR/apps/api/.venv/bin/python" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > "$SCRIPT_DIR/logs/backend.log" 2>&1 &
     echo $! > "$SCRIPT_DIR/.backend.pid"
 
     success "后端服务已启动 (PID: $(cat "$SCRIPT_DIR/.backend.pid"))"
@@ -396,6 +471,25 @@ check_status() {
     fi
 }
 
+# 判断环境是否已完成初始化
+is_initialized() {
+    [ -d "$SCRIPT_DIR/apps/api/.venv" ] &&
+    [ -d "$SCRIPT_DIR/apps/web/node_modules" ] &&
+    [ -f "$SCRIPT_DIR/apps/api/.env" ] &&
+    [ -f "$SCRIPT_DIR/apps/web/.env.local" ]
+}
+
+# 二次启动时仅设置 NPM_CMD（start_frontend 需要）
+set_run_commands() {
+    if check_command pnpm; then
+        NPM_CMD="pnpm"
+    elif check_command npm; then
+        NPM_CMD="npm"
+    else
+        error "找不到 npm/pnpm，请检查 Node.js 安装"
+    fi
+}
+
 # 主函数
 main() {
     # 创建日志目录
@@ -425,7 +519,9 @@ main() {
             check_dependencies
             setup_python_env
             setup_env_files
+            check_database_connection
             start_backend
+            wait_for_backend
             ;;
         frontend)
             detect_os
@@ -433,6 +529,7 @@ main() {
             setup_node_env
             setup_env_files
             start_frontend
+            wait_for_frontend
             ;;
         setup)
             detect_os
@@ -446,21 +543,37 @@ main() {
             show_help
             ;;
         "")
-            # 完整启动流程
-            detect_os
-            check_dependencies
-            check_ports
-            setup_python_env
-            setup_node_env
-            setup_env_files
-            start_database
-            sleep 2
-            start_backend
-            sleep 2
-            start_frontend
-            sleep 3
-            show_status
-            open_browser
+            if is_initialized; then
+                # 二次启动：跳过所有安装，直接启动
+                info "环境已就绪，直接启动服务..."
+                detect_os
+                set_run_commands
+                check_ports
+                start_database
+                check_database_connection
+                start_backend
+                wait_for_backend
+                start_frontend
+                wait_for_frontend
+                show_status
+                open_browser
+            else
+                # 首次启动：完整安装流程
+                detect_os
+                check_dependencies
+                check_ports
+                setup_python_env
+                setup_node_env
+                setup_env_files
+                start_database
+                check_database_connection
+                start_backend
+                wait_for_backend
+                start_frontend
+                wait_for_frontend
+                show_status
+                open_browser
+            fi
             ;;
         *)
             error "未知命令: $1\n运行 './start.sh help' 查看帮助"
