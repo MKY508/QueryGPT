@@ -2,7 +2,6 @@
 
 <img src="docs/images/logo.svg" width="220" alt="QueryGPT logo">
 
-# QueryGPT
 
 用中文问数据库，自动完成 SQL、分析、图表和诊断。
 
