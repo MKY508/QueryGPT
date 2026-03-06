@@ -10,9 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core import encryptor
+from app.core.config import settings
 from app.db import get_db
 from app.db.tables import Model, User
 from app.models import APIResponse, ModelCreate, ModelResponse, ModelTest
+from app.services.model_runtime import categorize_model_error, resolve_model_runtime
 
 router = APIRouter(prefix="/models", tags=["models"])
 
@@ -39,7 +41,6 @@ async def create_model(
     """添加模型配置"""
     # 如果设为默认，取消其他默认
     if model_in.is_default:
-        await db.execute(select(Model).where(Model.user_id == current_user.id, Model.is_default))
         result = await db.execute(
             select(Model).where(Model.user_id == current_user.id, Model.is_default)
         )
@@ -58,7 +59,7 @@ async def create_model(
         model_id=model_in.model_id,
         base_url=model_in.base_url,
         api_key_encrypted=api_key_encrypted,
-        extra_options=model_in.extra_options or {},
+        extra_options=model_in.extra_options.model_dump(),
         is_default=model_in.is_default,
     )
     db.add(model)
@@ -98,7 +99,7 @@ async def update_model(
     model.model_id = model_in.model_id
     model.base_url = model_in.base_url
     model.is_default = model_in.is_default
-    model.extra_options = model_in.extra_options or {}
+    model.extra_options = model_in.extra_options.model_dump()
 
     # 只有提供了新的 API Key 才更新
     if model_in.api_key:
@@ -151,34 +152,34 @@ async def test_model(
     if model.api_key_encrypted:
         api_key = encryptor.decrypt(model.api_key_encrypted)
 
-    if not api_key:
+    resolved, _ = resolve_model_runtime(
+        model,
+        fallback_model=settings.DEFAULT_MODEL,
+        fallback_api_key=api_key or settings.OPENAI_API_KEY,
+        fallback_base_url=settings.OPENAI_BASE_URL,
+    )
+
+    if not api_key and resolved.api_key_required:
         return APIResponse.ok(
             data=ModelTest(
                 success=False,
                 message="未配置 API Key",
+                resolved_provider=resolved.litellm_provider,
+                resolved_base_url=resolved.base_url,
+                api_format=resolved.api_format,
+                api_key_required=resolved.api_key_required,
+                error_category="auth",
             )
         )
 
     try:
         start_time = time.time()
 
-        # 构建模型名称
-        model_name = model.model_id
-        if model.provider == "openai":
-            model_name = f"openai/{model.model_id}"
-        elif model.provider == "anthropic":
-            model_name = f"anthropic/{model.model_id}"
-        elif model.provider == "deepseek":
-            model_name = f"deepseek/{model.model_id}"
-
-        # 发送简单测试请求
         response = await litellm.acompletion(
-            model=model_name,
             messages=[{"role": "user", "content": "Hi"}],
             max_tokens=5,
-            api_key=api_key,
-            api_base=model.base_url,
             timeout=10,
+            **resolved.completion_kwargs(),
         )
 
         elapsed_ms = int((time.time() - start_time) * 1000)
@@ -189,21 +190,33 @@ async def test_model(
                 model_name=response.model if hasattr(response, "model") else model.model_id,
                 response_time_ms=elapsed_ms,
                 message="连接成功",
+                resolved_provider=resolved.litellm_provider,
+                resolved_base_url=resolved.base_url,
+                api_format=resolved.api_format,
+                api_key_required=resolved.api_key_required,
             )
         )
 
     except Exception as e:
         error_msg = str(e)
-        if "authentication" in error_msg.lower() or "api key" in error_msg.lower():
+        error_category = categorize_model_error(error_msg)
+        if error_category == "auth":
             error_msg = "API Key 无效"
-        elif "timeout" in error_msg.lower():
+        elif error_category == "timeout":
             error_msg = "请求超时"
-        elif "connection" in error_msg.lower():
+        elif error_category == "connection":
             error_msg = "连接失败，请检查网络或 Base URL"
+        elif error_category == "model_not_found":
+            error_msg = "模型不存在或该网关不支持此模型"
 
         return APIResponse.ok(
             data=ModelTest(
                 success=False,
                 message=f"测试失败: {error_msg}",
+                resolved_provider=resolved.litellm_provider,
+                resolved_base_url=resolved.base_url,
+                api_format=resolved.api_format,
+                api_key_required=resolved.api_key_required,
+                error_category=error_category,
             )
         )

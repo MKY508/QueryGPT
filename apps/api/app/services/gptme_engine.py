@@ -19,6 +19,7 @@ import structlog
 from app.core.config import settings
 from app.models import SSEEvent
 from app.services.database import create_database_manager
+from app.services.model_runtime import categorize_model_error
 
 logger = structlog.get_logger()
 
@@ -98,6 +99,21 @@ BLOCKED_BUILTINS = frozenset(
         "help",
     }
 )
+
+MAX_AUTO_REPAIR_ATTEMPTS = 4
+
+
+class StopRequestedError(RuntimeError):
+    """用户主动停止当前执行"""
+
+
+def _truncate_text(value: str | None, limit: int = 400) -> str | None:
+    if not value:
+        return None
+    normalized = value.strip()
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: limit - 3] + "..."
 
 
 class PythonSecurityAnalyzer(ast.NodeVisitor):
@@ -186,13 +202,19 @@ class GptmeEngine:
     def __init__(
         self,
         model: str | None = None,
+        provider: str | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
+        headers: dict[str, str] | None = None,
+        query_params: dict[str, str] | None = None,
         timeout: int = 300,
     ):
         self.model = model or settings.GPTME_MODEL or settings.DEFAULT_MODEL
+        self.provider = provider  # 用于 litellm custom_llm_provider，避免模型名查表解析
         self.api_key = api_key or settings.OPENAI_API_KEY
         self.base_url = base_url or settings.OPENAI_BASE_URL
+        self.headers = headers or {}
+        self.query_params = query_params or {}
         self.timeout = timeout or settings.GPTME_TIMEOUT
         self._ipython = None  # IPython 实例（延迟初始化）
         self._sql_data: dict[str, Any] = {}  # SQL 结果缓存
@@ -297,6 +319,262 @@ plt.rcParams['font.size'] = 12
         content = re.sub(r"\n{3,}", "\n\n", content)
         return content.strip()
 
+    def _build_initial_messages(
+        self,
+        query: str,
+        system_prompt: str,
+        db_config: dict[str, Any] | None = None,
+        history: list[dict[str, str]] | None = None,
+    ) -> list[dict[str, str]]:
+        messages = [{"role": "system", "content": system_prompt}]
+
+        if db_config:
+            messages.append({"role": "system", "content": self._build_db_context(db_config)})
+
+        if history:
+            for msg in history:
+                if msg.get("role") in ("user", "assistant") and msg.get("content"):
+                    messages.append({"role": msg["role"], "content": msg["content"]})
+
+        messages.append({"role": "user", "content": query})
+        return messages
+
+    def _build_sql_repair_prompt(self, query: str, failed_sql: str | None, error_message: str) -> str:
+        sql_block = failed_sql or "未生成 SQL"
+        return f"""上一步生成的 SQL 无法执行，请修复后重新给出完整答复。
+
+原始问题：
+{query}
+
+失败 SQL：
+```sql
+{sql_block}
+```
+
+数据库错误：
+{error_message}
+
+要求：
+1. 必须基于已提供的真实表结构和字段名修复。
+2. 返回完整答复，并且必须包含一个新的 ```sql 代码块。
+3. 如果原先的分析、图表或 Python 思路仍有效，可以保留；否则一起修正。
+4. 只给最终版本，不要给多个候选 SQL。
+"""
+
+    def _build_missing_sql_prompt(self, query: str) -> str:
+        return f"""上一步回答没有提供可执行的 SQL，请重新给出完整答复。
+
+原始问题：
+{query}
+
+要求：
+1. 必须包含一个 ```sql 代码块。
+2. SQL 只能使用已提供的真实表和字段。
+3. 可以保留必要的分析说明，但不要省略 SQL。
+"""
+
+    def _build_python_repair_prompt(
+        self,
+        query: str,
+        failed_sql: str | None,
+        failed_python: str | None,
+        error_message: str,
+    ) -> str:
+        sql_block = failed_sql or "未提供 SQL"
+        python_block = failed_python or "未提供 Python"
+        return f"""上一步 Python 执行失败，请修复后重新给出完整答复。
+
+原始问题：
+{query}
+
+当前 SQL：
+```sql
+{sql_block}
+```
+
+失败 Python：
+```python
+{python_block}
+```
+
+Python 错误：
+{error_message}
+
+要求：
+1. 若 SQL 无需修改，请保留原 SQL；若确实有问题，也一并修正。
+2. 如果还需要 Python 分析，必须返回新的 ```python 代码块。
+3. 代码只能使用 pandas、numpy、sklearn、matplotlib、seaborn、scipy，并直接使用已注入的 df。
+4. 不要访问文件、网络或系统资源。
+"""
+
+    def _build_repair_messages(
+        self,
+        query: str,
+        system_prompt: str,
+        previous_content: str,
+        repair_prompt: str,
+        db_config: dict[str, Any] | None = None,
+        history: list[dict[str, str]] | None = None,
+    ) -> list[dict[str, str]]:
+        messages = self._build_initial_messages(
+            query=query,
+            system_prompt=system_prompt,
+            db_config=db_config,
+            history=history,
+        )
+        messages.append({"role": "assistant", "content": previous_content})
+        messages.append({"role": "user", "content": repair_prompt})
+        return messages
+
+    async def _stream_completion(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        phase: str,
+        attempt: int,
+        content_holder: list[str],
+        stop_checker: Callable[[], bool] | None = None,
+    ) -> AsyncGenerator[SSEEvent, None]:
+        import litellm
+
+        response = await litellm.acompletion(
+            model=self.model,
+            custom_llm_provider=self.provider,
+            messages=messages,
+            stream=True,
+            api_key=self.api_key,
+            base_url=self.base_url,
+            extra_headers=self.headers or None,
+            extra_query=self.query_params or None,
+        )
+
+        full_content = ""
+        sent_thinking: set[str] = set()
+
+        async for chunk in response:
+            if stop_checker and stop_checker():
+                raise StopRequestedError("查询已取消")
+
+            delta = chunk.choices[0].delta
+            if not delta.content:
+                continue
+
+            full_content += delta.content
+            for thinking in self._parse_thinking(full_content):
+                if thinking not in sent_thinking:
+                    yield SSEEvent.thinking(thinking, detail=f"{phase}:{attempt}")
+                    sent_thinking.add(thinking)
+
+        content_holder.append(full_content)
+
+    def _build_diagnostic_entry(
+        self,
+        *,
+        attempt: int,
+        phase: str,
+        status: str,
+        message: str,
+        error_code: str | None = None,
+        error_category: str | None = None,
+        recoverable: bool | None = None,
+        sql: str | None = None,
+        python: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "attempt": attempt,
+            "phase": phase,
+            "status": status,
+            "message": message,
+            "error_code": error_code,
+            "error_category": error_category,
+            "recoverable": recoverable,
+            "sql": _truncate_text(sql),
+            "python": _truncate_text(python),
+        }
+
+    def _categorize_generation_failure(self, message: str) -> tuple[str, str, bool]:
+        category = categorize_model_error(message)
+        code_map = {
+            "auth": "MODEL_AUTH_ERROR",
+            "timeout": "MODEL_TIMEOUT",
+            "connection": "MODEL_CONNECTION_ERROR",
+            "model_not_found": "MODEL_NOT_FOUND",
+            "rate_limited": "MODEL_RATE_LIMITED",
+            "provider_format": "PROVIDER_FORMAT_ERROR",
+            "unknown": "MODEL_EXECUTION_ERROR",
+        }
+        recoverable = category in {"timeout", "rate_limited"}
+        return code_map.get(category, "MODEL_EXECUTION_ERROR"), category, recoverable
+
+    def _categorize_sql_error(self, message: str) -> tuple[str, str, bool]:
+        normalized = message.lower()
+        if any(
+            token in normalized
+            for token in (
+                "password authentication failed",
+                "access denied",
+                "authentication failed",
+                "login failed",
+            )
+        ):
+            return "DB_AUTH_ERROR", "connection", False
+        if any(
+            token in normalized
+            for token in (
+                "connection refused",
+                "could not connect",
+                "can't connect",
+                "server closed the connection",
+                "timed out",
+                "name or service not known",
+                "network is unreachable",
+            )
+        ):
+            return "DB_CONNECTION_ERROR", "connection", False
+        if any(token in normalized for token in ("syntax", "parse error", "sql syntax", "near ")):
+            return "SQL_SYNTAX_ERROR", "sql", True
+        if any(
+            token in normalized
+            for token in ("no such table", "doesn't exist", "undefined table", "unknown table")
+        ):
+            return "SQL_TABLE_ERROR", "schema", True
+        if any(
+            token in normalized
+            for token in ("no such column", "unknown column", "undefined column", "ambiguous column")
+        ):
+            return "SQL_COLUMN_ERROR", "schema", True
+        if any(
+            token in normalized
+            for token in ("只允许执行只读查询", "危险关键字", "多语句", "sql 注释", "只读查询")
+        ):
+            return "SQL_SAFETY_ERROR", "safety", False
+        return "SQL_EXECUTION_ERROR", "sql", True
+
+    def _categorize_python_error(self, message: str) -> tuple[str, str, bool]:
+        normalized = message.lower()
+        if "检测到不安全的操作" in message:
+            return "PYTHON_SECURITY_ERROR", "safety", False
+        if "语法错误" in message or "syntaxerror" in normalized:
+            return "PYTHON_SYNTAX_ERROR", "python", True
+        if "timed out" in normalized or "timeout" in normalized:
+            return "PYTHON_TIMEOUT", "python", True
+        if any(
+            token in normalized
+            for token in (
+                "nameerror",
+                "attributeerror",
+                "typeerror",
+                "valueerror",
+                "keyerror",
+                "indexerror",
+                "modulenotfounderror",
+                "runtimeerror",
+                "执行错误",
+            )
+        ):
+            return "PYTHON_RUNTIME_ERROR", "python", True
+        return "PYTHON_EXECUTION_ERROR", "python", True
+
     async def execute(
         self,
         query: str,
@@ -318,12 +596,12 @@ plt.rcParams['font.size'] = 12
         logger.info("GptmeEngine.execute called", model=self.model, query_preview=query[:50])
 
         try:
-            # API key 和 base_url 直接传递给 litellm.acompletion
-            # 不再设置全局环境变量，避免多用户环境下的污染
-            logger.info("Yielding initializing event...")
-            yield SSEEvent.progress("initializing", "正在初始化 AI 引擎...")
-
-            # 使用 LiteLLM 执行
+            yield SSEEvent.progress(
+                "initializing",
+                "正在初始化 AI 引擎...",
+                attempt=1,
+                phase="initializing",
+            )
             async for event in self._execute_with_litellm(
                 query=query,
                 system_prompt=system_prompt,
@@ -332,9 +610,23 @@ plt.rcParams['font.size'] = 12
                 stop_checker=stop_checker,
             ):
                 yield event
-
+        except StopRequestedError as e:
+            yield SSEEvent.error(
+                "CANCELLED",
+                str(e),
+                error_category="cancelled",
+                failed_stage="cancelled",
+                attempt=1,
+            )
         except Exception as e:
-            yield SSEEvent.error("EXECUTION_ERROR", str(e))
+            code, category, _ = self._categorize_generation_failure(str(e))
+            yield SSEEvent.error(
+                code,
+                str(e),
+                error_category=category,
+                failed_stage="engine",
+                attempt=1,
+            )
 
     async def _execute_with_litellm(
         self,
@@ -345,143 +637,415 @@ plt.rcParams['font.size'] = 12
         stop_checker: Callable[[], bool] | None = None,
     ) -> AsyncGenerator[SSEEvent, None]:
         """使用 LiteLLM 执行查询"""
-        try:
-            import litellm
+        diagnostics: list[dict[str, Any]] = []
+        completion_messages = self._build_initial_messages(
+            query=query,
+            system_prompt=system_prompt,
+            db_config=db_config,
+            history=history,
+        )
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-            ]
+        full_content = ""
+        final_sql: str | None = None
+        final_python: str | None = None
+        final_data: list[dict] | None = None
+        final_rows_count: int | None = None
+        final_execution_time: float | None = None
+        python_output: str | None = None
+        python_images: list[str] = []
+        attempt = 1
 
-            if db_config:
-                db_context = self._build_db_context(db_config)
-                messages.append({"role": "system", "content": db_context})
-
-            # 添加对话历史（不包括当前查询，因为当前查询会单独添加）
-            if history:
-                # 过滤掉最后一条用户消息（如果和当前查询相同）
-                for msg in history:
-                    if msg.get("role") in ("user", "assistant") and msg.get("content"):
-                        messages.append({"role": msg["role"], "content": msg["content"]})
-                logger.info(f"Added {len(history)} history messages to context")
-
-            messages.append({"role": "user", "content": query})
-
-            yield SSEEvent.progress("generating", "正在生成响应...")
-
-            # 流式调用
-            response = await litellm.acompletion(
-                model=self.model,
-                messages=messages,
-                stream=True,
-                api_key=self.api_key,
-                base_url=self.base_url,
+        while attempt <= MAX_AUTO_REPAIR_ATTEMPTS:
+            yield SSEEvent.progress(
+                "generating",
+                "正在生成响应..." if attempt == 1 else f"正在进行第 {attempt} 次自动修复...",
+                attempt=attempt,
+                phase="generate",
             )
 
-            full_content = ""
-            sent_thinking = set()  # 已发送的思考标记
+            content_holder: list[str] = []
+            try:
+                async for event in self._stream_completion(
+                    completion_messages,
+                    phase="generate",
+                    attempt=attempt,
+                    content_holder=content_holder,
+                    stop_checker=stop_checker,
+                ):
+                    yield event
+            except StopRequestedError:
+                raise
+            except Exception as e:
+                code, category, recoverable = self._categorize_generation_failure(str(e))
+                diagnostic = self._build_diagnostic_entry(
+                    attempt=attempt,
+                    phase="generate",
+                    status="error",
+                    message=f"模型生成失败: {e}",
+                    error_code=code,
+                    error_category=category,
+                    recoverable=recoverable,
+                )
+                diagnostics.append(diagnostic)
+                yield SSEEvent.progress(
+                    "generating",
+                    diagnostic["message"],
+                    attempt=attempt,
+                    phase="generate",
+                    diagnostic_entry=diagnostic,
+                )
+                if recoverable and attempt < MAX_AUTO_REPAIR_ATTEMPTS:
+                    repair_entry = self._build_diagnostic_entry(
+                        attempt=attempt + 1,
+                        phase="generate",
+                        status="repaired",
+                        message="模型调用失败，正在自动重试。",
+                        error_code=code,
+                        error_category=category,
+                        recoverable=True,
+                    )
+                    diagnostics.append(repair_entry)
+                    yield SSEEvent.progress(
+                        "generating",
+                        repair_entry["message"],
+                        attempt=attempt + 1,
+                        phase="generate",
+                        diagnostic_entry=repair_entry,
+                    )
+                    attempt += 1
+                    continue
+                yield SSEEvent.error(
+                    code,
+                    str(e),
+                    error_category=category,
+                    failed_stage="generate",
+                    attempt=attempt,
+                    diagnostics=diagnostics,
+                )
+                return
 
-            async for chunk in response:
-                if stop_checker and stop_checker():
-                    break
+            full_content = content_holder[0] if content_holder else ""
+            final_sql = self._extract_sql(full_content)
+            final_python = self._extract_python(full_content)
+            chart_config = self._extract_chart_config(full_content)
 
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    full_content += delta.content
-
-                    # 实时解析并发送思考标记
-                    for thinking in self._parse_thinking(full_content):
-                        if thinking not in sent_thinking:
-                            yield SSEEvent.thinking(thinking)
-                            sent_thinking.add(thinking)
-
-            # 解析结果
-            sql_code = self._extract_sql(full_content)
-            python_code = self._extract_python(full_content)
-
-            # 调试日志
             logger.debug(
                 "AI content extracted",
                 content_length=len(full_content),
-                has_sql=bool(sql_code),
-                has_python=bool(python_code),
+                has_sql=bool(final_sql),
+                has_python=bool(final_python),
             )
 
-            # 如果有 SQL 和数据库配置，尝试执行
-            data = None
-            rows_count = None
-            execution_time = None
+            if db_config and not final_sql:
+                diagnostic = self._build_diagnostic_entry(
+                    attempt=attempt,
+                    phase="generate",
+                    status="error",
+                    message="模型回复缺少可执行 SQL，正在自动补全。",
+                    error_code="MISSING_SQL",
+                    error_category="sql",
+                    recoverable=attempt < MAX_AUTO_REPAIR_ATTEMPTS,
+                )
+                diagnostics.append(diagnostic)
+                yield SSEEvent.progress(
+                    "generating",
+                    diagnostic["message"],
+                    attempt=attempt,
+                    phase="generate",
+                    diagnostic_entry=diagnostic,
+                )
+                if attempt >= MAX_AUTO_REPAIR_ATTEMPTS:
+                    yield SSEEvent.error(
+                        "MISSING_SQL",
+                        "模型没有生成可执行 SQL。",
+                        error_category="sql",
+                        failed_stage="generate",
+                        attempt=attempt,
+                        diagnostics=diagnostics,
+                    )
+                    return
 
-            if sql_code and db_config:
-                yield SSEEvent.progress("executing_sql", "正在执行 SQL 查询...")
+                completion_messages = self._build_repair_messages(
+                    query=query,
+                    system_prompt=system_prompt,
+                    previous_content=full_content,
+                    repair_prompt=self._build_missing_sql_prompt(query),
+                    db_config=db_config,
+                    history=history,
+                )
+                repair_entry = self._build_diagnostic_entry(
+                    attempt=attempt + 1,
+                    phase="generate",
+                    status="repaired",
+                    message="已触发 SQL 自动补全。",
+                    error_code="MISSING_SQL",
+                    error_category="sql",
+                    recoverable=True,
+                )
+                diagnostics.append(repair_entry)
+                yield SSEEvent.progress(
+                    "generating",
+                    repair_entry["message"],
+                    attempt=attempt + 1,
+                    phase="generate",
+                    diagnostic_entry=repair_entry,
+                )
+                attempt += 1
+                continue
+
+            if final_sql and db_config:
+                yield SSEEvent.progress(
+                    "executing_sql",
+                    "正在执行 SQL 查询...",
+                    attempt=attempt,
+                    phase="sql",
+                )
                 start_time = time.time()
-
                 try:
-                    data, rows_count = await self._execute_sql(sql_code, db_config)
-                    execution_time = time.time() - start_time
+                    final_data, final_rows_count = await self._execute_sql(final_sql, db_config)
+                    final_execution_time = time.time() - start_time
 
-                    # 将 SQL 结果注入 Python 环境供后续分析使用
-                    if data:
-                        self._inject_sql_data("df", data)
-                        self._inject_sql_data("query_result", data)
+                    if final_data:
+                        self._inject_sql_data("df", final_data)
+                        self._inject_sql_data("query_result", final_data)
+
+                    diagnostic = self._build_diagnostic_entry(
+                        attempt=attempt,
+                        phase="sql",
+                        status="success",
+                        message=f"SQL 执行成功，返回 {final_rows_count or 0} 行。",
+                        sql=final_sql,
+                    )
+                    diagnostics.append(diagnostic)
+                    yield SSEEvent.progress(
+                        "executing_sql",
+                        diagnostic["message"],
+                        attempt=attempt,
+                        phase="sql",
+                        diagnostic_entry=diagnostic,
+                    )
                 except Exception as e:
-                    full_content += f"\n\n⚠️ SQL 执行错误: {str(e)}"
+                    code, category, recoverable = self._categorize_sql_error(str(e))
+                    diagnostic = self._build_diagnostic_entry(
+                        attempt=attempt,
+                        phase="sql",
+                        status="error",
+                        message=f"SQL 执行失败: {e}",
+                        error_code=code,
+                        error_category=category,
+                        recoverable=recoverable,
+                        sql=final_sql,
+                    )
+                    diagnostics.append(diagnostic)
+                    yield SSEEvent.progress(
+                        "executing_sql",
+                        diagnostic["message"],
+                        attempt=attempt,
+                        phase="sql",
+                        diagnostic_entry=diagnostic,
+                    )
+                    if recoverable and attempt < MAX_AUTO_REPAIR_ATTEMPTS:
+                        completion_messages = self._build_repair_messages(
+                            query=query,
+                            system_prompt=system_prompt,
+                            previous_content=full_content,
+                            repair_prompt=self._build_sql_repair_prompt(
+                                query=query,
+                                failed_sql=final_sql,
+                                error_message=str(e),
+                            ),
+                            db_config=db_config,
+                            history=history,
+                        )
+                        repair_entry = self._build_diagnostic_entry(
+                            attempt=attempt + 1,
+                            phase="sql",
+                            status="repaired",
+                            message="SQL 失败可恢复，正在自动修复并重试。",
+                            error_code=code,
+                            error_category=category,
+                            recoverable=True,
+                            sql=final_sql,
+                        )
+                        diagnostics.append(repair_entry)
+                        yield SSEEvent.progress(
+                            "executing_sql",
+                            repair_entry["message"],
+                            attempt=attempt + 1,
+                            phase="sql",
+                            diagnostic_entry=repair_entry,
+                        )
+                        attempt += 1
+                        continue
+                    yield SSEEvent.error(
+                        code,
+                        f"SQL 执行失败: {e}",
+                        error_category=category,
+                        failed_stage="sql",
+                        attempt=attempt,
+                        diagnostics=diagnostics,
+                    )
+                    return
 
-            # 如果有 Python 代码，执行它
-            python_output = None
-            python_images = []
-
-            if python_code:
-                logger.debug("Executing Python code")
-                yield SSEEvent.progress("executing_python", "正在执行 Python 分析...")
+            if final_python:
+                logger.debug("Executing Python code", attempt=attempt)
+                yield SSEEvent.progress(
+                    "executing_python",
+                    "正在执行 Python 分析...",
+                    attempt=attempt,
+                    phase="python",
+                )
 
                 try:
-                    python_output, python_images = await self._execute_python(python_code)
-                    logger.debug(
-                        "Python execution completed",
-                        output_length=len(python_output) if python_output else 0,
-                        images_count=len(python_images),
+                    python_output, python_images = await self._execute_python(final_python)
+                    diagnostic = self._build_diagnostic_entry(
+                        attempt=attempt,
+                        phase="python",
+                        status="success",
+                        message="Python 分析执行完成。",
+                        python=final_python,
+                    )
+                    diagnostics.append(diagnostic)
+                    yield SSEEvent.progress(
+                        "executing_python",
+                        diagnostic["message"],
+                        attempt=attempt,
+                        phase="python",
+                        diagnostic_entry=diagnostic,
                     )
 
-                    # 发送 Python 输出
                     if python_output:
-                        logger.debug("Sending python_output event")
                         yield SSEEvent.python_output(python_output, "stdout")
 
-                    # 发送 Python 生成的图表
-                    for i, img_base64 in enumerate(python_images):
-                        logger.debug(
-                            "Sending python_image event",
-                            index=i + 1,
-                            total=len(python_images),
-                            image_size=len(img_base64),
-                        )
+                    for img_base64 in python_images:
                         yield SSEEvent.python_image(img_base64, "png")
 
                 except Exception as e:
-                    logger.error("Python execution error", error=str(e))
-                    yield SSEEvent.python_output(f"⚠️ Python 执行错误: {str(e)}", "stderr")
+                    code, category, recoverable = self._categorize_python_error(str(e))
+                    diagnostic = self._build_diagnostic_entry(
+                        attempt=attempt,
+                        phase="python",
+                        status="error",
+                        message=f"Python 执行失败: {e}",
+                        error_code=code,
+                        error_category=category,
+                        recoverable=recoverable,
+                        sql=final_sql,
+                        python=final_python,
+                    )
+                    diagnostics.append(diagnostic)
+                    yield SSEEvent.progress(
+                        "executing_python",
+                        diagnostic["message"],
+                        attempt=attempt,
+                        phase="python",
+                        diagnostic_entry=diagnostic,
+                    )
+                    if recoverable and attempt < MAX_AUTO_REPAIR_ATTEMPTS:
+                        completion_messages = self._build_repair_messages(
+                            query=query,
+                            system_prompt=system_prompt,
+                            previous_content=full_content,
+                            repair_prompt=self._build_python_repair_prompt(
+                                query=query,
+                                failed_sql=final_sql,
+                                failed_python=final_python,
+                                error_message=str(e),
+                            ),
+                            db_config=db_config,
+                            history=history,
+                        )
+                        repair_entry = self._build_diagnostic_entry(
+                            attempt=attempt + 1,
+                            phase="python",
+                            status="repaired",
+                            message="Python 失败可恢复，正在自动修复并重试。",
+                            error_code=code,
+                            error_category=category,
+                            recoverable=True,
+                            python=final_python,
+                        )
+                        diagnostics.append(repair_entry)
+                        yield SSEEvent.progress(
+                            "executing_python",
+                            repair_entry["message"],
+                            attempt=attempt + 1,
+                            phase="python",
+                            diagnostic_entry=repair_entry,
+                        )
+                        attempt += 1
+                        continue
+                    yield SSEEvent.error(
+                        code,
+                        f"Python 执行失败: {e}",
+                        error_category=category,
+                        failed_stage="python",
+                        attempt=attempt,
+                        diagnostics=diagnostics,
+                    )
+                    return
 
-            # 从 AI 输出中提取图表配置
-            chart_config = self._extract_chart_config(full_content)
-
-            # 清理输出内容，只保留纯文本总结
             clean_content = self._clean_content_for_display(full_content)
-
             yield SSEEvent.result(
-                content=clean_content,
-                sql=sql_code,
-                data=data,
-                rows_count=rows_count,
-                execution_time=execution_time,
+                content=clean_content or "分析完成",
+                sql=final_sql,
+                data=final_data,
+                rows_count=final_rows_count,
+                execution_time=final_execution_time,
+                diagnostics=diagnostics,
             )
 
-            # 如果 Python 已生成图表，跳过自动图表生成
             if python_images:
-                pass  # Python 图表已通过 python_image 事件发送
-            # 如果 AI 提供了图表配置且有数据，生成可视化
-            elif chart_config and data and len(data) > 0:
-                # 构建图表数据
-                visualization = self._build_chart_from_config(chart_config, data)
+                return
+
+            if chart_config and final_data and len(final_data) > 0:
+                visualization = self._build_chart_from_config(chart_config, final_data)
+                if visualization:
+                    diagnostic = self._build_diagnostic_entry(
+                        attempt=attempt,
+                        phase="chart",
+                        status="success",
+                        message="已按模型提供的图表配置生成可视化。",
+                    )
+                    diagnostics.append(diagnostic)
+                    yield SSEEvent.progress(
+                        "visualizing",
+                        diagnostic["message"],
+                        attempt=attempt,
+                        phase="chart",
+                        diagnostic_entry=diagnostic,
+                    )
+                    yield SSEEvent.visualization(
+                        chart_type=visualization.get("type", "bar"),
+                        chart_data={
+                            "data": visualization.get("data", []),
+                            "xKey": visualization.get("xKey"),
+                            "yKeys": visualization.get("yKeys"),
+                            "title": visualization.get("title"),
+                        },
+                    )
+                    return
+
+                fallback_diag = self._build_diagnostic_entry(
+                    attempt=attempt,
+                    phase="chart",
+                    status="repaired",
+                    message="模型图表配置无效，已回退到自动图表生成。",
+                    error_code="CHART_CONFIG_INVALID",
+                    error_category="chart",
+                    recoverable=True,
+                )
+                diagnostics.append(fallback_diag)
+                yield SSEEvent.progress(
+                    "visualizing",
+                    fallback_diag["message"],
+                    attempt=attempt,
+                    phase="chart",
+                    diagnostic_entry=fallback_diag,
+                )
+
+            if final_data and len(final_data) > 0:
+                visualization = self._generate_visualization(final_data, query)
                 if visualization:
                     yield SSEEvent.visualization(
                         chart_type=visualization.get("type", "bar"),
@@ -492,21 +1056,9 @@ plt.rcParams['font.size'] = 12
                             "title": visualization.get("title"),
                         },
                     )
-            elif data and len(data) > 0:
-                # 如果 AI 没有提供图表配置，使用后备的自动生成逻辑
-                visualization = self._generate_visualization(data, query)
-                if visualization:
-                    yield SSEEvent.visualization(
-                        chart_type=visualization.get("type", "bar"),
-                        chart_data={
-                            "data": visualization.get("data", []),
-                            "xKey": visualization.get("xKey"),
-                            "yKeys": visualization.get("yKeys"),
-                        },
-                    )
+                return
 
-        except Exception as e:
-            yield SSEEvent.error("LITELLM_ERROR", str(e))
+            return
 
     async def _execute_sql(
         self,
@@ -582,7 +1134,7 @@ plt.rcParams['font.size'] = 12
                     images.append(img_base64)
                 plt.close("all")
 
-            # 如果有执行错误，添加详细信息
+            # 如果有执行错误，抛出异常交给上层做自动修复
             if result.error_in_exec:
                 error_msg = "".join(
                     traceback.format_exception(
@@ -591,17 +1143,21 @@ plt.rcParams['font.size'] = 12
                         result.error_in_exec.__traceback__,
                     )
                 )
-                output += f"\n执行错误:\n{error_msg}"
+                combined_output = output.strip()
+                if combined_output:
+                    error_msg = f"{combined_output}\n\n执行错误:\n{error_msg}"
+                raise RuntimeError(error_msg)
             elif result.error_before_exec:
-                output += f"\n语法错误: {result.error_before_exec}"
+                combined_output = output.strip()
+                syntax_error = f"语法错误: {result.error_before_exec}"
+                if combined_output:
+                    syntax_error = f"{combined_output}\n\n{syntax_error}"
+                raise SyntaxError(syntax_error)
 
             return output if output else None, images
 
-        except Exception:
-            error_msg = traceback.format_exc()
-            return f"Python 执行异常:\n{error_msg}", []
-
         finally:
+            plt.close("all")
             sys.stdout = old_stdout
             sys.stderr = old_stderr
 

@@ -64,6 +64,7 @@ class SSEEvent(BaseModel):
         data: list[dict] | None = None,
         rows_count: int | None = None,
         execution_time: float | None = None,
+        **extra: Any,
     ) -> "SSEEvent":
         """创建结果事件"""
         return cls(
@@ -74,6 +75,7 @@ class SSEEvent(BaseModel):
                 "data": data,
                 "rows_count": rows_count,
                 "execution_time": execution_time,
+                **extra,
             },
         )
 
@@ -94,11 +96,11 @@ class SSEEvent(BaseModel):
         )
 
     @classmethod
-    def error(cls, code: str, message: str) -> "SSEEvent":
+    def error(cls, code: str, message: str, **extra: Any) -> "SSEEvent":
         """创建错误事件"""
         return cls(
             type=SSEEventType.ERROR,
-            data={"code": code, "message": message},
+            data={"code": code, "message": message, **extra},
         )
 
     @classmethod
@@ -149,7 +151,7 @@ class ChatRequest(BaseModel):
     conversation_id: UUID | None = Field(default=None, description="对话 ID")
     connection_id: UUID | None = Field(default=None, description="数据库连接 ID")
     language: Literal["zh", "en"] = Field(default="zh", description="语言")
-    context_rounds: int = Field(default=3, ge=0, le=10, description="上下文轮数")
+    context_rounds: int = Field(default=5, ge=1, le=20, description="上下文轮数")
 
 
 class ChatStopRequest(BaseModel):
@@ -166,3 +168,4 @@ class ChatStreamParams(BaseModel):
     conversation_id: UUID | None = Field(default=None, description="对话 ID")
     connection_id: UUID | None = Field(default=None, description="数据库连接 ID")
     language: Literal["zh", "en"] = Field(default="zh", description="语言")
+    context_rounds: int = Field(default=5, ge=1, le=20, description="上下文轮数")

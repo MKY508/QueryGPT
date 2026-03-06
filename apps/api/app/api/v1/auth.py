@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.demo_db import get_demo_db_path
 from app.db import get_db
 from app.db.tables import Connection, User
-from app.models import APIResponse, Token, UserCreate, UserLogin, UserResponse
+from app.models import APIResponse, Token, TokenRefresh, UserCreate, UserLogin, UserResponse
 
 router = APIRouter()
 
@@ -105,20 +105,20 @@ async def login(
 
 @router.post("/refresh", response_model=APIResponse[Token])
 async def refresh_token(
-    refresh_token: str,
+    payload: TokenRefresh,
     db: AsyncSession = Depends(get_db),
 ):
     """刷新访问令牌"""
     from app.core import decode_token
 
-    payload = decode_token(refresh_token)
-    if not payload or payload.get("type") != "refresh":
+    decoded = decode_token(payload.refresh_token)
+    if not decoded or decoded.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的刷新令牌",
         )
 
-    user_id = payload.get("sub")
+    user_id = decoded.get("sub")
     result = await db.execute(select(User).where(User.id == UUID(user_id)))
     user = result.scalar_one_or_none()
 

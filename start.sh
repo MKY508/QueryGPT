@@ -44,6 +44,21 @@ check_command() {
     command -v "$1" &> /dev/null
 }
 
+# 构建后端启动参数
+build_backend_args() {
+    local backend_host="${QUERYGPT_BACKEND_HOST:-127.0.0.1}"
+    BACKEND_ARGS=(--host "$backend_host" --port 8000)
+    info "后端监听地址: $backend_host:8000"
+
+    # 默认关闭热重载，保证后台一键启动更稳定。
+    if [ "${QUERYGPT_BACKEND_RELOAD:-0}" = "1" ]; then
+        BACKEND_ARGS+=(--reload)
+        info "后端启动模式: 热重载"
+    else
+        info "后端启动模式: 稳定模式（关闭热重载）"
+    fi
+}
+
 # 激活 Python 虚拟环境
 activate_venv() {
     if [ "$OS" = "windows" ]; then
@@ -357,9 +372,10 @@ start_backend() {
 
     cd "$SCRIPT_DIR/apps/api"
     activate_venv
+    build_backend_args
 
     # 后台启动（显式使用 venv 内的 Python，避免解析到系统解释器）
-    nohup "$SCRIPT_DIR/apps/api/.venv/bin/python" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > "$SCRIPT_DIR/logs/backend.log" 2>&1 &
+    nohup "$SCRIPT_DIR/apps/api/.venv/bin/python" -m uvicorn app.main:app "${BACKEND_ARGS[@]}" > "$SCRIPT_DIR/logs/backend.log" 2>&1 &
     echo $! > "$SCRIPT_DIR/.backend.pid"
 
     success "后端服务已启动 (PID: $(cat "$SCRIPT_DIR/.backend.pid"))"
@@ -437,6 +453,10 @@ show_help() {
     echo "  frontend   仅启动前端"
     echo "  setup      仅安装依赖"
     echo "  help       显示此帮助"
+    echo ""
+    echo "环境变量:"
+    echo "  QUERYGPT_BACKEND_RELOAD=1   启用 uvicorn 热重载"
+    echo "  QUERYGPT_BACKEND_HOST=0.0.0.0   修改后端监听地址"
 }
 
 # 查看日志

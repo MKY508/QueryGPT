@@ -177,6 +177,13 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family:
+      "SF Pro Text",
+      "PingFang SC",
+      "Hiragino Sans GB",
+      "Microsoft YaHei",
+      "Noto Sans CJK SC",
+      sans-serif;
   }
 
   /* 自定义滚动条样式 */

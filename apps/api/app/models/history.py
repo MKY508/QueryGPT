@@ -29,9 +29,7 @@ class MessageResponse(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def map_extra_data_to_metadata(cls, data: Any) -> Any:
-        """将 ORM 的 extra_data 字段映射到 metadata"""
         if hasattr(data, "extra_data"):
-            # ORM 对象
             return {
                 "id": data.id,
                 "role": data.role,
@@ -39,8 +37,7 @@ class MessageResponse(BaseModel):
                 "metadata": data.extra_data,
                 "created_at": data.created_at,
             }
-        elif isinstance(data, dict) and "extra_data" in data:
-            # 字典形式
+        if isinstance(data, dict) and "extra_data" in data:
             data["metadata"] = data.pop("extra_data")
         return data
 
@@ -53,7 +50,15 @@ class MessageMetadata(BaseModel):
     rows_count: int | None = None
     steps: list[dict[str, str]] | None = None
     visualization: dict[str, Any] | None = None
+    data: list[dict[str, Any]] | None = None
+    python_output: str | None = None
+    python_images: list[str] | None = None
     error: str | None = None
+    error_code: str | None = None
+    error_category: str | None = None
+    original_query: str | None = None
+    execution_context: dict[str, Any] | None = None
+    diagnostics: list[dict[str, Any]] | None = None
 
 
 class ConversationCreate(BaseModel):
@@ -64,12 +69,35 @@ class ConversationCreate(BaseModel):
     connection_id: UUID | None = Field(default=None, description="数据库连接 ID")
 
 
+def _conversation_snapshot(data: Any) -> dict[str, Any]:
+    extra_data = getattr(data, "extra_data", None) or {}
+    return {
+        "id": data.id,
+        "title": data.title,
+        "model": extra_data.get("model_name"),
+        "model_id": data.model_id,
+        "connection_id": data.connection_id,
+        "connection_name": extra_data.get("connection_name"),
+        "provider_summary": extra_data.get("provider_summary"),
+        "context_rounds": extra_data.get("context_rounds"),
+        "is_favorite": data.is_favorite,
+        "status": data.status,
+        "created_at": data.created_at,
+        "updated_at": data.updated_at,
+    }
+
+
 class ConversationSummary(BaseModel):
     """对话摘要（列表用）"""
 
     id: UUID
     title: str | None
     model: str | None = None
+    model_id: UUID | None = None
+    connection_id: UUID | None = None
+    connection_name: str | None = None
+    provider_summary: str | None = None
+    context_rounds: int | None = None
     is_favorite: bool = False
     message_count: int = 0
     status: Literal["active", "completed", "error"] = "active"
@@ -78,6 +106,13 @@ class ConversationSummary(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @model_validator(mode="before")
+    @classmethod
+    def map_snapshot(cls, data: Any) -> Any:
+        if hasattr(data, "extra_data"):
+            return _conversation_snapshot(data)
+        return data
+
 
 class ConversationResponse(BaseModel):
     """对话详情响应"""
@@ -85,7 +120,11 @@ class ConversationResponse(BaseModel):
     id: UUID
     title: str | None
     model: str | None = None
+    model_id: UUID | None = None
     connection_id: UUID | None = None
+    connection_name: str | None = None
+    provider_summary: str | None = None
+    context_rounds: int | None = None
     is_favorite: bool = False
     status: Literal["active", "completed", "error"] = "active"
     messages: list[MessageResponse] = []
@@ -97,9 +136,8 @@ class ConversationResponse(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def convert_messages(cls, data: Any) -> Any:
-        """手动转换嵌套的消息列表，确保 extra_data 映射到 metadata"""
         if hasattr(data, "messages"):
-            # ORM 对象 - 手动转换每个消息
+            snapshot = _conversation_snapshot(data)
             messages = []
             for msg in data.messages:
                 messages.append(
@@ -112,15 +150,8 @@ class ConversationResponse(BaseModel):
                     }
                 )
             return {
-                "id": data.id,
-                "title": data.title,
-                "model": getattr(data, "model", None),
-                "connection_id": data.connection_id,
-                "is_favorite": data.is_favorite,
-                "status": data.status,
+                **snapshot,
                 "messages": messages,
-                "created_at": data.created_at,
-                "updated_at": data.updated_at,
             }
         return data
 

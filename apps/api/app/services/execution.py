@@ -21,6 +21,7 @@ from app.models import (
     SSEEvent,
     TableRelationshipResponse,
 )
+from app.services.model_runtime import resolve_model_runtime
 
 logger = structlog.get_logger()
 
@@ -35,68 +36,119 @@ class ExecutionService:
         model_name: str | None = None,
         connection_id: UUID | None = None,
         language: str = "zh",
+        context_rounds: int = 5,
     ):
         self.user = user
         self.db = db
         self.model_name = model_name
         self.connection_id = connection_id
         self.language = language
+        self.context_rounds = max(context_rounds, 1)
+        self._resolved_model_record: Model | None = None
+        self._resolved_connection_record: Connection | None = None
+        self._resolved_model_config: dict[str, Any] | None = None
+        self._resolved_connection_config: dict[str, Any] | None = None
 
-    async def _get_model_config(self) -> dict[str, Any]:
-        """获取模型配置"""
+    def _user_settings(self) -> dict[str, Any]:
+        settings_data = getattr(self.user, "settings", None)
+        return settings_data if isinstance(settings_data, dict) else {}
+
+    async def _get_model_record(self) -> Model | None:
+        if self._resolved_model_record is not None:
+            return self._resolved_model_record
+
+        model: Model | None = None
         if self.model_name:
-            # 尝试用 UUID id 查询
             try:
                 model_uuid = UUID(self.model_name)
                 result = await self.db.execute(
                     select(Model).where(
                         Model.user_id == self.user.id,
                         Model.id == model_uuid,
+                        Model.is_active.is_(True),
                     )
                 )
             except ValueError:
-                # 如果不是 UUID，用 model_id 查询
                 result = await self.db.execute(
                     select(Model).where(
                         Model.user_id == self.user.id,
                         Model.model_id == self.model_name,
+                        Model.is_active.is_(True),
                     )
                 )
             model = result.scalar_one_or_none()
         else:
-            result = await self.db.execute(
-                select(Model).where(
-                    Model.user_id == self.user.id,
-                    Model.is_default,
-                )
-            )
-            model = result.scalar_one_or_none()
-
-        if model:
-            api_key = None
-            if model.api_key_encrypted:
+            settings_data = self._user_settings()
+            default_model_id = settings_data.get("default_model_id")
+            if default_model_id:
                 try:
-                    api_key = encryptor.decrypt(model.api_key_encrypted)
-                except Exception:
-                    # 解密失败，使用默认 API key
-                    api_key = None
+                    result = await self.db.execute(
+                        select(Model).where(
+                            Model.user_id == self.user.id,
+                            Model.id == UUID(str(default_model_id)),
+                            Model.is_active.is_(True),
+                        )
+                    )
+                    model = result.scalar_one_or_none()
+                except ValueError:
+                    model = None
 
-            return {
-                "provider": model.provider,
-                "model": model.model_id,
-                "base_url": model.base_url,
-                "api_key": api_key or settings.OPENAI_API_KEY,
-            }
+            if model is None:
+                result = await self.db.execute(
+                    select(Model).where(
+                        Model.user_id == self.user.id,
+                        Model.is_default,
+                        Model.is_active.is_(True),
+                    )
+                )
+                model = result.scalar_one_or_none()
 
-        return {
-            "provider": "openai",
-            "model": settings.DEFAULT_MODEL,
-            "api_key": settings.OPENAI_API_KEY,
-            "base_url": settings.OPENAI_BASE_URL,
+        self._resolved_model_record = model
+        return model
+
+    async def _get_model_config(self) -> dict[str, Any]:
+        """获取模型配置"""
+        if self._resolved_model_config is not None:
+            return self._resolved_model_config
+
+        model = await self._get_model_record()
+        api_key = None
+        if model and model.api_key_encrypted:
+            try:
+                api_key = encryptor.decrypt(model.api_key_encrypted)
+            except Exception:
+                api_key = None
+
+        resolved, extra_options = resolve_model_runtime(
+            model,
+            fallback_model=settings.DEFAULT_MODEL,
+            fallback_api_key=api_key or settings.OPENAI_API_KEY,
+            fallback_base_url=settings.OPENAI_BASE_URL,
+        )
+
+        self._resolved_model_config = {
+            "provider": resolved.litellm_provider,
+            "resolved_provider": resolved.litellm_provider,
+            "source_provider": resolved.source_provider,
+            "model": resolved.model,
+            "display_name": resolved.display_name,
+            "base_url": resolved.base_url,
+            "api_key": resolved.api_key,
+            "api_format": resolved.api_format,
+            "api_key_required": resolved.api_key_required,
+            "headers": resolved.headers,
+            "query_params": resolved.query_params,
+            "healthcheck_mode": resolved.healthcheck_mode,
+            "extra_options": extra_options.model_dump(),
+            "model_id": str(model.id) if model else None,
         }
+        return self._resolved_model_config
 
-    async def _get_connection_config(self) -> dict[str, Any] | None:
-        """获取数据库连接配置"""
+    async def _get_connection_record(self) -> Connection | None:
+        if self._resolved_connection_record is not None:
+            return self._resolved_connection_record
+
+        connection: Connection | None = None
         if self.connection_id:
             result = await self.db.execute(
                 select(Connection).where(
@@ -106,13 +158,38 @@ class ExecutionService:
             )
             connection = result.scalar_one_or_none()
         else:
-            result = await self.db.execute(
-                select(Connection).where(
-                    Connection.user_id == self.user.id,
-                    Connection.is_default,
+            settings_data = self._user_settings()
+            default_connection_id = settings_data.get("default_connection_id")
+            if default_connection_id:
+                try:
+                    result = await self.db.execute(
+                        select(Connection).where(
+                            Connection.id == UUID(str(default_connection_id)),
+                            Connection.user_id == self.user.id,
+                        )
+                    )
+                    connection = result.scalar_one_or_none()
+                except ValueError:
+                    connection = None
+
+            if connection is None:
+                result = await self.db.execute(
+                    select(Connection).where(
+                        Connection.user_id == self.user.id,
+                        Connection.is_default,
+                    )
                 )
-            )
-            connection = result.scalar_one_or_none()
+                connection = result.scalar_one_or_none()
+
+        self._resolved_connection_record = connection
+        return connection
+
+    async def _get_connection_config(self) -> dict[str, Any] | None:
+        """获取数据库连接配置"""
+        if self._resolved_connection_config is not None:
+            return self._resolved_connection_config
+
+        connection = await self._get_connection_record()
 
         if not connection:
             return None
@@ -125,7 +202,7 @@ class ExecutionService:
                 # 解密失败，密码为空
                 password = None
 
-        return {
+        self._resolved_connection_config = {
             "driver": connection.driver,
             "host": connection.host,
             "port": connection.port,
@@ -133,9 +210,13 @@ class ExecutionService:
             "password": password,
             "database": connection.database_name,
         }
+        return self._resolved_connection_config
 
     async def _get_semantic_context(self) -> SemanticContext:
         """获取语义上下文"""
+        connection = await self._get_connection_record()
+        resolved_connection_id = connection.id if connection else None
+
         # 查询用户的语义术语（全局 + 当前连接）
         query = select(SemanticTerm).where(
             SemanticTerm.user_id == self.user.id,
@@ -143,10 +224,10 @@ class ExecutionService:
         )
 
         # 如果有指定连接，获取全局术语和该连接的术语
-        if self.connection_id:
+        if resolved_connection_id:
             query = query.where(
                 (SemanticTerm.connection_id.is_(None))
-                | (SemanticTerm.connection_id == self.connection_id)
+                | (SemanticTerm.connection_id == resolved_connection_id)
             )
         else:
             # 只获取全局术语
@@ -163,14 +244,15 @@ class ExecutionService:
         Args:
             max_relationships: 最大注入关系数量，防止超过 token 限制
         """
-        if not self.connection_id:
+        connection = await self._get_connection_record()
+        if not connection:
             return RelationshipContext(relationships=[])
 
         result = await self.db.execute(
             select(TableRelationship)
             .where(
                 TableRelationship.user_id == self.user.id,
-                TableRelationship.connection_id == self.connection_id,
+                TableRelationship.connection_id == connection.id,
                 TableRelationship.is_active.is_(True),
             )
             .limit(max_relationships)  # 限制数量
@@ -194,7 +276,10 @@ class ExecutionService:
         return prompt.content if prompt else None
 
     async def _get_conversation_history(
-        self, conversation_id: UUID, limit: int = 10
+        self,
+        conversation_id: UUID,
+        limit: int = 10,
+        exclude_message_id: UUID | None = None,
     ) -> list[dict[str, str]]:
         """获取对话历史消息
 
@@ -205,12 +290,10 @@ class ExecutionService:
         Returns:
             消息列表 [{"role": "user/assistant", "content": "..."}]
         """
-        result = await self.db.execute(
-            select(Message)
-            .where(Message.conversation_id == conversation_id)
-            .order_by(Message.created_at.desc())
-            .limit(limit)
-        )
+        query = select(Message).where(Message.conversation_id == conversation_id)
+        if exclude_message_id:
+            query = query.where(Message.id != exclude_message_id)
+        result = await self.db.execute(query.order_by(Message.created_at.desc()).limit(limit))
         messages = result.scalars().all()
 
         # 反转顺序，使最早的消息在前
@@ -222,10 +305,38 @@ class ExecutionService:
         logger.info(f"Loaded {len(history)} history messages for conversation {conversation_id}")
         return history
 
+    async def get_runtime_snapshot(self) -> dict[str, Any]:
+        model_config = await self._get_model_config()
+        connection = await self._get_connection_record()
+        source_provider = model_config.get("source_provider")
+        resolved_provider = model_config.get("resolved_provider") or model_config.get("provider")
+        api_format = model_config.get("api_format")
+        if source_provider and resolved_provider and source_provider != resolved_provider:
+            provider_summary = f"{source_provider} -> {resolved_provider} · {api_format}"
+        else:
+            provider_summary = f"{source_provider} · {api_format}" if source_provider else api_format
+
+        return {
+            "model_id": model_config.get("model_id"),
+            "model_name": model_config.get("display_name"),
+            "model_identifier": model_config.get("model"),
+            "source_provider": source_provider,
+            "resolved_provider": resolved_provider,
+            "provider_summary": provider_summary,
+            "connection_id": str(connection.id) if connection else None,
+            "connection_name": connection.name if connection else None,
+            "connection_driver": connection.driver if connection else None,
+            "connection_host": connection.host if connection else None,
+            "database_name": connection.database_name if connection else None,
+            "context_rounds": self.context_rounds,
+            "api_format": api_format,
+        }
+
     async def execute_stream(
         self,
         query: str,
         conversation_id: UUID,
+        exclude_message_id: UUID | None = None,
         stop_checker: Callable[[], bool] | None = None,
     ) -> AsyncGenerator[SSEEvent, None]:
         """流式执行查询"""
@@ -257,9 +368,14 @@ class ExecutionService:
             user_prompt = await self._get_user_prompt()
             logger.info(f"User prompt: {'custom' if user_prompt else 'default'}")
 
-            # 加载对话历史（不包括当前查询，因为当前查询还未保存）
+            # 加载对话历史（排除当前用户消息，避免重复注入）
             logger.info("Getting conversation history...")
-            history = await self._get_conversation_history(conversation_id, limit=10)
+            history_limit = max(self.context_rounds * 2, 1)
+            history = await self._get_conversation_history(
+                conversation_id,
+                limit=history_limit,
+                exclude_message_id=exclude_message_id,
+            )
 
             system_prompt = self._build_system_prompt(
                 db_config, semantic_context, relationship_context, user_prompt
@@ -267,8 +383,11 @@ class ExecutionService:
 
             engine = GptmeEngine(
                 model=model_config.get("model"),
+                provider=model_config.get("provider"),
                 api_key=model_config.get("api_key"),
                 base_url=model_config.get("base_url"),
+                headers=model_config.get("headers"),
+                query_params=model_config.get("query_params"),
             )
 
             logger.info("Starting engine.execute...")
@@ -283,7 +402,12 @@ class ExecutionService:
                 yield event
         except Exception as e:
             logger.exception(f"Error in execute_stream: {e}")
-            yield SSEEvent.error("EXECUTION_ERROR", str(e))
+            yield SSEEvent.error(
+                "EXECUTION_ERROR",
+                str(e),
+                error_category="execution",
+                failed_stage="execution",
+            )
 
     def _build_system_prompt(
         self,

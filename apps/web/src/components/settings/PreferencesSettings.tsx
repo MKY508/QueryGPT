@@ -11,6 +11,13 @@ interface UserConfig {
   language: string;
   theme: string;
   context_rounds: number;
+  default_model_id?: string | null;
+  default_connection_id?: string | null;
+}
+
+interface OptionItem {
+  id: string;
+  name: string;
 }
 
 export function PreferencesSettings() {
@@ -18,6 +25,8 @@ export function PreferencesSettings() {
     language: "zh",
     theme: "dawn",
     context_rounds: 5,
+    default_model_id: null,
+    default_connection_id: null,
   });
   const [hasChanges, setHasChanges] = useState(false);
   const queryClient = useQueryClient();
@@ -29,6 +38,22 @@ export function PreferencesSettings() {
     queryFn: async () => {
       const response = await api.get("/api/v1/config");
       return response.data.data as UserConfig;
+    },
+  });
+
+  const { data: models } = useQuery({
+    queryKey: ["models"],
+    queryFn: async () => {
+      const response = await api.get("/api/v1/config/models");
+      return response.data.data as OptionItem[];
+    },
+  });
+
+  const { data: connections } = useQuery({
+    queryKey: ["connections"],
+    queryFn: async () => {
+      const response = await api.get("/api/v1/config/connections");
+      return response.data.data as OptionItem[];
     },
   });
 
@@ -63,7 +88,7 @@ export function PreferencesSettings() {
     setFormData((prev) => ({ ...prev, theme: currentTheme }));
   }, [currentTheme]);
 
-  const handleChange = (key: keyof UserConfig, value: string | number) => {
+  const handleChange = (key: keyof UserConfig, value: string | number | null) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     setHasChanges(true);
   };
@@ -165,6 +190,50 @@ export function PreferencesSettings() {
           <p className="text-sm text-muted-foreground mt-1">
             AI 会记住最近 {formData.context_rounds} 轮对话作为上下文（1-20）
           </p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              默认模型
+            </label>
+            <select
+              value={formData.default_model_id || ""}
+              onChange={(e) => handleChange("default_model_id", e.target.value || null)}
+              className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="">跟随模型页默认项</option>
+              {models?.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-sm text-muted-foreground mt-1">
+              未手动选择模型时，聊天页优先使用这里的配置
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              默认数据库连接
+            </label>
+            <select
+              value={formData.default_connection_id || ""}
+              onChange={(e) => handleChange("default_connection_id", e.target.value || null)}
+              className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="">跟随连接页默认项</option>
+              {connections?.map((connection) => (
+                <option key={connection.id} value={connection.id}>
+                  {connection.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-sm text-muted-foreground mt-1">
+              新对话会优先使用这里指定的连接
+            </p>
+          </div>
         </div>
 
         {/* 保存按钮 */}

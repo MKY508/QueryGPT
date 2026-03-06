@@ -90,26 +90,6 @@ function getAccessToken(): string {
   return "";
 }
 
-// SSE 流式请求 - 使用 fetch + ReadableStream 替代 EventSource
-// 这样可以通过 headers 传递 token，更安全
-export function createEventSource(
-  url: string,
-  params: Record<string, string>
-): EventSource {
-  const searchParams = new URLSearchParams(params);
-  const fullUrl = `${API_URL}${url}?${searchParams.toString()}`;
-  const token = getAccessToken();
-
-  // 仍然使用 EventSource，但 token 通过 URL 传递
-  // 注意：这在生产环境中应该使用 HTTPS 来保护 token
-  // 更安全的方案是使用 fetch API，但需要修改 chat store 的实现
-  const eventSource = new EventSource(
-    `${fullUrl}&token=${encodeURIComponent(token)}`
-  );
-
-  return eventSource;
-}
-
 // SSE 事件类型
 interface SSEEvent {
   type: string;

@@ -14,12 +14,62 @@ export interface ChartDataPoint {
   [key: string]: string | number;
 }
 
+export interface ModelExtraOptions {
+  api_format?: "openai_compatible" | "anthropic_native" | "ollama_local" | "custom";
+  headers?: Record<string, string>;
+  query_params?: Record<string, string>;
+  api_key_optional?: boolean;
+  healthcheck_mode?: "chat_completion" | "models_list";
+}
+
+export interface ModelDiagnostics {
+  resolved_provider?: string;
+  resolved_base_url?: string;
+  api_format?: string;
+  api_key_required?: boolean;
+  error_category?: string;
+}
+
+export interface AgentTraceEntry {
+  attempt?: number;
+  phase?: string;
+  status?: "success" | "error" | "repaired" | "info";
+  message?: string;
+  error_code?: string;
+  error_category?: string;
+  recoverable?: boolean;
+  sql?: string;
+  python?: string;
+}
+
+export interface ExecutionContextSummary {
+  model_id?: string;
+  model_name?: string;
+  model_identifier?: string;
+  source_provider?: string;
+  resolved_provider?: string;
+  provider_summary?: string;
+  connection_id?: string;
+  connection_name?: string;
+  connection_driver?: string;
+  connection_host?: string;
+  database_name?: string;
+  context_rounds?: number;
+  api_format?: string;
+}
+
 // ===== SSE 事件类型 =====
 
 /** SSE 进度事件数据 */
 export interface SSEProgressData {
-  step: string;
+  step?: string;
+  stage?: string;
+  phase?: string;
+  attempt?: number;
   message: string;
+  conversation_id?: string;
+  execution_context?: ExecutionContextSummary;
+  diagnostic_entry?: AgentTraceEntry;
 }
 
 /** SSE 结果事件数据 */
@@ -29,6 +79,8 @@ export interface SSEResultData {
   data?: DataRow[];
   rows_count?: number;
   execution_time?: number;
+  execution_context?: ExecutionContextSummary;
+  diagnostics?: AgentTraceEntry[];
 }
 
 /** SSE 可视化事件数据 */
@@ -45,6 +97,12 @@ export interface SSEVisualizationData {
 export interface SSEErrorData {
   code: string;
   message: string;
+  error_category?: string;
+  failed_stage?: string;
+  attempt?: number;
+  conversation_id?: string;
+  execution_context?: ExecutionContextSummary;
+  diagnostics?: AgentTraceEntry[];
 }
 
 /** SSE 完成事件数据 */
@@ -93,10 +151,18 @@ export interface Visualization {
 /** 消息元数据 */
 export interface MessageMetadata {
   sql?: string;
+  execution_time?: number;
+  rows_count?: number;
   visualization?: Visualization;
   data?: DataRow[];
   python_output?: string;
   python_images?: string[];
+  error?: string;
+  error_code?: string;
+  error_category?: string;
+  original_query?: string;
+  execution_context?: ExecutionContextSummary;
+  diagnostics?: AgentTraceEntry[];
 }
 
 /** API 返回的消息 */
@@ -112,6 +178,12 @@ export interface APIMessage {
 export interface Conversation {
   id: string;
   title: string;
+  model?: string;
+  model_id?: string;
+  connection_id?: string;
+  connection_name?: string;
+  provider_summary?: string;
+  context_rounds?: number;
   status: string;
   messages: APIMessage[];
   created_at: string;
@@ -124,6 +196,12 @@ export interface Conversation {
 export interface ConversationListItem {
   id: string;
   title: string;
+  model?: string;
+  model_id?: string;
+  connection_id?: string;
+  connection_name?: string;
+  provider_summary?: string;
+  context_rounds?: number;
   status: string;
   created_at: string;
   updated_at: string;

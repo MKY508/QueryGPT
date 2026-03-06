@@ -3,6 +3,7 @@
 from app.models.auth import (
     Token,
     TokenPayload,
+    TokenRefresh,
     UserCreate,
     UserLogin,
     UserResponse,
@@ -24,6 +25,7 @@ from app.models.config import (
     ConnectionResponse,
     ConnectionTest,
     ModelCreate,
+    ModelExtraOptions,
     ModelResponse,
     ModelTest,
     UserConfig,
@@ -65,6 +67,7 @@ __all__ = [
     "UserUpdate",
     "Token",
     "TokenPayload",
+    "TokenRefresh",
     # Chat
     "ChatRequest",
     "ChatStopRequest",
@@ -76,6 +79,7 @@ __all__ = [
     "PaginatedResponse",
     # Config
     "ModelCreate",
+    "ModelExtraOptions",
     "ModelResponse",
     "ModelTest",
     "ConnectionCreate",

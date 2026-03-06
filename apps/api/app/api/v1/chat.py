@@ -84,6 +84,7 @@ async def chat_stream(
     conversation_id: UUID | None = Query(default=None, description="对话 ID"),
     connection_id: UUID | None = Query(default=None, description="数据库连接 ID"),
     language: str = Query(default="zh", description="语言"),
+    context_rounds: int | None = Query(default=None, ge=1, le=20, description="上下文轮数"),
     authorization: Annotated[str | None, Header()] = None,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
@@ -93,6 +94,40 @@ async def chat_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         nonlocal current_conversation_id
+
+        def merge_metadata(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
+            merged = dict(base)
+            for key, value in updates.items():
+                if value is None:
+                    continue
+                if key == "execution_context" and isinstance(value, dict):
+                    existing = merged.get("execution_context")
+                    merged["execution_context"] = {
+                        **(existing if isinstance(existing, dict) else {}),
+                        **value,
+                    }
+                elif key == "diagnostics" and isinstance(value, list):
+                    existing = merged.get("diagnostics")
+                    diagnostics = [*((existing if isinstance(existing, list) else [])), *value]
+                    deduped: list[dict[str, Any]] = []
+                    seen: set[tuple[Any, ...]] = set()
+                    for item in diagnostics:
+                        if not isinstance(item, dict):
+                            continue
+                        marker = (
+                            item.get("attempt"),
+                            item.get("phase"),
+                            item.get("status"),
+                            item.get("message"),
+                        )
+                        if marker in seen:
+                            continue
+                        seen.add(marker)
+                        deduped.append(item)
+                    merged["diagnostics"] = deduped
+                else:
+                    merged[key] = value
+            return merged
 
         # 从 Authorization header 获取用户
         try:
@@ -132,6 +167,7 @@ async def chat_stream(
         )
         db.add(user_message)
         await db.commit()
+        await db.refresh(user_message)
 
         # 标记查询开始
         query_key = str(current_conversation_id)
@@ -139,7 +175,14 @@ async def chat_stream(
 
         try:
             # 发送开始事件
-            yield SSEEvent.progress("start", "开始处理请求...").to_sse()
+            yield SSEEvent.progress(
+                "start",
+                "开始处理请求...",
+                conversation_id=str(current_conversation_id),
+            ).to_sse()
+
+            user_settings = current_user.settings if isinstance(current_user.settings, dict) else {}
+            effective_context_rounds = context_rounds or int(user_settings.get("context_rounds", 5))
 
             # 创建执行服务
             execution_service = ExecutionService(
@@ -148,36 +191,89 @@ async def chat_stream(
                 model_name=model,
                 connection_id=connection_id,
                 language=language,
+                context_rounds=effective_context_rounds,
             )
+
+            runtime_snapshot = await execution_service.get_runtime_snapshot()
+            yield SSEEvent.progress(
+                "context_ready",
+                "执行上下文已准备",
+                conversation_id=str(current_conversation_id),
+                execution_context=runtime_snapshot,
+            ).to_sse()
+            if conversation:
+                conversation.status = "active"
+                conversation.extra_data = {
+                    **(conversation.extra_data or {}),
+                    **runtime_snapshot,
+                }
+                if runtime_snapshot.get("model_id"):
+                    conversation.model_id = UUID(str(runtime_snapshot["model_id"]))
+                if runtime_snapshot.get("connection_id"):
+                    conversation.connection_id = UUID(str(runtime_snapshot["connection_id"]))
+                await db.commit()
 
             # 执行查询（流式）
             assistant_content = ""
-            metadata: dict[str, Any] = {}
+            metadata: dict[str, Any] = {
+                "execution_context": runtime_snapshot,
+                "diagnostics": [],
+                "original_query": query,
+            }
             python_output_parts: list[str] = []
             python_images: list[str] = []
+            error_payload: dict[str, Any] | None = None
 
             async for event in execution_service.execute_stream(
                 query=query,
                 conversation_id=current_conversation_id,
+                exclude_message_id=user_message.id,
                 stop_checker=lambda: not active_queries.get(query_key, False),
             ):
                 yield event.to_sse()
 
                 # 收集结果
-                if event.type.value == "result":
-                    assistant_content = event.data.get("content", "")
-                    metadata = {
-                        "sql": event.data.get("sql"),
-                        "execution_time": event.data.get("execution_time"),
-                        "rows_count": event.data.get("rows_count"),
-                        "data": event.data.get("data"),
-                    }
+                if event.type.value == "progress":
+                    metadata = merge_metadata(
+                        metadata,
+                        {
+                            "execution_context": event.data.get("execution_context"),
+                            "diagnostics": [event.data["diagnostic_entry"]]
+                            if event.data.get("diagnostic_entry")
+                            else None,
+                        },
+                    )
+                elif event.type.value == "result":
+                    assistant_content = str(event.data.get("content", "") or assistant_content)
+                    metadata = merge_metadata(
+                        metadata,
+                        {
+                            "sql": event.data.get("sql"),
+                            "execution_time": event.data.get("execution_time"),
+                            "rows_count": event.data.get("rows_count"),
+                            "data": event.data.get("data"),
+                            "execution_context": event.data.get("execution_context"),
+                            "diagnostics": event.data.get("diagnostics"),
+                        },
+                    )
                 elif event.type.value == "visualization":
-                    metadata["visualization"] = event.data.get("chart")
+                    metadata = merge_metadata(metadata, {"visualization": event.data.get("chart")})
                 elif event.type.value == "python_output":
                     python_output_parts.append(event.data.get("output", ""))
                 elif event.type.value == "python_image":
                     python_images.append(event.data.get("image", ""))
+                elif event.type.value == "error":
+                    error_payload = dict(event.data)
+                    metadata = merge_metadata(
+                        metadata,
+                        {
+                            "error": event.data.get("message"),
+                            "error_code": event.data.get("code"),
+                            "error_category": event.data.get("error_category"),
+                            "execution_context": event.data.get("execution_context"),
+                            "diagnostics": event.data.get("diagnostics"),
+                        },
+                    )
 
             # 保存 Python 输出和图表
             if python_output_parts:
@@ -185,14 +281,40 @@ async def chat_stream(
             if python_images:
                 metadata["python_images"] = python_images
 
+            assistant_message_content = assistant_content or "分析完成"
+            if error_payload and not assistant_content:
+                assistant_message_content = str(error_payload.get("message") or "执行失败")
+
             # 保存助手消息
             assistant_message = Message(
                 conversation_id=current_conversation_id,
                 role="assistant",
-                content=assistant_content or "分析完成",
+                content=assistant_message_content,
                 extra_data=metadata,
             )
             db.add(assistant_message)
+            if error_payload:
+                if conversation:
+                    conversation.status = "error"
+                    conversation.extra_data = {
+                        **(conversation.extra_data or {}),
+                        **runtime_snapshot,
+                        "last_query": query,
+                        "last_error": error_payload.get("message"),
+                        "error_category": error_payload.get("error_category"),
+                    }
+                await db.commit()
+                await db.refresh(assistant_message)
+                return
+            elif conversation:
+                conversation.status = "completed"
+                conversation.extra_data = {
+                    **(conversation.extra_data or {}),
+                    **runtime_snapshot,
+                    "last_query": query,
+                    "execution_time": metadata.get("execution_time"),
+                    "rows_count": metadata.get("rows_count"),
+                }
             await db.commit()
             await db.refresh(assistant_message)
 
@@ -200,9 +322,31 @@ async def chat_stream(
             yield SSEEvent.done(str(current_conversation_id), str(assistant_message.id)).to_sse()
 
         except asyncio.CancelledError:
-            yield SSEEvent.error("CANCELLED", "查询已取消").to_sse()
+            if conversation:
+                conversation.status = "error"
+                conversation.extra_data = {
+                    **(conversation.extra_data or {}),
+                    "last_error": "查询已取消",
+                }
+                await db.commit()
+            yield SSEEvent.error(
+                "CANCELLED",
+                "查询已取消",
+                conversation_id=str(current_conversation_id) if current_conversation_id else None,
+            ).to_sse()
         except Exception as e:
-            yield SSEEvent.error("EXECUTION_ERROR", str(e)).to_sse()
+            if conversation:
+                conversation.status = "error"
+                conversation.extra_data = {
+                    **(conversation.extra_data or {}),
+                    "last_error": str(e),
+                }
+                await db.commit()
+            yield SSEEvent.error(
+                "EXECUTION_ERROR",
+                str(e),
+                conversation_id=str(current_conversation_id) if current_conversation_id else None,
+            ).to_sse()
         finally:
             active_queries.pop(query_key, None)
 

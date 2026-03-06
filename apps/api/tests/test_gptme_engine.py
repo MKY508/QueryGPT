@@ -312,6 +312,49 @@ class TestGptmeEngine:
         assert chart is not None
         assert "sales" in chart["yKeys"] or "profit" in chart["yKeys"]
 
+    def test_categorize_sql_error(self):
+        """Test SQL error categorization for auto repair"""
+        engine = GptmeEngine()
+
+        assert engine._categorize_sql_error("You have an error in your SQL syntax")[0] == "SQL_SYNTAX_ERROR"
+        assert engine._categorize_sql_error("no such table: users")[0] == "SQL_TABLE_ERROR"
+        assert engine._categorize_sql_error("unknown column 'email'")[0] == "SQL_COLUMN_ERROR"
+        assert engine._categorize_sql_error("Access denied for user")[0] == "DB_AUTH_ERROR"
+        assert engine._categorize_sql_error("只允许执行只读查询")[0] == "SQL_SAFETY_ERROR"
+
+    def test_categorize_python_error(self):
+        """Test Python error categorization for auto repair"""
+        engine = GptmeEngine()
+
+        assert engine._categorize_python_error("SyntaxError: invalid syntax")[0] == "PYTHON_SYNTAX_ERROR"
+        assert engine._categorize_python_error("NameError: df2 is not defined")[0] == "PYTHON_RUNTIME_ERROR"
+        assert (
+            engine._categorize_python_error("检测到不安全的操作: 禁止导入模块: os")[0]
+            == "PYTHON_SECURITY_ERROR"
+        )
+
+    def test_build_diagnostic_entry(self):
+        """Test diagnostic entry payload shape"""
+        engine = GptmeEngine()
+
+        entry = engine._build_diagnostic_entry(
+            attempt=2,
+            phase="sql",
+            status="repaired",
+            message="SQL 失败可恢复，正在自动修复并重试。",
+            error_code="SQL_SYNTAX_ERROR",
+            error_category="sql",
+            recoverable=True,
+            sql="SELECT * FROM users",
+        )
+
+        assert entry["attempt"] == 2
+        assert entry["phase"] == "sql"
+        assert entry["status"] == "repaired"
+        assert entry["error_code"] == "SQL_SYNTAX_ERROR"
+        assert entry["recoverable"] is True
+        assert "SELECT * FROM users" in entry["sql"]
+
 
 class TestPythonSecurityAnalyzer:
     """Test PythonSecurityAnalyzer"""

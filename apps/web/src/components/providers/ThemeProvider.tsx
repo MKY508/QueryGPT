@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useThemeStore } from "@/lib/stores/theme";
+import { THEMES, useThemeStore } from "@/lib/stores/theme";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useThemeStore((state) => state.theme);
@@ -16,9 +16,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof document !== "undefined") {
       const root = document.documentElement;
-      // 移除所有主题类
-      root.className = root.className.replace(/theme-\w+/g, "").trim();
-      // 添加新主题类
+      Object.keys(THEMES).forEach((themeName) => {
+        root.classList.remove(`theme-${themeName}`);
+      });
       root.classList.add(`theme-${theme}`);
     }
   }, [theme]);
