@@ -1,5 +1,6 @@
 """Tests for execution.py"""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -118,6 +119,73 @@ class TestExecutionService:
         assert "python" in prompt.lower()
         assert "matplotlib" in prompt.lower() or "plt" in prompt.lower()
         assert "df" in prompt  # DataFrame reference
+
+    @pytest.mark.asyncio
+    async def test_get_runtime_snapshot_with_provider_mapping(self, mock_user, mock_db):
+        service = ExecutionService(
+            user=mock_user,
+            db=mock_db,
+            language="zh",
+            context_rounds=0,
+        )
+        service._get_model_config = AsyncMock(
+            return_value={
+                "model_id": "model-uuid",
+                "display_name": "DeepSeek Chat",
+                "model": "deepseek-chat",
+                "source_provider": "deepseek",
+                "resolved_provider": "openai",
+                "provider": "openai",
+                "api_format": "openai_compatible",
+            }
+        )
+        service._get_connection_record = AsyncMock(
+            return_value=SimpleNamespace(
+                id=uuid4(),
+                name="Analytics DB",
+                driver="postgresql",
+                host="db.internal",
+                database_name="analytics",
+            )
+        )
+
+        snapshot = await service.get_runtime_snapshot()
+
+        assert snapshot["model_id"] == "model-uuid"
+        assert snapshot["model_name"] == "DeepSeek Chat"
+        assert snapshot["model_identifier"] == "deepseek-chat"
+        assert snapshot["source_provider"] == "deepseek"
+        assert snapshot["resolved_provider"] == "openai"
+        assert snapshot["provider_summary"] == "deepseek -> openai · openai_compatible"
+        assert snapshot["connection_name"] == "Analytics DB"
+        assert snapshot["connection_driver"] == "postgresql"
+        assert snapshot["connection_host"] == "db.internal"
+        assert snapshot["database_name"] == "analytics"
+        assert snapshot["context_rounds"] == 1
+        assert snapshot["api_format"] == "openai_compatible"
+
+    @pytest.mark.asyncio
+    async def test_get_runtime_snapshot_without_connection(self, mock_user, mock_db):
+        service = ExecutionService(user=mock_user, db=mock_db, language="en", context_rounds=3)
+        service._get_model_config = AsyncMock(
+            return_value={
+                "model_id": None,
+                "display_name": "Anthropic Claude",
+                "model": "claude-3-7-sonnet",
+                "source_provider": "anthropic",
+                "resolved_provider": "anthropic",
+                "provider": "anthropic",
+                "api_format": "anthropic_native",
+            }
+        )
+        service._get_connection_record = AsyncMock(return_value=None)
+
+        snapshot = await service.get_runtime_snapshot()
+
+        assert snapshot["provider_summary"] == "anthropic · anthropic_native"
+        assert snapshot["connection_id"] is None
+        assert snapshot["connection_name"] is None
+        assert snapshot["context_rounds"] == 3
 
 
 class TestSemanticContext:

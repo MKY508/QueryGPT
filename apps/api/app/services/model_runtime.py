@@ -71,7 +71,7 @@ def categorize_model_error(message: str) -> str:
         for token in ("authentication", "api key", "unauthorized", "invalid_api_key")
     ):
         return "auth"
-    if "timeout" in normalized:
+    if "timeout" in normalized or "timed out" in normalized:
         return "timeout"
     if any(token in normalized for token in ("connection", "dns", "refused", "unreachable")):
         return "connection"
