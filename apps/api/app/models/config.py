@@ -6,7 +6,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 ModelProvider = Literal["openai", "anthropic", "deepseek", "ollama", "custom"]
 ModelAPIFormat = Literal["openai_compatible", "anthropic_native", "ollama_local", "custom"]
 ModelHealthcheckMode = Literal["chat_completion", "models_list"]

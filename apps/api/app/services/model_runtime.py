@@ -66,13 +66,18 @@ def resolve_litellm_provider(provider: str, api_format: ModelAPIFormat) -> str:
 
 def categorize_model_error(message: str) -> str:
     normalized = message.lower()
-    if any(token in normalized for token in ("authentication", "api key", "unauthorized", "invalid_api_key")):
+    if any(
+        token in normalized
+        for token in ("authentication", "api key", "unauthorized", "invalid_api_key")
+    ):
         return "auth"
     if "timeout" in normalized:
         return "timeout"
     if any(token in normalized for token in ("connection", "dns", "refused", "unreachable")):
         return "connection"
-    if any(token in normalized for token in ("404", "not found", "model_not_found", "unknown model")):
+    if any(
+        token in normalized for token in ("404", "not found", "model_not_found", "unknown model")
+    ):
         return "model_not_found"
     if "429" in normalized or "rate limit" in normalized:
         return "rate_limited"

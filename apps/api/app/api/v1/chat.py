@@ -108,7 +108,7 @@ async def chat_stream(
                     }
                 elif key == "diagnostics" and isinstance(value, list):
                     existing = merged.get("diagnostics")
-                    diagnostics = [*((existing if isinstance(existing, list) else [])), *value]
+                    diagnostics = [*(existing if isinstance(existing, list) else []), *value]
                     deduped: list[dict[str, Any]] = []
                     seen: set[tuple[Any, ...]] = set()
                     for item in diagnostics:

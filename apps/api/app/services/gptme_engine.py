@@ -339,7 +339,9 @@ plt.rcParams['font.size'] = 12
         messages.append({"role": "user", "content": query})
         return messages
 
-    def _build_sql_repair_prompt(self, query: str, failed_sql: str | None, error_message: str) -> str:
+    def _build_sql_repair_prompt(
+        self, query: str, failed_sql: str | None, error_message: str
+    ) -> str:
         sql_block = failed_sql or "未生成 SQL"
         return f"""上一步生成的 SQL 无法执行，请修复后重新给出完整答复。
 
@@ -540,7 +542,12 @@ Python 错误：
             return "SQL_TABLE_ERROR", "schema", True
         if any(
             token in normalized
-            for token in ("no such column", "unknown column", "undefined column", "ambiguous column")
+            for token in (
+                "no such column",
+                "unknown column",
+                "undefined column",
+                "ambiguous column",
+            )
         ):
             return "SQL_COLUMN_ERROR", "schema", True
         if any(
