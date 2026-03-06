@@ -107,6 +107,8 @@ def test_provider_helpers_cover_defaults():
 
 
 def test_resolve_model_runtime_without_saved_model_uses_openai_defaults():
+    expected_base_url = settings.OPENAI_BASE_URL or "https://api.example.com/v1"
+
     resolved, extra = resolve_model_runtime(
         None,
         fallback_model="gpt-4o-mini",
@@ -117,7 +119,7 @@ def test_resolve_model_runtime_without_saved_model_uses_openai_defaults():
     assert resolved.source_provider == "openai"
     assert resolved.litellm_provider == "openai"
     assert resolved.model == "gpt-4o-mini"
-    assert resolved.base_url == settings.OPENAI_BASE_URL
+    assert resolved.base_url == expected_base_url
     assert resolved.api_key == "fallback-key"
     assert resolved.api_key_required is True
     assert extra.api_format == "openai_compatible"
@@ -126,13 +128,13 @@ def test_resolve_model_runtime_without_saved_model_uses_openai_defaults():
         "resolved_provider": "openai",
         "api_format": "openai_compatible",
         "model": "gpt-4o-mini",
-        "base_url": settings.OPENAI_BASE_URL,
+        "base_url": expected_base_url,
         "api_key_required": True,
     }
     assert resolved.completion_kwargs(stream=True) == {
         "model": "gpt-4o-mini",
         "custom_llm_provider": "openai",
-        "base_url": settings.OPENAI_BASE_URL,
+        "base_url": expected_base_url,
         "api_key": "fallback-key",
         "stream": True,
     }
