@@ -51,8 +51,8 @@ test("settings workflow and chat smoke test", async ({ page }) => {
 
   await page.goto("/");
   await expect(page.getByTestId("chat-input")).toBeVisible();
-  await expect(page.getByText("示例数据库")).toBeVisible();
-  await expect(page.getByText(modelName)).toBeVisible();
+  await expect(page.getByTestId("chat-connection-select")).toContainText("示例数据库");
+  await expect(page.getByTestId("chat-model-select")).toContainText(modelName);
 
   await page
     .getByTestId("chat-input")
