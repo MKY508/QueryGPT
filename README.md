@@ -10,8 +10,9 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-000000.svg?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
-[![GitHub stars](https://img.shields.io/github/stars/mky508/querygpt?style=flat-square)](https://github.com/mky508/querygpt/stargazers)
-[![Last Commit](https://img.shields.io/github/last-commit/mky508/querygpt?style=flat-square)](https://github.com/mky508/querygpt/commits/main)
+<br>
+[![GitHub stars](https://img.shields.io/github/stars/mky508/querygpt?style=for-the-badge)](https://github.com/mky508/querygpt/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/mky508/querygpt?style=for-the-badge)](https://github.com/mky508/querygpt/commits/main)
 
 </div>
 
