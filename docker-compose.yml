@@ -1,0 +1,74 @@
+name: querygpt
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: querygpt
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d querygpt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    working_dir: /workspace/apps/api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/querygpt
+      HOST: 0.0.0.0
+      PORT: "8000"
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_FORMAT: console
+      CORS_ORIGINS_STR: http://localhost:3000,http://127.0.0.1:3000
+      MPLBACKEND: Agg
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/api:/workspace/apps/api
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    working_dir: /workspace/apps/web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      INTERNAL_API_URL: http://api:8000
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/workspace/apps/web
+      - web_node_modules:/workspace/apps/web/node_modules
+      - web_next:/workspace/apps/web/.next
+    depends_on:
+      api:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/opt/querygpt/scripts/web-bootstrap.sh"]
+    command: ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]
+
+volumes:
+  pgdata:
+  web_node_modules:
+  web_next:

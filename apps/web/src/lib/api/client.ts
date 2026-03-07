@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { SSEEventData } from "@/lib/types/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -10,16 +11,19 @@ export const api = axios.create({
   timeout: 30000,
 });
 
-interface SSEEvent {
-  type: string;
-  data: Record<string, unknown>;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isSSEEventData(value: unknown): value is SSEEventData {
+  return isRecord(value) && typeof value.type === "string" && isRecord(value.data);
 }
 
 export async function* createSecureEventStream(
   url: string,
   params: Record<string, string>,
   signal?: AbortSignal
-): AsyncGenerator<SSEEvent> {
+): AsyncGenerator<SSEEventData> {
   const searchParams = new URLSearchParams(params);
   const fullUrl = `${API_URL}${url}?${searchParams.toString()}`;
 
@@ -56,7 +60,9 @@ export async function* createSecureEventStream(
         if (!line.startsWith("data: ")) continue;
         try {
           const data = JSON.parse(line.slice(6));
-          yield { type: "message", data };
+          if (isSSEEventData(data)) {
+            yield data;
+          }
         } catch {
           // 忽略单条 SSE 解析错误
         }

@@ -103,18 +103,85 @@ graph LR
 </tr>
 </table>
 
-## 快速开始
+## 如何使用
 
-![Python](https://img.shields.io/badge/需要-Python_3.11+-3776AB?logo=python&logoColor=white)
-![Node.js](https://img.shields.io/badge/需要-Node.js_LTS-339933?logo=node.js&logoColor=white)
+### 1. 获取代码
 
 ```bash
 git clone git@github.com:mky508/querygpt.git
 cd querygpt
+```
+
+### 2. 选择你的平台启动
+
+<table>
+<tr>
+<th width="33%">macOS</th>
+<th width="33%">Linux</th>
+<th width="33%">Windows</th>
+</tr>
+<tr>
+<td>
+
+**方式 A — 宿主机直接运行**
+
+需要 Python 3.11+ 和 Node.js LTS
+
+```bash
 ./start.sh
 ```
 
-启动后访问 `http://localhost:3000`，首次使用：
+**方式 B — Docker**
+
+需要 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+```bash
+docker compose up --build
+```
+
+</td>
+<td>
+
+**方式 A — 宿主机直接运行**
+
+需要 Python 3.11+ 和 Node.js LTS
+
+```bash
+./start.sh
+```
+
+**方式 B — Docker**
+
+需要 Docker Engine
+
+```bash
+docker compose up --build
+```
+
+</td>
+<td>
+
+**推荐 — Docker Desktop**
+
+Windows 用户建议使用 Docker，仓库不再维护 `.bat` / `.ps1` 脚本。
+
+安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)，然后：
+
+```bash
+docker compose up --build
+```
+
+**备选 — WSL2**
+
+安装 [WSL2](https://learn.microsoft.com/zh-cn/windows/wsl/install) 后，在 WSL 终端中按 Linux 方式运行 `./start.sh`。
+
+</td>
+</tr>
+</table>
+
+### 3. 访问与配置
+
+启动后访问 `http://localhost:3000`：
 
 1. 在设置页添加模型（填入 provider 和 API Key）
 2. 使用内置的 `示例数据库`，或添加自己的 SQLite / MySQL / PostgreSQL 连接
@@ -175,15 +242,15 @@ cd querygpt
 <summary><strong>启动脚本</strong></summary>
 
 ```bash
-./start.sh          # 默认启动（检查环境、安装依赖、初始化数据库、启动前后端）
-./start.sh setup    # 仅安装环境
-./start.sh stop     # 停止服务
-./start.sh restart  # 重启服务
-./start.sh status   # 查看状态
-./start.sh logs     # 查看日志
-./start.sh doctor   # 环境诊断
-./start.sh test all # 运行全部测试
-./start.sh cleanup  # 清理临时文件
+./start.sh          # 宿主机模式：检查环境、安装依赖、初始化数据库、启动前后端
+./start.sh setup    # 宿主机模式：仅安装环境
+./start.sh stop     # 停止宿主机模式服务
+./start.sh restart  # 重启宿主机模式服务
+./start.sh status   # 查看宿主机模式状态
+./start.sh logs     # 查看宿主机模式日志
+./start.sh doctor   # 宿主机模式环境诊断
+./start.sh test all # 宿主机模式运行全部测试
+./start.sh cleanup  # 清理宿主机模式临时状态
 ```
 
 补装分析依赖（`scikit-learn`、`scipy`、`seaborn`）：
@@ -202,7 +269,40 @@ QUERYGPT_BACKEND_HOST=0.0.0.0 ./start.sh # 监听所有网卡
 </details>
 
 <details>
-<summary><strong>本地开发</strong></summary>
+<summary><strong>Docker 开发</strong></summary>
+
+Windows 开发环境现在统一建议使用 Docker；仓库不再维护 `start.ps1` / `start.bat`。
+
+默认开发栈会启动：
+- `web`：Next.js 开发服务器（热更新）
+- `api`：FastAPI 开发服务器（`--reload`）
+- `db`：PostgreSQL 16
+
+```bash
+docker-compose up --build               # 前台启动全部服务
+docker-compose up -d --build            # 后台启动全部服务
+docker-compose down                     # 停止并移除容器
+docker-compose down -v --remove-orphans # 连数据卷一起清理
+docker-compose ps                       # 查看状态
+docker-compose logs -f api web          # 查看前后端日志
+docker-compose restart api web          # 重启前后端
+docker-compose up db                    # 仅启动数据库
+docker-compose run --rm api ./run-tests.sh
+docker-compose run --rm web npm run type-check
+docker-compose run --rm web npm test
+```
+
+说明：
+- 默认浏览器访问 `http://localhost:3000`
+- 默认后端访问 `http://localhost:8000`
+- PostgreSQL 暴露在 `localhost:5432`
+- 依赖变更后请继续使用 `docker-compose up --build`
+- 若本机安装了 Docker Compose 插件，也可以把以上命令替换成 `docker compose ...`
+
+</details>
+
+<details>
+<summary><strong>本地开发（宿主机模式）</strong></summary>
 
 ### 后端
 
@@ -235,6 +335,8 @@ ENCRYPTION_KEY=your-fernet-key
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
+# 可选：仅 Docker / 容器内 Next rewrite 使用
+# INTERNAL_API_URL=http://api:8000
 ```
 
 ### 测试

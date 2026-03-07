@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.models import RelationshipContext, SemanticContext
-from app.services.execution import ExecutionService
+from app.models import RelationshipContext, SSEEvent, SSEEventType, SemanticContext, SystemCapabilities
+from app.services.execution import ExecutionInputs, ExecutionService
 
 
 class TestExecutionService:
@@ -186,6 +186,46 @@ class TestExecutionService:
         prompt = service._build_system_prompt(None)
         assert "Python 分析已关闭" in prompt
         assert "不要生成 ```python 代码块" in prompt
+
+    @pytest.mark.asyncio
+    async def test_execute_stream_loads_execution_inputs_with_keyword_args(self, mock_db):
+        conversation_id = uuid4()
+        service = ExecutionService(db=mock_db, language="zh")
+        history_mock = AsyncMock(return_value=[])
+        service._get_model_config = AsyncMock(return_value={"model": "gpt-4o"})
+        service._get_connection_config = AsyncMock(return_value=None)
+        service._get_semantic_context = AsyncMock(return_value=SemanticContext(terms=[]))
+        service._get_relationship_context = AsyncMock(
+            return_value=RelationshipContext(relationships=[])
+        )
+        service._get_default_prompt = AsyncMock(return_value=None)
+        service._get_conversation_history = history_mock
+        service._capabilities = MagicMock(
+            return_value=SystemCapabilities(available_python_libraries=["pandas"])
+        )
+        service._build_system_prompt = MagicMock(return_value="system prompt")
+
+        class FakeEngine:
+            async def execute(self, **_: object):
+                yield SSEEvent.result("分析完成")
+
+        service._build_engine = MagicMock(return_value=FakeEngine())
+
+        events = [
+            event
+            async for event in service.execute_stream(
+                query="show revenue",
+                conversation_id=conversation_id,
+            )
+        ]
+
+        history_mock.assert_awaited_once_with(
+            conversation_id,
+            limit=10,
+            exclude_message_id=None,
+        )
+        assert len(events) == 1
+        assert events[0].type == SSEEventType.RESULT
 
 
 class TestSemanticContext:

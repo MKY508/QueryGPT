@@ -1,37 +1,17 @@
-# QueryGPT Web Dockerfile
-FROM node:20-alpine AS base
+FROM node:20-bookworm-slim
 
-# 安装依赖
-FROM base AS deps
-WORKDIR /app
-COPY apps/web/package.json ./
-RUN npm install
+WORKDIR /workspace/apps/web
 
-# 构建
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY apps/web .
-RUN npm run build
+COPY apps/web/package.json ./package.json
+COPY apps/web/package-lock.json ./package-lock.json
+COPY docker/scripts/web-bootstrap.sh /opt/querygpt/scripts/web-bootstrap.sh
 
-# 生产镜像
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV=production
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
+RUN chmod +x /opt/querygpt/scripts/web-bootstrap.sh \
+    && npm ci \
+    && mkdir -p /opt/querygpt \
+    && cp -a node_modules /opt/querygpt/web-node_modules \
+    && sha256sum package-lock.json | awk '{print $1}' > /opt/querygpt/package-lock.sha256
 
 EXPOSE 3000
 
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]

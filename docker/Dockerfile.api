@@ -1,28 +1,23 @@
-# QueryGPT API Dockerfile
 FROM python:3.11-slim
 
-WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    gcc \
+WORKDIR /workspace/apps/api
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 uv (快速 Python 包管理器)
-RUN pip install uv
-
-# 复制依赖文件
-COPY apps/api/pyproject.toml .
-
-# 安装依赖
-RUN uv pip install --system -e .
-
-# 复制应用代码
+COPY apps/api/pyproject.toml ./pyproject.toml
+COPY apps/api/run-tests.sh ./run-tests.sh
 COPY apps/api/app ./app
 
-# 暴露端口
+RUN chmod +x ./run-tests.sh \
+    && python -m pip install --upgrade pip \
+    && python -m pip install -e ".[dev,analytics]"
+
 EXPOSE 8000
 
-# 启动命令
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

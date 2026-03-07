@@ -16,7 +16,6 @@ import {
   type Node,
   type NodeTypes,
   type NodeChange,
-  MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -35,6 +34,13 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api/client";
 import { TableNode } from "@/components/schema/TableNode";
+import {
+  buildLayoutSnapshot,
+  buildRelationshipEdges,
+  buildSchemaNodes,
+  deriveHiddenTables,
+  filterVisibleTables,
+} from "@/lib/settings/schema";
 import type {
   SchemaInfo,
   TableRelationship,
@@ -213,12 +219,8 @@ function SchemaSettingsInner({ connectionId }: SchemaSettingsProps) {
   // 应用布局数据
   useEffect(() => {
     if (currentLayout) {
-      // 应用隐藏表
-      if (currentLayout.visible_tables) {
-        const allTables = schemaInfo?.tables.map((t) => t.name) || [];
-        const hidden = new Set(allTables.filter((t) => !currentLayout.visible_tables!.includes(t)));
-        setHiddenTables(hidden);
-      }
+      const allTables = schemaInfo?.tables.map((table) => table.name) || [];
+      setHiddenTables(deriveHiddenTables(currentLayout, allTables));
 
       // 应用视口
       if (currentLayout.zoom && currentLayout.viewport_x !== undefined) {
@@ -233,16 +235,7 @@ function SchemaSettingsInner({ connectionId }: SchemaSettingsProps) {
 
   // 过滤后的表
   const visibleTables = useMemo(() => {
-    if (!schemaInfo?.tables) return [];
-    return schemaInfo.tables.filter((table) => {
-      // 排除隐藏的表
-      if (hiddenTables.has(table.name)) return false;
-      // 搜索过滤
-      if (searchQuery && !table.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-        return false;
-      }
-      return true;
-    });
+    return filterVisibleTables(schemaInfo?.tables, hiddenTables, searchQuery);
   }, [schemaInfo, hiddenTables, searchQuery]);
 
   // 构建节点和边
@@ -253,78 +246,23 @@ function SchemaSettingsInner({ connectionId }: SchemaSettingsProps) {
       return;
     }
 
-    // 创建表节点
-    const tableNodes: Node[] = visibleTables.map((table, index) => {
-      // 使用布局数据中的位置，否则使用默认位置
-      const layoutPosition = currentLayout?.layout_data?.[table.name];
-      return {
-        id: table.name,
-        type: "tableNode",
-        position: layoutPosition
-          ? { x: layoutPosition.x, y: layoutPosition.y }
-          : {
-              x: (index % 3) * 280 + 50,
-              y: Math.floor(index / 3) * 350 + 50,
-            },
-        data: { table },
-      };
-    });
-
-    setNodes(tableNodes);
-
-    // 创建关系边
-    if (relationships) {
-      const visibleTableNames = new Set(visibleTables.map((t) => t.name));
-      const relationshipEdges: Edge[] = relationships
-        .filter(
-          (rel) => visibleTableNames.has(rel.source_table) && visibleTableNames.has(rel.target_table)
-        )
-        .map((rel) => ({
-          id: rel.id,
-          source: rel.source_table,
-          sourceHandle: `${rel.source_column}-left`,
-          target: rel.target_table,
-          targetHandle: `${rel.target_column}-right`,
-          label: `${rel.relationship_type} (${rel.join_type})`,
-          markerEnd: { type: MarkerType.ArrowClosed },
-          style: { stroke: "hsl(var(--primary))", strokeWidth: 2 },
-          labelStyle: { fontSize: 10, fill: "hsl(var(--muted-foreground))" },
-          labelBgStyle: { fill: "hsl(var(--background))" },
-        }));
-
-      setEdges(relationshipEdges);
-    }
+    setNodes(buildSchemaNodes(visibleTables, currentLayout));
+    setEdges(buildRelationshipEdges(visibleTables, relationships));
   }, [visibleTables, relationships, currentLayout, setNodes, setEdges]);
 
   // 自动保存布局（debounce）
   const saveLayout = useCallback(() => {
     if (!selectedLayoutId || !connectionId) return;
 
-    const layoutData: Record<string, { x: number; y: number }> = {};
-    nodes.forEach((node) => {
-      layoutData[node.id] = { x: node.position.x, y: node.position.y };
-    });
-
-    const viewport = getViewport();
-    const visibleTablesList = schemaInfo?.tables
-      .filter((t) => !hiddenTables.has(t.name))
-      .map((t) => t.name);
-
-    const dataToSave = JSON.stringify({ layoutData, viewport, visibleTablesList });
+    const snapshot = buildLayoutSnapshot(nodes, getViewport(), schemaInfo?.tables, hiddenTables);
 
     // 避免重复保存相同数据
-    if (dataToSave === lastSavedRef.current) return;
-    lastSavedRef.current = dataToSave;
+    if (snapshot.signature === lastSavedRef.current) return;
+    lastSavedRef.current = snapshot.signature;
 
     updateLayoutMutation.mutate({
       id: selectedLayoutId,
-      data: {
-        layout_data: layoutData,
-        zoom: viewport.zoom,
-        viewport_x: viewport.x,
-        viewport_y: viewport.y,
-        visible_tables: visibleTablesList,
-      },
+      data: snapshot.payload,
     });
   }, [selectedLayoutId, connectionId, nodes, getViewport, hiddenTables, schemaInfo, updateLayoutMutation]);
 

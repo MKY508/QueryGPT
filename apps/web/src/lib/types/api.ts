@@ -22,6 +22,37 @@ export interface ModelExtraOptions {
   healthcheck_mode?: "chat_completion" | "models_list";
 }
 
+export interface ConnectionSummary {
+  id: string;
+  name: string;
+  driver: string;
+  host?: string;
+  database_name?: string;
+  is_default: boolean;
+}
+
+export interface ConfiguredConnection extends ConnectionSummary {
+  host: string;
+  port: number;
+  username: string;
+  created_at: string;
+}
+
+export interface ModelSummary {
+  id: string;
+  name: string;
+  provider: string;
+  model_id: string;
+  is_default: boolean;
+  api_key_configured?: boolean;
+  extra_options?: ModelExtraOptions;
+}
+
+export interface ConfiguredModel extends ModelSummary {
+  base_url?: string;
+  created_at: string;
+}
+
 export interface ModelDiagnostics {
   resolved_provider?: string;
   resolved_base_url?: string;
@@ -127,6 +158,7 @@ export interface SSEErrorData {
 /** SSE 完成事件数据 */
 export interface SSEDoneData {
   conversation_id?: string;
+  message_id?: string | null;
 }
 
 /** SSE 思考阶段事件数据 */
