@@ -17,8 +17,8 @@ from slowapi.util import get_remote_address
 
 from app.api.v1 import api_router
 from app.core.config import settings
-from app.core.demo_db import init_demo_database
-from app.db import engine
+from app.core.demo_db import ensure_demo_connection, init_demo_database
+from app.db import AsyncSessionLocal, engine
 from app.db.base import Base
 
 # 配置日志
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 验证密钥配置
     settings.validate_secrets()
     if settings.is_using_default_secrets:
-        logger.warning("使用默认密钥，请在生产环境中更改 JWT_SECRET_KEY 和 ENCRYPTION_KEY")
+        logger.warning("使用默认密钥，请在生产环境中更改 ENCRYPTION_KEY")
 
     # 创建数据库表（开发环境）
     if settings.is_development:
@@ -70,6 +70,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 初始化示例数据库
     demo_db_path = init_demo_database()
     logger.info("Demo database initialized", path=demo_db_path)
+
+    async with AsyncSessionLocal() as session:
+        await ensure_demo_connection(session, demo_db_path)
+        await session.commit()
 
     yield
 

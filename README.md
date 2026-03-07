@@ -24,7 +24,7 @@ QueryGPT 是一个面向中文场景的数据库分析助手。
 - 返回总结
 - 出错时给出诊断，并自动修复可恢复的问题
 
-适合做内部数据助手、本地分析工具，或者接 OpenAI-compatible 网关的私有部署场景。
+这版项目已经收口为单用户、本地优先的工作区模式，适合个人分析、内部助手或自托管使用。
 
 ## 功能
 
@@ -33,24 +33,29 @@ QueryGPT 是一个面向中文场景的数据库分析助手。
 - 自动分析链路: 查询结果可以继续生成图表或 Python 分析
 - 诊断与自愈: 展示 provider、数据库连接、尝试记录，并自动修复常见执行错误
 - 语义层与表关系: 支持业务术语、关系管理、Schema 布局
-- 多用户隔离: JWT 认证、用户配置、聊天历史、默认模型和连接
+- 单工作区模式: 默认模型、默认连接、上下文轮数与能力开关集中管理
+- 内置示例数据库: 首次启动会生成 `demo.db`，空工作区会自动补一条 `示例数据库` 连接
 
 ## 界面截图
 
-| 登录 | 对话工作台 |
-| --- | --- |
-| <img src="docs/images/login.png" alt="登录界面" width="100%"> | <img src="docs/images/chat.png" alt="对话工作台" width="100%"> |
+- 对话工作台
 
-| 语义层 | Schema 关系视图 |
-| --- | --- |
-| <img src="docs/images/semantic.png" alt="语义层设置" width="100%"> | <img src="docs/images/schema.png" alt="Schema 关系视图" width="100%"> |
+  <img src="docs/images/chat.png" alt="对话工作台" width="100%">
+
+- 语义层
+
+  <img src="docs/images/semantic.png" alt="语义层设置" width="100%">
+
+- Schema 关系视图
+
+  <img src="docs/images/schema.png" alt="Schema 关系视图" width="100%">
 
 ## 快速开始
 
 需要:
 
 - Python 3.11+
-- Node.js 18+
+- Node.js LTS
 
 ```bash
 git clone git@github.com:mky508/querygpt.git
@@ -66,11 +71,10 @@ cd querygpt
 
 第一次进入后:
 
-1. 注册或登录
-2. 在设置页添加模型
-3. 添加数据库连接
-4. 选择默认模型和默认连接
-5. 回到聊天页直接提问
+1. 先在设置页添加模型
+2. 可以直接用内置的 `示例数据库`，也可以自己添加连接
+3. 按需设置默认模型、默认连接和上下文轮数
+4. 回到聊天页提问
 
 ## 配置说明
 
@@ -106,6 +110,12 @@ cd querygpt
 
 系统只允许执行只读 SQL。
 
+项目内置一个 SQLite 示例库:
+
+- 路径: `apps/api/data/demo.db`
+- 默认连接名: `示例数据库`
+- 如果工作区里没有任何连接，启动时会自动补回这条示例连接
+
 ## 启动脚本
 
 默认启动:
@@ -114,13 +124,25 @@ cd querygpt
 ./start.sh
 ```
 
+这个脚本会做几件事:
+
+- 检查并复用 `apps/api/.venv`
+- 按依赖指纹跳过重复安装
+- 初始化后端元数据库
+- 创建内置 `demo.db`
+- 启动前后端服务
+
 常用命令:
 
 ```bash
+./start.sh setup
+./start.sh install analytics
+./start.sh install dev
 ./start.sh stop
 ./start.sh restart
 ./start.sh status
 ./start.sh logs
+./start.sh doctor
 ```
 
 可选环境变量:
@@ -129,6 +151,11 @@ cd querygpt
 QUERYGPT_BACKEND_RELOAD=1 ./start.sh
 QUERYGPT_BACKEND_HOST=0.0.0.0 ./start.sh
 ```
+
+说明:
+
+- `install analytics` 会补装 `scikit-learn`、`scipy`、`seaborn`
+- 默认安装已经包含 `pandas`、`numpy`、`matplotlib`
 
 ## 本地开发
 
@@ -156,7 +183,6 @@ npm run dev
 
 ```env
 DATABASE_URL=sqlite+aiosqlite:///./data/querygpt.db
-JWT_SECRET_KEY=your-secret-key
 ENCRYPTION_KEY=your-fernet-key
 ```
 
@@ -211,14 +237,15 @@ python -m pytest
 - 聊天页会显示模型 provider、数据库连接、上下文轮数、执行耗时和结果行数
 - 可恢复错误会自动继续修复，例如 SQL 或 Python 执行错误
 - 历史对话会保留执行上下文，支持按原配置重新运行
+- 产品按单用户、本地优先的工作区模式收口，不再依赖登录和 JWT
 
 ## 已知边界
 
 - 只允许只读 SQL
 - `/chat/stop` 目前按单实例语义设计
 - 自动修复优先覆盖 SQL、Python、图表配置这类可恢复错误
+- 开发环境建议使用 Node.js LTS；如果 `next dev` 出现异常，先清理 `apps/web/.next`
 
 ## 许可证
 
 MIT
-

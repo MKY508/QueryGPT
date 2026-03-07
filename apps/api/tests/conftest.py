@@ -10,25 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.security import create_access_token
 from app.db import get_db
 from app.db.tables import Base
 from app.main import app, limiter
 
-# 测试数据库 URL
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter() -> Generator[None, None, None]:
-    """每个测试前重置限速器内存存储，防止跨测试计数累积触发限流"""
     limiter._storage.reset()
     yield
 
 
 @pytest.fixture(scope="session")
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create event loop for async tests"""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
@@ -36,7 +32,6 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 
 @pytest.fixture(scope="function")
 async def async_engine():
-    """Create async engine for each test"""
     engine = create_async_engine(
         TEST_DATABASE_URL,
         connect_args={"check_same_thread": False},
@@ -52,7 +47,6 @@ async def async_engine():
 
 @pytest.fixture(scope="function")
 async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
-    """Create database session for each test"""
     async_session = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
         yield session
@@ -60,8 +54,6 @@ async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.fixture(scope="function")
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """Create test client with overridden database"""
-
     async def override_get_db():
         yield db_session
 
@@ -75,13 +67,5 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
 @pytest.fixture
 def sync_client() -> Generator[TestClient, None, None]:
-    """Sync test client for simple tests"""
     with TestClient(app) as c:
         yield c
-
-
-@pytest.fixture
-def auth_headers() -> dict[str, str]:
-    """Generate auth headers with test token"""
-    token = create_access_token(data={"sub": "test@example.com", "user_id": "test-user-id"})
-    return {"Authorization": f"Bearer {token}"}

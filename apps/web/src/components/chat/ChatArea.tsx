@@ -21,7 +21,7 @@ import ReactMarkdown from "react-markdown";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ExecutionContextSummary, ModelExtraOptions } from "@/lib/types/api";
+import type { AppSettings, ExecutionContextSummary, ModelExtraOptions } from "@/lib/types/api";
 import { useChatStore } from "@/lib/stores/chat";
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
@@ -46,12 +46,6 @@ interface Model {
   is_default: boolean;
   api_key_configured?: boolean;
   extra_options?: ModelExtraOptions;
-}
-
-interface UserConfig {
-  context_rounds: number;
-  default_model_id?: string | null;
-  default_connection_id?: string | null;
 }
 
 interface ChatAreaProps {
@@ -380,15 +374,15 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
     },
   });
 
-  const { data: userConfig } = useQuery({
-    queryKey: ["user-config"],
+  const { data: appSettings } = useQuery({
+    queryKey: ["app-settings"],
     queryFn: async () => {
-      const response = await api.get("/api/v1/config");
-      return response.data.data as UserConfig;
+      const response = await api.get("/api/v1/settings");
+      return response.data.data as AppSettings;
     },
   });
 
-  const effectiveContextRounds = userConfig?.context_rounds || 5;
+  const effectiveContextRounds = appSettings?.context_rounds || 5;
 
   const handleSelectConnection = (id: string) => {
     setSelectedConnectionId(id);
@@ -404,27 +398,27 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
     if (!isInitialized || !connections?.length) return;
     const savedExists = selectedConnectionId && connections.some((c) => c.id === selectedConnectionId);
     if (!savedExists) {
-      const preferredId = userConfig?.default_connection_id;
+      const preferredId = appSettings?.default_connection_id;
       const nextId =
         connections.find((c) => c.id === preferredId)?.id ||
         connections.find((c) => c.is_default)?.id ||
         connections[0].id;
       handleSelectConnection(nextId);
     }
-  }, [isInitialized, connections, selectedConnectionId, userConfig?.default_connection_id]);
+  }, [isInitialized, connections, selectedConnectionId, appSettings?.default_connection_id]);
 
   useEffect(() => {
     if (!isInitialized || !models?.length) return;
     const savedExists = selectedModelId && models.some((m) => m.id === selectedModelId);
     if (!savedExists) {
-      const preferredId = userConfig?.default_model_id;
+      const preferredId = appSettings?.default_model_id;
       const nextId =
         models.find((m) => m.id === preferredId)?.id ||
         models.find((m) => m.is_default)?.id ||
         models[0].id;
       handleSelectModel(nextId);
     }
-  }, [isInitialized, models, selectedModelId, userConfig?.default_model_id]);
+  }, [isInitialized, models, selectedModelId, appSettings?.default_model_id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

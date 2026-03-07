@@ -1,14 +1,4 @@
 """Pydantic 数据模型 - API 契约定义"""
-
-from app.models.auth import (
-    Token,
-    TokenPayload,
-    TokenRefresh,
-    UserCreate,
-    UserLogin,
-    UserResponse,
-    UserUpdate,
-)
 from app.models.chat import (
     ChatRequest,
     ChatStopRequest,
@@ -21,6 +11,8 @@ from app.models.common import (
     PaginatedResponse,
 )
 from app.models.config import (
+    AppSettings,
+    AppSettingsUpdate,
     ConnectionCreate,
     ConnectionResponse,
     ConnectionTest,
@@ -28,7 +20,7 @@ from app.models.config import (
     ModelExtraOptions,
     ModelResponse,
     ModelTest,
-    UserConfig,
+    SystemCapabilities,
 )
 from app.models.history import (
     ConversationCreate,
@@ -60,14 +52,6 @@ from app.models.semantic import (
 )
 
 __all__ = [
-    # Auth
-    "UserCreate",
-    "UserLogin",
-    "UserResponse",
-    "UserUpdate",
-    "Token",
-    "TokenPayload",
-    "TokenRefresh",
     # Chat
     "ChatRequest",
     "ChatStopRequest",
@@ -85,7 +69,9 @@ __all__ = [
     "ConnectionCreate",
     "ConnectionResponse",
     "ConnectionTest",
-    "UserConfig",
+    "AppSettings",
+    "AppSettingsUpdate",
+    "SystemCapabilities",
     # History
     "ConversationCreate",
     "ConversationResponse",

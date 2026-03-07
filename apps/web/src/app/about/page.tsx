@@ -15,22 +15,22 @@ import {
 const VERSION = "2.0.0";
 
 const providers = [
-  ["OpenAI-compatible", "官方 OpenAI、自建网关、DeepSeek 兼容接口"],
+  ["OpenAI-compatible", "OpenAI、DeepSeek、自建兼容网关"],
   ["Anthropic", "原生协议调用"],
   ["Ollama", "本地模型 / 无 key 场景"],
-  ["Custom", "通过高级参数补充 headers 与查询参数"],
+  ["Custom", "通过高级参数补 headers 与 query params"],
 ];
 
 const capabilities = [
-  ["自然语言 -> SQL", "读取 schema、语义层、表关系后生成只读 SQL"],
-  ["结果检查", "对话保留 SQL、数据、图表、Python 输出与执行快照"],
-  ["布局管理", "支持 schema 布局保存、复制、导入导出"],
-  ["多配置", "用户级模型、连接、提示词、主题和偏好设置"],
+  ["自然语言 -> SQL", "结合 schema、语义层、表关系生成只读 SQL"],
+  ["执行可追踪", "保留 SQL、数据、图表、Python 输出和执行诊断"],
+  ["自动修复", "SQL / Python 可恢复错误会在单轮内自动修正并续跑"],
+  ["工作区配置", "单用户默认模型、默认连接、上下文轮数与能力开关"],
 ];
 
 const currentLimits = [
+  "当前产品定位是单用户、本地优先，不包含团队账号和权限管理",
   "查询停止仍按单实例语义工作，不支持多实例共享取消状态",
-  "模型健康检查默认以 chat completion 为主，第三方网关细节仍依赖兼容程度",
   "数据库执行保持只读策略，不支持写操作",
 ];
 
@@ -57,11 +57,11 @@ export default function AboutPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
                 <Gauge size={12} />
-                Product Status
+                Single-User Workspace
               </div>
               <h1 className="mt-4 text-4xl font-semibold text-foreground">QueryGPT</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-                一个面向数据库问答与分析的工作台。当前版本重点放在模型适配、执行可追踪性、语义层和 schema 布局管理。
+                一个面向个人和自托管场景的数据库分析工作台。重点是把模型适配、执行诊断、语义层和 schema 管理做扎实，而不是做成多租户平台。
               </p>
             </div>
             <div className="rounded-2xl border border-border bg-background px-5 py-4 text-sm">
@@ -123,7 +123,7 @@ export default function AboutPage() {
               <Palette size={16} className="text-primary" />
               界面
             </div>
-            <div className="mt-3 text-sm text-muted-foreground">多主题、聊天结果检查面板、设置页统一配置流</div>
+            <div className="mt-3 text-sm text-muted-foreground">聊天检查面板、工作区设置、多主题</div>
           </div>
         </section>
 

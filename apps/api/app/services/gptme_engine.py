@@ -12,6 +12,7 @@ import re
 import sys
 import time
 from collections.abc import AsyncGenerator, Callable
+from importlib.util import find_spec
 from typing import Any
 
 import structlog
@@ -208,6 +209,11 @@ class GptmeEngine:
         headers: dict[str, str] | None = None,
         query_params: dict[str, str] | None = None,
         timeout: int = 300,
+        python_enabled: bool = True,
+        diagnostics_enabled: bool = True,
+        auto_repair_enabled: bool = True,
+        available_python_libraries: list[str] | None = None,
+        analytics_installed: bool = False,
     ):
         self.model = model or settings.GPTME_MODEL or settings.DEFAULT_MODEL
         self.provider = provider  # 用于 litellm custom_llm_provider，避免模型名查表解析
@@ -216,8 +222,23 @@ class GptmeEngine:
         self.headers = headers or {}
         self.query_params = query_params or {}
         self.timeout = timeout or settings.GPTME_TIMEOUT
+        self.python_enabled = python_enabled
+        self.diagnostics_enabled = diagnostics_enabled
+        self.auto_repair_enabled = auto_repair_enabled
+        self.available_python_libraries = available_python_libraries or [
+            "pandas",
+            "numpy",
+            "matplotlib",
+        ]
+        self.analytics_installed = analytics_installed
         self._ipython = None  # IPython 实例（延迟初始化）
         self._sql_data: dict[str, Any] = {}  # SQL 结果缓存
+
+    def _diagnostics_payload(self, diagnostics: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+        return diagnostics if self.diagnostics_enabled else None
+
+    def _diagnostic_entry_payload(self, entry: dict[str, Any]) -> dict[str, Any] | None:
+        return entry if self.diagnostics_enabled else None
 
     def _get_ipython(self):
         """获取或创建 IPython 实例"""
@@ -288,6 +309,36 @@ plt.rcParams['font.size'] = 12
         if not is_safe:
             return False, f"检测到不安全的操作: {'; '.join(violations)}"
         return True, None
+
+    def _validate_python_dependencies(self, code: str) -> tuple[bool, str | None]:
+        """检查 Python 代码引用的库是否已安装"""
+        try:
+            tree = ast.parse(code)
+        except SyntaxError as exc:
+            return False, f"语法错误: {exc}"
+
+        missing: list[str] = []
+
+        def check_module(module_name: str) -> None:
+            root = module_name.split(".")[0]
+            if root in BLOCKED_MODULES:
+                return
+            if find_spec(root) is None:
+                missing.append(root)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    check_module(alias.name)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                check_module(node.module)
+
+        if not missing:
+            return True, None
+
+        unique_missing = sorted(set(missing))
+        package_names = ", ".join(unique_missing)
+        return False, f"未安装所需 Python 库: {package_names}"
 
     def _parse_thinking(self, content: str) -> list[str]:
         """解析思考标记"""
@@ -405,7 +456,7 @@ Python 错误：
 要求：
 1. 若 SQL 无需修改，请保留原 SQL；若确实有问题，也一并修正。
 2. 如果还需要 Python 分析，必须返回新的 ```python 代码块。
-3. 代码只能使用 pandas、numpy、sklearn、matplotlib、seaborn、scipy，并直接使用已注入的 df。
+3. 代码只能使用这些当前可用库：{', '.join(self.available_python_libraries)}，并直接使用已注入的 df。
 4. 不要访问文件、网络或系统资源。
 """
 
@@ -645,6 +696,7 @@ Python 错误：
     ) -> AsyncGenerator[SSEEvent, None]:
         """使用 LiteLLM 执行查询"""
         diagnostics: list[dict[str, Any]] = []
+        max_attempts = MAX_AUTO_REPAIR_ATTEMPTS if self.auto_repair_enabled else 1
         completion_messages = self._build_initial_messages(
             query=query,
             system_prompt=system_prompt,
@@ -662,7 +714,7 @@ Python 错误：
         python_images: list[str] = []
         attempt = 1
 
-        while attempt <= MAX_AUTO_REPAIR_ATTEMPTS:
+        while attempt <= max_attempts:
             yield SSEEvent.progress(
                 "generating",
                 "正在生成响应..." if attempt == 1 else f"正在进行第 {attempt} 次自动修复...",
@@ -699,9 +751,9 @@ Python 错误：
                     diagnostic["message"],
                     attempt=attempt,
                     phase="generate",
-                    diagnostic_entry=diagnostic,
+                    diagnostic_entry=self._diagnostic_entry_payload(diagnostic),
                 )
-                if recoverable and attempt < MAX_AUTO_REPAIR_ATTEMPTS:
+                if recoverable and attempt < max_attempts:
                     repair_entry = self._build_diagnostic_entry(
                         attempt=attempt + 1,
                         phase="generate",
@@ -717,7 +769,7 @@ Python 错误：
                         repair_entry["message"],
                         attempt=attempt + 1,
                         phase="generate",
-                        diagnostic_entry=repair_entry,
+                        diagnostic_entry=self._diagnostic_entry_payload(repair_entry),
                     )
                     attempt += 1
                     continue
@@ -727,7 +779,7 @@ Python 错误：
                     error_category=category,
                     failed_stage="generate",
                     attempt=attempt,
-                    diagnostics=diagnostics,
+                    diagnostics=self._diagnostics_payload(diagnostics),
                 )
                 return
 
@@ -759,16 +811,16 @@ Python 错误：
                     diagnostic["message"],
                     attempt=attempt,
                     phase="generate",
-                    diagnostic_entry=diagnostic,
+                    diagnostic_entry=self._diagnostic_entry_payload(diagnostic),
                 )
-                if attempt >= MAX_AUTO_REPAIR_ATTEMPTS:
+                if attempt >= max_attempts:
                     yield SSEEvent.error(
                         "MISSING_SQL",
                         "模型没有生成可执行 SQL。",
                         error_category="sql",
                         failed_stage="generate",
                         attempt=attempt,
-                        diagnostics=diagnostics,
+                        diagnostics=self._diagnostics_payload(diagnostics),
                     )
                     return
 
@@ -795,7 +847,7 @@ Python 错误：
                     repair_entry["message"],
                     attempt=attempt + 1,
                     phase="generate",
-                    diagnostic_entry=repair_entry,
+                    diagnostic_entry=self._diagnostic_entry_payload(repair_entry),
                 )
                 attempt += 1
                 continue
@@ -829,7 +881,7 @@ Python 错误：
                         diagnostic["message"],
                         attempt=attempt,
                         phase="sql",
-                        diagnostic_entry=diagnostic,
+                        diagnostic_entry=self._diagnostic_entry_payload(diagnostic),
                     )
                 except Exception as e:
                     code, category, recoverable = self._categorize_sql_error(str(e))
@@ -849,9 +901,9 @@ Python 错误：
                         diagnostic["message"],
                         attempt=attempt,
                         phase="sql",
-                        diagnostic_entry=diagnostic,
+                        diagnostic_entry=self._diagnostic_entry_payload(diagnostic),
                     )
-                    if recoverable and attempt < MAX_AUTO_REPAIR_ATTEMPTS:
+                    if recoverable and attempt < max_attempts:
                         completion_messages = self._build_repair_messages(
                             query=query,
                             system_prompt=system_prompt,
@@ -880,7 +932,7 @@ Python 错误：
                             repair_entry["message"],
                             attempt=attempt + 1,
                             phase="sql",
-                            diagnostic_entry=repair_entry,
+                            diagnostic_entry=self._diagnostic_entry_payload(repair_entry),
                         )
                         attempt += 1
                         continue
@@ -890,54 +942,20 @@ Python 错误：
                         error_category=category,
                         failed_stage="sql",
                         attempt=attempt,
-                        diagnostics=diagnostics,
+                        diagnostics=self._diagnostics_payload(diagnostics),
                     )
                     return
 
             if final_python:
-                logger.debug("Executing Python code", attempt=attempt)
-                yield SSEEvent.progress(
-                    "executing_python",
-                    "正在执行 Python 分析...",
-                    attempt=attempt,
-                    phase="python",
-                )
-
-                try:
-                    python_output, python_images = await self._execute_python(final_python)
-                    diagnostic = self._build_diagnostic_entry(
-                        attempt=attempt,
-                        phase="python",
-                        status="success",
-                        message="Python 分析执行完成。",
-                        python=final_python,
-                    )
-                    diagnostics.append(diagnostic)
-                    yield SSEEvent.progress(
-                        "executing_python",
-                        diagnostic["message"],
-                        attempt=attempt,
-                        phase="python",
-                        diagnostic_entry=diagnostic,
-                    )
-
-                    if python_output:
-                        yield SSEEvent.python_output(python_output, "stdout")
-
-                    for img_base64 in python_images:
-                        yield SSEEvent.python_image(img_base64, "png")
-
-                except Exception as e:
-                    code, category, recoverable = self._categorize_python_error(str(e))
+                if not self.python_enabled:
                     diagnostic = self._build_diagnostic_entry(
                         attempt=attempt,
                         phase="python",
                         status="error",
-                        message=f"Python 执行失败: {e}",
-                        error_code=code,
-                        error_category=category,
-                        recoverable=recoverable,
-                        sql=final_sql,
+                        message="Python 分析已在设置中关闭，已跳过 Python 执行。",
+                        error_code="PYTHON_DISABLED",
+                        error_category="python",
+                        recoverable=False,
                         python=final_python,
                     )
                     diagnostics.append(diagnostic)
@@ -946,51 +964,105 @@ Python 错误：
                         diagnostic["message"],
                         attempt=attempt,
                         phase="python",
-                        diagnostic_entry=diagnostic,
+                        diagnostic_entry=self._diagnostic_entry_payload(diagnostic),
                     )
-                    if recoverable and attempt < MAX_AUTO_REPAIR_ATTEMPTS:
-                        completion_messages = self._build_repair_messages(
-                            query=query,
-                            system_prompt=system_prompt,
-                            previous_content=full_content,
-                            repair_prompt=self._build_python_repair_prompt(
-                                query=query,
-                                failed_sql=final_sql,
-                                failed_python=final_python,
-                                error_message=str(e),
-                            ),
-                            db_config=db_config,
-                            history=history,
-                        )
-                        repair_entry = self._build_diagnostic_entry(
-                            attempt=attempt + 1,
+                    final_python = None
+                else:
+                    logger.debug("Executing Python code", attempt=attempt)
+                    yield SSEEvent.progress(
+                        "executing_python",
+                        "正在执行 Python 分析...",
+                        attempt=attempt,
+                        phase="python",
+                    )
+                    try:
+                        python_output, python_images = await self._execute_python(final_python)
+                        diagnostic = self._build_diagnostic_entry(
+                            attempt=attempt,
                             phase="python",
-                            status="repaired",
-                            message="Python 失败可恢复，正在自动修复并重试。",
-                            error_code=code,
-                            error_category=category,
-                            recoverable=True,
+                            status="success",
+                            message="Python 分析执行完成。",
                             python=final_python,
                         )
-                        diagnostics.append(repair_entry)
+                        diagnostics.append(diagnostic)
                         yield SSEEvent.progress(
                             "executing_python",
-                            repair_entry["message"],
-                            attempt=attempt + 1,
+                            diagnostic["message"],
+                            attempt=attempt,
                             phase="python",
-                            diagnostic_entry=repair_entry,
+                            diagnostic_entry=self._diagnostic_entry_payload(diagnostic),
                         )
-                        attempt += 1
-                        continue
-                    yield SSEEvent.error(
-                        code,
-                        f"Python 执行失败: {e}",
-                        error_category=category,
-                        failed_stage="python",
-                        attempt=attempt,
-                        diagnostics=diagnostics,
-                    )
-                    return
+
+                        if python_output:
+                            yield SSEEvent.python_output(python_output, "stdout")
+
+                        for img_base64 in python_images:
+                            yield SSEEvent.python_image(img_base64, "png")
+
+                    except Exception as e:
+                        code, category, recoverable = self._categorize_python_error(str(e))
+                        diagnostic = self._build_diagnostic_entry(
+                            attempt=attempt,
+                            phase="python",
+                            status="error",
+                            message=f"Python 执行失败: {e}",
+                            error_code=code,
+                            error_category=category,
+                            recoverable=recoverable,
+                            sql=final_sql,
+                            python=final_python,
+                        )
+                        diagnostics.append(diagnostic)
+                        yield SSEEvent.progress(
+                            "executing_python",
+                            diagnostic["message"],
+                            attempt=attempt,
+                            phase="python",
+                            diagnostic_entry=self._diagnostic_entry_payload(diagnostic),
+                        )
+                        if recoverable and attempt < max_attempts:
+                            completion_messages = self._build_repair_messages(
+                                query=query,
+                                system_prompt=system_prompt,
+                                previous_content=full_content,
+                                repair_prompt=self._build_python_repair_prompt(
+                                    query=query,
+                                    failed_sql=final_sql,
+                                    failed_python=final_python,
+                                    error_message=str(e),
+                                ),
+                                db_config=db_config,
+                                history=history,
+                            )
+                            repair_entry = self._build_diagnostic_entry(
+                                attempt=attempt + 1,
+                                phase="python",
+                                status="repaired",
+                                message="Python 失败可恢复，正在自动修复并重试。",
+                                error_code=code,
+                                error_category=category,
+                                recoverable=True,
+                                python=final_python,
+                            )
+                            diagnostics.append(repair_entry)
+                            yield SSEEvent.progress(
+                                "executing_python",
+                                repair_entry["message"],
+                                attempt=attempt + 1,
+                                phase="python",
+                                diagnostic_entry=self._diagnostic_entry_payload(repair_entry),
+                            )
+                            attempt += 1
+                            continue
+                        yield SSEEvent.error(
+                            code,
+                            f"Python 执行失败: {e}",
+                            error_category=category,
+                            failed_stage="python",
+                            attempt=attempt,
+                            diagnostics=self._diagnostics_payload(diagnostics),
+                        )
+                        return
 
             clean_content = self._clean_content_for_display(full_content)
             yield SSEEvent.result(
@@ -999,7 +1071,7 @@ Python 错误：
                 data=final_data,
                 rows_count=final_rows_count,
                 execution_time=final_execution_time,
-                diagnostics=diagnostics,
+                diagnostics=self._diagnostics_payload(diagnostics),
             )
 
             if python_images:
@@ -1020,7 +1092,7 @@ Python 错误：
                         diagnostic["message"],
                         attempt=attempt,
                         phase="chart",
-                        diagnostic_entry=diagnostic,
+                        diagnostic_entry=self._diagnostic_entry_payload(diagnostic),
                     )
                     yield SSEEvent.visualization(
                         chart_type=visualization.get("type", "bar"),
@@ -1048,7 +1120,7 @@ Python 错误：
                     fallback_diag["message"],
                     attempt=attempt,
                     phase="chart",
-                    diagnostic_entry=fallback_diag,
+                    diagnostic_entry=self._diagnostic_entry_payload(fallback_diag),
                 )
 
             if final_data and len(final_data) > 0:
@@ -1092,6 +1164,10 @@ Python 错误：
         is_valid, error = self._validate_python_code(code)
         if not is_valid:
             raise ValueError(error)
+
+        deps_ok, deps_error = self._validate_python_dependencies(code)
+        if not deps_ok:
+            raise RuntimeError(deps_error)
 
         # 在线程中执行（避免阻塞事件循环）
         return await asyncio.wait_for(

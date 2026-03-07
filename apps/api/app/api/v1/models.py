@@ -8,26 +8,36 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
 from app.core import encryptor
 from app.core.config import settings
 from app.db import get_db
-from app.db.tables import Model, User
+from app.db.tables import Model
 from app.models import APIResponse, ModelCreate, ModelResponse, ModelTest
 from app.services.model_runtime import categorize_model_error, resolve_model_runtime
 
 router = APIRouter(prefix="/models", tags=["models"])
 
 
+async def _get_model_or_404(db: AsyncSession, model_id: UUID) -> Model:
+    result = await db.execute(select(Model).where(Model.id == model_id))
+    model = result.scalar_one_or_none()
+    if not model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模型不存在")
+    return model
+
+
+async def _clear_default_models(db: AsyncSession, exclude_id: UUID | None = None) -> None:
+    result = await db.execute(select(Model).where(Model.is_default.is_(True)))
+    for model in result.scalars():
+        if exclude_id and model.id == exclude_id:
+            continue
+        model.is_default = False
+
+
 @router.get("", response_model=APIResponse[list[ModelResponse]])
-async def list_models(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
+async def list_models(db: AsyncSession = Depends(get_db)):
     """获取模型列表"""
-    result = await db.execute(
-        select(Model).where(Model.user_id == current_user.id).order_by(Model.created_at.desc())
-    )
+    result = await db.execute(select(Model).order_by(Model.created_at.desc()))
     models = result.scalars().all()
     return APIResponse.ok(data=[ModelResponse.model_validate(m) for m in models])
 
@@ -35,25 +45,14 @@ async def list_models(
 @router.post("", response_model=APIResponse[ModelResponse])
 async def create_model(
     model_in: ModelCreate,
-    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """添加模型配置"""
-    # 如果设为默认，取消其他默认
     if model_in.is_default:
-        result = await db.execute(
-            select(Model).where(Model.user_id == current_user.id, Model.is_default)
-        )
-        for m in result.scalars():
-            m.is_default = False
+        await _clear_default_models(db)
 
-    # 加密 API Key
-    api_key_encrypted = None
-    if model_in.api_key:
-        api_key_encrypted = encryptor.encrypt(model_in.api_key)
-
+    api_key_encrypted = encryptor.encrypt(model_in.api_key) if model_in.api_key else None
     model = Model(
-        user_id=current_user.id,
         name=model_in.name,
         provider=model_in.provider,
         model_id=model_in.model_id,
@@ -73,35 +72,20 @@ async def create_model(
 async def update_model(
     model_id: UUID,
     model_in: ModelCreate,
-    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """更新模型配置"""
-    result = await db.execute(
-        select(Model).where(Model.id == model_id, Model.user_id == current_user.id)
-    )
-    model = result.scalar_one_or_none()
+    model = await _get_model_or_404(db, model_id)
 
-    if not model:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模型不存在")
-
-    # 如果设为默认，取消其他默认
     if model_in.is_default and not model.is_default:
-        other_result = await db.execute(
-            select(Model).where(Model.user_id == current_user.id, Model.is_default)
-        )
-        for m in other_result.scalars():
-            m.is_default = False
+        await _clear_default_models(db, exclude_id=model.id)
 
-    # 更新字段
     model.name = model_in.name
     model.provider = model_in.provider
     model.model_id = model_in.model_id
     model.base_url = model_in.base_url
     model.is_default = model_in.is_default
     model.extra_options = model_in.extra_options.model_dump()
-
-    # 只有提供了新的 API Key 才更新
     if model_in.api_key:
         model.api_key_encrypted = encryptor.encrypt(model_in.api_key)
 
@@ -114,43 +98,23 @@ async def update_model(
 @router.delete("/{model_id}", response_model=APIResponse[dict])
 async def delete_model(
     model_id: UUID,
-    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """删除模型配置"""
-    result = await db.execute(
-        select(Model).where(Model.id == model_id, Model.user_id == current_user.id)
-    )
-    model = result.scalar_one_or_none()
-
-    if not model:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模型不存在")
-
+    model = await _get_model_or_404(db, model_id)
     await db.delete(model)
     await db.commit()
-
     return APIResponse.ok(message="模型已删除")
 
 
 @router.post("/{model_id}/test", response_model=APIResponse[ModelTest])
 async def test_model(
     model_id: UUID,
-    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """测试模型 API Key"""
-    result = await db.execute(
-        select(Model).where(Model.id == model_id, Model.user_id == current_user.id)
-    )
-    model = result.scalar_one_or_none()
-
-    if not model:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模型不存在")
-
-    # 解密 API Key
-    api_key = None
-    if model.api_key_encrypted:
-        api_key = encryptor.decrypt(model.api_key_encrypted)
+    """测试模型配置"""
+    model = await _get_model_or_404(db, model_id)
+    api_key = encryptor.decrypt(model.api_key_encrypted) if model.api_key_encrypted else None
 
     resolved, _ = resolve_model_runtime(
         model,
@@ -174,16 +138,13 @@ async def test_model(
 
     try:
         start_time = time.time()
-
         response = await litellm.acompletion(
             messages=[{"role": "user", "content": "Hi"}],
             max_tokens=5,
             timeout=10,
             **resolved.completion_kwargs(),
         )
-
         elapsed_ms = int((time.time() - start_time) * 1000)
-
         return APIResponse.ok(
             data=ModelTest(
                 success=True,
@@ -196,7 +157,6 @@ async def test_model(
                 api_key_required=resolved.api_key_required,
             )
         )
-
     except Exception as e:
         error_msg = str(e)
         error_category = categorize_model_error(error_msg)

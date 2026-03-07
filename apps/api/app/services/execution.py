@@ -13,14 +13,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import encryptor
 from app.core.config import settings
-from app.db.tables import Connection, Message, Model, Prompt, SemanticTerm, TableRelationship, User
+from app.db.tables import Connection, Message, Model, Prompt, SemanticTerm, TableRelationship
 from app.models import (
     RelationshipContext,
     SemanticContext,
     SemanticTermResponse,
     SSEEvent,
+    SystemCapabilities,
     TableRelationshipResponse,
 )
+from app.services.app_settings import detect_system_capabilities
 from app.services.model_runtime import resolve_model_runtime
 
 logger = structlog.get_logger()
@@ -31,27 +33,29 @@ class ExecutionService:
 
     def __init__(
         self,
-        user: User,
         db: AsyncSession,
         model_name: str | None = None,
         connection_id: UUID | None = None,
         language: str = "zh",
         context_rounds: int = 5,
+        settings_data: dict[str, Any] | None = None,
     ):
-        self.user = user
         self.db = db
         self.model_name = model_name
         self.connection_id = connection_id
         self.language = language
         self.context_rounds = max(context_rounds, 1)
+        self.settings_data = settings_data or {}
         self._resolved_model_record: Model | None = None
         self._resolved_connection_record: Connection | None = None
         self._resolved_model_config: dict[str, Any] | None = None
         self._resolved_connection_config: dict[str, Any] | None = None
 
-    def _user_settings(self) -> dict[str, Any]:
-        settings_data = getattr(self.user, "settings", None)
-        return settings_data if isinstance(settings_data, dict) else {}
+    def _workspace_settings(self) -> dict[str, Any]:
+        return self.settings_data if isinstance(self.settings_data, dict) else {}
+
+    def _capabilities(self) -> SystemCapabilities:
+        return detect_system_capabilities(self._workspace_settings())
 
     async def _get_model_record(self) -> Model | None:
         if self._resolved_model_record is not None:
@@ -63,7 +67,6 @@ class ExecutionService:
                 model_uuid = UUID(self.model_name)
                 result = await self.db.execute(
                     select(Model).where(
-                        Model.user_id == self.user.id,
                         Model.id == model_uuid,
                         Model.is_active.is_(True),
                     )
@@ -71,20 +74,18 @@ class ExecutionService:
             except ValueError:
                 result = await self.db.execute(
                     select(Model).where(
-                        Model.user_id == self.user.id,
                         Model.model_id == self.model_name,
                         Model.is_active.is_(True),
                     )
                 )
             model = result.scalar_one_or_none()
         else:
-            settings_data = self._user_settings()
+            settings_data = self._workspace_settings()
             default_model_id = settings_data.get("default_model_id")
             if default_model_id:
                 try:
                     result = await self.db.execute(
                         select(Model).where(
-                            Model.user_id == self.user.id,
                             Model.id == UUID(str(default_model_id)),
                             Model.is_active.is_(True),
                         )
@@ -96,7 +97,6 @@ class ExecutionService:
             if model is None:
                 result = await self.db.execute(
                     select(Model).where(
-                        Model.user_id == self.user.id,
                         Model.is_default,
                         Model.is_active.is_(True),
                     )
@@ -153,19 +153,17 @@ class ExecutionService:
             result = await self.db.execute(
                 select(Connection).where(
                     Connection.id == self.connection_id,
-                    Connection.user_id == self.user.id,
                 )
             )
             connection = result.scalar_one_or_none()
         else:
-            settings_data = self._user_settings()
+            settings_data = self._workspace_settings()
             default_connection_id = settings_data.get("default_connection_id")
             if default_connection_id:
                 try:
                     result = await self.db.execute(
                         select(Connection).where(
                             Connection.id == UUID(str(default_connection_id)),
-                            Connection.user_id == self.user.id,
                         )
                     )
                     connection = result.scalar_one_or_none()
@@ -175,7 +173,6 @@ class ExecutionService:
             if connection is None:
                 result = await self.db.execute(
                     select(Connection).where(
-                        Connection.user_id == self.user.id,
                         Connection.is_default,
                     )
                 )
@@ -218,10 +215,7 @@ class ExecutionService:
         resolved_connection_id = connection.id if connection else None
 
         # 查询用户的语义术语（全局 + 当前连接）
-        query = select(SemanticTerm).where(
-            SemanticTerm.user_id == self.user.id,
-            SemanticTerm.is_active.is_(True),
-        )
+        query = select(SemanticTerm).where(SemanticTerm.is_active.is_(True))
 
         # 如果有指定连接，获取全局术语和该连接的术语
         if resolved_connection_id:
@@ -251,7 +245,6 @@ class ExecutionService:
         result = await self.db.execute(
             select(TableRelationship)
             .where(
-                TableRelationship.user_id == self.user.id,
                 TableRelationship.connection_id == connection.id,
                 TableRelationship.is_active.is_(True),
             )
@@ -263,11 +256,10 @@ class ExecutionService:
             relationships=[TableRelationshipResponse.model_validate(r) for r in relationships]
         )
 
-    async def _get_user_prompt(self) -> str | None:
-        """获取用户自定义提示词"""
+    async def _get_default_prompt(self) -> str | None:
+        """获取默认提示词"""
         result = await self.db.execute(
             select(Prompt).where(
-                Prompt.user_id == self.user.id,
                 Prompt.is_default.is_(True),
                 Prompt.is_active.is_(True),
             )
@@ -365,10 +357,9 @@ class ExecutionService:
             relationship_context = await self._get_relationship_context()
             logger.info(f"Relationships count: {len(relationship_context.relationships)}")
 
-            # 获取用户自定义提示词
-            logger.info("Getting user prompt...")
-            user_prompt = await self._get_user_prompt()
-            logger.info(f"User prompt: {'custom' if user_prompt else 'default'}")
+            logger.info("Getting default prompt...")
+            default_prompt = await self._get_default_prompt()
+            logger.info(f"Prompt source: {'custom' if default_prompt else 'builtin'}")
 
             # 加载对话历史（排除当前用户消息，避免重复注入）
             logger.info("Getting conversation history...")
@@ -379,8 +370,13 @@ class ExecutionService:
                 exclude_message_id=exclude_message_id,
             )
 
+            capabilities = self._capabilities()
             system_prompt = self._build_system_prompt(
-                db_config, semantic_context, relationship_context, user_prompt
+                db_config,
+                semantic_context,
+                relationship_context,
+                default_prompt,
+                capabilities,
             )
 
             engine = GptmeEngine(
@@ -390,6 +386,11 @@ class ExecutionService:
                 base_url=model_config.get("base_url"),
                 headers=model_config.get("headers"),
                 query_params=model_config.get("query_params"),
+                python_enabled=capabilities.python_enabled,
+                diagnostics_enabled=capabilities.diagnostics_enabled,
+                auto_repair_enabled=capabilities.auto_repair_enabled,
+                available_python_libraries=capabilities.available_python_libraries,
+                analytics_installed=capabilities.analytics_installed,
             )
 
             logger.info("Starting engine.execute...")
@@ -416,12 +417,20 @@ class ExecutionService:
         db_config: dict[str, Any] | None,
         semantic_context: SemanticContext | None = None,
         relationship_context: RelationshipContext | None = None,
-        user_prompt: str | None = None,
+        default_prompt: str | None = None,
+        capabilities: SystemCapabilities | None = None,
     ) -> str:
         """构建系统提示"""
-        # 如果用户有自定义提示词，使用自定义提示词作为基础
-        if user_prompt:
-            base_prompt = user_prompt
+        capabilities = capabilities or self._capabilities()
+        available_python_libraries = capabilities.available_python_libraries or [
+            "pandas",
+            "numpy",
+            "matplotlib",
+        ]
+        python_libraries = ", ".join(available_python_libraries)
+
+        if default_prompt:
+            base_prompt = default_prompt.strip()
         elif self.language == "zh":
             base_prompt = """你是 QueryGPT 数据分析助手，负责帮助用户查询和分析数据库数据。
 
@@ -437,61 +446,6 @@ class ExecutionService:
 1. 只生成只读 SQL（SELECT、SHOW、DESCRIBE）
 2. 用中文回复用户
 3. SQL 代码使用 ```sql 代码块
-
-## Python 可视化（重要！）
-**当用户要求使用 Python 画图、matplotlib、或任何 Python 可视化时，你必须生成 ```python 代码块！**
-
-工作流程：
-1. 先用 SQL 查询数据
-2. 然后用 Python 代码绑定数据并绑定图表
-3. SQL 查询结果会自动注入为 `df` DataFrame，你可以直接使用
-
-可用库：pandas, numpy, sklearn, matplotlib, seaborn, scipy
-
-**简单画图示例**（用户说"用python画图"时使用这种格式）：
-```python
-import matplotlib.pyplot as plt
-
-# df 已包含 SQL 查询结果
-plt.figure(figsize=(10, 6))
-plt.bar(df['date'].astype(str), df['amount'])
-plt.xlabel('日期')
-plt.ylabel('金额')
-plt.title('销售数据')
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
-```
-
-**复杂分析示例**（RFM 分析 + 聚类）：
-```python
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
-import matplotlib.pyplot as plt
-
-# df 已包含 SQL 查询结果
-X = StandardScaler().fit_transform(df[['recency', 'frequency', 'monetary']])
-df['cluster'] = KMeans(n_clusters=4).fit_predict(X)
-
-plt.scatter(df['recency'], df['monetary'], c=df['cluster'], cmap='viridis')
-plt.xlabel('最近购买天数')
-plt.ylabel('消费金额')
-plt.title('用户 RFM 聚类')
-plt.show()
-```
-
-## 简单图表配置（不使用 Python 时）
-如果用户没有明确要求 Python，可以使用 ```chart 代码块生成简单图表：
-```chart
-{
-  "type": "bar",
-  "title": "图表标题",
-  "xKey": "x轴字段名",
-  "yKeys": ["y轴字段名1"]
-}
-```
-
-图表类型：bar（柱状图）、line（折线图）、pie（饼图）、area（面积图）
 """
         else:
             base_prompt = """You are QueryGPT data analysis assistant, helping users query and analyze database data.
@@ -508,16 +462,107 @@ Use [thinking: ...] markers to show your analysis process:
 1. Only generate read-only SQL (SELECT, SHOW, DESCRIBE)
 2. Reply in English
 3. Use ```sql code blocks for SQL
+"""
 
-## Advanced Analysis
-For complex analysis (statistics, ML, custom visualizations), use Python:
-- SQL results are auto-injected as `df` DataFrame
-- Available: pandas, numpy, sklearn, matplotlib, seaborn, scipy
-- Use ```python code blocks
-- matplotlib charts are auto-captured
+        runtime_rules = (
+            """
+
+## 固定运行时约束
+1. 只允许生成只读 SQL（SELECT、SHOW、DESCRIBE）
+2. 只能基于真实 schema、语义层和表关系回答
+3. 不要编造不存在的表、字段、函数或结果
+4. 不要访问文件、网络或系统资源
+"""
+            if self.language == "zh"
+            else """
+
+## Fixed Runtime Constraints
+1. Only generate read-only SQL (SELECT, SHOW, DESCRIBE)
+2. Only rely on the real schema, semantic layer, and table relationships
+3. Do not invent tables, columns, functions, or results
+4. Do not access files, network, or system resources
+"""
+        )
+        base_prompt += runtime_rules
+
+        if capabilities.python_enabled:
+            if self.language == "zh":
+                python_section = f"""
+
+## Python 分析
+当用户明确要求 Python、matplotlib 或自定义分析时，可以生成 ```python 代码块。
+工作流程：
+1. 先生成只读 SQL。
+2. SQL 查询结果会自动注入为 `df` DataFrame。
+3. 仅使用这些已启用库：{python_libraries}
+4. 不要访问文件、网络或系统资源。
+
+简单示例：
+```python
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10, 6))
+plt.bar(df['date'].astype(str), df['amount'])
+plt.xlabel('日期')
+plt.ylabel('金额')
+plt.title('销售数据')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+```
+"""
+                if not capabilities.analytics_installed:
+                    python_section += """
+当前未安装高级分析扩展，不要使用 `sklearn`、`scipy`、`seaborn`。
+"""
+                python_section += """
+
+## 简单图表配置
+如果不需要 Python，可以使用 ```chart 代码块：
+```chart
+{
+  "type": "bar",
+  "title": "图表标题",
+  "xKey": "x轴字段名",
+  "yKeys": ["y轴字段名1"]
+}
+```
+
+图表类型：bar、line、pie、area
+"""
+            else:
+                python_section = f"""
+
+## Python Analysis
+When the user explicitly asks for Python, matplotlib, or custom analysis, you may emit a ```python block.
+Workflow:
+1. Generate read-only SQL first.
+2. SQL results are injected as the `df` DataFrame.
+3. Only use these enabled libraries: {python_libraries}
+4. Do not access files, network, or system resources.
+
+Simple example:
+```python
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10, 6))
+plt.bar(df['date'].astype(str), df['amount'])
+plt.xlabel('Date')
+plt.ylabel('Amount')
+plt.title('Sales')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+```
+"""
+                if not capabilities.analytics_installed:
+                    python_section += """
+Advanced analytics extras are not installed, so do not use `sklearn`, `scipy`, or `seaborn`.
+"""
+                python_section += """
 
 ## Simple Charts
-Use ```chart code blocks for simple visualizations:
+If Python is unnecessary, use a ```chart block:
 ```chart
 {
   "type": "bar",
@@ -529,6 +574,14 @@ Use ```chart code blocks for simple visualizations:
 
 Chart types: bar, line, pie, area
 """
+        else:
+            python_section = (
+                "\n\n## Python 分析已关闭\n不要生成 ```python 代码块，只使用 SQL 和可选的 ```chart 代码块。\n"
+                if self.language == "zh"
+                else "\n\n## Python Analysis Disabled\nDo not emit ```python blocks. Use SQL and optional ```chart blocks only.\n"
+            )
+
+        base_prompt += python_section
 
         if db_config:
             db_info = f"""

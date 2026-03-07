@@ -53,12 +53,6 @@ class Settings(BaseSettings):
     # ===== Redis 配置 (可选) =====
     REDIS_URL: str | None = None
 
-    # ===== JWT 配置 =====
-    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
-    JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
     # ===== 加密配置 =====
     ENCRYPTION_KEY: str = "your-encryption-key-32-bytes-long"  # Fernet key
 
@@ -100,17 +94,12 @@ class Settings(BaseSettings):
     @property
     def is_using_default_secrets(self) -> bool:
         """检查是否使用了默认的不安全密钥"""
-        return (
-            self.JWT_SECRET_KEY == "your-secret-key-change-in-production"
-            or self.ENCRYPTION_KEY == "your-encryption-key-32-bytes-long"
-        )
+        return self.ENCRYPTION_KEY == "your-encryption-key-32-bytes-long"
 
     def validate_secrets(self) -> None:
         """验证密钥配置，生产环境必须更改默认密钥"""
         if self.is_production and self.is_using_default_secrets:
-            raise ValueError(
-                "生产环境不能使用默认密钥！请设置 JWT_SECRET_KEY 和 ENCRYPTION_KEY 环境变量"
-            )
+            raise ValueError("生产环境不能使用默认加密密钥！请设置 ENCRYPTION_KEY 环境变量")
 
 
 @lru_cache

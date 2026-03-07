@@ -226,21 +226,35 @@ class ColumnSchema(BaseModel):
     default: str | None = None
 
 
-class UserConfig(BaseModel):
-    """用户配置"""
+class AppSettings(BaseModel):
+    """单工作区设置"""
 
-    language: Literal["zh", "en"] = "zh"
-    theme: str = "dawn"  # 主题: dawn, midnight, monet, vangogh, sakura, forest, aurora
     default_model_id: UUID | None = None
     default_connection_id: UUID | None = None
     context_rounds: int = Field(default=5, ge=1, le=20)
+    python_enabled: bool = True
+    diagnostics_enabled: bool = True
+    auto_repair_enabled: bool = True
 
 
-class UserConfigUpdate(BaseModel):
-    """更新用户配置"""
+class AppSettingsUpdate(BaseModel):
+    """更新单工作区设置"""
 
-    language: Literal["zh", "en"] | None = None
-    theme: str | None = None
     default_model_id: UUID | None = None
     default_connection_id: UUID | None = None
     context_rounds: int | None = Field(default=None, ge=1, le=20)
+    python_enabled: bool | None = None
+    diagnostics_enabled: bool | None = None
+    auto_repair_enabled: bool | None = None
+
+
+class SystemCapabilities(BaseModel):
+    """运行时能力状态"""
+
+    install_profile: Literal["core", "analytics"] = "core"
+    python_enabled: bool = True
+    diagnostics_enabled: bool = True
+    auto_repair_enabled: bool = True
+    analytics_installed: bool = False
+    available_python_libraries: list[str] = Field(default_factory=list)
+    missing_optional_libraries: list[str] = Field(default_factory=list)

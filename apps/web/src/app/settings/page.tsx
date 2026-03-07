@@ -1,10 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Database, Brain, Settings as SettingsIcon, User, BookOpen, GitBranch, Info, MessageSquare } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  Brain,
+  Database,
+  GitBranch,
+  Info,
+  MessageSquare,
+  Settings as SettingsIcon,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuthStore } from "@/lib/stores/auth";
 import { api } from "@/lib/api/client";
 import { ModelSettings } from "@/components/settings/ModelSettings";
 import { ConnectionSettings } from "@/components/settings/ConnectionSettings";
@@ -24,44 +33,23 @@ type TabType = "models" | "connections" | "schema" | "semantic" | "prompts" | "p
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabType>("models");
-  const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
-
-  // 未登录重定向 - 使用 useEffect 避免渲染时调用 setState
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/");
-    }
-  }, [isAuthenticated, router]);
-
-  // 用于 SchemaSettings 的连接 ID 状态 - 必须在条件返回之前
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+  const router = useRouter();
 
-  // 获取连接列表，自动选择默认连接
   const { data: connections } = useQuery({
     queryKey: ["connections"],
     queryFn: async () => {
       const response = await api.get("/api/v1/config/connections");
       return response.data.data as Connection[];
     },
-    enabled: isAuthenticated,
   });
 
-  // 自动选择默认连接
   useEffect(() => {
     if (connections && connections.length > 0 && !selectedConnectionId) {
       const defaultConn = connections.find((c) => c.is_default);
-      if (defaultConn) {
-        setSelectedConnectionId(defaultConn.id);
-      } else {
-        setSelectedConnectionId(connections[0].id);
-      }
+      setSelectedConnectionId(defaultConn?.id || connections[0].id);
     }
   }, [connections, selectedConnectionId]);
-
-  if (!isAuthenticated) {
-    return null;
-  }
 
   const tabs = [
     { id: "models" as TabType, label: "AI 模型", icon: Brain },
@@ -69,17 +57,16 @@ export default function SettingsPage() {
     { id: "schema" as TabType, label: "表关系", icon: GitBranch },
     { id: "semantic" as TabType, label: "语义层", icon: BookOpen },
     { id: "prompts" as TabType, label: "提示词", icon: MessageSquare },
-    { id: "preferences" as TabType, label: "偏好设置", icon: User },
+    { id: "preferences" as TabType, label: "工作区设置", icon: SlidersHorizontal },
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-background border-b border-border sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center gap-4">
+      <header className="sticky top-0 z-10 border-b border-border bg-background">
+        <div className="mx-auto flex h-16 max-w-5xl items-center gap-4 px-4">
           <button
             onClick={() => router.push("/")}
-            className="p-2 hover:bg-muted rounded-lg text-muted-foreground transition-colors"
+            className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted"
           >
             <ArrowLeft size={20} />
           </button>
@@ -90,9 +77,8 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
+      <div className="mx-auto max-w-5xl px-4 py-6">
         <div className="flex gap-6">
-          {/* Sidebar */}
           <nav className="w-48 flex-shrink-0">
             <ul className="space-y-1">
               {tabs.map((tab) => (
@@ -100,9 +86,9 @@ export default function SettingsPage() {
                   <button
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                       activeTab === tab.id
-                        ? "bg-primary/10 text-primary font-medium"
+                        ? "bg-primary/10 font-medium text-primary"
                         : "text-muted-foreground hover:bg-muted"
                     )}
                   >
@@ -113,11 +99,10 @@ export default function SettingsPage() {
               ))}
             </ul>
 
-            {/* 关于链接 */}
-            <div className="mt-6 pt-6 border-t border-border">
+            <div className="mt-6 border-t border-border pt-6">
               <button
                 onClick={() => router.push("/about")}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted transition-colors"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
               >
                 <Info size={18} />
                 关于
@@ -125,8 +110,7 @@ export default function SettingsPage() {
             </div>
           </nav>
 
-          {/* Content */}
-          <main className="flex-1 bg-background rounded-xl border border-border p-6">
+          <main className="flex-1 rounded-xl border border-border bg-background p-6">
             {activeTab === "models" && <ModelSettings />}
             {activeTab === "connections" && <ConnectionSettings onSelectConnection={setSelectedConnectionId} />}
             {activeTab === "schema" && <SchemaSettings connectionId={selectedConnectionId} />}

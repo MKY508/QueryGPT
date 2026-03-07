@@ -10,11 +10,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import structlog
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.tables import Connection
+from app.services.app_settings import get_or_create_app_settings
 
 logger = structlog.get_logger()
 
 # 示例数据库路径
 DEMO_DB_PATH = Path(__file__).parent.parent.parent / "data" / "demo.db"
+DEMO_CONNECTION_NAME = "示例数据库"
 
 # 产品数据
 PRODUCTS = [
@@ -72,7 +78,7 @@ def init_demo_database() -> str:
     # 如果数据库已存在，直接返回
     if DEMO_DB_PATH.exists():
         logger.info("Demo database already exists", path=str(DEMO_DB_PATH))
-        return str(DEMO_DB_PATH)
+        return get_demo_db_path()
 
     logger.info("Creating demo database", path=str(DEMO_DB_PATH))
 
@@ -100,7 +106,7 @@ def init_demo_database() -> str:
             "Demo database created successfully",
             products=len(PRODUCTS),
             customers=100,
-            path=str(DEMO_DB_PATH),
+            path=get_demo_db_path(),
         )
 
     except Exception as e:
@@ -110,7 +116,34 @@ def init_demo_database() -> str:
     finally:
         conn.close()
 
-    return str(DEMO_DB_PATH)
+    return get_demo_db_path()
+
+
+async def ensure_demo_connection(db: AsyncSession, demo_db_path: str) -> None:
+    """在单工作区没有任何连接时，自动补一条示例数据库连接"""
+    has_connections = await db.scalar(select(Connection.id).limit(1))
+    if has_connections is not None:
+        return
+
+    connection = Connection(
+        name=DEMO_CONNECTION_NAME,
+        driver="sqlite",
+        host=None,
+        port=None,
+        username=None,
+        password_encrypted=None,
+        database_name=demo_db_path,
+        extra_options={},
+        is_default=True,
+    )
+    db.add(connection)
+    await db.flush()
+
+    settings_record = await get_or_create_app_settings(db)
+    settings_record.default_connection_id = connection.id
+    await db.flush()
+
+    logger.info("Seeded demo connection", name=DEMO_CONNECTION_NAME, database=demo_db_path)
 
 
 def _create_tables(cursor: sqlite3.Cursor) -> None:

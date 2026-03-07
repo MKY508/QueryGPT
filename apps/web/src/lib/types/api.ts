@@ -58,6 +58,25 @@ export interface ExecutionContextSummary {
   api_format?: string;
 }
 
+export interface AppSettings {
+  default_model_id?: string | null;
+  default_connection_id?: string | null;
+  context_rounds: number;
+  python_enabled: boolean;
+  diagnostics_enabled: boolean;
+  auto_repair_enabled: boolean;
+}
+
+export interface SystemCapabilities {
+  install_profile: "core" | "analytics";
+  python_enabled: boolean;
+  diagnostics_enabled: boolean;
+  auto_repair_enabled: boolean;
+  analytics_installed: boolean;
+  available_python_libraries: string[];
+  missing_optional_libraries: string[];
+}
+
 // ===== SSE 事件类型 =====
 
 /** SSE 进度事件数据 */

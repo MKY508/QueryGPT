@@ -1,45 +1,27 @@
-"""Schema and Table Relationship API tests"""
+"""Schema and table relationship API tests"""
+
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 
 
-async def get_auth_token_and_connection(client: AsyncClient) -> tuple[str, str]:
-    """Helper to register, get auth token, and create a connection"""
-    # Register user
+async def create_connection(client: AsyncClient) -> str:
     response = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "schema_test@example.com",
-            "password": "testpassword123",
-            "display_name": "Schema Test User",
-        },
-    )
-    token = response.json()["data"]["access_token"]
-
-    # Create a connection
-    conn_response = await client.post(
         "/api/v1/config/connections",
-        headers={"Authorization": f"Bearer {token}"},
         json={
-            "name": "Test DB",
+            "name": "Schema Test DB",
             "driver": "sqlite",
-            "database_name": ":memory:",
+            "database": ":memory:",
         },
     )
-    conn_id = conn_response.json()["data"]["id"]
+    assert response.status_code == 200
+    return response.json()["data"]["id"]
 
-    return token, conn_id
 
-
-@pytest.mark.asyncio
-async def test_create_relationship(client: AsyncClient):
-    """Test creating a table relationship"""
-    token, conn_id = await get_auth_token_and_connection(client)
-
+async def create_relationship(client: AsyncClient, connection_id: str) -> dict:
     response = await client.post(
-        f"/api/v1/schema/{conn_id}/relationships",
-        headers={"Authorization": f"Bearer {token}"},
+        f"/api/v1/schema/{connection_id}/relationships",
         json={
             "source_table": "orders",
             "source_column": "customer_id",
@@ -51,53 +33,25 @@ async def test_create_relationship(client: AsyncClient):
         },
     )
     assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert data["data"]["source_table"] == "orders"
-    assert data["data"]["target_table"] == "customers"
-    assert data["data"]["relationship_type"] == "N:1"
-    assert "id" in data["data"]
+    return response.json()["data"]
 
 
 @pytest.mark.asyncio
-async def test_list_relationships(client: AsyncClient):
-    """Test listing table relationships"""
-    token, conn_id = await get_auth_token_and_connection(client)
+async def test_create_and_list_relationships(client: AsyncClient):
+    conn_id = await create_connection(client)
+    created = await create_relationship(client, conn_id)
+    assert created["source_table"] == "orders"
 
-    # Create a relationship first
-    await client.post(
-        f"/api/v1/schema/{conn_id}/relationships",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "source_table": "items",
-            "source_column": "order_id",
-            "target_table": "orders",
-            "target_column": "id",
-            "relationship_type": "N:1",
-            "join_type": "INNER",
-        },
-    )
-
-    # List relationships
-    response = await client.get(
-        f"/api/v1/schema/{conn_id}/relationships",
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    response = await client.get(f"/api/v1/schema/{conn_id}/relationships")
     assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert isinstance(data["data"], list)
-    assert len(data["data"]) >= 1
+    assert len(response.json()["data"]) == 1
 
 
 @pytest.mark.asyncio
 async def test_batch_create_relationships(client: AsyncClient):
-    """Test batch creating table relationships"""
-    token, conn_id = await get_auth_token_and_connection(client)
-
+    conn_id = await create_connection(client)
     response = await client.post(
         f"/api/v1/schema/{conn_id}/relationships/batch",
-        headers={"Authorization": f"Bearer {token}"},
         json={
             "relationships": [
                 {
@@ -120,253 +74,77 @@ async def test_batch_create_relationships(client: AsyncClient):
         },
     )
     assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert isinstance(data["data"], list)
-    assert len(data["data"]) == 2
+    assert len(response.json()["data"]) == 2
 
 
 @pytest.mark.asyncio
-async def test_update_relationship(client: AsyncClient):
-    """Test updating a table relationship"""
-    token, conn_id = await get_auth_token_and_connection(client)
+async def test_update_and_delete_relationship(client: AsyncClient):
+    conn_id = await create_connection(client)
+    relationship = await create_relationship(client, conn_id)
 
-    # Create relationship first
-    create_response = await client.post(
-        f"/api/v1/schema/{conn_id}/relationships",
-        headers={"Authorization": f"Bearer {token}"},
+    updated = await client.put(
+        f"/api/v1/schema/relationships/{relationship['id']}",
         json={
-            "source_table": "payments",
-            "source_column": "order_id",
-            "target_table": "orders",
-            "target_column": "id",
             "relationship_type": "1:1",
-            "join_type": "LEFT",
-        },
-    )
-    rel_id = create_response.json()["data"]["id"]
-
-    # Update relationship
-    response = await client.put(
-        f"/api/v1/schema/relationships/{rel_id}",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "relationship_type": "N:1",
             "join_type": "INNER",
             "description": "更新后的描述",
         },
     )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert data["data"]["relationship_type"] == "N:1"
-    assert data["data"]["join_type"] == "INNER"
+    assert updated.status_code == 200
+    assert updated.json()["data"]["join_type"] == "INNER"
+
+    deleted = await client.delete(f"/api/v1/schema/relationships/{relationship['id']}")
+    assert deleted.status_code == 200
+    relationships = (await client.get(f"/api/v1/schema/{conn_id}/relationships")).json()["data"]
+    assert relationships == []
 
 
 @pytest.mark.asyncio
-async def test_delete_relationship(client: AsyncClient):
-    """Test deleting a table relationship"""
-    token, conn_id = await get_auth_token_and_connection(client)
+async def test_layout_crud(client: AsyncClient):
+    conn_id = await create_connection(client)
 
-    # Create relationship first
-    create_response = await client.post(
-        f"/api/v1/schema/{conn_id}/relationships",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "source_table": "logs",
-            "source_column": "user_id",
-            "target_table": "users",
-            "target_column": "id",
-            "relationship_type": "N:1",
-            "join_type": "LEFT",
-        },
-    )
-    rel_id = create_response.json()["data"]["id"]
-
-    # Delete relationship
-    response = await client.delete(
-        f"/api/v1/schema/relationships/{rel_id}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200
-
-    # Verify deletion
-    list_response = await client.get(
-        f"/api/v1/schema/{conn_id}/relationships",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    relationships = list_response.json()["data"]
-    assert not any(r["id"] == rel_id for r in relationships)
-
-
-@pytest.mark.asyncio
-async def test_list_layouts(client: AsyncClient):
-    """Test listing schema layouts"""
-    token, conn_id = await get_auth_token_and_connection(client)
-
-    response = await client.get(
+    created = await client.post(
         f"/api/v1/schema/{conn_id}/layouts",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert isinstance(data["data"], list)
-
-
-@pytest.mark.asyncio
-async def test_create_layout(client: AsyncClient):
-    """Test creating a schema layout"""
-    token, conn_id = await get_auth_token_and_connection(client)
-
-    response = await client.post(
-        f"/api/v1/schema/{conn_id}/layouts",
-        headers={"Authorization": f"Bearer {token}"},
         json={
             "name": "开发视图",
             "is_default": True,
-            "layout_data": {
-                "users": {"x": 100, "y": 100},
-                "orders": {"x": 300, "y": 100},
-            },
-            "visible_tables": ["users", "orders", "products"],
+            "layout_data": {"users": {"x": 100, "y": 100}},
+            "visible_tables": ["users", "orders"],
         },
     )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert data["data"]["name"] == "开发视图"
-    assert data["data"]["is_default"] is True
-    assert "id" in data["data"]
+    assert created.status_code == 200
+    layout = created.json()["data"]
 
+    fetched = await client.get(f"/api/v1/schema/{conn_id}/layouts/{layout['id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["data"]["name"] == "开发视图"
 
-@pytest.mark.asyncio
-async def test_get_layout(client: AsyncClient):
-    """Test getting a single layout"""
-    token, conn_id = await get_auth_token_and_connection(client)
-
-    # Create layout first
-    create_response = await client.post(
-        f"/api/v1/schema/{conn_id}/layouts",
-        headers={"Authorization": f"Bearer {token}"},
+    updated = await client.put(
+        f"/api/v1/schema/{conn_id}/layouts/{layout['id']}",
         json={
-            "name": "测试布局",
-            "is_default": False,
-        },
-    )
-    layout_id = create_response.json()["data"]["id"]
-
-    # Get layout
-    response = await client.get(
-        f"/api/v1/schema/{conn_id}/layouts/{layout_id}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert data["data"]["name"] == "测试布局"
-
-
-@pytest.mark.asyncio
-async def test_update_layout(client: AsyncClient):
-    """Test updating a schema layout"""
-    token, conn_id = await get_auth_token_and_connection(client)
-
-    # Create layout first
-    create_response = await client.post(
-        f"/api/v1/schema/{conn_id}/layouts",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "name": "原始布局",
-            "is_default": False,
-        },
-    )
-    layout_id = create_response.json()["data"]["id"]
-
-    # Update layout
-    response = await client.put(
-        f"/api/v1/schema/{conn_id}/layouts/{layout_id}",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "name": "更新后布局",
-            "layout_data": {"table1": {"x": 200, "y": 200}},
-            "zoom": 1.5,
-            "viewport_x": 100,
-            "viewport_y": 50,
-        },
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert data["data"]["name"] == "更新后布局"
-
-
-@pytest.mark.asyncio
-async def test_delete_layout(client: AsyncClient):
-    """Test deleting a schema layout"""
-    token, conn_id = await get_auth_token_and_connection(client)
-
-    # Create layout first
-    create_response = await client.post(
-        f"/api/v1/schema/{conn_id}/layouts",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "name": "待删除布局",
-            "is_default": False,
-        },
-    )
-    layout_id = create_response.json()["data"]["id"]
-
-    # Delete layout
-    response = await client.delete(
-        f"/api/v1/schema/{conn_id}/layouts/{layout_id}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200
-
-    # Verify deletion
-    list_response = await client.get(
-        f"/api/v1/schema/{conn_id}/layouts",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    layouts = list_response.json()["data"]
-    assert not any(layout["id"] == layout_id for layout in layouts)
-
-
-@pytest.mark.asyncio
-async def test_duplicate_layout(client: AsyncClient):
-    """Test duplicating a schema layout"""
-    token, conn_id = await get_auth_token_and_connection(client)
-
-    # Create layout first
-    create_response = await client.post(
-        f"/api/v1/schema/{conn_id}/layouts",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "name": "原始布局",
+            "name": "分析视图",
+            "layout_data": {"users": {"x": 120, "y": 160}},
+            "visible_tables": ["users"],
             "is_default": True,
-            "layout_data": {"table1": {"x": 100, "y": 100}},
         },
     )
-    layout_id = create_response.json()["data"]["id"]
+    assert updated.status_code == 200
+    assert updated.json()["data"]["name"] == "分析视图"
 
-    # Duplicate layout
-    response = await client.post(
-        f"/api/v1/schema/{conn_id}/layouts/{layout_id}/duplicate",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    # Duplicated layout should have different id
-    assert data["data"]["id"] != layout_id
-    # Duplicated layout should not be default
-    assert data["data"]["is_default"] is False
+    deleted = await client.delete(f"/api/v1/schema/{conn_id}/layouts/{layout['id']}")
+    assert deleted.status_code == 200
+    layouts = (await client.get(f"/api/v1/schema/{conn_id}/layouts")).json()["data"]
+    assert layouts == []
 
 
 @pytest.mark.asyncio
-async def test_relationship_unauthorized(client: AsyncClient):
-    """Test accessing relationships without authentication"""
-    fake_conn_id = "00000000-0000-0000-0000-000000000000"
-    response = await client.get(f"/api/v1/schema/{fake_conn_id}/relationships")
-    assert response.status_code == 401
+async def test_schema_resources_not_found(client: AsyncClient):
+    fake_id = str(uuid4())
+    missing_connection = await client.get(f"/api/v1/schema/{fake_id}/relationships")
+    assert missing_connection.status_code == 404
+
+    missing_relationship = await client.put(
+        f"/api/v1/schema/relationships/{fake_id}",
+        json={"join_type": "INNER"},
+    )
+    assert missing_relationship.status_code == 404

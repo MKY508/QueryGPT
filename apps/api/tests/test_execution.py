@@ -14,41 +14,32 @@ class TestExecutionService:
     """Test ExecutionService class"""
 
     @pytest.fixture
-    def mock_user(self):
-        """Create mock user"""
-        user = MagicMock()
-        user.id = uuid4()
-        return user
-
-    @pytest.fixture
     def mock_db(self):
         """Create mock database session"""
         return AsyncMock()
 
-    def test_init(self, mock_user, mock_db):
+    def test_init(self, mock_db):
         """Test service initialization"""
         service = ExecutionService(
-            user=mock_user,
             db=mock_db,
             model_name="gpt-4",
             connection_id=uuid4(),
             language="zh",
         )
-        assert service.user == mock_user
         assert service.db == mock_db
         assert service.model_name == "gpt-4"
         assert service.language == "zh"
 
-    def test_init_defaults(self, mock_user, mock_db):
+    def test_init_defaults(self, mock_db):
         """Test service initialization with defaults"""
-        service = ExecutionService(user=mock_user, db=mock_db)
+        service = ExecutionService(db=mock_db)
         assert service.model_name is None
         assert service.connection_id is None
         assert service.language == "zh"
 
-    def test_build_system_prompt_zh(self, mock_user, mock_db):
+    def test_build_system_prompt_zh(self, mock_db):
         """Test Chinese system prompt generation"""
-        service = ExecutionService(user=mock_user, db=mock_db, language="zh")
+        service = ExecutionService(db=mock_db, language="zh")
         prompt = service._build_system_prompt(None)
 
         assert "QueryGPT" in prompt
@@ -57,18 +48,18 @@ class TestExecutionService:
         assert "```sql" in prompt
         assert "```python" in prompt
 
-    def test_build_system_prompt_en(self, mock_user, mock_db):
+    def test_build_system_prompt_en(self, mock_db):
         """Test English system prompt generation"""
-        service = ExecutionService(user=mock_user, db=mock_db, language="en")
+        service = ExecutionService(db=mock_db, language="en")
         prompt = service._build_system_prompt(None)
 
         assert "QueryGPT" in prompt
         assert "[thinking:" in prompt
         assert "```sql" in prompt
 
-    def test_build_system_prompt_with_db_config(self, mock_user, mock_db):
+    def test_build_system_prompt_with_db_config(self, mock_db):
         """Test system prompt with database config"""
-        service = ExecutionService(user=mock_user, db=mock_db, language="zh")
+        service = ExecutionService(db=mock_db, language="zh")
 
         db_config = {
             "driver": "mysql",
@@ -84,9 +75,9 @@ class TestExecutionService:
         assert "3306" in prompt
         assert "testdb" in prompt
 
-    def test_build_system_prompt_with_semantic_context(self, mock_user, mock_db):
+    def test_build_system_prompt_with_semantic_context(self, mock_db):
         """Test system prompt with semantic terms"""
-        service = ExecutionService(user=mock_user, db=mock_db, language="zh")
+        service = ExecutionService(db=mock_db, language="zh")
 
         # Create mock semantic context
         semantic_context = MagicMock(spec=SemanticContext)
@@ -97,9 +88,9 @@ class TestExecutionService:
 
         assert "月活用户" in prompt
 
-    def test_build_system_prompt_with_relationship_context(self, mock_user, mock_db):
+    def test_build_system_prompt_with_relationship_context(self, mock_db):
         """Test system prompt with table relationships"""
-        service = ExecutionService(user=mock_user, db=mock_db, language="zh")
+        service = ExecutionService(db=mock_db, language="zh")
 
         # Create mock relationship context
         relationship_context = MagicMock(spec=RelationshipContext)
@@ -110,9 +101,9 @@ class TestExecutionService:
 
         assert "users.id" in prompt
 
-    def test_build_system_prompt_python_instructions(self, mock_user, mock_db):
+    def test_build_system_prompt_python_instructions(self, mock_db):
         """Test that Python instructions are in prompt"""
-        service = ExecutionService(user=mock_user, db=mock_db, language="zh")
+        service = ExecutionService(db=mock_db, language="zh")
         prompt = service._build_system_prompt(None)
 
         # Check Python-related instructions
@@ -121,9 +112,8 @@ class TestExecutionService:
         assert "df" in prompt  # DataFrame reference
 
     @pytest.mark.asyncio
-    async def test_get_runtime_snapshot_with_provider_mapping(self, mock_user, mock_db):
+    async def test_get_runtime_snapshot_with_provider_mapping(self, mock_db):
         service = ExecutionService(
-            user=mock_user,
             db=mock_db,
             language="zh",
             context_rounds=0,
@@ -165,8 +155,8 @@ class TestExecutionService:
         assert snapshot["api_format"] == "openai_compatible"
 
     @pytest.mark.asyncio
-    async def test_get_runtime_snapshot_without_connection(self, mock_user, mock_db):
-        service = ExecutionService(user=mock_user, db=mock_db, language="en", context_rounds=3)
+    async def test_get_runtime_snapshot_without_connection(self, mock_db):
+        service = ExecutionService(db=mock_db, language="en", context_rounds=3)
         service._get_model_config = AsyncMock(
             return_value={
                 "model_id": None,
@@ -186,6 +176,16 @@ class TestExecutionService:
         assert snapshot["connection_id"] is None
         assert snapshot["connection_name"] is None
         assert snapshot["context_rounds"] == 3
+
+    def test_build_system_prompt_without_python(self, mock_db):
+        service = ExecutionService(
+            db=mock_db,
+            language="zh",
+            settings_data={"python_enabled": False},
+        )
+        prompt = service._build_system_prompt(None)
+        assert "Python 分析已关闭" in prompt
+        assert "不要生成 ```python 代码块" in prompt
 
 
 class TestSemanticContext:

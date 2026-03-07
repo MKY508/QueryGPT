@@ -20,11 +20,13 @@ class TestGptmeEngine:
             api_key="test-key",
             base_url="https://api.test.com",
             timeout=600,
+            python_enabled=False,
         )
         assert engine.model == "gpt-4"
         assert engine.api_key == "test-key"
         assert engine.base_url == "https://api.test.com"
         assert engine.timeout == 600
+        assert engine.python_enabled is False
 
     def test_validate_python_code_safe(self):
         """Test safe Python code validation"""
@@ -64,6 +66,13 @@ class TestGptmeEngine:
             is_valid, error = engine._validate_python_code(code)
             assert not is_valid, f"Code should be unsafe: {code}"
             assert error is not None
+
+    def test_validate_python_dependencies_missing_module(self):
+        """Test missing optional module detection"""
+        engine = GptmeEngine()
+        is_valid, error = engine._validate_python_dependencies("import definitely_missing_querygpt_lib")
+        assert not is_valid
+        assert "未安装所需 Python 库" in str(error)
 
     def test_parse_thinking(self):
         """Test thinking marker parsing"""
