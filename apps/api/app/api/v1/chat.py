@@ -109,7 +109,7 @@ async def chat_stream(
             async for event in execution_service.execute_stream(
                 query=query,
                 conversation_id=current_conversation_id,
-                exclude_message_id=user_message.id,
+                exclude_message_id=UUID(str(user_message.id)),
                 stop_checker=active_query_registry.stop_checker(query_key),
             ):
                 yield event.to_sse()

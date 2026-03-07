@@ -144,15 +144,16 @@ def resolve_model_runtime(
 
     base_url = getattr(model, "base_url", None) or default_base_url(provider) or fallback_base_url
     api_key = fallback_api_key
+    api_format: ModelAPIFormat = extra.api_format or default_api_format(provider)
 
     resolved = ResolvedModelConfig(
         source_provider=provider,
-        litellm_provider=resolve_litellm_provider(provider, extra.api_format),
+        litellm_provider=resolve_litellm_provider(provider, api_format),
         model=model_id,
         display_name=display_name,
         base_url=base_url.rstrip("/") if isinstance(base_url, str) else None,
         api_key=api_key,
-        api_format=extra.api_format,
+        api_format=api_format,
         api_key_required=not extra.api_key_optional,
         healthcheck_mode=extra.healthcheck_mode,
         headers=extra.headers,

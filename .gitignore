@@ -12,6 +12,8 @@ build/
 node_modules/
 .next/
 out/
+playwright-report/
+test-results/
 
 # Environment
 .env
@@ -37,6 +39,7 @@ data/
 # Logs
 *.log
 logs/
+mock-llm.log
 
 # Cache
 .cache/

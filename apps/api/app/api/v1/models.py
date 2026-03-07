@@ -1,6 +1,7 @@
 """模型配置管理 API"""
 
 import time
+from typing import Any
 from uuid import UUID
 
 import litellm
@@ -35,7 +36,7 @@ async def _clear_default_models(db: AsyncSession, exclude_id: UUID | None = None
 
 
 @router.get("", response_model=APIResponse[list[ModelResponse]])
-async def list_models(db: AsyncSession = Depends(get_db)):
+async def list_models(db: AsyncSession = Depends(get_db)) -> APIResponse[list[ModelResponse]]:
     """获取模型列表"""
     result = await db.execute(select(Model).order_by(Model.created_at.desc()))
     models = result.scalars().all()
@@ -46,7 +47,7 @@ async def list_models(db: AsyncSession = Depends(get_db)):
 async def create_model(
     model_in: ModelCreate,
     db: AsyncSession = Depends(get_db),
-):
+) -> APIResponse[ModelResponse]:
     """添加模型配置"""
     if model_in.is_default:
         await _clear_default_models(db)
@@ -73,12 +74,12 @@ async def update_model(
     model_id: UUID,
     model_in: ModelCreate,
     db: AsyncSession = Depends(get_db),
-):
+) -> APIResponse[ModelResponse]:
     """更新模型配置"""
     model = await _get_model_or_404(db, model_id)
 
     if model_in.is_default and not model.is_default:
-        await _clear_default_models(db, exclude_id=model.id)
+        await _clear_default_models(db, exclude_id=UUID(str(model.id)))
 
     model.name = model_in.name
     model.provider = model_in.provider
@@ -95,11 +96,11 @@ async def update_model(
     return APIResponse.ok(data=ModelResponse.model_validate(model), message="模型已更新")
 
 
-@router.delete("/{model_id}", response_model=APIResponse[dict])
+@router.delete("/{model_id}", response_model=APIResponse[dict[str, Any]])
 async def delete_model(
     model_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> APIResponse[dict[str, Any]]:
     """删除模型配置"""
     model = await _get_model_or_404(db, model_id)
     await db.delete(model)
@@ -111,7 +112,7 @@ async def delete_model(
 async def test_model(
     model_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> APIResponse[ModelTest]:
     """测试模型配置"""
     model = await _get_model_or_404(db, model_id)
     api_key = encryptor.decrypt(model.api_key_encrypted) if model.api_key_encrypted else None

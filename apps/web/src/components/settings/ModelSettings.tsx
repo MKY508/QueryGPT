@@ -116,6 +116,7 @@ export function ModelSettings() {
             }
             setShowForm(true);
           }}
+          data-testid="model-add-button"
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
         >
           <Plus size={16} />
@@ -152,7 +153,7 @@ export function ModelSettings() {
       )}
 
       {testResult && (
-        <div className="rounded-2xl border border-border bg-background p-4">
+        <div data-testid="model-test-summary" className="rounded-2xl border border-border bg-background p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             {testResult.success ? (
               <CheckCircle size={16} className="text-green-600" />

@@ -158,7 +158,7 @@ class ExecutionService:
         )
 
     @staticmethod
-    def _build_engine(inputs: ExecutionInputs):
+    def _build_engine(inputs: ExecutionInputs) -> Any:
         from app.services.gptme_engine import GptmeEngine
 
         return GptmeEngine(
@@ -181,12 +181,11 @@ class ExecutionService:
         source_provider = model_config.get("source_provider")
         resolved_provider = model_config.get("resolved_provider") or model_config.get("provider")
         api_format = model_config.get("api_format")
+        provider_summary: str | None
         if source_provider and resolved_provider and source_provider != resolved_provider:
             provider_summary = f"{source_provider} -> {resolved_provider} · {api_format}"
         else:
-            provider_summary = (
-                f"{source_provider} · {api_format}" if source_provider else api_format
-            )
+            provider_summary = f"{source_provider} · {api_format}" if source_provider else None
 
         return {
             "model_id": model_config.get("model_id"),

@@ -1,5 +1,6 @@
 """数据库连接管理 API"""
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -32,7 +33,9 @@ async def _clear_default_connections(db: AsyncSession, exclude_id: UUID | None =
 
 
 @router.get("", response_model=APIResponse[list[ConnectionResponse]])
-async def list_connections(db: AsyncSession = Depends(get_db)):
+async def list_connections(
+    db: AsyncSession = Depends(get_db),
+) -> APIResponse[list[ConnectionResponse]]:
     """获取数据库连接列表"""
     result = await db.execute(select(Connection).order_by(Connection.created_at.desc()))
     connections = result.scalars().all()
@@ -43,7 +46,7 @@ async def list_connections(db: AsyncSession = Depends(get_db)):
 async def create_connection(
     conn_in: ConnectionCreate,
     db: AsyncSession = Depends(get_db),
-):
+) -> APIResponse[ConnectionResponse]:
     """添加数据库连接"""
     if conn_in.is_default:
         await _clear_default_connections(db)
@@ -71,7 +74,7 @@ async def create_connection(
 async def test_connection(
     connection_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> APIResponse[ConnectionTest]:
     """测试数据库连接"""
     connection = await _get_connection_or_404(db, connection_id)
 
@@ -104,12 +107,12 @@ async def update_connection(
     connection_id: UUID,
     conn_in: ConnectionCreate,
     db: AsyncSession = Depends(get_db),
-):
+) -> APIResponse[ConnectionResponse]:
     """更新数据库连接"""
     connection = await _get_connection_or_404(db, connection_id)
 
     if conn_in.is_default and not connection.is_default:
-        await _clear_default_connections(db, exclude_id=connection.id)
+        await _clear_default_connections(db, exclude_id=UUID(str(connection.id)))
 
     connection.name = conn_in.name
     connection.driver = conn_in.driver
@@ -128,11 +131,11 @@ async def update_connection(
     return APIResponse.ok(data=ConnectionResponse.model_validate(connection), message="连接已更新")
 
 
-@router.delete("/{connection_id}", response_model=APIResponse[dict])
+@router.delete("/{connection_id}", response_model=APIResponse[dict[str, Any]])
 async def delete_connection(
     connection_id: UUID,
     db: AsyncSession = Depends(get_db),
-):
+) -> APIResponse[dict[str, Any]]:
     """删除数据库连接"""
     connection = await _get_connection_or_404(db, connection_id)
     await db.delete(connection)

@@ -29,6 +29,7 @@ export function ConnectionSettingsForm({
   return (
     <form
       onSubmit={onSubmit}
+      data-testid="connection-form"
       className="mb-6 p-4 bg-secondary rounded-lg border border-border"
     >
       <h3 className="text-sm font-medium text-foreground mb-4">
@@ -41,6 +42,7 @@ export function ConnectionSettingsForm({
             type="text"
             value={formData.name}
             onChange={(event) => onChange({ ...formData, name: event.target.value })}
+            data-testid="connection-name-input"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             placeholder="例如: 生产数据库"
             required
@@ -51,6 +53,7 @@ export function ConnectionSettingsForm({
           <select
             value={formData.driver}
             onChange={(event) => onDriverChange(event.target.value)}
+            data-testid="connection-driver-select"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
           >
             {CONNECTION_DRIVERS.map((driver) => (
@@ -68,6 +71,7 @@ export function ConnectionSettingsForm({
                 type="text"
                 value={formData.host}
                 onChange={(event) => onChange({ ...formData, host: event.target.value })}
+                data-testid="connection-host-input"
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder="localhost"
                 required
@@ -81,6 +85,7 @@ export function ConnectionSettingsForm({
                 onChange={(event) =>
                   onChange({ ...formData, port: parseInt(event.target.value, 10) })
                 }
+                data-testid="connection-port-input"
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 required
               />
@@ -95,6 +100,7 @@ export function ConnectionSettingsForm({
             type="text"
             value={formData.database}
             onChange={(event) => onChange({ ...formData, database: event.target.value })}
+            data-testid="connection-database-input"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             placeholder={formData.driver === "sqlite" ? "/path/to/database.db" : "mydb"}
             required
@@ -108,6 +114,7 @@ export function ConnectionSettingsForm({
                 type="text"
                 value={formData.username}
                 onChange={(event) => onChange({ ...formData, username: event.target.value })}
+                data-testid="connection-username-input"
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder="root"
                 required
@@ -124,6 +131,7 @@ export function ConnectionSettingsForm({
                 type="password"
                 value={formData.password}
                 onChange={(event) => onChange({ ...formData, password: event.target.value })}
+                data-testid="connection-password-input"
                 className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                 placeholder={editingId ? "留空保持原密码" : "••••••••"}
               />
@@ -136,6 +144,7 @@ export function ConnectionSettingsForm({
               type="checkbox"
               checked={formData.is_default}
               onChange={(event) => onChange({ ...formData, is_default: event.target.checked })}
+              data-testid="connection-default-checkbox"
               className="w-4 h-4 text-primary rounded focus:ring-ring"
             />
             <span className="text-sm text-foreground">设为默认连接</span>
@@ -153,6 +162,7 @@ export function ConnectionSettingsForm({
         <button
           type="submit"
           disabled={isSubmitting}
+          data-testid="connection-submit-button"
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm"
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}

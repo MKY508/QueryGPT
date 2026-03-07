@@ -2,15 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # 后端测试
   backend:
     name: Backend (Python)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: apps/api
@@ -36,15 +41,14 @@ jobs:
           ruff format --check .
 
       - name: Type check with mypy
-        run: mypy app --ignore-missing-imports
-        continue-on-error: true
+        run: mypy --config-file mypy.ini
 
       - name: Run tests with coverage
-        run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=term --cov-fail-under=60
+        run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=term --cov-fail-under=70
         env:
-          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
-          JWT_SECRET_KEY: "test-secret-key-for-ci"
-          ENCRYPTION_KEY: "dGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz"
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+          JWT_SECRET_KEY: test-secret-key-for-ci
+          ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -53,10 +57,10 @@ jobs:
           flags: backend
           fail_ci_if_error: false
 
-  # 前端测试
   frontend:
     name: Frontend (Next.js)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: apps/web
@@ -80,19 +84,25 @@ jobs:
       - name: Type check
         run: npm run type-check
 
-      - name: Run tests
-        run: npm run test --if-present
+      - name: Run unit tests
+        run: npm run test
 
       - name: Build
         run: npm run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
+          INTERNAL_API_URL: http://localhost:8000
 
-  # 所有检查通过
   ci-success:
     name: CI Success
     needs: [backend, frontend]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: All checks passed
-        run: echo "✅ All CI checks passed!"
+      - name: Verify required jobs
+        run: |
+          if [ "${{ needs.backend.result }}" != "success" ] || [ "${{ needs.frontend.result }}" != "success" ]; then
+            echo "At least one CI job failed"
+            exit 1
+          fi
+          echo "✅ All CI checks passed!"

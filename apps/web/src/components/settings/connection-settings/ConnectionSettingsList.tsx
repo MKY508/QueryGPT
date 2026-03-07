@@ -67,6 +67,7 @@ export function ConnectionSettingsList({
         <div
           key={connection.id}
           onClick={() => onSelect(connection.id)}
+          data-testid={`connection-card-${connection.id}`}
           className={cn(
             "flex items-center justify-between p-4 bg-secondary rounded-lg border cursor-pointer transition-colors",
             selectedId === connection.id
@@ -130,6 +131,7 @@ export function ConnectionSettingsList({
                 onTest(connection.id);
               }}
               disabled={testingConnectionId === connection.id}
+              data-testid={`connection-test-${connection.id}`}
               className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
               title="测试连接"
             >

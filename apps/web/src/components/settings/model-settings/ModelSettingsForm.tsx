@@ -33,6 +33,7 @@ export function ModelSettingsForm({
   return (
     <form
       onSubmit={onSubmit}
+      data-testid="model-form"
       className="rounded-2xl border border-border bg-secondary p-5 space-y-5"
     >
       <div className="grid gap-3 md:grid-cols-3">
@@ -41,6 +42,7 @@ export function ModelSettingsForm({
             key={key}
             type="button"
             onClick={() => onPresetSelect(key)}
+            data-testid={`model-preset-${key}`}
             className={cn(
               "rounded-xl border p-4 text-left transition-colors",
               formData.provider === preset.provider
@@ -84,6 +86,7 @@ export function ModelSettingsForm({
             type="text"
             value={formData.name}
             onChange={(event) => onChange({ ...formData, name: event.target.value })}
+            data-testid="model-name-input"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
             placeholder="例如: DeepSeek V3"
             required
@@ -94,6 +97,7 @@ export function ModelSettingsForm({
           <select
             value={formData.provider}
             onChange={(event) => onPresetSelect(event.target.value)}
+            data-testid="model-provider-select"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
           >
             {Object.keys(MODEL_PRESETS).map((key) => (
@@ -109,6 +113,7 @@ export function ModelSettingsForm({
             type="text"
             value={formData.model_id}
             onChange={(event) => onChange({ ...formData, model_id: event.target.value })}
+            data-testid="model-id-input"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
             placeholder="例如: gpt-4o / deepseek-chat / llama3.1"
             required
@@ -124,6 +129,7 @@ export function ModelSettingsForm({
                 api_format: event.target.value as ModelFormData["api_format"],
               })
             }
+            data-testid="model-api-format-select"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
           >
             <option value="openai_compatible">openai_compatible</option>
@@ -138,6 +144,7 @@ export function ModelSettingsForm({
             type="url"
             value={formData.base_url}
             onChange={(event) => onChange({ ...formData, base_url: event.target.value })}
+            data-testid="model-base-url-input"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
             placeholder="https://api.openai.com/v1"
           />
@@ -150,6 +157,7 @@ export function ModelSettingsForm({
             type="password"
             value={formData.api_key}
             onChange={(event) => onChange({ ...formData, api_key: event.target.value })}
+            data-testid="model-api-key-input"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
             placeholder={formData.api_key_optional ? "本地模型可留空" : "sk-..."}
           />
@@ -162,6 +170,7 @@ export function ModelSettingsForm({
               onChange={(event) =>
                 onChange({ ...formData, api_key_optional: event.target.checked })
               }
+              data-testid="model-api-key-optional-checkbox"
               className="w-4 h-4 text-primary rounded"
             />
             允许不配置 API Key
@@ -173,6 +182,7 @@ export function ModelSettingsForm({
               type="checkbox"
               checked={formData.is_default}
               onChange={(event) => onChange({ ...formData, is_default: event.target.checked })}
+              data-testid="model-default-checkbox"
               className="w-4 h-4 text-primary rounded"
             />
             设为默认模型
@@ -188,6 +198,7 @@ export function ModelSettingsForm({
                 healthcheck_mode: event.target.value as ModelFormData["healthcheck_mode"],
               })
             }
+            data-testid="model-healthcheck-mode-select"
             className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground"
           >
             <option value="chat_completion">chat_completion</option>
@@ -200,6 +211,7 @@ export function ModelSettingsForm({
             <textarea
               value={formData.headersText}
               onChange={(event) => onChange({ ...formData, headersText: event.target.value })}
+              data-testid="model-headers-textarea"
               className="h-32 w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground font-mono text-xs"
             />
           </div>
@@ -210,6 +222,7 @@ export function ModelSettingsForm({
               onChange={(event) =>
                 onChange({ ...formData, queryParamsText: event.target.value })
               }
+              data-testid="model-query-params-textarea"
               className="h-32 w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground font-mono text-xs"
             />
           </div>
@@ -227,6 +240,7 @@ export function ModelSettingsForm({
         <button
           type="submit"
           disabled={isSubmitting}
+          data-testid="model-submit-button"
           className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors text-sm"
         >
           {isSubmitting && <Loader2 size={16} className="animate-spin" />}

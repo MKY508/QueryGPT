@@ -201,6 +201,7 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
                 setShowConnectionDropdown((prev) => !prev);
                 setShowModelDropdown(false);
               }}
+              data-testid="chat-connection-select"
               className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
             >
               <Database size={14} className="text-muted-foreground" />
@@ -217,6 +218,7 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
                         handleSelectConnection(connection.id);
                         setShowConnectionDropdown(false);
                       }}
+                      data-testid={`chat-connection-option-${connection.id}`}
                       className={cn(
                         "flex w-full items-center justify-between px-3 py-2 text-left text-sm text-foreground hover:bg-muted",
                         connection.id === selectedConnectionId && "bg-primary/10 text-primary"
@@ -247,6 +249,7 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
                 setShowModelDropdown((prev) => !prev);
                 setShowConnectionDropdown(false);
               }}
+              data-testid="chat-model-select"
               className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground"
             >
               <Brain size={14} className="text-muted-foreground" />
@@ -263,6 +266,7 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
                         handleSelectModel(model.id);
                         setShowModelDropdown(false);
                       }}
+                      data-testid={`chat-model-option-${model.id}`}
                       className={cn(
                         "flex w-full items-center justify-between px-3 py-2 text-left text-sm text-foreground hover:bg-muted",
                         model.id === selectedModelId && "bg-primary/10 text-primary"
@@ -369,12 +373,14 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
               type="text"
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              data-testid="chat-input"
               placeholder="输入你的问题，例如：查询上月销售额..."
               className="w-full rounded-[24px] border border-input bg-background px-5 py-4 pr-16 text-foreground shadow-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="submit"
               disabled={(!input.trim() && !isLoading) || !readyToQuery}
+              data-testid="chat-submit"
               className={cn(
                 "absolute right-2 rounded-2xl p-3 text-white shadow-sm transition-all",
                 isLoading

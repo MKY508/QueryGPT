@@ -54,13 +54,17 @@ export function AssistantMessageCard({
   );
 
   return (
-    <div className="w-full max-w-4xl rounded-[24px] border border-border bg-background shadow-sm">
+    <div
+      data-testid={`assistant-message-card-${index}`}
+      className="w-full max-w-4xl rounded-[24px] border border-border bg-background shadow-sm"
+    >
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              data-testid={`assistant-tab-${tab.id}`}
               className={
                 activeTab === tab.id
                   ? "rounded-full bg-primary px-3 py-1.5 text-xs text-primary-foreground transition-colors"

@@ -349,6 +349,29 @@ cd apps/web && npm run type-check && npm test && npm run build
 ./apps/api/run-tests.sh
 ```
 
+### GitHub CI 覆盖
+
+当前 GitHub Actions 分成两层：
+
+- 快速层：后端 `ruff + mypy(聊天/配置主链路) + pytest`，前端 `lint + type-check + vitest + build`
+- 集成层：Docker 全栈启动、Playwright 烟测、`start.sh` 宿主机烟测、SQLite / PostgreSQL / MySQL 连接测试、模型测试假网关
+
+本地复现常用命令：
+
+```bash
+# Docker 全栈
+docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build
+
+# 后端集成测试（需先准备 PostgreSQL / MySQL / mock gateway 环境变量）
+cd apps/api && pytest tests/test_config_integration.py -v
+
+# 后端主链路类型检查
+cd apps/api && mypy --config-file mypy.ini
+
+# 前端浏览器烟测（需自行启动应用）
+cd apps/web && npm run test:e2e
+```
+
 </details>
 
 <details>

@@ -53,7 +53,11 @@ export function ModelSettingsList({
   return (
     <div className="space-y-3">
       {models.map((model) => (
-        <div key={model.id} className="rounded-2xl border border-border bg-secondary p-4">
+        <div
+          key={model.id}
+          data-testid={`model-card-${model.id}`}
+          className="rounded-2xl border border-border bg-secondary p-4"
+        >
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -88,6 +92,7 @@ export function ModelSettingsList({
               <button
                 onClick={() => onTest(model.id)}
                 disabled={testingModelId === model.id}
+                data-testid={`model-test-${model.id}`}
                 className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                 title="测试连接"
               >

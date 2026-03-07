@@ -85,6 +85,7 @@ export default function SettingsPage() {
                 <li key={tab.id}>
                   <button
                     onClick={() => setActiveTab(tab.id)}
+                    data-testid={`settings-tab-${tab.id}`}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                       activeTab === tab.id

@@ -1,0 +1,25 @@
+services:
+  mock-llm:
+    image: python:3.11-slim
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    command: ["python", "/workspace/scripts/mock_llm_gateway.py"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4010/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    depends_on:
+      db:
+        condition: service_healthy
+      mock-llm:
+        condition: service_healthy

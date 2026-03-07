@@ -1,0 +1,262 @@
+name: Integration
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-integration:
+    name: Backend Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: querygpt
+          POSTGRES_PASSWORD: querygpt
+          POSTGRES_DB: querygpt_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U querygpt -d querygpt_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: querygpt_test
+          MYSQL_USER: querygpt
+          MYSQL_PASSWORD: querygpt
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uquerygpt -pquerygpt"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Install dependencies
+        working-directory: apps/api
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Start mock LLM gateway
+        run: |
+          python scripts/mock_llm_gateway.py > mock-llm.log 2>&1 &
+          echo $! > /tmp/mock-llm.pid
+          python - <<'PY'
+          import time
+          import urllib.request
+
+          for _ in range(30):
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:4010/health", timeout=2):
+                      break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit("Mock LLM gateway failed to become healthy")
+          PY
+
+      - name: Run integration tests
+        working-directory: apps/api
+        env:
+          QUERYGPT_TEST_PG_HOST: 127.0.0.1
+          QUERYGPT_TEST_PG_PORT: "5432"
+          QUERYGPT_TEST_PG_USER: querygpt
+          QUERYGPT_TEST_PG_PASSWORD: querygpt
+          QUERYGPT_TEST_PG_DATABASE: querygpt_test
+          QUERYGPT_TEST_MYSQL_HOST: 127.0.0.1
+          QUERYGPT_TEST_MYSQL_PORT: "3306"
+          QUERYGPT_TEST_MYSQL_USER: querygpt
+          QUERYGPT_TEST_MYSQL_PASSWORD: querygpt
+          QUERYGPT_TEST_MYSQL_DATABASE: querygpt_test
+          QUERYGPT_TEST_MODEL_BASE_URL: http://127.0.0.1:4010/v1
+          ENCRYPTION_KEY: dGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz
+        run: pytest tests/test_config_integration.py -v
+
+      - name: Upload mock gateway log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-mock-llm-log
+          path: mock-llm.log
+          if-no-files-found: ignore
+
+  docker-e2e:
+    name: Docker E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Build and start Docker stack
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build
+
+      - name: Wait for frontend and backend
+        run: |
+          for url in http://127.0.0.1:8000/health http://127.0.0.1:3000; do
+            for _ in $(seq 1 60); do
+              if curl -fsS "$url" >/dev/null; then
+                break
+              fi
+              sleep 2
+            done
+            curl -fsS "$url" >/dev/null
+          done
+
+      - name: Install Playwright browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke test
+        working-directory: apps/web
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        run: npm run test:e2e
+
+      - name: Collect Docker logs
+        if: always()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose.integration.log || true
+
+      - name: Upload Docker and Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-e2e-artifacts
+          path: |
+            docker-compose.integration.log
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: ignore
+
+      - name: Shutdown Docker stack
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans
+
+  start-sh-smoke:
+    name: start.sh Smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: apps/api/pyproject.toml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Write CI env files
+        run: |
+          cat > apps/api/.env <<'EOF'
+          DATABASE_URL=sqlite+aiosqlite:///./data/querygpt.db
+          ENCRYPTION_KEY=dGVzdC1lbmNyeXB0aW9uLWtleS0zMmJ5dGVz
+          EOF
+          cat > apps/web/.env.local <<'EOF'
+          NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+          INTERNAL_API_URL=http://127.0.0.1:8000
+          EOF
+
+      - name: Setup workspace
+        run: QUERYGPT_NO_BROWSER=1 ./start.sh setup
+
+      - name: Doctor
+        run: QUERYGPT_NO_BROWSER=1 ./start.sh doctor
+
+      - name: Start backend
+        run: QUERYGPT_NO_BROWSER=1 ./start.sh backend
+
+      - name: Start frontend
+        run: QUERYGPT_NO_BROWSER=1 ./start.sh frontend
+
+      - name: Wait for services
+        run: |
+          for url in http://127.0.0.1:8000/health http://127.0.0.1:3000; do
+            for _ in $(seq 1 60); do
+              if curl -fsS "$url" >/dev/null; then
+                break
+              fi
+              sleep 2
+            done
+            curl -fsS "$url" >/dev/null
+          done
+
+      - name: Status
+        run: ./start.sh status
+
+      - name: Upload host smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: start-sh-smoke-${{ matrix.os }}
+          path: |
+            logs/backend.log
+            logs/frontend.log
+          if-no-files-found: ignore
+
+      - name: Stop services
+        if: always()
+        run: ./start.sh stop
+
+  integration-success:
+    name: Integration Success
+    needs: [backend-integration, docker-e2e, start-sh-smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify integration jobs
+        run: |
+          if [ "${{ needs.backend-integration.result }}" != "success" ] || \
+             [ "${{ needs.docker-e2e.result }}" != "success" ] || \
+             [ "${{ needs.start-sh-smoke.result }}" != "success" ]; then
+            echo "At least one integration job failed"
+            exit 1
+          fi
+          echo "✅ All integration checks passed!"
