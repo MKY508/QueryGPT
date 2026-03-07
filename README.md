@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/logo.svg" width="320" alt="QueryGPT logo">
+<img src="docs/images/logo.svg" width="400" alt="QueryGPT logo">
 
 ### 用自然语言驱动数据库 — 提问、查询、分析、图表，一步到位。
 
@@ -10,16 +10,14 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-000000.svg?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
-[![GitHub stars](https://img.shields.io/github/stars/mky508/querygpt?style=for-the-badge)](https://github.com/mky508/querygpt/stargazers)
-[![Last Commit](https://img.shields.io/github/last-commit/mky508/querygpt?style=for-the-badge)](https://github.com/mky508/querygpt/commits/main)
+[![GitHub stars](https://img.shields.io/github/stars/mky508/querygpt?style=flat-square)](https://github.com/mky508/querygpt/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/mky508/querygpt?style=flat-square)](https://github.com/mky508/querygpt/commits/main)
 
 </div>
 
 ---
 
 <img src="docs/images/chat.png" alt="对话工作台" width="100%">
-
----
 
 ## 核心能力
 
