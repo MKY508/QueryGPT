@@ -4,15 +4,10 @@
 
 ### 用自然语言驱动数据库 — 提问、查询、分析、图表，一步到位。
 
-开源 AI 数据库助手 | 中文优先 | 本地部署 | 只读安全
+[核心能力](#核心能力) | [工作流程](#工作流程) | [部署与启动](#部署与启动) | [技术栈](#技术栈)
 
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-15-000000.svg?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
-<br>
-[![GitHub stars](https://img.shields.io/github/stars/mky508/querygpt?style=for-the-badge)](https://github.com/mky508/querygpt/stargazers)
-[![Last Commit](https://img.shields.io/github/last-commit/mky508/querygpt?style=for-the-badge)](https://github.com/mky508/querygpt/commits/main)
+[![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=flat-square)](https://github.com/MKY508/QueryGPT/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT?style=flat-square)](https://github.com/MKY508/QueryGPT/commits/main)
 
 </div>
 
@@ -33,25 +28,9 @@
 </td>
 <td width="50%">
 
-**多模型适配**
-
-支持 OpenAI-compatible、Anthropic、Ollama、Custom 网关，一套配置切换。
-
-</td>
-</tr>
-<tr>
-<td>
-
 **自动分析链路**
 
 查询结果自动衔接 Python 分析与图表生成，一次提问完成完整分析。
-
-</td>
-<td>
-
-**诊断与自愈**
-
-展示 provider、连接状态、执行轨迹；SQL 或 Python 执行出错时自动修复。
 
 </td>
 </tr>
@@ -76,39 +55,40 @@
 ## 工作流程
 
 ```mermaid
-graph LR
-    A[自然语言提问] --> B[SQL 生成] --> C[执行查询] --> D[Python 分析] --> E[图表输出]
-    C -- 出错 --> F[自动修复] --> B
-    D -- 出错 --> F
+flowchart LR
+    query["自然语言提问"] --> context["结合语义层与 Schema 理解需求"]
+    context --> sql["生成只读 SQL"]
+    sql --> execute["执行查询"]
+    execute --> result["返回结果与总结"]
+    result --> decision{"需要进一步分析或图表?"}
+    decision -->|是| python["Python 分析与图表"]
+    decision -->|否| done["结束"]
+    python --> done
+    execute -->|SQL 出错| repair_sql["自动修复并重试"]
+    python -->|Python 出错| repair_py["自动修复并重试"]
+    repair_sql --> sql
+    repair_py --> python
 ```
 
 ## 界面一览
 
-<table>
-<tr>
-<td width="50%" align="center">
-
 <img src="docs/images/schema.png" alt="Schema 关系视图" width="100%">
 
-**Schema 关系视图**
+<p align="center"><strong>Schema 关系视图</strong></p>
 
-</td>
-<td width="50%" align="center">
+<br>
+<br>
 
 <img src="docs/images/semantic.png" alt="语义层配置" width="100%">
 
-**语义层配置**
+<p align="center"><strong>语义层配置</strong></p>
 
-</td>
-</tr>
-</table>
-
-## 如何使用
+## 部署与启动
 
 ### 1. 获取代码
 
 ```bash
-git clone git@github.com:mky508/querygpt.git
+git clone git@github.com:MKY508/QueryGPT.git
 cd querygpt
 ```
 
@@ -192,23 +172,26 @@ docker compose up --build
 
 ## 技术栈
 
+**项目**<br>
+![License](https://img.shields.io/badge/License-MIT-F7DF1E?style=flat-square)
+
 **前端**<br>
-![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Zustand](https://img.shields.io/badge/Zustand-5-764ABC)
-![TanStack Query](https://img.shields.io/badge/TanStack_Query-5-FF4154)
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Zustand](https://img.shields.io/badge/Zustand-5-764ABC?style=flat-square)
+![TanStack Query](https://img.shields.io/badge/TanStack_Query-5-FF4154?style=flat-square)
 
 **后端**<br>
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
-![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00)
-![LiteLLM](https://img.shields.io/badge/LiteLLM-latest-blue)
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0-D71F00?style=flat-square)
+![LiteLLM](https://img.shields.io/badge/LiteLLM-latest-blue?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)
 
 **数据库**<br>
-![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 
 <details>
 <summary><strong>配置说明</strong></summary>
