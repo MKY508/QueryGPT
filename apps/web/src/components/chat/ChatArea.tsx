@@ -332,7 +332,10 @@ export function ChatArea({ sidebarOpen: _sidebarOpen, onToggleSidebar }: ChatAre
 
                 {message.role === "assistant" ? (
                   message.isLoading ? (
-                    <div className="rounded-[24px] border border-border bg-background px-5 py-4 text-sm text-muted-foreground shadow-sm">
+                    <div
+                      data-testid="assistant-loading-message"
+                      className="rounded-[24px] border border-border bg-background px-5 py-4 text-sm text-muted-foreground shadow-sm"
+                    >
                       <div className="flex items-center gap-2">
                         <Loader2 size={16} className="animate-spin" />
                         {message.thinkingStage || message.status || "正在分析..."}

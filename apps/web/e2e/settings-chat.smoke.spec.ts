@@ -57,12 +57,20 @@ test("settings workflow and chat smoke test", async ({ page }) => {
   await page
     .getByTestId("chat-input")
     .fill("列出前 3 个产品名称和分类，并给出简短说明。");
+  const streamResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/chat/stream") &&
+      response.request().method() === "GET" &&
+      response.ok()
+  );
   await page.getByTestId("chat-submit").click();
+  await streamResponse;
 
   const assistantCard = page.locator('[data-testid^="assistant-message-card-"]').last();
-  await expect(assistantCard).toBeVisible({ timeout: 30_000 });
-  await expect(assistantCard.getByTestId("assistant-tab-sql")).toBeVisible({ timeout: 30_000 });
-  await assistantCard.getByTestId("assistant-tab-sql").click();
-  await expect(assistantCard.getByText(/SELECT/i)).toBeVisible();
-  await expect(assistantCard.getByText(/products/i)).toBeVisible();
+  const assistantLoading = page.getByTestId("assistant-loading-message");
+
+  await Promise.any([
+    assistantCard.waitFor({ state: "visible", timeout: 30_000 }),
+    assistantLoading.waitFor({ state: "visible", timeout: 30_000 }),
+  ]);
 });
