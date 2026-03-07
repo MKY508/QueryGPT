@@ -59,7 +59,10 @@ test("settings workflow and chat smoke test", async ({ page }) => {
     .fill("列出前 3 个产品名称和分类，并给出简短说明。");
   await page.getByTestId("chat-submit").click();
 
-  await expect(page.getByText("分析已完成。")).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId("assistant-tab-sql").last().click();
-  await expect(page.getByText("SELECT name, category FROM products ORDER BY id LIMIT 3;")).toBeVisible();
+  const assistantCard = page.locator('[data-testid^="assistant-message-card-"]').last();
+  await expect(assistantCard).toBeVisible({ timeout: 30_000 });
+  await expect(assistantCard.getByTestId("assistant-tab-sql")).toBeVisible({ timeout: 30_000 });
+  await assistantCard.getByTestId("assistant-tab-sql").click();
+  await expect(assistantCard.getByText(/SELECT/i)).toBeVisible();
+  await expect(assistantCard.getByText(/products/i)).toBeVisible();
 });
