@@ -114,7 +114,9 @@ class ExecutionService:
             limit=limit,
             exclude_message_id=exclude_message_id,
         )
-        logger.info("Loaded conversation history", count=len(history), conversation_id=str(conversation_id))
+        logger.info(
+            "Loaded conversation history", count=len(history), conversation_id=str(conversation_id)
+        )
         return history
 
     async def _load_execution_inputs(
@@ -182,7 +184,9 @@ class ExecutionService:
         if source_provider and resolved_provider and source_provider != resolved_provider:
             provider_summary = f"{source_provider} -> {resolved_provider} · {api_format}"
         else:
-            provider_summary = f"{source_provider} · {api_format}" if source_provider else api_format
+            provider_summary = (
+                f"{source_provider} · {api_format}" if source_provider else api_format
+            )
 
         return {
             "model_id": model_config.get("model_id"),

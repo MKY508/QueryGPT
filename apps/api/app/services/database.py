@@ -30,7 +30,7 @@ class DatabaseConfig:
     database: str = ""
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "DatabaseConfig":
+    def from_dict(cls, data: dict[str, Any]) -> DatabaseConfig:
         return cls(
             driver=data.get("driver", "mysql"),
             host=data.get("host", "localhost"),

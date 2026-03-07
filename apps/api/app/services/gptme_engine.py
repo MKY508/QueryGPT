@@ -39,11 +39,17 @@ from app.services.engine_prompts import (
 )
 from app.services.engine_visualization import build_chart_from_config, generate_visualization
 from app.services.engine_workflow import EngineRunState, WorkflowDecision
-from app.services.python_runtime import PythonExecutionRuntime, PythonSecurityAnalyzer, validate_python_code
+from app.services.python_runtime import (
+    PythonExecutionRuntime,
+    PythonSecurityAnalyzer,
+    validate_python_code,
+)
 
 logger = structlog.get_logger()
 
 MAX_AUTO_REPAIR_ATTEMPTS = 4
+
+__all__ = ["GptmeEngine", "PythonSecurityAnalyzer", "StopRequestedError"]
 
 
 class StopRequestedError(RuntimeError):
@@ -88,7 +94,10 @@ class GptmeEngine:
             available_python_libraries=self.available_python_libraries,
             analytics_installed=self.analytics_installed,
             font_path=str(
-                Path(__file__).resolve().parent.parent / "assets" / "fonts" / "NotoSansSC-Regular.ttf"
+                Path(__file__).resolve().parent.parent
+                / "assets"
+                / "fonts"
+                / "NotoSansSC-Regular.ttf"
             ),
         )
         self._ipython = None
@@ -633,7 +642,9 @@ class GptmeEngine:
         logger.debug("Executing Python code", attempt=state.attempt)
 
         try:
-            state.python_output, state.python_images = await self._execute_python(state.final_python)
+            state.python_output, state.python_images = await self._execute_python(
+                state.final_python
+            )
             diagnostic = self._record_diagnostic(
                 state,
                 phase="python",
@@ -835,7 +846,9 @@ class GptmeEngine:
         while state.attempt <= state.max_attempts:
             yield SSEEvent.progress(
                 "generating",
-                "正在生成响应..." if state.attempt == 1 else f"正在进行第 {state.attempt} 次自动修复...",
+                "正在生成响应..."
+                if state.attempt == 1
+                else f"正在进行第 {state.attempt} 次自动修复...",
                 attempt=state.attempt,
                 phase="generate",
             )

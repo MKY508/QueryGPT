@@ -6,8 +6,14 @@ from uuid import uuid4
 
 import pytest
 
-from app.models import RelationshipContext, SSEEvent, SSEEventType, SemanticContext, SystemCapabilities
-from app.services.execution import ExecutionInputs, ExecutionService
+from app.models import (
+    RelationshipContext,
+    SemanticContext,
+    SSEEvent,
+    SSEEventType,
+    SystemCapabilities,
+)
+from app.services.execution import ExecutionService
 
 
 class TestExecutionService:

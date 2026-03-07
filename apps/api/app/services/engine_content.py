@@ -19,9 +19,7 @@ def parse_thinking_markers(content: str) -> list[str]:
 
 def extract_python_block(content: str) -> str | None:
     """Extract a python or ipython code block."""
-    python_match = re.search(
-        r"```(?:python|ipython|py)\s*([\s\S]*?)```", content, re.IGNORECASE
-    )
+    python_match = re.search(r"```(?:python|ipython|py)\s*([\s\S]*?)```", content, re.IGNORECASE)
     if python_match:
         return python_match.group(1).strip()
     return None

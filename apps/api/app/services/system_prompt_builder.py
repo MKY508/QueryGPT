@@ -178,9 +178,9 @@ Chart types: bar, line, pie, area
     if db_config:
         base_prompt += f"""
 数据库连接信息:
-- 类型: {db_config['driver']}
-- 主机: {db_config['host']}:{db_config['port']}
-- 数据库: {db_config['database']}
+- 类型: {db_config["driver"]}
+- 主机: {db_config["host"]}:{db_config["port"]}
+- 数据库: {db_config["database"]}
 """
 
     if semantic_context and semantic_context.terms:

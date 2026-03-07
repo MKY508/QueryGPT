@@ -1,6 +1,5 @@
 """Context resolution helpers for the execution service."""
 
-from collections.abc import Callable
 from typing import Any
 from uuid import UUID
 
@@ -136,7 +135,9 @@ class ExecutionContextResolver:
 
         connection: Connection | None = None
         if self.connection_id:
-            result = await self.db.execute(select(Connection).where(Connection.id == self.connection_id))
+            result = await self.db.execute(
+                select(Connection).where(Connection.id == self.connection_id)
+            )
             connection = result.scalar_one_or_none()
         else:
             settings_data = self.workspace_settings()
@@ -254,7 +255,9 @@ class ExecutionContextResolver:
         if source_provider and resolved_provider and source_provider != resolved_provider:
             provider_summary = f"{source_provider} -> {resolved_provider} · {api_format}"
         else:
-            provider_summary = f"{source_provider} · {api_format}" if source_provider else api_format
+            provider_summary = (
+                f"{source_provider} · {api_format}" if source_provider else api_format
+            )
 
         return {
             "model_id": model_config.get("model_id"),

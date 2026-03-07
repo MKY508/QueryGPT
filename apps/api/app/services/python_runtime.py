@@ -185,7 +185,9 @@ class PythonExecutionRuntime:
             if font_loaded:
                 logger.info("Loading bundled font", path=self.font_path)
             else:
-                logger.warning("Bundled font not found, falling back to system fonts", path=self.font_path)
+                logger.warning(
+                    "Bundled font not found, falling back to system fonts", path=self.font_path
+                )
 
             self._ipython.run_cell(
                 f"""

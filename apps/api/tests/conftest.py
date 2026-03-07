@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db import metadata as metadata_db
 from app.db import get_db
+from app.db import metadata as metadata_db
 from app.db.tables import Base
 from app.main import app, limiter
 

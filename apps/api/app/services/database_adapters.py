@@ -62,8 +62,7 @@ class MySQLAdapter:
                 (table_name,),
             )
             return [
-                {"name": row["COLUMN_NAME"], "type": row["DATA_TYPE"]}
-                for row in cursor.fetchall()
+                {"name": row["COLUMN_NAME"], "type": row["DATA_TYPE"]} for row in cursor.fetchall()
             ]
 
 

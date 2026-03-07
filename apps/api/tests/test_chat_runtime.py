@@ -35,9 +35,7 @@ def test_active_query_registry_lifecycle():
 def test_merge_metadata_dedupes_diagnostics_and_merges_execution_context():
     base = {
         "execution_context": {"model_id": "model-a"},
-        "diagnostics": [
-            {"attempt": 1, "phase": "sql", "status": "error", "message": "broken"}
-        ],
+        "diagnostics": [{"attempt": 1, "phase": "sql", "status": "error", "message": "broken"}],
     }
     updates = {
         "execution_context": {"connection_id": "conn-a"},
