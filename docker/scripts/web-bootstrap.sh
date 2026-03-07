@@ -11,8 +11,8 @@ package_lock_hash() {
 }
 
 copy_cached_modules() {
-  rm -rf node_modules
   mkdir -p node_modules
+  find node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} +
   cp -a "$CACHE_DIR"/. node_modules/
   printf '%s\n' "$1" > "$TARGET_HASH_FILE"
 }

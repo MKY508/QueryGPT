@@ -49,6 +49,26 @@ switch_to_sqlite() {
   warn "数据库不可达，已切换到 SQLite: $sqlite_url"
 }
 
+ensure_sqlite_parent_dir() {
+  [ -f "$API_DIR/.env" ] || return 0
+  local db_url
+  db_url="$(grep '^DATABASE_URL=' "$API_DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
+  [[ "$db_url" == sqlite* ]] || return 0
+
+  local db_path
+  if [[ "$db_url" == sqlite+aiosqlite:///* ]]; then
+    db_path="${db_url#sqlite+aiosqlite:///}"
+  else
+    db_path="${db_url#sqlite:///}"
+  fi
+
+  if [[ "$db_path" != /* ]]; then
+    db_path="$API_DIR/${db_path#./}"
+  fi
+
+  mkdir -p "$(dirname "$db_path")"
+}
+
 reset_legacy_sqlite_if_needed() {
   [ -f "$API_DIR/.env" ] || return 0
   local db_url
@@ -89,6 +109,7 @@ check_database_connection() {
   [ -n "$db_url" ] || return 0
 
   if [[ "$db_url" == sqlite* ]]; then
+    ensure_sqlite_parent_dir
     ensure_aiosqlite
     return 0
   fi
