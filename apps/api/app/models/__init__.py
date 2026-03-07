@@ -1,4 +1,5 @@
 """Pydantic 数据模型 - API 契约定义"""
+
 from app.models.chat import (
     ChatRequest,
     ChatStopRequest,

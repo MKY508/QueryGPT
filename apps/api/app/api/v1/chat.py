@@ -115,9 +115,15 @@ async def chat_stream(
                 conversation_id=str(current_conversation_id),
             ).to_sse()
 
-            effective_context_rounds = context_rounds or int(settings_data.get("context_rounds", 5) or 5)
-            effective_model = model or (str(conversation.model_id) if conversation and conversation.model_id else None)
-            effective_connection_id = connection_id or (conversation.connection_id if conversation else None)
+            effective_context_rounds = context_rounds or int(
+                settings_data.get("context_rounds", 5) or 5
+            )
+            effective_model = model or (
+                str(conversation.model_id) if conversation and conversation.model_id else None
+            )
+            effective_connection_id = connection_id or (
+                conversation.connection_id if conversation else None
+            )
 
             execution_service = ExecutionService(
                 db=db,

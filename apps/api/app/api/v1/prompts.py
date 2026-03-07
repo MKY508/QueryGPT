@@ -49,7 +49,9 @@ async def _find_root_prompt_id(db: AsyncSession, prompt: Prompt) -> UUID:
 async def list_prompts(db: AsyncSession = Depends(get_db)):
     """获取提示词列表（只返回激活版本）"""
     result = await db.execute(
-        select(Prompt).where(Prompt.is_active.is_(True)).order_by(Prompt.is_default.desc(), Prompt.created_at.desc())
+        select(Prompt)
+        .where(Prompt.is_active.is_(True))
+        .order_by(Prompt.is_default.desc(), Prompt.created_at.desc())
     )
     prompts = result.scalars().all()
     return APIResponse.ok(
@@ -128,7 +130,9 @@ async def delete_prompt(
     """删除提示词（删除所有版本）"""
     prompt = await _get_prompt_or_404(db, prompt_id)
     root_id = await _find_root_prompt_id(db, prompt)
-    result = await db.execute(select(Prompt).where((Prompt.id == root_id) | (Prompt.parent_id == root_id)))
+    result = await db.execute(
+        select(Prompt).where((Prompt.id == root_id) | (Prompt.parent_id == root_id))
+    )
     for item in result.scalars().all():
         await db.delete(item)
     await db.commit()

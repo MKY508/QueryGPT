@@ -70,7 +70,9 @@ class TestGptmeEngine:
     def test_validate_python_dependencies_missing_module(self):
         """Test missing optional module detection"""
         engine = GptmeEngine()
-        is_valid, error = engine._validate_python_dependencies("import definitely_missing_querygpt_lib")
+        is_valid, error = engine._validate_python_dependencies(
+            "import definitely_missing_querygpt_lib"
+        )
         assert not is_valid
         assert "未安装所需 Python 库" in str(error)
 

@@ -68,7 +68,9 @@ async def test_import_preview_and_merge(client: AsyncClient):
         "conflict_resolution": "skip",
     }
 
-    preview = await client.post(f"/api/v1/config/connections/{conn_id}/import/preview", json=import_data)
+    preview = await client.post(
+        f"/api/v1/config/connections/{conn_id}/import/preview", json=import_data
+    )
     assert preview.status_code == 200
     assert preview.json()["data"]["total"] == 2
 

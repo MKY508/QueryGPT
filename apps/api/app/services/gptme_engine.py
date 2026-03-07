@@ -234,7 +234,9 @@ class GptmeEngine:
         self._ipython = None  # IPython 实例（延迟初始化）
         self._sql_data: dict[str, Any] = {}  # SQL 结果缓存
 
-    def _diagnostics_payload(self, diagnostics: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+    def _diagnostics_payload(
+        self, diagnostics: list[dict[str, Any]]
+    ) -> list[dict[str, Any]] | None:
         return diagnostics if self.diagnostics_enabled else None
 
     def _diagnostic_entry_payload(self, entry: dict[str, Any]) -> dict[str, Any] | None:
@@ -456,7 +458,7 @@ Python 错误：
 要求：
 1. 若 SQL 无需修改，请保留原 SQL；若确实有问题，也一并修正。
 2. 如果还需要 Python 分析，必须返回新的 ```python 代码块。
-3. 代码只能使用这些当前可用库：{', '.join(self.available_python_libraries)}，并直接使用已注入的 df。
+3. 代码只能使用这些当前可用库：{", ".join(self.available_python_libraries)}，并直接使用已注入的 df。
 4. 不要访问文件、网络或系统资源。
 """
 

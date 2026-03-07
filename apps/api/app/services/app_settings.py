@@ -77,6 +77,10 @@ def detect_system_capabilities(
         auto_repair_enabled=_setting_flag(settings_record, "auto_repair_enabled", True),
         analytics_installed=analytics_installed,
         available_python_libraries=available_libraries
-        + [package_name for import_name, package_name in OPTIONAL_ANALYTICS_LIBRARIES if find_spec(import_name)],
+        + [
+            package_name
+            for import_name, package_name in OPTIONAL_ANALYTICS_LIBRARIES
+            if find_spec(import_name)
+        ],
         missing_optional_libraries=missing_optional,
     )

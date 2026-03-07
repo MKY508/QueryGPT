@@ -39,7 +39,9 @@ async def list_conversations(
         query = query.where(Conversation.title.ilike(f"%{q}%"))
 
     total = await db.scalar(select(func.count()).select_from(query.subquery())) or 0
-    result = await db.execute(query.order_by(Conversation.updated_at.desc()).offset(offset).limit(limit))
+    result = await db.execute(
+        query.order_by(Conversation.updated_at.desc()).offset(offset).limit(limit)
+    )
     rows = result.all()
     summaries = [
         ConversationSummary(

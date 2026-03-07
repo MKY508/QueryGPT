@@ -75,7 +75,9 @@ async def test_connection(
     """测试数据库连接"""
     connection = await _get_connection_or_404(db, connection_id)
 
-    password = encryptor.decrypt(connection.password_encrypted) if connection.password_encrypted else None
+    password = (
+        encryptor.decrypt(connection.password_encrypted) if connection.password_encrypted else None
+    )
     db_config = DatabaseConfig(
         driver=connection.driver,
         host=connection.host or "localhost",

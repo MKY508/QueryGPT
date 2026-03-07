@@ -78,7 +78,9 @@ def _detect_relationships(tables: list[TableInfo]) -> list[RelationshipSuggestio
             if not matched_table or matched_table == table.name:
                 continue
             target_table_info = next((item for item in tables if item.name == matched_table), None)
-            if target_table_info and any(col.name.lower() == "id" for col in target_table_info.columns):
+            if target_table_info and any(
+                col.name.lower() == "id" for col in target_table_info.columns
+            ):
                 suggestions.append(
                     RelationshipSuggestion(
                         source_table=table.name,
@@ -133,7 +135,9 @@ async def get_schema(
     return APIResponse.ok(data=SchemaInfo(tables=tables, suggestions=suggestions))
 
 
-@router.get("/{connection_id}/relationships", response_model=APIResponse[list[TableRelationshipResponse]])
+@router.get(
+    "/{connection_id}/relationships", response_model=APIResponse[list[TableRelationshipResponse]]
+)
 async def get_relationships(
     connection_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -146,10 +150,14 @@ async def get_relationships(
             TableRelationship.is_active.is_(True),
         )
     )
-    return APIResponse.ok(data=[TableRelationshipResponse.model_validate(r) for r in result.scalars().all()])
+    return APIResponse.ok(
+        data=[TableRelationshipResponse.model_validate(r) for r in result.scalars().all()]
+    )
 
 
-@router.post("/{connection_id}/relationships", response_model=APIResponse[TableRelationshipResponse])
+@router.post(
+    "/{connection_id}/relationships", response_model=APIResponse[TableRelationshipResponse]
+)
 async def create_relationship(
     connection_id: UUID,
     data: TableRelationshipCreate,
@@ -178,7 +186,10 @@ async def create_relationships_batch(
 ):
     """批量创建表关系"""
     await _get_connection(connection_id, db)
-    relationships = [TableRelationship(connection_id=connection_id, **item.model_dump()) for item in data.relationships]
+    relationships = [
+        TableRelationship(connection_id=connection_id, **item.model_dump())
+        for item in data.relationships
+    ]
     db.add_all(relationships)
     await db.commit()
     for relationship in relationships:
@@ -189,14 +200,18 @@ async def create_relationships_batch(
     )
 
 
-@router.put("/relationships/{relationship_id}", response_model=APIResponse[TableRelationshipResponse])
+@router.put(
+    "/relationships/{relationship_id}", response_model=APIResponse[TableRelationshipResponse]
+)
 async def update_relationship(
     relationship_id: UUID,
     data: TableRelationshipUpdate,
     db: AsyncSession = Depends(get_db),
 ):
     """更新表关系"""
-    result = await db.execute(select(TableRelationship).where(TableRelationship.id == relationship_id))
+    result = await db.execute(
+        select(TableRelationship).where(TableRelationship.id == relationship_id)
+    )
     relationship = result.scalar_one_or_none()
     if not relationship:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="关系不存在")
@@ -216,7 +231,9 @@ async def delete_relationship(
     db: AsyncSession = Depends(get_db),
 ):
     """删除表关系"""
-    result = await db.execute(delete(TableRelationship).where(TableRelationship.id == relationship_id))
+    result = await db.execute(
+        delete(TableRelationship).where(TableRelationship.id == relationship_id)
+    )
     if result.rowcount == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="关系不存在")
     await db.commit()
@@ -243,7 +260,9 @@ async def create_layout(
     """创建新布局"""
     await _get_connection(connection_id, db)
     if LayoutRepository.layout_name_exists(connection_id, data.name):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"布局名称 '{data.name}' 已存在")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"布局名称 '{data.name}' 已存在"
+        )
     layout = LayoutRepository.create_layout(
         connection_id=connection_id,
         name=data.name,
@@ -254,7 +273,9 @@ async def create_layout(
     return APIResponse.ok(data=SchemaLayoutResponse(**layout), message="布局创建成功")
 
 
-@router.get("/{connection_id}/layouts/{layout_id}", response_model=APIResponse[SchemaLayoutResponse])
+@router.get(
+    "/{connection_id}/layouts/{layout_id}", response_model=APIResponse[SchemaLayoutResponse]
+)
 async def get_layout(
     connection_id: UUID,
     layout_id: UUID,
@@ -268,7 +289,9 @@ async def get_layout(
     return APIResponse.ok(data=SchemaLayoutResponse(**layout))
 
 
-@router.put("/{connection_id}/layouts/{layout_id}", response_model=APIResponse[SchemaLayoutResponse])
+@router.put(
+    "/{connection_id}/layouts/{layout_id}", response_model=APIResponse[SchemaLayoutResponse]
+)
 async def update_layout(
     connection_id: UUID,
     layout_id: UUID,
@@ -280,8 +303,14 @@ async def update_layout(
     existing = LayoutRepository.get_layout(layout_id)
     if not existing or existing["connection_id"] != str(connection_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="布局不存在")
-    if data.name and data.name != existing["name"] and LayoutRepository.layout_name_exists(connection_id, data.name, layout_id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"布局名称 '{data.name}' 已存在")
+    if (
+        data.name
+        and data.name != existing["name"]
+        and LayoutRepository.layout_name_exists(connection_id, data.name, layout_id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"布局名称 '{data.name}' 已存在"
+        )
     layout = LayoutRepository.update_layout(
         layout_id=layout_id,
         connection_id=connection_id,

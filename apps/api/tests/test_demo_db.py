@@ -28,7 +28,9 @@ async def test_seed_demo_connection_when_workspace_is_empty(db_session: AsyncSes
 
 
 @pytest.mark.asyncio
-async def test_skip_demo_connection_when_workspace_already_has_connections(db_session: AsyncSession):
+async def test_skip_demo_connection_when_workspace_already_has_connections(
+    db_session: AsyncSession,
+):
     existing = Connection(
         name="Custom DB",
         driver="sqlite",
@@ -42,6 +44,8 @@ async def test_skip_demo_connection_when_workspace_already_has_connections(db_se
     await ensure_demo_connection(db_session, "/tmp/querygpt-demo.db")
     await db_session.commit()
 
-    connections = (await db_session.execute(select(Connection).order_by(Connection.name))).scalars().all()
+    connections = (
+        (await db_session.execute(select(Connection).order_by(Connection.name))).scalars().all()
+    )
     assert len(connections) == 1
     assert connections[0].name == "Custom DB"

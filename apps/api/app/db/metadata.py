@@ -314,9 +314,7 @@ class LayoutRepository:
             return cursor.rowcount
 
     @staticmethod
-    def layout_name_exists(
-        connection_id: UUID, name: str, exclude_id: UUID | None = None
-    ) -> bool:
+    def layout_name_exists(connection_id: UUID, name: str, exclude_id: UUID | None = None) -> bool:
         with get_metadata_db() as conn:
             cursor = conn.cursor()
             if exclude_id:

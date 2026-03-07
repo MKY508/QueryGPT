@@ -34,21 +34,29 @@ async def export_config(
     """导出指定连接的所有配置"""
     connection = await _get_connection(connection_id, db)
     relationships = (
-        await db.execute(
-            select(TableRelationship).where(
-                TableRelationship.connection_id == connection_id,
-                TableRelationship.is_active.is_(True),
+        (
+            await db.execute(
+                select(TableRelationship).where(
+                    TableRelationship.connection_id == connection_id,
+                    TableRelationship.is_active.is_(True),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     terms = (
-        await db.execute(
-            select(SemanticTerm).where(
-                SemanticTerm.connection_id == connection_id,
-                SemanticTerm.is_active.is_(True),
+        (
+            await db.execute(
+                select(SemanticTerm).where(
+                    SemanticTerm.connection_id == connection_id,
+                    SemanticTerm.is_active.is_(True),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     layouts = LayoutRepository.list_layouts_full(connection_id)
 
     return APIResponse.ok(
@@ -108,9 +116,7 @@ async def download_config(
     response = await export_config(connection_id, db)
     export_data = response.data
     assert export_data is not None
-    filename = (
-        f"querygpt-config-{export_data.connection.name}-{export_data.exported_at.strftime('%Y%m%d')}.json"
-    )
+    filename = f"querygpt-config-{export_data.connection.name}-{export_data.exported_at.strftime('%Y%m%d')}.json"
     return JSONResponse(
         content=export_data.model_dump(mode="json"),
         headers={
@@ -157,7 +163,9 @@ async def _process_import(
     created = updated = skipped = failed = 0
 
     if request.mode == "replace" and not dry_run:
-        await db.execute(delete(TableRelationship).where(TableRelationship.connection_id == connection_id))
+        await db.execute(
+            delete(TableRelationship).where(TableRelationship.connection_id == connection_id)
+        )
         await db.execute(delete(SemanticTerm).where(SemanticTerm.connection_id == connection_id))
         LayoutRepository.delete_all_layouts(connection_id)
 

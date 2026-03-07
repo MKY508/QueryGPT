@@ -5,7 +5,9 @@ from uuid import uuid4
 from httpx import AsyncClient
 
 
-async def create_prompt(client: AsyncClient, name: str = "Test Prompt", content: str = "You are helpful.") -> dict:
+async def create_prompt(
+    client: AsyncClient, name: str = "Test Prompt", content: str = "You are helpful."
+) -> dict:
     response = await client.post(
         "/api/v1/prompts",
         json={
