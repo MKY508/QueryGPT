@@ -2,16 +2,13 @@
 
 <img src="docs/images/logo.svg" width="400" alt="QueryGPT logo">
 
-### 用自然语言驱动数据库 — 提问、查询、分析、图表，一步到位。
+### 中文优先的开源 AI 数据库助手
+
+用自然语言提问，生成只读 SQL，返回结果、分析与图表。
 
 [核心能力](#核心能力) | [工作流程](#工作流程) | [部署与启动](#部署与启动) | [技术栈](#技术栈)
 
-[![GitHub stars](https://img.shields.io/github/stars/MKY508/QueryGPT?style=flat-square)](https://github.com/MKY508/QueryGPT/stargazers)
-[![Last Commit](https://img.shields.io/github/last-commit/MKY508/QueryGPT?style=flat-square)](https://github.com/MKY508/QueryGPT/commits/main)
-
 </div>
-
----
 
 <img src="docs/images/chat.png" alt="对话工作台" width="100%">
 
