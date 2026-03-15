@@ -380,3 +380,6 @@ cd apps/web && npm run test:e2e
 ## 许可证
 
 MIT
+
+---
+> Built with ❤️
