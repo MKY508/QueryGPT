@@ -12,12 +12,27 @@ const FOCUSABLE_SELECTOR = [
   '[contenteditable="true"]',
 ].join(",");
 
-function focusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (element) =>
-      element.getAttribute("aria-hidden") !== "true" &&
-      !element.hasAttribute("hidden")
-  );
+function available(element: HTMLElement): boolean {
+  if (!element.isConnected || element.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
+  const visibility = window.getComputedStyle(element).visibility;
+  if (visibility === "hidden" || visibility === "collapse") return false;
+  // Responsive master/detail panes stay mounted to retain their place. A
+  // hidden ancestor must not become an initial or wraparound focus target.
+  for (let parent: HTMLElement | null = element; parent; parent = parent.parentElement) {
+    if (window.getComputedStyle(parent).display === "none") return false;
+  }
+  return true;
+}
+
+export function focusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    .filter((element) => element.getAttribute("tabindex") !== "-1" && available(element));
+}
+
+/** Inline native dialogs are panels, not overlays that own workspace focus. */
+export function hasModalDialog(except?: Element | null): boolean {
+  return Array.from(document.querySelectorAll('dialog[open], [aria-modal="true"]:not(dialog)')).some(node =>
+    node !== except && (node.getAttribute("aria-modal") === "true" || node.matches(":modal")));
 }
 
 interface UseModalFocusOptions {
@@ -52,14 +67,15 @@ export function useModalFocus({
     const focusTimer = window.setTimeout(() => {
       const container = containerRef.current;
       if (!container) return;
-      const initialFocus =
-        initialFocusRef?.current || focusableElements(container)[0] || container;
+      const requested = initialFocusRef?.current;
+      const initialFocus = requested && available(requested) ? requested : focusableElements(container)[0] || container;
       initialFocus.focus();
     }, 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const container = containerRef.current;
       if (!container) return;
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
 
       if (event.key === "Escape") {
         event.preventDefault();
