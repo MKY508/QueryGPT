@@ -15,6 +15,24 @@ class AnalystStoppedError(RuntimeError):
     pass
 
 
+async def finish_before_cancellation(operation: Awaitable[ResultT]) -> ResultT:
+    """Settle an irreversible write before propagating its owner's cancellation."""
+    with CancelScope(shield=True):
+        task = asyncio.ensure_future(operation)
+        cancellation: asyncio.CancelledError | None = None
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError as exc:
+                if task.cancelled():
+                    raise
+                cancellation = exc
+        result = task.result()
+        if cancellation is not None:
+            raise cancellation
+        return result
+
+
 @contextlib.asynccontextmanager
 async def owned_task(
     operation: Callable[[], Awaitable[ResultT]],

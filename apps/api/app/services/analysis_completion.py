@@ -1,14 +1,13 @@
 """One commit for terminal run changes and their user-facing transcript."""
 
-import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-from anyio import CancelScope
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SSEEvent
+from app.services.run_control import finish_before_cancellation
 
 
 @dataclass
@@ -24,23 +23,10 @@ class AnalysisCompletion:
             raise RuntimeError("This investigation already has a durable completion")
         try:
             yield
-            with CancelScope(shield=True):
-                task = asyncio.create_task(self._commit())
-                cancellation: asyncio.CancelledError | None = None
-                while not task.done():
-                    try:
-                        await asyncio.shield(task)
-                    except asyncio.CancelledError as exc:
-                        if task.cancelled():
-                            raise
-                        cancellation = exc
-                task.result()
-                if cancellation is not None:
-                    raise cancellation
+            await finish_before_cancellation(self._commit())
         except BaseException:
             if not self.committed:
-                with CancelScope(shield=True):
-                    await self.db.rollback()
+                await finish_before_cancellation(self.db.rollback())
             raise
 
     async def _commit(self) -> None:

@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator, Callable
 from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from inspect import isawaitable
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -40,16 +41,15 @@ from app.models.analysis_state import (
     REPORT_ANALYSIS_STATES,
     TERMINAL_ANALYSIS_STATES,
     AnalysisState,
-    parse_analysis_state,
 )
 from app.services.analysis_checkpoint import (
     load_runtime_checkpoint,
     revalidate_database_replay_journal,
-    save_runtime_checkpoint,
     source_fingerprint_map,
     validate_source_fingerprints,
 )
 from app.services.analysis_completion import AnalysisCompletion
+from app.services.analysis_run_journal import AnalysisRunJournal, AnalysisRunOwnershipError
 from app.services.business_decision_slots import canonicalize_decision_key
 from app.services.checkpoint_contract import (
     CheckpointDriftError,
@@ -629,6 +629,7 @@ class ExecutionService:
         self.db = db
         self.stream_attempt_id = stream_attempt_id or uuid4().hex
         self.analysis_run_id: UUID | None = None
+        self._run_journal: AnalysisRunJournal | None = None
         self.model_name = model_name
         self.connection_id = connection_id
         self.language = language
@@ -649,6 +650,13 @@ class ExecutionService:
             settings_data=self.settings_data,
             allow_default_connection_fallback=not self.project_scoped,
         )
+
+    def _journal_for(self, run: AnalysisRun) -> AnalysisRunJournal:
+        if self._run_journal is None:
+            self._run_journal = AnalysisRunJournal(self.db, run, self.stream_attempt_id)
+        elif self._run_journal.run is not run:
+            raise RuntimeError("An execution service owns exactly one analysis run")
+        return self._run_journal
 
     def _public_event(self, event: SSEEvent) -> SSEEvent | None:
         data = self.execution_policy.public_event_data(event.type.value, event.data)
@@ -939,12 +947,6 @@ class ExecutionService:
                     }
                 )
             project_context.required_relationship_validations = required_relationships
-            if run is not None:
-                run.checkpoint = {
-                    **(run.checkpoint or {}),
-                    "semantic_validation_selection": validation_contract,
-                }
-                await self.db.commit()
         standing_checkpoint = (
             (run.checkpoint or {}).get("standing_analysis") if run is not None else None
         )
@@ -992,47 +994,21 @@ class ExecutionService:
             )
 
         checkpoint_callback = None
-        if run is not None and self.execution_policy.diagnostics_enabled:
-            # PydanticAI can execute independent tool calls from one model turn in
-            # parallel. A run has one SQLAlchemy session and one monotonic checkpoint
-            # stream, so both the disk write and DB commit must remain serial.
-            checkpoint_lock = asyncio.Lock()
-
-            async def persist_checkpoint(snapshot: dict[str, Any]) -> dict[str, Any]:
-                async with checkpoint_lock:
-                    revision = int((run.checkpoint or {}).get("revision") or 0) + 1
-                    continuation_checkpoint = dict(run.checkpoint or {})
-                    manifest = await save_runtime_checkpoint(
-                        project_context.project_dir,
-                        str(run.id),
-                        revision,
-                        {
-                            **snapshot,
-                            "source_fingerprints": source_fingerprint_map(project_context.sources),
-                        },
-                    )
-                    receipt = continuation_checkpoint.get("confirmation_receipt")
-                    if isinstance(receipt, dict):
-                        manifest["confirmation_receipt"] = receipt
-                        manifest["confirmation_receipt_status"] = "consumed"
-                        manifest["confirmation_consumed_at"] = continuation_checkpoint.get(
-                            "confirmation_consumed_at"
-                        )
-                    standing_analysis = continuation_checkpoint.get("standing_analysis")
-                    if isinstance(standing_analysis, dict):
-                        manifest["standing_analysis"] = standing_analysis
-                    correction_context = continuation_checkpoint.get("correction_context")
-                    if isinstance(correction_context, dict):
-                        manifest["correction_context"] = correction_context
-                    run.checkpoint = manifest
-                    run.stage = str(snapshot.get("stage") or run.stage)
-                    checkpoint_state = parse_analysis_state(snapshot.get("analysis_state"))
-                    if checkpoint_state is not None and run.state not in TERMINAL_ANALYSIS_STATES:
-                        run.state = checkpoint_state
-                    await self.db.commit()
-                    return manifest
-
-            checkpoint_callback = persist_checkpoint
+        if run is not None:
+            journal = self._journal_for(run)
+            # End the context-read transaction before starting remote model work.
+            async with journal.transaction():
+                if validation_contract:
+                    run.checkpoint = {
+                        **(run.checkpoint or {}),
+                        "semantic_validation_selection": validation_contract,
+                    }
+            if self.execution_policy.diagnostics_enabled:
+                checkpoint_callback = partial(
+                    journal.checkpoint,
+                    project_dir=project_context.project_dir,
+                    source_fingerprints=source_fingerprint_map(project_context.sources),
+                )
         return PydanticAnalystRuntime(
             model_config=inputs.model_config,
             project_context=project_context,
@@ -2750,7 +2726,12 @@ class ExecutionService:
         events: list[SSEEvent],
         completion: AnalysisCompletion,
     ) -> list[SSEEvent]:
-        async with completion.transaction():
+        transaction = (
+            self._journal_for(run).transaction(completion)
+            if run is not None
+            else completion.transaction()
+        )
+        async with transaction:
             outcome = (
                 await self._stage_project_result(run, result_data)
                 if run is not None
@@ -2836,6 +2817,8 @@ class ExecutionService:
                 correction_id=correction_id,
             )
             self.analysis_run_id = run.id if run is not None else None
+            if run is not None:
+                self._journal_for(run)
             confirmation_receipt = stored_confirmation_receipt
             if confirmation_receipt is None and resume_run_id is None:
                 confirmation_receipt = await self._persist_explicit_confirmation(
@@ -2868,20 +2851,15 @@ class ExecutionService:
             ) as events:
                 async for event in events:
                     if run:
-                        event.data["analysis_run_id"] = str(run.id)
-                        event.data["project_id"] = str(run.project_id)
-                        event.data["resumable"] = bool((run.checkpoint or {}).get("resumable"))
+                        context = self._journal_for(run).event_context
+                        for key in ("analysis_run_id", "project_id", "resumable"):
+                            event.data[key] = context[key]
                     buffer_event = bool(buffered_terminal_events) or event.is_terminal_progress
                     if run and event.type.value == "progress":
-                        next_stage = str(event.data.get("stage") or run.stage)
                         if event.is_terminal_progress:
                             buffer_event = True
                         else:
-                            run.stage = next_stage
-                            next_state = parse_analysis_state(event.data.get("analysis_state"))
-                            if next_state is not None:
-                                run.state = next_state
-                            await self.db.commit()
+                            await self._journal_for(run).progress(event.data)
                     if event.type.value == "result":
                         if (event.data.get("report") or {}).get("status") == "needs_data":
                             event.data["resumable"] = True
@@ -2930,6 +2908,16 @@ class ExecutionService:
                 with CancelScope(shield=True):
                     await self._mark_run_needs_attention(run, exc)
             raise
+
+        except AnalysisRunOwnershipError:
+            yield SSEEvent.error(
+                "CANCELLED",
+                "这次调查已结束或已由新的执行接续",
+                error_category="cancelled",
+                failed_stage="execution",
+                **self._run_event_context(run),
+            )
+            return
 
         except _AnalysisFinalizationStoppedError as exc:
             await self._mark_run_needs_attention(run, exc)
@@ -3056,7 +3044,7 @@ class ExecutionService:
             logger.warning(
                 "Analysis checkpoint cannot be resumed",
                 conversation_id=str(conversation_id),
-                analysis_run_id=str(run.id) if run else None,
+                analysis_run_id=str(self.analysis_run_id) if self.analysis_run_id else None,
                 exception_detail=self._diagnostic_error(exc),
             )
             await self._mark_run_needs_attention(run, exc)
@@ -3158,7 +3146,7 @@ class ExecutionService:
                     **self._run_event_context(run),
                 )
                 return
-            resumable = bool((run.checkpoint or {}).get("resumable")) if run else False
+            resumable = bool(self._run_event_context(run).get("resumable"))
             diagnostic = build_diagnostic_entry(
                 attempt=1,
                 phase="execution",
@@ -3228,16 +3216,10 @@ class ExecutionService:
                 **self._run_event_context(run),
             )
 
-    @staticmethod
-    def _run_event_context(run: AnalysisRun | None) -> dict[str, Any]:
+    def _run_event_context(self, run: AnalysisRun | None) -> dict[str, Any]:
         if run is None:
             return {}
-        return {
-            "analysis_run_id": str(run.id),
-            "project_id": str(run.project_id),
-            "analysis_state": "needs_attention",
-            "resumable": bool((run.checkpoint or {}).get("resumable")),
-        }
+        return self._journal_for(run).event_context
 
     async def _mark_run_needs_attention(
         self,
@@ -3246,77 +3228,62 @@ class ExecutionService:
     ) -> None:
         if run is None:
             return
+        journal = self._journal_for(run)
         try:
             if isinstance(error, SQLAlchemyError):
                 await self.db.rollback()
-            await self.db.refresh(run)
-            owned = await self.db.execute(
-                update(AnalysisRun)
-                .where(
-                    AnalysisRun.id == run.id,
-                    AnalysisRun.checkpoint["stream_attempt_id"].as_string()
-                    == self.stream_attempt_id,
+            async with journal.transaction(include_attention=True):
+                if isinstance(error, GeneratorExit):
+                    reason = "client_disconnected"
+                    stage = "paused"
+                elif isinstance(error, (AnalystStoppedError, asyncio.CancelledError)):
+                    reason = "user_stopped"
+                    stage = "paused"
+                elif isinstance(error, CheckpointDriftError):
+                    reason = "checkpoint_drift"
+                    stage = "needs_attention"
+                elif isinstance(error, CheckpointError):
+                    reason = "checkpoint_unavailable"
+                    stage = "needs_attention"
+                elif isinstance(error, SemanticValidationSelectionError):
+                    reason = "semantic_validation_selection_drift"
+                    stage = "needs_attention"
+                elif isinstance(error, TimeoutError):
+                    reason = "timeout"
+                    stage = "needs_attention"
+                else:
+                    reason = "execution_error"
+                    stage = "needs_attention"
+                checkpoint_updates: dict[str, Any] = {}
+                if isinstance(error, (CheckpointError, SemanticValidationSelectionError)):
+                    checkpoint_updates["resumable"] = False
+                persisted_error = (
+                    (str(error) or reason)[:4000]
+                    if self.execution_policy.diagnostics_enabled
+                    else reason
                 )
-                .values(updated_at=AnalysisRun.updated_at)
-                .returning(AnalysisRun.id)
-                .execution_options(synchronize_session=False)
-            )
-            if owned.scalar_one_or_none() is None:
-                return
-            await self.db.refresh(run)
-            if run.state in {"completed", "waiting_confirmation"}:
-                return
-            if isinstance(error, GeneratorExit):
-                reason = "client_disconnected"
-                stage = "paused"
-            elif isinstance(error, (AnalystStoppedError, asyncio.CancelledError)):
-                reason = "user_stopped"
-                stage = "paused"
-            elif isinstance(error, CheckpointDriftError):
-                reason = "checkpoint_drift"
-                stage = "needs_attention"
-            elif isinstance(error, CheckpointError):
-                reason = "checkpoint_unavailable"
-                stage = "needs_attention"
-            elif isinstance(error, SemanticValidationSelectionError):
-                reason = "semantic_validation_selection_drift"
-                stage = "needs_attention"
-            elif isinstance(error, TimeoutError):
-                reason = "timeout"
-                stage = "needs_attention"
-            else:
-                reason = "execution_error"
-                stage = "needs_attention"
-            checkpoint_updates: dict[str, Any] = {}
-            if isinstance(error, (CheckpointError, SemanticValidationSelectionError)):
-                checkpoint_updates["resumable"] = False
-            persisted_error = (
-                (str(error) or reason)[:4000]
-                if self.execution_policy.diagnostics_enabled
-                else reason
-            )
-            checkpoint_updates.update({"reason": reason, "last_error": persisted_error})
-            checkpoint = self.execution_policy.checkpoint_payload(
-                run.checkpoint,
-                updates=checkpoint_updates,
-            )
-            run.state = "needs_attention"
-            run.stage = stage
-            run.error = persisted_error
-            run.checkpoint = checkpoint
-            try:
-                await mark_standing_run_needs_attention(
-                    self.db,
-                    run,
-                    "这次持续分析未能完成，上一版可信结果保持不变",
-                    reason_code="standing_execution_failed",
+                checkpoint_updates.update({"reason": reason, "last_error": persisted_error})
+                checkpoint = self.execution_policy.checkpoint_payload(
+                    run.checkpoint,
+                    updates=checkpoint_updates,
                 )
-            except (StandingCompletionError, ValueError):
-                logger.exception(
-                    "Unable to update standing analysis failure state",
-                    run_id=str(run.id),
-                )
-            await self.db.commit()
+                run.state = "needs_attention"
+                run.stage = stage
+                run.error = persisted_error
+                run.checkpoint = checkpoint
+                try:
+                    await mark_standing_run_needs_attention(
+                        self.db,
+                        run,
+                        "这次持续分析未能完成，上一版可信结果保持不变",
+                        reason_code="standing_execution_failed",
+                    )
+                except (StandingCompletionError, ValueError):
+                    logger.exception(
+                        "Unable to update standing analysis failure state",
+                        run_id=str(run.id),
+                    )
+        except AnalysisRunOwnershipError:
+            return
         except SQLAlchemyError:
-            await self.db.rollback()
-            logger.exception("Unable to persist failed analysis run", run_id=str(run.id))
+            logger.exception("Unable to persist failed analysis run", run_id=str(journal.run_id))

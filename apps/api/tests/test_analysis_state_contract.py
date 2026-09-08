@@ -42,6 +42,7 @@ class AnalysisStateContractTests(unittest.IsolatedAsyncioTestCase):
             checkpoint={},
         )
         service = ExecutionService(AsyncMock())
+        service.db.execute.return_value = Mock(scalar_one_or_none=Mock(return_value=run.id))
         service._load_execution_inputs = AsyncMock(
             return_value=ExecutionInputs(
                 model_config=synthetic_model_config(),
