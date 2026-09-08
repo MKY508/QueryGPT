@@ -4,18 +4,20 @@ import asyncio
 import json
 import shutil
 from collections.abc import AsyncGenerator
+from contextlib import aclosing
 from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID, uuid4
 
+from anyio import CancelScope
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import desc, func, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sse_starlette.sse import EventSourceResponse
 
+from app.api.analysis_stream import AnalysisStreamResponse
 from app.db import get_db
 from app.db.tables import AnalysisRun, Conversation, Message, ProjectDataSource, SemanticEntry
 from app.i18n import get_progress_message, t
@@ -263,17 +265,35 @@ async def _chat_stream_response(
                 runtime_snapshot=runtime_snapshot,
             )
             accumulator.metadata["stream_attempt_id"] = stream_attempt_id
-            async for event in execution_service.execute_stream(
-                query=effective_query,
-                conversation_id=current_conversation_id,
-                exclude_message_id=UUID(str(user_message.id)) if user_message else None,
-                stop_checker=active_query_registry.stop_checker(query_key),
-                finalization_guard=active_query_registry.finalization_guard(query_key),
-                resume_run_id=resume_run_id,
-                correction_id=correction_id,
-            ):
-                yield event.to_sse()
-                accumulator.consume(event)
+            terminal_events: list[SSEEvent] = []
+            async with aclosing(
+                execution_service.execute_stream(
+                    query=effective_query,
+                    conversation_id=current_conversation_id,
+                    exclude_message_id=UUID(str(user_message.id)) if user_message else None,
+                    stop_checker=active_query_registry.stop_checker(query_key),
+                    finalization_guard=active_query_registry.finalization_guard(query_key),
+                    resume_run_id=resume_run_id,
+                    correction_id=correction_id,
+                )
+            ) as events:
+                async for event in events:
+                    accumulator.consume(event)
+                    if accumulator.has_error:
+                        terminal_events = [event]
+                        break
+                    elif (
+                        terminal_events
+                        or accumulator.has_result
+                        or event.data.get("stage") in {
+                            "completed",
+                            "waiting_confirmation",
+                            "needs_attention",
+                        }
+                    ):
+                        terminal_events.append(event)
+                    else:
+                        yield event.to_sse()
 
             if not accumulator.has_result and not accumulator.has_error:
                 incomplete_event = SSEEvent.error(
@@ -290,7 +310,7 @@ async def _chat_stream_response(
                     diagnostics=accumulator.metadata.get("diagnostics"),
                 )
                 accumulator.consume(incomplete_event)
-                yield incomplete_event.to_sse()
+                terminal_events = [incomplete_event]
 
             if (
                 accumulator.has_result
@@ -309,7 +329,7 @@ async def _chat_stream_response(
                     resumable=bool(accumulator.metadata.get("resumable")),
                 )
                 accumulator.consume(cancelled_event)
-                yield cancelled_event.to_sse()
+                terminal_events = [cancelled_event]
 
             metadata = accumulator.build_metadata()
             assistant_message = Message(
@@ -327,51 +347,46 @@ async def _chat_stream_response(
                     query=effective_query,
                     error_payload=accumulator.error_payload,
                 )
+            else:
+                mark_conversation_completed(
+                    conversation,
+                    runtime_snapshot=runtime_snapshot,
+                    query=effective_query,
+                    metadata=metadata,
+                )
+            # The result and its full message history become durable before
+            # publishing terminal events. A disconnect cannot split this commit.
+            with CancelScope(shield=True):
                 await db.commit()
                 assistant_message_persisted = True
                 await db.refresh(assistant_message)
-                return
 
-            mark_conversation_completed(
-                conversation,
-                runtime_snapshot=runtime_snapshot,
-                query=effective_query,
-                metadata=metadata,
-            )
-            await db.commit()
-            assistant_message_persisted = True
-            await db.refresh(assistant_message)
-
-            yield SSEEvent.done(str(current_conversation_id), str(assistant_message.id)).to_sse()
-        except asyncio.CancelledError:
-            mark_conversation_exception(conversation, t("error.cancelled", language))
-            run_result = await db.execute(
-                select(AnalysisRun)
-                .where(
-                    AnalysisRun.conversation_id == current_conversation_id,
-                    AnalysisRun.state == "needs_attention",
+            for event in terminal_events:
+                yield event.to_sse()
+            if not accumulator.has_error:
+                yield SSEEvent.done(str(current_conversation_id), str(assistant_message.id)).to_sse()
+        except (asyncio.CancelledError, GeneratorExit):
+            if assistant_message_persisted:
+                raise
+            with CancelScope(shield=True):
+                mark_conversation_exception(conversation, t("error.cancelled", language))
+                run_result = await db.execute(
+                    select(AnalysisRun)
+                    .where(
+                        AnalysisRun.conversation_id == current_conversation_id,
+                        AnalysisRun.state == "needs_attention",
+                    )
+                    .order_by(AnalysisRun.updated_at.desc())
                 )
-                .order_by(AnalysisRun.updated_at.desc())
-            )
-            interrupted_run = run_result.scalars().first()
-            if interrupted_run is not None:
-                await ensure_recovery_message(
-                    db,
-                    interrupted_run,
-                    reason="client_disconnected",
-                )
-            await db.commit()
-            yield SSEEvent.error(
-                "CANCELLED",
-                t("error.cancelled", language),
-                conversation_id=str(current_conversation_id) if current_conversation_id else None,
-                analysis_run_id=str(interrupted_run.id) if interrupted_run else None,
-                project_id=str(interrupted_run.project_id) if interrupted_run else None,
-                analysis_state="needs_attention" if interrupted_run else None,
-                resumable=bool((interrupted_run.checkpoint or {}).get("resumable"))
-                if interrupted_run
-                else False,
-            ).to_sse()
+                interrupted_run = run_result.scalars().first()
+                if interrupted_run is not None:
+                    await ensure_recovery_message(
+                        db,
+                        interrupted_run,
+                        reason="client_disconnected",
+                    )
+                await db.commit()
+            raise
         except ModelSelectionConflictError as exc:
             # The user's question was committed before request resolution. Keep
             # it visible, keep the existing investigation/model binding intact,
@@ -525,14 +540,7 @@ async def _chat_stream_response(
         finally:
             active_query_registry.release(query_key)
 
-    return EventSourceResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
-    )
+    return AnalysisStreamResponse(event_generator())
 
 
 @router.get("/stream")

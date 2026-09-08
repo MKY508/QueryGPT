@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 from collections.abc import AsyncGenerator, Callable
+from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from inspect import isawaitable
@@ -14,6 +15,7 @@ from typing import Any, cast
 from uuid import UUID, uuid4
 
 import structlog
+from anyio import CancelScope
 from pydantic import ValidationError as PydanticValidationError
 from pydantic_ai import UnexpectedModelBehavior
 from pydantic_ai.exceptions import ToolRetryError
@@ -67,6 +69,7 @@ from app.services.project_context import (
     resolve_confirmed_ambiguity,
 )
 from app.services.result_filters import validate_business_rule_strategy_definition
+from app.services.run_control import AnalystStoppedError
 from app.services.semantic_revisions import (
     SemanticRevisionConflictError,
     append_semantic_revision,
@@ -90,7 +93,7 @@ class SemanticValidationSelectionError(ValueError):
     """Raised when a revision-bound batch validation selection has drifted."""
 
 
-class _AnalysisFinalizationStoppedError(RuntimeError):
+class _AnalysisFinalizationStoppedError(AnalystStoppedError):
     """Stop won the terminal-state claim before a successful result was durable."""
 
 
@@ -2810,57 +2813,60 @@ class ExecutionService:
                 analysis_run_id=str(run.id) if run else None,
                 resumed=resume_run_id is not None,
             )
-            async for event in engine.execute(
-                query=effective_query,
-                history=inputs.history,
-                stop_checker=stop_checker,
-            ):
-                if run:
-                    event.data["analysis_run_id"] = str(run.id)
-                    event.data["project_id"] = str(run.project_id)
-                    event.data["resumable"] = bool((run.checkpoint or {}).get("resumable"))
-                buffer_event = bool(buffered_terminal_events)
-                if run and event.type.value == "progress":
-                    next_stage = str(event.data.get("stage") or run.stage)
-                    product_states = {
-                        "understanding",
-                        "waiting_confirmation",
-                        "investigating",
-                        "completed",
-                        "needs_attention",
-                    }
-                    if next_stage in {"waiting_confirmation", "completed", "needs_attention"}:
+            async with aclosing(
+                engine.execute(
+                    query=effective_query,
+                    history=inputs.history,
+                    stop_checker=stop_checker,
+                )
+            ) as events:
+                async for event in events:
+                    if run:
+                        event.data["analysis_run_id"] = str(run.id)
+                        event.data["project_id"] = str(run.project_id)
+                        event.data["resumable"] = bool((run.checkpoint or {}).get("resumable"))
+                    buffer_event = bool(buffered_terminal_events)
+                    if run and event.type.value == "progress":
+                        next_stage = str(event.data.get("stage") or run.stage)
+                        product_states = {
+                            "understanding",
+                            "waiting_confirmation",
+                            "investigating",
+                            "completed",
+                            "needs_attention",
+                        }
+                        if next_stage in {"waiting_confirmation", "completed", "needs_attention"}:
+                            buffer_event = True
+                        else:
+                            run.stage = next_stage
+                            run.state = next_stage if next_stage in product_states else run.state
+                            await self.db.commit()
+                    if run and event.type.value == "result":
+                        if (event.data.get("report") or {}).get("status") == "needs_data":
+                            event.data["resumable"] = True
+                        event.data["confirmed_corrections"] = (
+                            [confirmation_receipt]
+                            if confirmation_receipt
+                            and confirmation_receipt.get("applied")
+                            and not confirmation_receipt.get("conflict")
+                            else []
+                        )
+                        project_result_data = dict(event.data)
                         buffer_event = True
+                    elif event.type.value == "result" and not claim_finalization():
+                        raise _AnalysisFinalizationStoppedError("分析已在结果发布前停止")
+                    if run and event.type.value == "python_image":
+                        image = event.data.get("image")
+                        if image:
+                            project_python_images.append(str(image))
+                    if run and event.type.value == "visualization":
+                        project_visualization = event.data.get("chart")
+                    if run and buffer_event:
+                        buffered_terminal_events.append(event)
                     else:
-                        run.stage = next_stage
-                        run.state = next_stage if next_stage in product_states else run.state
-                        await self.db.commit()
-                if run and event.type.value == "result":
-                    if (event.data.get("report") or {}).get("status") == "needs_data":
-                        event.data["resumable"] = True
-                    event.data["confirmed_corrections"] = (
-                        [confirmation_receipt]
-                        if confirmation_receipt
-                        and confirmation_receipt.get("applied")
-                        and not confirmation_receipt.get("conflict")
-                        else []
-                    )
-                    project_result_data = dict(event.data)
-                    buffer_event = True
-                elif event.type.value == "result" and not claim_finalization():
-                    raise _AnalysisFinalizationStoppedError("分析已在结果发布前停止")
-                if run and event.type.value == "python_image":
-                    image = event.data.get("image")
-                    if image:
-                        project_python_images.append(str(image))
-                if run and event.type.value == "visualization":
-                    project_visualization = event.data.get("chart")
-                if run and buffer_event:
-                    buffered_terminal_events.append(event)
-                else:
-                    public_event = self._public_event(event)
-                    if public_event is not None:
-                        yield public_event
+                        public_event = self._public_event(event)
+                        if public_event is not None:
+                            yield public_event
             # Only the runtime's successful Agent.run marks provider health.
             # Some investigations can stop for deterministic confirmation
             # before any model request, so iterator completion alone is not
@@ -2896,8 +2902,9 @@ class ExecutionService:
             elif run and buffered_terminal_events:
                 raise RuntimeError("调查结束前没有生成可持久化的最终结果")
 
-        except asyncio.CancelledError as exc:
-            await self._mark_run_needs_attention(run, exc)
+        except (asyncio.CancelledError, GeneratorExit) as exc:
+            with CancelScope(shield=True):
+                await self._mark_run_needs_attention(run, exc)
             raise
 
         except _AnalysisFinalizationStoppedError as exc:
@@ -3039,7 +3046,7 @@ class ExecutionService:
 
         except RuntimeError as exc:
             # Runtime errors from execution engine
-            if type(exc).__name__ == "AnalystStoppedError":
+            if isinstance(exc, AnalystStoppedError):
                 await self._mark_run_needs_attention(run, exc)
                 yield SSEEvent.error(
                     "CANCELLED",
@@ -3069,8 +3076,9 @@ class ExecutionService:
                 )
                 return
             except asyncio.CancelledError as cancellation:
-                await self.db.rollback()
-                await self._mark_run_needs_attention(run, cancellation)
+                with CancelScope(shield=True):
+                    await self.db.rollback()
+                    await self._mark_run_needs_attention(run, cancellation)
                 raise
             if fallback is not None:
                 fallback_result, persistence = fallback
@@ -3247,8 +3255,10 @@ class ExecutionService:
             await self.db.refresh(run)
             if run.state in {"completed", "waiting_confirmation"}:
                 return
-            error_name = type(error).__name__
-            if error_name == "AnalystStoppedError" or isinstance(error, asyncio.CancelledError):
+            if isinstance(error, GeneratorExit):
+                reason = "client_disconnected"
+                stage = "paused"
+            elif isinstance(error, (AnalystStoppedError, asyncio.CancelledError)):
                 reason = "user_stopped"
                 stage = "paused"
             elif isinstance(error, CheckpointDriftError):

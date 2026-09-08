@@ -7,7 +7,7 @@ import contextlib
 import json
 import re
 import threading
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any, Literal, cast
 
 import structlog
@@ -77,7 +77,12 @@ from app.services.python_sandbox import PythonSandbox
 from app.services.result_filters import (
     resolve_confirmed_rule_strategy,
 )
-from app.services.run_control import AnalystStoppedError, run_with_controls
+from app.services.run_control import (
+    AnalystStoppedError,
+    next_task_progress,
+    owned_task,
+    run_with_controls,
+)
 
 logger = structlog.get_logger()
 
@@ -767,16 +772,13 @@ class PydanticAnalystRuntime:
                 async with model_session(self.model_config, model=self._model) as model:
                     return await self.agent.run(prompt, deps=self.deps, model=model)
 
-        try:
-            result = await run_with_controls(
-                run_with_serial_tool_state,
-                timeout=self.timeout,
-                stop_checker=stop_checker,
-            )
-            self.model_request_succeeded = True
-            return result.output
-        finally:
-            self.deps.python_sandbox.cleanup()
+        result = await run_with_controls(
+            run_with_serial_tool_state,
+            timeout=self.timeout,
+            stop_checker=stop_checker,
+        )
+        self.model_request_succeeded = True
+        return result.output
 
     async def execute(
         self,
@@ -784,7 +786,24 @@ class PydanticAnalystRuntime:
         query: str,
         history: list[dict[str, Any]] | None = None,
         stop_checker: Any | None = None,
-    ):
+    ) -> AsyncGenerator[SSEEvent, None]:
+        """Own the investigation and workspace until every child task has settled."""
+        try:
+            async with contextlib.aclosing(
+                self._execute(query=query, history=history, stop_checker=stop_checker)
+            ) as events:
+                async for event in events:
+                    yield event
+        finally:
+            self.deps.python_sandbox.cleanup()
+
+    async def _execute(
+        self,
+        *,
+        query: str,
+        history: list[dict[str, Any]] | None,
+        stop_checker: Any | None,
+    ) -> AsyncGenerator[SSEEvent, None]:
         self._prepare_query_context(query)
         if self.resume_state:
             yield self._progress_event("understanding", "restore_saved_steps")
@@ -808,17 +827,14 @@ class PydanticAnalystRuntime:
             )
             self.last_report = report
             yield self._progress_event("waiting_confirmation", "confirmation_required")
-            try:
-                yield SSEEvent.result(
-                    _report_markdown(report, self.language),
-                    report=report.model_dump(),
-                    analysis_state="waiting_confirmation",
-                    tool_history=self.deps.tool_history,
-                    knowledge_proposals=self.deps.knowledge_proposals,
-                    semantic_engine=self.deps.semantic_adapter.status,
-                )
-            finally:
-                self.deps.python_sandbox.cleanup()
+            yield SSEEvent.result(
+                _report_markdown(report, self.language),
+                report=report.model_dump(),
+                analysis_state="waiting_confirmation",
+                tool_history=self.deps.tool_history,
+                knowledge_proposals=self.deps.knowledge_proposals,
+                semantic_engine=self.deps.semantic_adapter.status,
+            )
             return
 
         recent_history = history or []
@@ -895,34 +911,16 @@ class PydanticAnalystRuntime:
                 f"{json.dumps(system_verified_result, ensure_ascii=False, default=str)}\n"
                 "</system_verified_result>"
             )
-        agent_task = asyncio.create_task(self._run_agent(prompt, stop_checker))
-        try:
-            while not agent_task.done():
-                try:
-                    milestone = await asyncio.wait_for(
-                        self.deps.progress_queue.get(),
-                        timeout=0.1,
-                    )
-                except TimeoutError:
-                    continue
+        async with owned_task(lambda: self._run_agent(prompt, stop_checker)) as agent_task:
+            while (
+                milestone := await next_task_progress(agent_task, self.deps.progress_queue)
+            ) is not None:
                 yield SSEEvent.progress(
                     milestone["stage"],
                     milestone["message"],
                     step=milestone["step"],
                 )
-            report = await agent_task
-            while not self.deps.progress_queue.empty():
-                milestone = self.deps.progress_queue.get_nowait()
-                yield SSEEvent.progress(
-                    milestone["stage"],
-                    milestone["message"],
-                    step=milestone["step"],
-                )
-        finally:
-            if not agent_task.done():
-                agent_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await agent_task
+            report = agent_task.result()
         if self.deps.protected_results:
             if len(self.deps.protected_results) != 1:
                 raise RuntimeError("系统执行产生了多个受保护结果，调查不能继续")
@@ -1008,48 +1006,45 @@ class PydanticAnalystRuntime:
             ),
             None,
         )
-        try:
-            correction_application = next(
-                (
-                    item
-                    for item in reversed(self.deps.tool_history)
-                    if item.get("kind") == "correction_application"
-                ),
-                None,
+        correction_application = next(
+            (
+                item
+                for item in reversed(self.deps.tool_history)
+                if item.get("kind") == "correction_application"
+            ),
+            None,
+        )
+        yield SSEEvent.result(
+            _report_markdown(report, self.language),
+            sql=last_sql,
+            python=last_python,
+            data=data_preview,
+            rows_count=rows_count,
+            truncated=source_truncated,
+            preview_truncated=preview_truncated,
+            data_note=data_note,
+            result_name=last_data_name,
+            report=report.model_dump(),
+            analysis_state=state,
+            tool_history=self.deps.tool_history,
+            knowledge_proposals=self.deps.knowledge_proposals,
+            semantic_engine=self.deps.semantic_adapter.status,
+            correction_application=correction_application,
+        )
+        if report.visualization and report.visualization.type in {
+            "bar",
+            "horizontal_bar",
+            "line",
+            "pie",
+            "area",
+            "scatter",
+        }:
+            yield SSEEvent.visualization(
+                report.visualization.type,
+                report.visualization.model_dump(),
             )
-            yield SSEEvent.result(
-                _report_markdown(report, self.language),
-                sql=last_sql,
-                python=last_python,
-                data=data_preview,
-                rows_count=rows_count,
-                truncated=source_truncated,
-                preview_truncated=preview_truncated,
-                data_note=data_note,
-                result_name=last_data_name,
-                report=report.model_dump(),
-                analysis_state=state,
-                tool_history=self.deps.tool_history,
-                knowledge_proposals=self.deps.knowledge_proposals,
-                semantic_engine=self.deps.semantic_adapter.status,
-                correction_application=correction_application,
-            )
-            if report.visualization and report.visualization.type in {
-                "bar",
-                "horizontal_bar",
-                "line",
-                "pie",
-                "area",
-                "scatter",
-            }:
-                yield SSEEvent.visualization(
-                    report.visualization.type,
-                    report.visualization.model_dump(),
-                )
-            for output in self.deps.python_output:
-                if output:
-                    yield SSEEvent.python_output(output)
-            for image in self.deps.python_images:
-                yield SSEEvent.python_image(image)
-        finally:
-            self.deps.python_sandbox.cleanup()
+        for output in self.deps.python_output:
+            if output:
+                yield SSEEvent.python_output(output)
+        for image in self.deps.python_images:
+            yield SSEEvent.python_image(image)

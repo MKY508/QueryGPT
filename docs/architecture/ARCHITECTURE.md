@@ -18,7 +18,7 @@ ReceiptBI 不是“模型先写一段 SQL，再固定执行一段 Python”的�
 | 边界 | 当前落地 | 后续替换工作 |
 |---|---|---|
 | 模型引擎 | `model_engine.py` 的 `model_session` 按任务管理连接池；显式协议选择 Chat Completions、Responses 或 Anthropic 适配器，支持借用外部 `Model` / HTTP 客户端 | 供应商能力发现与结构化输出验证 |
-| 任务控制 | `run_control.py` 统一实际经过时间、停止检查与子任务取消；不引入另一套模型循环 | 执行服务、检查点与前端运行状态收敛到一个任务合同 |
+| 任务控制 | `run_control.py` 持有并收束子任务，统一截止时间与停止检查；进度等待由事件或任务完成唤醒 | 执行服务、检查点与前端运行状态收敛到一个任务合同 |
 | 数据工具 | `query_compiler.py` 编译、`file_query.py` 读取、`result_profile.py` 校验结果；Agent 与保存方法执行器复用同一实现 | 收敛来源查询的取消和资源生命周期 |
 | 工具与会话 | `analyst/toolsets.py` 用 PydanticAI 工具集组合 15 个独立工具；`session.py` 持有当前调查状态、进度与检查点；`report_validation.py` 独立验收报告 | 检查点恢复仍在运行时中，需与任务事件合同一起收敛 |
 | 数据合同 | `models/analysis.py` 定义报告与图表；`models/query.py` 定义工具查询输入；数据模块不导入 Agent 或模型 SDK | 任务事件与持久化运行状态统一 |
@@ -31,6 +31,8 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 
 调查、报告草稿、问题建议、语义文案和连接检查都通过 `model_session` 调用模型。连接池只在实际调用时创建，同一任务内的工具轮次复用；完成、异常、超时或取消后释放。等待业务确认和只创建建议回调不会分配连接。调用方注入的模型或 HTTP 客户端仍由调用方关闭，不跨任务缓存凭证。
 
+调查流逐层拥有下层资源：`AnalysisStreamResponse` 关闭聊天流，聊天流关闭执行流，执行流关闭运行时，运行时先收束模型任务再清理 Python 工作区。提前关闭、处理事件失败与 ASGI 断连都经过同一释放链；异步清理和中断记录不受 ASGI 已取消作用域再次打断。项目结果和完整聊天记录保存后才发布终态事件，保存失败不发布成功结果；发布后断连不改写已保存的会话状态。任务状态与检查点仍使用现有合同，尚未统一重构。
+
 ### 成熟实现的取舍依据
 
 - [Pi agent loop](https://github.com/badlogic/pi-mono/blob/main/packages/agent/src/agent-loop.ts)：在模型调用边界注入模型/流函数，业务消息不直接绑定某家 SDK。这里采用依赖注入原则，不复制 TypeScript 循环。
@@ -40,6 +42,7 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 - [PydanticAI models](https://pydantic.dev/docs/ai/models/openai/)：直接复用现有依赖中的协议、工具循环、结构化输出与 DeepSeek profile，没有拷贝第三方实现到仓库。
 - [PydanticAI 连接所有权](https://pydantic.dev/docs/ai/models/overview/#http-client-lifecycle) 与 [HTTPX 异步连接池](https://www.python-httpx.org/async/#opening-and-closing-clients)：采用任务作用域和显式借用，复用已安装 PydanticAI 1.107.1 的客户端工厂，不在工具循环里逐轮建连接。
 - [PydanticAI toolsets](https://pydantic.dev/docs/ai/tools-toolsets/toolsets/) 与 [dependencies](https://pydantic.dev/docs/ai/core-concepts/dependencies/)：工具按项目语义、来源查询、结果、关系、知识和可选 Python 六组组合；每次调用通过 `RunContext[AnalystSession]` 取得当前会话，不捕获创建 Agent 时的运行时。工具集保留超时和顺序执行约束，关闭的 Python 能力不向模型发布。
+- [Python aclosing](https://docs.python.org/3/library/contextlib.html#aclosing) 与 [AnyIO finalization](https://anyio.readthedocs.io/en/stable/cancellation.html#finalization)：显式关闭提前结束的生成器，只在退出清理期间屏蔽作用域取消；SSE 编码、断连监听和心跳继续复用现有 sse-starlette。
 - 接入参数以 [Groq](https://console.groq.com/docs/openai) 与 [百炼](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope) 官方说明为准（核对日期：2026-09-08）。
 
 ### 边界验证
@@ -50,6 +53,8 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 - `.venv/bin/python -m unittest tests.test_analyst_toolsets -q`：工具不导入模型引擎或调查运行时；同一 Agent 并发执行两个独立项目的文件查询、汇总、校验和报告；检查点快照隔离、不可恢复状态保持和关闭能力不发布。
 - `.venv/bin/python -m unittest tests.test_model_session tests.test_model_session_consumers -q`：真实 SDK 配合离线 HTTP transport，检查三种协议的连接复用与释放、失败/停止/超时/取消、外部资源所有权、待确认调查零连接、并发建议各自持有连接。
 - `.venv/bin/python -m unittest tests.test_model_configuration -q`：保存配置经解析器分别进入执行和连接检查，验证供应商、协议、地址、请求头及查询参数；检查配置不可变与普通/诊断快照的字段边界。
+
+- `.venv/bin/python -m unittest tests.test_analysis_stream_lifetime -q`：离线 SDK 请求的提前关闭、事件投影异常、任务与作用域取消；ASGI 发送中和等待事件时断连的清理顺序；聊天提交前不发布终态，发布后断连保留完成状态。
 
 以上为离线边界验证，不代替全部业务回归或云端实测。
 
