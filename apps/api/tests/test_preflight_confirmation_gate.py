@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -14,10 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, Conversation, Project, ProjectDataSource
 from app.models import SSEEventType
+from app.models.analysis import AnalysisReport
 from app.services import analyst_runtime
-from app.services.analyst_runtime import AnalysisReport, PydanticAnalystRuntime
+from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.execution import ExecutionService
 from app.services.project_context import ProjectRuntimeContext
+from tests.model_fixtures import synthetic_model_config
 
 REFUND_AMBIGUITY = {
     "key": "revenue_refund_policy",
@@ -33,7 +36,7 @@ class CompletedModelProbe:
     def __init__(self) -> None:
         self.calls = 0
 
-    async def run(self, prompt: str, *, deps: Any) -> SimpleNamespace:
+    async def run(self, prompt: str, *, deps: Any, model: Any) -> SimpleNamespace:
         del prompt, deps
         self.calls += 1
         return SimpleNamespace(
@@ -93,9 +96,9 @@ def _runtime(
     knowledge_key: str = REFUND_AMBIGUITY["key"],
     language: str = "zh",
 ) -> tuple[PydanticAnalystRuntime, CompletedModelProbe]:
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _config: TestModel())
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=_project_context(
             knowledge_state=knowledge_state,
             ambiguity=ambiguity,
@@ -369,11 +372,11 @@ async def test_generated_gate_resumes_same_run_but_rejects_unsupported_completio
             "summary": "同一项调查已经继续完成。",
         },
     )
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _config: model)
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(model))
     service = ExecutionService(db_session, project_id=project.id)
 
     class Inputs:
-        model_config: dict = {}
+        model_config = synthetic_model_config()
         db_config = None
         history: list[dict] = []
         language = "zh"

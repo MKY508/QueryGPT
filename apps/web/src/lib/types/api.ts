@@ -33,7 +33,7 @@ export type {
 export type DataRow = Record<string, string | number | boolean | null>;
 
 export interface ModelExtraOptions {
-  api_format?: "openai_compatible" | "anthropic_native" | "ollama_local" | "custom";
+  api_format?: "openai_compatible" | "openai_responses" | "anthropic_native" | "ollama_local" | "custom";
   headers?: Record<string, string>;
   query_params?: Record<string, string>;
   api_key_optional?: boolean;
@@ -106,7 +106,7 @@ export interface ConfiguredModel extends ModelSummary {
 }
 
 export interface ModelDiagnostics {
-  resolved_provider?: string;
+  source_provider?: string;
   resolved_base_url?: string;
   api_format?: string;
   api_key_required?: boolean;
@@ -130,7 +130,6 @@ export interface ExecutionContextSummary {
   model_name?: string;
   model_identifier?: string;
   source_provider?: string;
-  resolved_provider?: string;
   provider_summary?: string;
   connection_id?: string;
   connection_name?: string;

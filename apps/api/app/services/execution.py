@@ -58,6 +58,7 @@ from app.services.metric_candidate_learning import learn_verified_aggregate_metr
 from app.services.model_runtime import (
     ModelCredentialError,
     ModelRuntimeConfigurationError,
+    ResolvedModelConfig,
     categorize_model_exception,
 )
 from app.services.project_context import (
@@ -583,7 +584,7 @@ def _required_playbook_receipt_is_satisfied(
 
 @dataclass(frozen=True)
 class ExecutionInputs:
-    model_config: dict[str, Any]
+    model_config: ResolvedModelConfig
     db_config: dict[str, Any] | None
     history: list[dict[str, Any]]
     language: str = "zh"
@@ -796,7 +797,7 @@ class ExecutionService:
     async def _get_model_record(self) -> Model | None:
         return await self.resolver.get_model_record()
 
-    async def _get_model_config(self) -> dict[str, Any]:
+    async def _get_model_config(self) -> ResolvedModelConfig:
         """获取模型配置"""
         return await self.resolver.get_model_config()
 
@@ -861,7 +862,7 @@ class ExecutionService:
         logger.info(
             "Execution inputs resolved",
             conversation_id=str(conversation_id),
-            model=model_config.get("model"),
+            model=model_config.model,
             connection_driver=db_config.get("driver") if db_config else None,
             history_count=len(history),
         )
@@ -1487,18 +1488,8 @@ class ExecutionService:
     async def get_runtime_snapshot(self) -> dict[str, Any]:
         model_config = await self._get_model_config()
         connection = await self._get_connection_record()
-        source_provider = model_config.get("source_provider")
-        resolved_provider = model_config.get("resolved_provider") or model_config.get("provider")
-        api_format = model_config.get("api_format")
-        provider_summary: str | None
-        if source_provider and resolved_provider and source_provider != resolved_provider:
-            provider_summary = f"{source_provider} -> {resolved_provider} · {api_format}"
-        else:
-            provider_summary = f"{source_provider} · {api_format}" if source_provider else None
-
         snapshot: dict[str, Any] = {
-            "model_id": model_config.get("model_id"),
-            "model_name": model_config.get("display_name"),
+            **model_config.public_snapshot(diagnostics=self.execution_policy.diagnostics_enabled),
             "connection_id": str(connection.id) if connection else None,
             "connection_name": connection.name if connection else None,
             "context_rounds": self.context_rounds,
@@ -1506,14 +1497,9 @@ class ExecutionService:
         if self.execution_policy.diagnostics_enabled:
             snapshot.update(
                 {
-                    "model_identifier": model_config.get("model"),
-                    "source_provider": source_provider,
-                    "resolved_provider": resolved_provider,
-                    "provider_summary": provider_summary,
                     "connection_driver": connection.driver if connection else None,
                     "connection_host": connection.host if connection else None,
                     "database_name": connection.database_name if connection else None,
-                    "api_format": api_format,
                 }
             )
         if self.project_id:
@@ -2820,7 +2806,7 @@ class ExecutionService:
             logger.info(
                 "Starting engine execution",
                 conversation_id=str(conversation_id),
-                model=inputs.model_config.get("model"),
+                model=inputs.model_config.model,
                 analysis_run_id=str(run.id) if run else None,
                 resumed=resume_run_id is not None,
             )

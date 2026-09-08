@@ -12,16 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from app.models.query import StructuredQueryFilter, StructuredQueryMetric, StructuredQuerySort
 from app.models.workspace import AnalysisPlaybookStructuredQueryPlan
-from app.services.analyst_runtime import (
-    StructuredQueryFilter,
-    StructuredQueryMetric,
-    StructuredQuerySort,
-    _compile_structured_query,
-    _query_project_file_rows,
-    _validate_read_only,
-)
 from app.services.database import create_database_manager
+from app.services.file_query import query_project_file_rows
+from app.services.query_compiler import compile_structured_query, validate_read_only
 
 
 class StructuredQueryExecutionError(ValueError):
@@ -106,7 +101,7 @@ async def execute_structured_query(
 
     try:
         metrics, filters, sort = _runtime_plan_models(plan)
-        compiled_sql, query_plan = _compile_structured_query(
+        compiled_sql, query_plan = compile_structured_query(
             source,
             table=plan.table,
             dimensions=list(plan.dimensions),
@@ -115,7 +110,7 @@ async def execute_structured_query(
             sort=sort,
             limit=plan.limit,
         )
-        _validate_read_only(compiled_sql)
+        validate_read_only(compiled_sql)
     except (TypeError, ValueError) as exc:
         raise StructuredQueryExecutionError(
             f"the structured query no longer matches the bound schema: {exc}"
@@ -133,7 +128,7 @@ async def execute_structured_query(
             connection_holder: dict[str, Any] = {}
             query_task = asyncio.create_task(
                 asyncio.to_thread(
-                    _query_project_file_rows,
+                    query_project_file_rows,
                     [source],
                     compiled_sql,
                     project_dir,

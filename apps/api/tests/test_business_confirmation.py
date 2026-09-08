@@ -32,6 +32,7 @@ from app.services.correction_targets import discover_report_correction_targets
 from app.services.data_preflight import fingerprint_file
 from app.services.execution import ExecutionService
 from app.services.semantic_revisions import append_semantic_revision
+from tests.model_fixtures import synthetic_model_config
 
 
 async def _seed_confirmation_run(
@@ -638,7 +639,7 @@ async def test_confirmation_continues_and_completes_the_same_run(
     service = ExecutionService(db_session, project_id=project.id)
 
     class Inputs:
-        model_config = {"model": "test"}
+        model_config = synthetic_model_config(model="test")
         history = [
             {
                 "role": "assistant",

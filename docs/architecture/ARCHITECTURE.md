@@ -13,6 +13,46 @@ ReceiptBI 不是“模型先写一段 SQL，再固定执行一段 Python”的�
 
 这套分工允许模型能力有差异：模型影响调查深度和方向，系统仍掌握数据读取、字段绑定、只读执行、关系启用、证据记录与完成条件。
 
+## Harness 重构边界
+
+| 边界 | 当前落地 | 后续替换工作 |
+|---|---|---|
+| 模型引擎 | `model_engine.py` 的 `model_session` 按任务管理连接池；显式协议选择 Chat Completions、Responses 或 Anthropic 适配器，支持借用外部 `Model` / HTTP 客户端 | 供应商能力发现与结构化输出验证 |
+| 任务控制 | `run_control.py` 统一实际经过时间、停止检查与子任务取消；不引入另一套模型循环 | 执行服务、检查点与前端运行状态收敛到一个任务合同 |
+| 数据工具 | `query_compiler.py` 编译、`file_query.py` 读取、`result_profile.py` 校验结果；Agent 与保存方法执行器复用同一实现 | 收敛来源查询的取消和资源生命周期 |
+| 工具与会话 | `analyst/toolsets.py` 用 PydanticAI 工具集组合 15 个独立工具；`session.py` 持有当前调查状态、进度与检查点；`report_validation.py` 独立验收报告 | 检查点恢复仍在运行时中，需与任务事件合同一起收敛 |
+| 数据合同 | `models/analysis.py` 定义报告与图表；`models/query.py` 定义工具查询输入；数据模块不导入 Agent 或模型 SDK | 任务事件与持久化运行状态统一 |
+
+这不是“已经可随意切换 Codex/Hermes/Pi 引擎”的声明。当前直接复用已安装的 PydanticAI；外部编程 Agent 没有接入，也没有新增运行时依赖。
+
+`model_runtime.py` 将已选服务解析为唯一的 `ResolvedModelConfig`：供应商身份与 API 协议分开，地址只规范化一次，凭证及请求参数在任务内固定。执行服务、建议生成与连接检查直接传递此对象；模型引擎不再猜默认值。普通运行快照只含服务名称与身份，诊断按需追加模型标识、供应商和协议。
+
+Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的百炼工作空间地址。未做供应商真实 API 调用，离线 SDK 测试不能证明账号、配额或具体模型在线可用。
+
+调查、报告草稿、问题建议、语义文案和连接检查都通过 `model_session` 调用模型。连接池只在实际调用时创建，同一任务内的工具轮次复用；完成、异常、超时或取消后释放。等待业务确认和只创建建议回调不会分配连接。调用方注入的模型或 HTTP 客户端仍由调用方关闭，不跨任务缓存凭证。
+
+### 成熟实现的取舍依据
+
+- [Pi agent loop](https://github.com/badlogic/pi-mono/blob/main/packages/agent/src/agent-loop.ts)：在模型调用边界注入模型/流函数，业务消息不直接绑定某家 SDK。这里采用依赖注入原则，不复制 TypeScript 循环。
+- [Pi contracts](https://github.com/badlogic/pi-mono/blob/main/packages/agent/src/types.ts) 与 [模型类型](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/types.ts)：分别定义供应商、协议、配置、工具和循环。ReceiptBI 使用领域类型传递配置与结果，查询及报告 API 不反向依赖分析 Agent；未复制第三方源码。
+- [Codex App Server](https://openai.com/index/unlocking-the-codex-harness/)：线程、轮次、事件分别有明确生命周期，客户端消费稳定事件。作为后续任务合同的参考，当前未移植其 JSON-RPC 服务。
+- [Hermes agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop)：调用可中断，工具结果回到任务状态。ReceiptBI 共享可变分析状态的工具仍顺序执行，不照搬并发策略。
+- [PydanticAI models](https://pydantic.dev/docs/ai/models/openai/)：直接复用现有依赖中的协议、工具循环、结构化输出与 DeepSeek profile，没有拷贝第三方实现到仓库。
+- [PydanticAI 连接所有权](https://pydantic.dev/docs/ai/models/overview/#http-client-lifecycle) 与 [HTTPX 异步连接池](https://www.python-httpx.org/async/#opening-and-closing-clients)：采用任务作用域和显式借用，复用已安装 PydanticAI 1.107.1 的客户端工厂，不在工具循环里逐轮建连接。
+- [PydanticAI toolsets](https://pydantic.dev/docs/ai/tools-toolsets/toolsets/) 与 [dependencies](https://pydantic.dev/docs/ai/core-concepts/dependencies/)：工具按项目语义、来源查询、结果、关系、知识和可选 Python 六组组合；每次调用通过 `RunContext[AnalystSession]` 取得当前会话，不捕获创建 Agent 时的运行时。工具集保留超时和顺序执行约束，关闭的 Python 能力不向模型发布。
+- 接入参数以 [Groq](https://console.groq.com/docs/openai) 与 [百炼](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope) 官方说明为准（核对日期：2026-09-08）。
+
+### 边界验证
+
+在 `apps/api` 按修改边界选择运行：
+
+- `.venv/bin/python -m unittest tests.test_analysis_module_boundaries -q`：数据模块不加载模型 SDK；中文路径下真实 DuckDB 查询与结果校验；注入 TestModel 后的产品报告输出。
+- `.venv/bin/python -m unittest tests.test_analyst_toolsets -q`：工具不导入模型引擎或调查运行时；同一 Agent 并发执行两个独立项目的文件查询、汇总、校验和报告；检查点快照隔离、不可恢复状态保持和关闭能力不发布。
+- `.venv/bin/python -m unittest tests.test_model_session tests.test_model_session_consumers -q`：真实 SDK 配合离线 HTTP transport，检查三种协议的连接复用与释放、失败/停止/超时/取消、外部资源所有权、待确认调查零连接、并发建议各自持有连接。
+- `.venv/bin/python -m unittest tests.test_model_configuration -q`：保存配置经解析器分别进入执行和连接检查，验证供应商、协议、地址、请求头及查询参数；检查配置不可变与普通/诊断快照的字段边界。
+
+以上为离线边界验证，不代替全部业务回归或云端实测。
+
 ## 当前组件
 
 ```mermaid
@@ -54,7 +94,7 @@ flowchart TD
 
 - `apps/api/app/api/v1/projects.py` 提供项目、来源、预检、语义知识、纠正、分析运行和产物接口。
 - `apps/api/app/services/execution.py` 组装模型、项目上下文和分析运行时。
-- `apps/api/app/services/analyst_runtime.py` 实现 PydanticAI 调查循环及 `query_source_data`、Python、关系验证和 `validate_result` 等工具。
+- `apps/api/app/services/analyst_runtime.py` 负责调查指令、预执行、恢复和产品事件；工具组合、会话状态和报告验收位于 `services/analyst/`，详见上方 Harness 边界。
 - `apps/api/app/services/analysis_playbook_runner.py` 执行 AnalysisPlaybook v3 的窄安全通道：只接受单来源、单类型化查询和最终校验，绑定当前数据后生成不含 SQL 的执行回执；回执把方法形状、当前来源、结果、画像和校验相互绑定。
 - `apps/api/app/services/structured_query.py` 承担该通道复用的结构化查询校验、只读编译与当前来源执行；分析就绪的文件通过 DuckDB 查询，数据库走对应只读适配器。保存的方法只携带声明式查询意图，不保存物理来源 ID 或编译后的 SQL。
 - `apps/api/app/services/project_context.py` 只加载当前项目的数据源、候选/已确认/锁定知识与可执行关系，避免跨项目串用。
@@ -70,7 +110,7 @@ flowchart TD
 ### 数据执行与分析层
 
 - `apps/api/app/services/data_preflight.py` 对文件执行确定性预检和可重复清洗，保留原件并生成工作副本。
-- `apps/api/app/services/analyst_runtime.py` 为分析就绪的文件建立受限 DuckDB 视图，聚合、筛选和 Join 在本地执行，模型和前端只接收有界结果；这不等于当前所有 CSV/XLSX 预检都已经改成流式 DuckDB 导入。
+- `apps/api/app/services/file_query.py` 为分析就绪的文件建立受限 DuckDB 表，聚合、筛选和 Join 在本地执行，模型和前端只接收有界结果；这不等于当前所有 CSV/XLSX 预检都已经改成流式 DuckDB 导入。
 - `apps/api/app/services/database_value_preflight.py` 在严格表、列、行、字节和时间预算内对数据库做只读抽样画像；它优先使用真实主键/唯一约束提出粒度候选，并把声明外键保留为仍需值验证的关系依据，同时抑制敏感、标识符和高基数原值。
 - `apps/api/app/services/database.py` 与 `database_adapters.py` 统一数据库只读访问，并在 SQLite、MySQL、PostgreSQL 可用时读取表类型、字段可空性、主键、外键与唯一约束；获取不到的约束会明确标记为不可用。当前 MySQL、PostgreSQL 和源码模式 SQLite 仍由 Python 适配器执行；取消事件会中断活动查询，PostgreSQL 使用驱动取消，MySQL 使用独立控制连接终止当前查询并在失败时关闭目标连接。
 - `crates/sqlite-executor-core/` 与 `crates/sqlite-executor-sidecar/` 提供当前 Rust 可信执行实现；桌面打包时由 `apps/desktop/scripts/build-pyinstaller.ts` 构建并与冻结后端一起分发。

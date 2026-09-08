@@ -7,6 +7,7 @@ import base64
 import contextlib
 import os
 import sqlite3
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -44,23 +45,23 @@ from app.services.analysis_checkpoint import (
     stable_payload_hash,
     validate_source_fingerprints,
 )
-from app.services.analyst_runtime import (
-    PydanticAnalystRuntime,
-    _aggregate_result_rows,
+from app.services.analyst.python_tools import (
     _build_result_chart_code,
+    _render_result_chart,
+    execute_python_code,
+)
+from app.services.analyst.relationships import (
     _join_result_rows,
     _matching_candidate_relationship,
-    _query_project_file_rows,
     _relationship_profile,
     _relationship_proof_scope,
-    _render_result_chart,
     _required_trial_relationship,
-    _result_profile,
-    _validate_read_only,
 )
+from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.data_preflight import fingerprint_file, run_preflight
 from app.services.dependency_manager import ProjectDependencyManager
 from app.services.execution import ExecutionService
+from app.services.file_query import query_project_file_rows
 from app.services.golden_regression import (
     build_golden_contract,
     evaluate_golden_contract,
@@ -68,8 +69,12 @@ from app.services.golden_regression import (
 )
 from app.services.project_context import ProjectRuntimeContext, load_project_context
 from app.services.python_sandbox import PythonSandbox
+from app.services.query_compiler import validate_read_only
+from app.services.result_aggregation import aggregate_result_rows as _aggregate_result_rows
 from app.services.result_filters import apply_value_filter
+from app.services.result_profile import profile_result
 from app.services.semantic_adapter import SemanticEngineAdapter, build_manifest
+from tests.model_fixtures import synthetic_model_config
 
 
 def _write_messy_orders(path: Path) -> None:
@@ -705,17 +710,17 @@ async def test_python_sandbox_timeout_terminates_runaway_worker():
 
 
 def test_only_single_read_only_queries_are_allowed():
-    _validate_read_only("WITH totals AS (SELECT 1 AS amount) SELECT * FROM totals")
+    validate_read_only("WITH totals AS (SELECT 1 AS amount) SELECT * FROM totals")
     with pytest.raises(ValueError):
-        _validate_read_only("SELECT 1; DROP TABLE orders")
+        validate_read_only("SELECT 1; DROP TABLE orders")
     with pytest.raises(ValueError):
-        _validate_read_only("SELECT pg_read_file('/etc/passwd')")
+        validate_read_only("SELECT pg_read_file('/etc/passwd')")
     with pytest.raises(ValueError):
-        _validate_read_only("SELECT * INTO copied_orders FROM orders")
+        validate_read_only("SELECT * INTO copied_orders FROM orders")
 
 
 def test_result_profile_checks_keys_duplicates_nulls_and_totals():
-    profile = _result_profile(
+    profile = profile_result(
         [
             {"store_id": "S-1", "revenue": 10},
             {"store_id": "S-1", "revenue": 10},
@@ -847,7 +852,7 @@ def test_project_file_query_can_only_read_materialized_project_sources(tmp_path:
         }
     ]
 
-    rows, truncated, available = _query_project_file_rows(
+    rows, truncated, available = query_project_file_rows(
         sources,
         "SELECT * FROM orders",
         tmp_path / "project",
@@ -859,7 +864,7 @@ def test_project_file_query_can_only_read_materialized_project_sources(tmp_path:
 
     escaped_secret = str(secret).replace("'", "''")
     with pytest.raises(duckdb.PermissionException, match="file system operations are disabled"):
-        _query_project_file_rows(
+        query_project_file_rows(
             sources,
             f"SELECT * FROM read_csv_auto('{escaped_secret}')",
             tmp_path / "project",
@@ -889,9 +894,9 @@ async def test_python_execution_auto_installs_a_missing_project_module_once(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(settings, "WORKSPACE_ROOT", tmp_path)
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: TestModel())
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="依赖项目"),
     )
     installed_requests: list[list[str]] = []
@@ -907,8 +912,10 @@ async def test_python_execution_auto_installs_a_missing_project_module_once(
     monkeypatch.setattr(runtime.deps.dependency_manager, "install", fake_install)
     code = "import receiptbi_auto_dep_probe\nprint(receiptbi_auto_dep_probe.VALUE)"
     try:
-        output, images, installed = await runtime._execute_python_code(code, sql_data={})
-        second_output, _, second_installed = await runtime._execute_python_code(code, sql_data={})
+        output, images, installed = await execute_python_code(runtime.deps, code, sql_data={})
+        second_output, _, second_installed = await execute_python_code(
+            runtime.deps, code, sql_data={}
+        )
     finally:
         runtime.deps.python_sandbox.cleanup()
 
@@ -1581,9 +1588,9 @@ async def test_pydantic_agent_loop_returns_a_typed_business_report(
             ],
         },
     )
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: test_model)
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model))
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="经营分析项目"),
     )
 
@@ -1602,12 +1609,12 @@ async def test_pydantic_agent_loop_returns_a_typed_business_report(
 @pytest.mark.asyncio
 async def test_runtime_returns_the_validated_result_instead_of_the_last_temporary_frame():
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="校验结果项目"),
     )
 
     class AgentWithTemporaryFrameAfterValidation:
-        async def run(self, prompt, deps):
+        async def run(self, prompt, deps, model):
             del prompt
             deps.dataframes["validated_summary"] = [{"门店": "一店", "订单数": 2}]
             deps.tool_history.append(
@@ -1641,13 +1648,13 @@ async def test_runtime_returns_the_validated_result_instead_of_the_last_temporar
 @pytest.mark.asyncio
 async def test_cancelling_runtime_also_cancels_the_inner_model_task():
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="取消调查项目"),
     )
     inner_cancelled = asyncio.Event()
 
     class BlockingAgent:
-        async def run(self, prompt, deps):
+        async def run(self, prompt, deps, model):
             del prompt, deps
             try:
                 await asyncio.Future()
@@ -1685,9 +1692,9 @@ async def test_missing_data_returns_an_explicit_product_action(
             },
         },
     )
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: test_model)
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model))
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="经营分析项目"),
     )
 
@@ -1715,9 +1722,9 @@ async def test_business_confirmation_requires_a_pending_question(
             "summary": "后续会沿用该口径。",
         },
     )
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: test_model)
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model))
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="经营分析项目"),
     )
 
@@ -1744,7 +1751,7 @@ async def test_business_confirmation_requires_a_pending_question(
     assert runtime.deps.pending_confirmation["key"] == "revenue_refund_policy"
 
     second_runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="经营分析项目"),
     )
     _ = [event async for event in second_runtime.execute(query="我确认")]
@@ -1788,11 +1795,11 @@ async def test_pending_confirmation_proposal_uses_the_pending_canonical_slot(
 
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="口径归一项目"),
     )
 
@@ -1879,11 +1886,11 @@ async def test_apply_confirmed_rule_writes_only_the_canonical_rule_key(
 
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="规则归一项目",
             confirmed_knowledge=[
@@ -1958,11 +1965,11 @@ async def test_report_completion_compares_pending_and_evidence_by_canonical_slot
 
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="完成门禁归一项目",
             sources=[
@@ -2052,11 +2059,11 @@ async def test_report_confirmation_reuses_known_canonical_slot_instead_of_asking
 
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="已确认口径项目",
             confirmed_knowledge=[
@@ -2693,10 +2700,10 @@ async def test_checkpoint_revision_reservation_is_unique_under_parallel_tools(
 async def test_safe_boundary_freezes_tool_state_before_checkpoint_callback(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: TestModel())
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
     captured: list[dict] = []
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="并行检查点项目"),
     )
     runtime.deps.dataframes["first"] = [{"value": 1}]
@@ -2706,8 +2713,8 @@ async def test_safe_boundary_freezes_tool_state_before_checkpoint_callback(
         captured.append(snapshot)
         return snapshot
 
-    runtime.checkpoint_callback = capture_checkpoint
-    await runtime._persist_safe_boundary()
+    runtime.deps.checkpoint_callback = capture_checkpoint
+    await runtime.deps.checkpoint()
 
     assert set(runtime.deps.dataframes) == {"first", "late"}
     assert set(captured[0]["dataframes"]) == {"first"}
@@ -2782,9 +2789,9 @@ async def test_render_chart_checkpoint_restores_verified_artifacts_and_rejects_t
     assert restored.python_images == [image]
     assert checkpoint_manifest_is_readable(tmp_path, checkpoint) is True
 
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: TestModel())
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="恢复图表项目"),
         resume_state={
             "manifest": restored.manifest,
@@ -2799,7 +2806,7 @@ async def test_render_chart_checkpoint_restores_verified_artifacts_and_rejects_t
 
     restored.manifest["replay_journal"][-1]["code_hash"] = "0" * 64
     drifted_runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="漂移图表项目"),
         resume_state={
             "manifest": restored.manifest,
@@ -2841,7 +2848,7 @@ async def test_resume_reuses_same_analysis_run_and_exposes_id_on_first_progress(
     service = ExecutionService(db_session, project_id=project.id)
 
     class Inputs:
-        model_config = {"model": "test"}
+        model_config = synthetic_model_config(model="test")
         history: list[dict] = []
 
     class FakeEngine:
@@ -2980,7 +2987,7 @@ async def test_duplicate_prepared_stream_does_not_mutate_the_running_owner(
     )
 
     class Inputs:
-        model_config = {"model": "test"}
+        model_config = synthetic_model_config(model="test")
         history: list[dict] = []
 
     async def fake_load_inputs(**kwargs):
@@ -3040,7 +3047,7 @@ async def test_missing_data_resume_reuses_same_run_without_replaying_old_tools(
     service = ExecutionService(db_session, project_id=project.id)
 
     class Inputs:
-        model_config = {"model": "test"}
+        model_config = synthetic_model_config(model="test")
         history: list[dict] = []
 
     class FakeEngine:
@@ -3220,7 +3227,7 @@ async def test_terminal_events_are_not_emitted_when_result_persistence_fails(
     service = ExecutionService(db_session, project_id=project.id)
 
     class Inputs:
-        model_config = {"model": "test"}
+        model_config = synthetic_model_config(model="test")
         history: list[dict] = []
 
     class FakeEngine:

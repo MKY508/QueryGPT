@@ -12,6 +12,7 @@ from app.db.tables import Model
 from app.models import SSEEvent, SSEEventType
 from app.services.execution import ExecutionService
 from app.services.model_runtime import ModelCredentialError, ModelSelectionError
+from tests.model_fixtures import synthetic_model_config
 
 
 class TestExecutionService:
@@ -94,22 +95,20 @@ class TestExecutionService:
         mock_db.execute.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_get_runtime_snapshot_with_provider_mapping(self, mock_db):
+    async def test_get_runtime_snapshot_keeps_provider_and_protocol_separate(self, mock_db):
         service = ExecutionService(
             db=mock_db,
             language="zh",
             context_rounds=0,
         )
         service._get_model_config = AsyncMock(
-            return_value={
-                "model_id": "model-uuid",
-                "display_name": "DeepSeek Chat",
-                "model": "deepseek-chat",
-                "source_provider": "deepseek",
-                "resolved_provider": "openai",
-                "provider": "openai",
-                "api_format": "openai_compatible",
-            }
+            return_value=synthetic_model_config(
+                model_id="model-uuid",
+                display_name="DeepSeek Chat",
+                model="deepseek-chat",
+                source_provider="deepseek",
+                api_format="openai_compatible",
+            )
         )
         service._get_connection_record = AsyncMock(
             return_value=SimpleNamespace(
@@ -127,8 +126,7 @@ class TestExecutionService:
         assert snapshot["model_name"] == "DeepSeek Chat"
         assert snapshot["model_identifier"] == "deepseek-chat"
         assert snapshot["source_provider"] == "deepseek"
-        assert snapshot["resolved_provider"] == "openai"
-        assert snapshot["provider_summary"] == "deepseek -> openai · openai_compatible"
+        assert snapshot["provider_summary"] == "deepseek · openai_compatible"
         assert snapshot["connection_name"] == "Analytics DB"
         assert snapshot["connection_driver"] == "postgresql"
         assert snapshot["connection_host"] == "db.internal"
@@ -140,15 +138,13 @@ class TestExecutionService:
     async def test_get_runtime_snapshot_without_connection(self, mock_db):
         service = ExecutionService(db=mock_db, language="en", context_rounds=3)
         service._get_model_config = AsyncMock(
-            return_value={
-                "model_id": None,
-                "display_name": "Anthropic Claude",
-                "model": "claude-3-7-sonnet",
-                "source_provider": "anthropic",
-                "resolved_provider": "anthropic",
-                "provider": "anthropic",
-                "api_format": "anthropic_native",
-            }
+            return_value=synthetic_model_config(
+                model_id=None,
+                display_name="Anthropic Claude",
+                model="claude-3-7-sonnet",
+                source_provider="anthropic",
+                api_format="anthropic_native",
+            )
         )
         service._get_connection_record = AsyncMock(return_value=None)
 
@@ -170,15 +166,13 @@ class TestExecutionService:
             settings_data={"diagnostics_enabled": False},
         )
         service._get_model_config = AsyncMock(
-            return_value={
-                "model_id": "model-uuid",
-                "display_name": "DeepSeek Chat",
-                "model": "deepseek-chat",
-                "source_provider": "deepseek",
-                "resolved_provider": "openai",
-                "provider": "openai",
-                "api_format": "openai_compatible",
-            }
+            return_value=synthetic_model_config(
+                model_id="model-uuid",
+                display_name="DeepSeek Chat",
+                model="deepseek-chat",
+                source_provider="deepseek",
+                api_format="openai_compatible",
+            )
         )
         service._get_connection_record = AsyncMock(
             return_value=SimpleNamespace(
@@ -206,7 +200,7 @@ class TestExecutionService:
         conversation_id = uuid4()
         service = ExecutionService(db=mock_db, language="zh")
         history_mock = AsyncMock(return_value=[])
-        service._get_model_config = AsyncMock(return_value={"model": "gpt-4o"})
+        service._get_model_config = AsyncMock(return_value=synthetic_model_config(model="gpt-4o"))
         service._get_connection_config = AsyncMock(return_value=None)
         service._get_conversation_history = history_mock
         health_mock = AsyncMock()
@@ -241,7 +235,7 @@ class TestExecutionService:
     async def test_execute_stream_stop_wins_before_terminal_result_is_published(self, mock_db):
         conversation_id = uuid4()
         service = ExecutionService(db=mock_db, language="zh")
-        service._get_model_config = AsyncMock(return_value={"model": "gpt-4o"})
+        service._get_model_config = AsyncMock(return_value=synthetic_model_config(model="gpt-4o"))
         service._get_connection_config = AsyncMock(return_value=None)
         service._get_conversation_history = AsyncMock(return_value=[])
 
@@ -277,7 +271,9 @@ class TestExecutionService:
         )
         service = ExecutionService(db=mock_db, language="zh")
         service._load_execution_inputs = AsyncMock(
-            return_value=SimpleNamespace(model_config={"model": "gpt-4o"}, history=[])
+            return_value=SimpleNamespace(
+                model_config=synthetic_model_config(model="gpt-4o"), history=[]
+            )
         )
         service._prepare_analysis_run = AsyncMock(return_value=(run, "show revenue", None, None))
         service._mark_run_needs_attention = AsyncMock()
@@ -378,7 +374,7 @@ class TestExecutionService:
     @pytest.mark.asyncio
     async def test_runtime_failure_keeps_product_message_and_advanced_diagnostic(self, mock_db):
         service = ExecutionService(db=mock_db, language="zh")
-        service._get_model_config = AsyncMock(return_value={"model": "gpt-4o"})
+        service._get_model_config = AsyncMock(return_value=synthetic_model_config(model="gpt-4o"))
         service._get_connection_config = AsyncMock(return_value=None)
         service._get_conversation_history = AsyncMock(return_value=[])
 

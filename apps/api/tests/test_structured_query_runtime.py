@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import nullcontext
 from pathlib import Path
 
 import pandas as pd
@@ -17,31 +18,37 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from app.core.config import settings
 from app.models import SSEEventType
-from app.services import analyst_runtime
-from app.services.analysis_checkpoint import stable_payload_hash
-from app.services.analyst_runtime import (
-    AnalystDependencies,
-    PydanticAnalystRuntime,
+from app.models.query import (
     SemanticDimensionFilter,
     StructuredQueryFilter,
     StructuredQueryMetric,
     StructuredQuerySort,
+)
+from app.services import analyst_runtime
+from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.analyst import semantics
+from app.services.analyst.semantics import (
     _compile_semantic_dimension_filter,
-    _compile_structured_query,
     _enforce_connection_semantic_query,
     _opened_semantic_scope_receipt,
-    _query_project_file_rows,
     _reject_ordinary_database_sql,
     _resolve_confirmed_aggregate_metric,
     _resolve_confirmed_derived_metric,
     _resolve_confirmed_dimension,
-    _resolve_runtime_semantic_table,
     _resolve_structured_source,
-    _validate_read_only,
     _validate_semantic_scope_receipt,
 )
+from app.services.analyst.session import AnalystSession
+from app.services.analyst_runtime import PydanticAnalystRuntime
+from app.services.file_query import query_project_file_rows
 from app.services.project_context import ProjectRuntimeContext
+from app.services.query_compiler import (
+    _resolve_runtime_semantic_table,
+    compile_structured_query,
+    validate_read_only,
+)
 from app.services.result_filters import stable_field_binding_candidates
+from tests.model_fixtures import synthetic_model_config
 
 
 def _file_source(path: Path) -> dict:
@@ -98,7 +105,7 @@ def _table_scope_fields(source: dict, *, scope_id: str = "scope:table") -> dict:
 
 
 def test_semantic_scope_receipt_is_current_run_and_exact_table_bound() -> None:
-    deps = AnalystDependencies(
+    deps = AnalystSession(
         project=ProjectRuntimeContext(),
         python_sandbox=None,  # type: ignore[arg-type]
         dependency_manager=None,  # type: ignore[arg-type]
@@ -317,11 +324,11 @@ async def test_source_then_table_semantics_expose_ancestors_without_sibling_entr
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="层级语义",
             sources=[source],
@@ -354,7 +361,7 @@ def test_structured_query_compiles_real_schema_and_executes_file(tmp_path: Path)
     ).to_parquet(source_path, index=False)
     source = _file_source(source_path)
 
-    sql, plan = _compile_structured_query(
+    sql, plan = compile_structured_query(
         source,
         table=None,
         dimensions=["商品 品类"],
@@ -363,7 +370,7 @@ def test_structured_query_compiles_real_schema_and_executes_file(tmp_path: Path)
         sort=[StructuredQuerySort(field="销售额", direction="desc")],
         limit=100,
     )
-    rows, truncated, available = _query_project_file_rows([source], sql, tmp_path / "project")
+    rows, truncated, available = query_project_file_rows([source], sql, tmp_path / "project")
 
     assert plan["table"] == "online_orders"
     assert plan["table_or_view"] == "online_orders"
@@ -376,7 +383,7 @@ def test_structured_query_compiles_real_schema_and_executes_file(tmp_path: Path)
 
 def test_structured_query_scope_distinguishes_full_filtered_and_aggregated(tmp_path: Path):
     source = _file_source(tmp_path / "orders.parquet")
-    _, full_plan = _compile_structured_query(
+    _, full_plan = compile_structured_query(
         source,
         table=None,
         dimensions=["商品品类", "实付金额", "退款状态"],
@@ -385,7 +392,7 @@ def test_structured_query_scope_distinguishes_full_filtered_and_aggregated(tmp_p
         sort=[],
         limit=100,
     )
-    _, filtered_plan = _compile_structured_query(
+    _, filtered_plan = compile_structured_query(
         source,
         table=None,
         dimensions=["商品品类", "实付金额"],
@@ -394,7 +401,7 @@ def test_structured_query_scope_distinguishes_full_filtered_and_aggregated(tmp_p
         sort=[],
         limit=100,
     )
-    _, aggregated_plan = _compile_structured_query(
+    _, aggregated_plan = compile_structured_query(
         source,
         table=None,
         dimensions=["商品品类"],
@@ -427,7 +434,7 @@ def test_structured_query_escapes_values_and_rejects_unknown_schema_names():
             ]
         },
     }
-    sql, _ = _compile_structured_query(
+    sql, _ = compile_structured_query(
         source,
         table="order items",
         dimensions=["store_name"],
@@ -446,10 +453,10 @@ def test_structured_query_escapes_values_and_rejects_unknown_schema_names():
     assert "FROM `order-items`" in sql
     assert "`store name`" in sql
     assert "'店铺''精选'" in sql
-    _validate_read_only(sql)
+    validate_read_only(sql)
 
     with pytest.raises(ValueError, match="找不到汇总字段"):
-        _compile_structured_query(
+        compile_structured_query(
             source,
             table=None,
             dimensions=[],
@@ -497,7 +504,7 @@ def test_canonical_database_table_identity_is_schema_safe_at_runtime():
         public_config,
     ) == ("orders", "public.orders")
 
-    sql, plan = _compile_structured_query(
+    sql, plan = compile_structured_query(
         source,
         connection_config=public_config,
         table="public.orders",
@@ -516,7 +523,7 @@ def test_canonical_database_table_identity_is_schema_safe_at_runtime():
         "extra_options": {"schema": "archive"},
     }
     with pytest.raises(ValueError, match="当前连接仅允许 Schema.*archive"):
-        _compile_structured_query(
+        compile_structured_query(
             source,
             connection_config=archive_config,
             table="public.orders",
@@ -727,14 +734,14 @@ async def test_connection_query_executes_confirmed_metric_and_dimension_only(
         )
 
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
-    monkeypatch.setattr(analyst_runtime, "uuid4", lambda: receipt_token)
+    monkeypatch.setattr(semantics, "uuid4", lambda: receipt_token)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="已治理销售库",
             sources=[source],
@@ -793,7 +800,7 @@ def test_structured_query_rejects_unsafe_mysql_literals(unsafe_value: str):
     }
 
     with pytest.raises(ValueError, match="不安全字符|无效字符"):
-        _compile_structured_query(
+        compile_structured_query(
             source,
             table=None,
             dimensions=["store_name"],
@@ -809,7 +816,7 @@ def test_structured_query_rejects_null_inside_list_filter(operator: str):
     source = _file_source(Path("orders.parquet"))
 
     with pytest.raises(ValueError, match="列表不能包含空值.*is_null.*not_null"):
-        _compile_structured_query(
+        compile_structured_query(
             source,
             table=None,
             dimensions=["商品品类"],
@@ -831,7 +838,7 @@ def test_structured_query_rejects_non_numeric_or_unknown_metric_types(operation:
     source = _file_source(Path("orders.parquet"))
 
     with pytest.raises(ValueError, match="必须是预检明确识别的数值字段.*object"):
-        _compile_structured_query(
+        compile_structured_query(
             source,
             table=None,
             dimensions=[],
@@ -843,7 +850,7 @@ def test_structured_query_rejects_non_numeric_or_unknown_metric_types(operation:
 
     source["profile"]["schema"]["columns"].append({"name": "口径待定"})
     with pytest.raises(ValueError, match="必须是预检明确识别的数值字段.*unknown"):
-        _compile_structured_query(
+        compile_structured_query(
             source,
             table=None,
             dimensions=[],
@@ -951,11 +958,11 @@ async def test_agent_structured_query_is_executed_validated_and_bound_to_report(
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="销售项目", sources=[source]),
     )
 
@@ -1106,14 +1113,14 @@ async def test_confirmed_verified_aggregate_metric_is_server_bound_and_receipted
         )
 
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
-    monkeypatch.setattr(analyst_runtime, "uuid4", lambda: scope_receipt)
+    monkeypatch.setattr(semantics, "uuid4", lambda: scope_receipt)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="确认指标执行",
             sources=[source],
@@ -1420,14 +1427,14 @@ async def test_confirmed_year_department_and_sales_semantics_execute_together(
         )
 
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
-    monkeypatch.setattr(analyst_runtime, "uuid4", lambda: scope_receipt)
+    monkeypatch.setattr(semantics, "uuid4", lambda: scope_receipt)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="已治理部门销量",
             sources=[source],
@@ -1626,13 +1633,13 @@ async def test_confirmed_derived_metric_uses_governed_formula_with_year_and_depa
         )
 
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
-    monkeypatch.setattr(analyst_runtime, "uuid4", lambda: scope_receipt)
+    monkeypatch.setattr(semantics, "uuid4", lambda: scope_receipt)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
-    runtime = PydanticAnalystRuntime(model_config={}, project_context=context)
+    runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
 
     _ = [event async for event in runtime.execute(query="看 2023 年哪个部门的毛利")]
 

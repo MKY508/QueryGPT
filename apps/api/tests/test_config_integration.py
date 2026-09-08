@@ -184,6 +184,6 @@ async def test_model_healthcheck_against_mock_gateway(client: AsyncClient):
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["success"] is True
-    assert data["resolved_provider"] == "openai"
+    assert data["source_provider"] == "custom"
     assert data["resolved_base_url"] == env["RECEIPTBI_TEST_MODEL_BASE_URL"]
     assert data["message"] == "连接成功"

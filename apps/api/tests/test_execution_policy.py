@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from dataclasses import FrozenInstanceError
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -16,10 +17,12 @@ from app.core.config import settings
 from app.db.tables import AnalysisRun, ArtifactRecord, Project, SemanticEntry
 from app.models import SSEEvent
 from app.services import analyst_runtime
+from app.services.analyst.python_tools import execute_python_code
 from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.execution import ExecutionService
 from app.services.execution_policy import ExecutionPolicy, ExecutionPolicyError
 from app.services.project_context import ProjectRuntimeContext
+from tests.model_fixtures import synthetic_model_config
 
 
 def test_execution_policy_is_immutable_and_malformed_flags_fail_closed():
@@ -77,9 +80,9 @@ async def test_python_policy_hides_tools_and_blocks_defensive_execution(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(settings, "WORKSPACE_ROOT", tmp_path)
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: TestModel())
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="受限项目"),
         execution_policy=ExecutionPolicy(
             python_enabled=False,
@@ -88,7 +91,7 @@ async def test_python_policy_hides_tools_and_blocks_defensive_execution(
         ),
     )
 
-    registered_tools = set(runtime.agent._function_toolset.tools)
+    registered_tools = {name for toolset in runtime.agent.toolsets for name in toolset.tools}
 
     assert {
         "render_chart",
@@ -99,7 +102,7 @@ async def test_python_policy_hides_tools_and_blocks_defensive_execution(
     assert runtime.agent._max_tool_retries == 0
     assert runtime.agent._max_output_retries == 0
     with pytest.raises(ExecutionPolicyError, match="Python 能力已关闭"):
-        await runtime._execute_python_code("print(1)", sql_data={})
+        await execute_python_code(runtime.deps, "print(1)", sql_data={})
 
 
 @pytest.mark.asyncio
@@ -108,9 +111,9 @@ async def test_auto_repair_off_does_not_install_missing_python_modules(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(settings, "WORKSPACE_ROOT", tmp_path)
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: TestModel())
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="无自动修复项目"),
         execution_policy=ExecutionPolicy(
             python_enabled=True,
@@ -118,7 +121,9 @@ async def test_auto_repair_off_does_not_install_missing_python_modules(
             diagnostics_enabled=True,
         ),
     )
-    assert "install_python_packages" not in runtime.agent._function_toolset.tools
+    assert "install_python_packages" not in {
+        name for toolset in runtime.agent.toolsets for name in toolset.tools
+    }
     with pytest.raises(ExecutionPolicyError, match="自动修复已关闭"):
         runtime.execution_policy.require_auto_repair("Python 依赖安装")
 
@@ -133,7 +138,8 @@ async def test_auto_repair_off_does_not_install_missing_python_modules(
     monkeypatch.setattr(runtime.deps.python_sandbox, "execute", execute)
 
     with pytest.raises(RuntimeError, match="已关闭自动修复"):
-        await runtime._execute_python_code(
+        await execute_python_code(
+            runtime.deps,
             "import missing_receiptbi_probe",
             sql_data={},
         )

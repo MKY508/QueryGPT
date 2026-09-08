@@ -13,9 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, ArtifactRecord, Conversation, Project
 from app.models import SSEEvent, SSEEventType
+from app.models.analysis import AnalysisReport
 from app.services.analysis_checkpoint import stable_payload_hash
-from app.services.analyst_runtime import AnalysisReport
 from app.services.execution import ExecutionService
+from tests.model_fixtures import synthetic_model_config
 
 
 def _invalid_report_output_error(*, business_rejection: bool = False) -> RuntimeError:
@@ -113,7 +114,7 @@ async def _stream_with_engine(
     service = ExecutionService(db_session, project_id=project.id, language=language)
 
     async def fake_load_inputs(**_kwargs):
-        return SimpleNamespace(model_config={"model": "test"}, history=[])
+        return SimpleNamespace(model_config=synthetic_model_config(model="test"), history=[])
 
     async def fake_prepare_run(**_kwargs):
         return run, run.query, None, None

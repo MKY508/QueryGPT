@@ -215,8 +215,8 @@ export function ModelSettings() {
             </summary>
             <div className="mt-3 grid gap-2 border-l-2 border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground md:grid-cols-2">
               <div>
-                {t("resolvedProvider") + ":"}{" "}
-                <span className="text-foreground">{testResult.resolved_provider || "-"}</span>
+                {t("sourceProvider") + ":"}{" "}
+                <span className="text-foreground">{testResult.source_provider || "-"}</span>
               </div>
               <div>
                 {t("apiFormat") + ":"}{" "}

@@ -1,6 +1,8 @@
 """模型适配解析与诊断"""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
@@ -11,6 +13,8 @@ from app.models.config import ModelAPIFormat, ModelExtraOptions
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+DEFAULT_ORCAROUTER_BASE_URL = "https://api.orcarouter.ai/v1"
+DEFAULT_GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 
 
@@ -28,7 +32,16 @@ class ModelSelectionError(ModelRuntimeConfigurationError):
 
 def normalize_provider(provider: str | None) -> str:
     normalized = (provider or "openai").strip().lower()
-    if normalized in {"openai", "anthropic", "deepseek", "ollama", "custom"}:
+    if normalized in {
+        "openai",
+        "anthropic",
+        "deepseek",
+        "groq",
+        "qwen",
+        "orcarouter",
+        "ollama",
+        "custom",
+    }:
         return normalized
     return "custom"
 
@@ -66,6 +79,10 @@ def default_base_url(provider: str) -> str | None:
         return DEFAULT_ANTHROPIC_BASE_URL
     if provider == "deepseek":
         return DEFAULT_DEEPSEEK_BASE_URL
+    if provider == "orcarouter":
+        return DEFAULT_ORCAROUTER_BASE_URL
+    if provider == "groq":
+        return DEFAULT_GROQ_BASE_URL
     if provider == "ollama":
         return DEFAULT_OLLAMA_BASE_URL
     return None
@@ -97,28 +114,18 @@ def normalize_runtime_base_url(
         raise ModelRuntimeConfigurationError("模型服务地址不能包含 fragment")
 
     path = parsed.path.rstrip("/")
-    endpoint_suffix = "/chat/completions"
+    endpoint_suffix = "/responses" if api_format == "openai_responses" else "/chat/completions"
     supplied_full_endpoint = path.lower().endswith(endpoint_suffix)
     if supplied_full_endpoint:
         path = path[: -len(endpoint_suffix)].rstrip("/")
 
     root_path = path in {"", "/"}
-    needs_openai_v1 = api_format == "openai_compatible"
-    needs_ollama_v1 = provider == "ollama" and api_format == "ollama_local"
+    needs_openai_v1 = api_format in {"openai_compatible", "openai_responses"}
+    needs_ollama_v1 = api_format == "ollama_local"
     if root_path and not supplied_full_endpoint and (needs_openai_v1 or needs_ollama_v1):
         path = "/v1"
 
     return urlunsplit((parsed.scheme.lower(), parsed.netloc, path, parsed.query, ""))
-
-
-def resolve_litellm_provider(provider: str, api_format: ModelAPIFormat) -> str:
-    if api_format == "anthropic_native":
-        return "anthropic"
-    if api_format == "ollama_local":
-        return "ollama"
-    if provider == "deepseek" and api_format == "custom":
-        return "deepseek"
-    return "openai"
 
 
 def categorize_model_error(message: str) -> str:
@@ -188,43 +195,41 @@ def categorize_model_exception(error: BaseException) -> str:
     return "unknown"
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class ResolvedModelConfig:
-    """统一的模型运行时配置"""
+    """One resolved connection, independent of SDKs and stable for its task."""
 
     source_provider: str
-    litellm_provider: str
     model: str
     display_name: str
-    base_url: str | None
-    api_key: str | None
+    base_url: str
+    api_key: str | None = field(repr=False)
     api_format: ModelAPIFormat
     api_key_required: bool
-    healthcheck_mode: str
-    headers: dict[str, str] = field(default_factory=dict)
-    query_params: dict[str, str] = field(default_factory=dict)
+    model_id: str | None = None
+    headers: Mapping[str, str] = field(default_factory=dict, repr=False)
+    query_params: Mapping[str, str] = field(default_factory=dict, repr=False)
 
-    def completion_kwargs(self, **overrides: Any) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "custom_llm_provider": self.litellm_provider,
-            "base_url": self.base_url,
-            "extra_headers": self.headers or None,
-            **overrides,
-        }
-        if self.api_key:
-            kwargs["api_key"] = self.api_key
-        return {key: value for key, value in kwargs.items() if value is not None}
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "headers", MappingProxyType(dict(self.headers)))
+        object.__setattr__(self, "query_params", MappingProxyType(dict(self.query_params)))
 
-    def diagnostic_summary(self) -> dict[str, Any]:
-        return {
-            "provider": self.source_provider,
-            "resolved_provider": self.litellm_provider,
-            "api_format": self.api_format,
-            "model": self.model,
-            "base_url": self.base_url,
-            "api_key_required": self.api_key_required,
-        }
+    @property
+    def credentials_available(self) -> bool:
+        return not self.api_key_required or bool(self.api_key)
+
+    def public_snapshot(self, *, diagnostics: bool) -> dict[str, Any]:
+        snapshot = {"model_id": self.model_id, "model_name": self.display_name}
+        if diagnostics:
+            snapshot.update(
+                {
+                    "model_identifier": self.model,
+                    "source_provider": self.source_provider,
+                    "api_format": self.api_format,
+                    "provider_summary": f"{self.source_provider} · {self.api_format}",
+                }
+            )
+        return snapshot
 
 
 def resolve_model_runtime(
@@ -257,8 +262,8 @@ def resolve_model_runtime(
                 api_key = encryptor.decrypt(encrypted_api_key)
             except Exception as exc:
                 raise ModelCredentialError("保存的 API Key 无法读取，请重新输入") from exc
-        if provider == "custom" and not base_url:
-            raise ModelRuntimeConfigurationError("自定义模型服务必须配置 Base URL")
+        if not base_url:
+            raise ModelRuntimeConfigurationError("此模型服务必须配置 Base URL")
 
     api_format: ModelAPIFormat = extra.api_format or default_api_format(provider)
     base_url = normalize_runtime_base_url(
@@ -266,17 +271,18 @@ def resolve_model_runtime(
         provider=provider,
         api_format=api_format,
     )
+    if not base_url:
+        raise ModelRuntimeConfigurationError("此模型服务必须配置 Base URL")
 
     resolved = ResolvedModelConfig(
         source_provider=provider,
-        litellm_provider=resolve_litellm_provider(provider, api_format),
         model=model_id,
         display_name=display_name,
         base_url=base_url,
         api_key=api_key,
         api_format=api_format,
         api_key_required=not extra.api_key_optional,
-        healthcheck_mode=extra.healthcheck_mode,
+        model_id=str(model.id) if model is not None and getattr(model, "id", None) else None,
         headers=extra.headers,
         query_params=extra.query_params,
     )

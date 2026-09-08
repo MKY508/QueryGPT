@@ -18,7 +18,7 @@ from app.models.workspace import (
     AnalysisPlaybookStructuredQueryPlan,
 )
 from app.services.analysis_checkpoint import stable_payload_hash
-from app.services.analyst_runtime import _result_profile
+from app.services.result_profile import profile_result
 from app.services.structured_query import (
     StructuredQueryExecutionError,
     execute_structured_query,
@@ -214,6 +214,16 @@ def _system_steps(
     return query_step, plan, output_result, validation_step
 
 
+def bind_analysis_playbook_source(
+    playbook: AnalysisPlaybookResponse,
+    sources: list[dict[str, Any]],
+) -> tuple[dict[str, Any], str]:
+    """Resolve the same governed source for execution and publication checks."""
+
+    _system_steps(playbook)
+    return _bind_source_role(playbook.source_roles[0], sources)
+
+
 async def run_analysis_playbook(
     playbook: AnalysisPlaybookResponse,
     *,
@@ -226,7 +236,7 @@ async def run_analysis_playbook(
 
     query_step, plan, result_name, validation_step = _system_steps(playbook)
     role = playbook.source_roles[0]
-    source, source_schema_signature = _bind_source_role(role, sources)
+    source, source_schema_signature = bind_analysis_playbook_source(playbook, sources)
     try:
         execution = await execute_structured_query(
             source,
@@ -280,7 +290,7 @@ async def run_analysis_playbook(
     }
 
     try:
-        profile = _result_profile(
+        profile = profile_result(
             execution.rows,
             key_columns=list(validation_step.key_columns),
             numeric_columns=list(validation_step.numeric_columns),
@@ -352,6 +362,7 @@ __all__ = [
     "AnalysisPlaybookExecutionReceipt",
     "AnalysisPlaybookRunResult",
     "AnalysisPlaybookRunnerError",
+    "bind_analysis_playbook_source",
     "run_analysis_playbook",
     "run_system_analysis_playbook",
 ]

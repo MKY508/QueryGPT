@@ -7,8 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
-ModelProvider = Literal["openai", "anthropic", "deepseek", "ollama", "custom"]
-ModelAPIFormat = Literal["openai_compatible", "anthropic_native", "ollama_local", "custom"]
+ModelProvider = Literal["openai", "anthropic", "deepseek", "groq", "qwen", "orcarouter", "ollama", "custom"]
+ModelAPIFormat = Literal["openai_compatible", "openai_responses", "anthropic_native", "ollama_local", "custom"]
 ModelHealthcheckMode = Literal["chat_completion", "models_list"]
 ModelCredentialState = Literal["missing", "readable", "unreadable", "not_required"]
 ModelHealthStatus = Literal["unknown", "healthy", "unhealthy"]
@@ -137,8 +137,8 @@ class ModelCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_remote_endpoint(self) -> "ModelCreate":
-        if self.provider == "custom" and not self.base_url:
-            raise ValueError("自定义模型服务必须配置 Base URL")
+        if self.provider in {"custom", "qwen"} and not self.base_url:
+            raise ValueError("此模型服务必须配置 Base URL")
         if not self.base_url:
             return self
 
@@ -344,7 +344,7 @@ class ModelTest(BaseModel):
     model_name: str | None = None
     response_time_ms: int | None = None
     message: str
-    resolved_provider: str | None = None
+    source_provider: str | None = None
     resolved_base_url: str | None = None
     api_format: ModelAPIFormat | None = None
     api_key_required: bool = True

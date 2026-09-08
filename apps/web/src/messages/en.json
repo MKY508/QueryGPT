@@ -125,7 +125,7 @@
     "lastDiagnostic": "Last diagnostic",
     "result": "Result",
     "latency": "Latency",
-    "resolvedProvider": "Resolved provider",
+    "sourceProvider": "Service provider",
     "apiFormat": "API format",
     "baseUrl": "Base URL",
     "errorCategoryLabel": "Error category",

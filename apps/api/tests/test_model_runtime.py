@@ -13,7 +13,6 @@ from app.services.model_runtime import (
     default_base_url,
     normalize_provider,
     normalize_runtime_base_url,
-    resolve_litellm_provider,
     resolve_model_runtime,
 )
 
@@ -35,9 +34,23 @@ def test_resolve_openai_compatible_provider_defaults():
     )
 
     assert resolved.source_provider == "deepseek"
-    assert resolved.litellm_provider == "openai"
     assert resolved.base_url == "https://api.deepseek.com/v1"
     assert extra.api_format == "openai_compatible"
+
+
+def test_orcarouter_uses_own_endpoint_and_preserves_gateway_model_id():
+    from app.models.config import ModelCreate
+
+    model = ModelCreate(name="OrcaRouter", provider="orcarouter", model_id="orcarouter/auto", api_key="test-orca-key")
+    resolved, extra = resolve_model_runtime(
+        model, fallback_model="gpt-4o", fallback_api_key="unrelated-key",
+        fallback_base_url="https://unrelated.invalid/v1",
+    )
+    assert resolved.source_provider == "orcarouter"
+    assert resolved.base_url == "https://api.orcarouter.ai/v1"
+    assert resolved.model == "orcarouter/auto"
+    assert extra.api_format == "openai_compatible"
+    assert resolved.api_key_required is True
 
 
 def test_resolve_ollama_allows_missing_api_key():
@@ -56,7 +69,7 @@ def test_resolve_ollama_allows_missing_api_key():
         fallback_base_url=None,
     )
 
-    assert resolved.litellm_provider == "ollama"
+    assert resolved.source_provider == "ollama"
     assert resolved.api_key is None
     assert resolved.api_key_required is False
     assert extra.api_key_optional is True
@@ -171,10 +184,6 @@ def test_provider_helpers_cover_defaults():
     assert default_base_url("deepseek") == "https://api.deepseek.com"
     assert default_base_url("ollama") == "http://localhost:11434"
     assert default_base_url("openai") == "https://api.openai.com/v1"
-    assert resolve_litellm_provider("anthropic", "anthropic_native") == "anthropic"
-    assert resolve_litellm_provider("ollama", "ollama_local") == "ollama"
-    assert resolve_litellm_provider("deepseek", "custom") == "deepseek"
-    assert resolve_litellm_provider("custom", "openai_compatible") == "openai"
 
 
 def test_resolve_model_runtime_without_saved_model_uses_openai_defaults():
@@ -188,26 +197,18 @@ def test_resolve_model_runtime_without_saved_model_uses_openai_defaults():
     )
 
     assert resolved.source_provider == "openai"
-    assert resolved.litellm_provider == "openai"
     assert resolved.model == "gpt-4o-mini"
     assert resolved.base_url == expected_base_url
     assert resolved.api_key == "fallback-key"
     assert resolved.api_key_required is True
     assert extra.api_format == "openai_compatible"
-    assert resolved.diagnostic_summary() == {
-        "provider": "openai",
-        "resolved_provider": "openai",
+    assert resolved.public_snapshot(diagnostics=True) == {
+        "model_id": None,
+        "model_name": "gpt-4o-mini",
+        "model_identifier": "gpt-4o-mini",
+        "source_provider": "openai",
         "api_format": "openai_compatible",
-        "model": "gpt-4o-mini",
-        "base_url": expected_base_url,
-        "api_key_required": True,
-    }
-    assert resolved.completion_kwargs(stream=True) == {
-        "model": "gpt-4o-mini",
-        "custom_llm_provider": "openai",
-        "base_url": expected_base_url,
-        "api_key": "fallback-key",
-        "stream": True,
+        "provider_summary": "openai · openai_compatible",
     }
 
 

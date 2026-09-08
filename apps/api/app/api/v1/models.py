@@ -18,8 +18,8 @@ from app.db import get_db
 from app.db.tables import AppSettings, Model
 from app.models import APIResponse, ModelCreate, ModelResponse, ModelTest
 from app.models.config import ModelAPIFormat, ModelHealthStatus
-from app.services.analyst_runtime import build_pydantic_model
 from app.services.app_settings import get_or_create_app_settings
+from app.services.model_engine import model_session
 from app.services.model_runtime import (
     ModelCredentialError,
     ModelRuntimeConfigurationError,
@@ -112,7 +112,7 @@ async def _finish_model_test(
     success: bool,
     message: str,
     response_time_ms: int | None = None,
-    resolved_provider: str | None = None,
+    source_provider: str | None = None,
     resolved_base_url: str | None = None,
     api_format: ModelAPIFormat | None = None,
     api_key_required: bool = True,
@@ -131,7 +131,7 @@ async def _finish_model_test(
             model_name=model.model_id if success else None,
             response_time_ms=response_time_ms,
             message=message,
-            resolved_provider=resolved_provider,
+            source_provider=source_provider,
             resolved_base_url=resolved_base_url,
             api_format=api_format,
             api_key_required=api_key_required,
@@ -204,6 +204,7 @@ async def update_model(
 
     stored_base_url = _stored_base_url(model_in)
     next_extra_options = model_in.extra_options.model_dump()
+    provider_changed = model.provider != model_in.provider
     connection_changed = any(
         (
             model.provider != model_in.provider,
@@ -221,6 +222,8 @@ async def update_model(
     model.extra_options = next_extra_options
     if model_in.api_key:
         model.api_key_encrypted = encryptor.encrypt(model_in.api_key)
+    elif provider_changed:
+        model.api_key_encrypted = None
     if connection_changed:
         _reset_model_health(model)
     if model_in.is_default:
@@ -287,13 +290,13 @@ async def test_model(
             error_category="model_endpoint",
         )
 
-    if not resolved.api_key and resolved.api_key_required:
+    if not resolved.credentials_available:
         return await _finish_model_test(
             db,
             model,
             success=False,
             message="未配置 API Key",
-            resolved_provider=resolved.litellm_provider,
+            source_provider=resolved.source_provider,
             resolved_base_url=_public_base_url(resolved.base_url),
             api_format=resolved.api_format,
             api_key_required=resolved.api_key_required,
@@ -301,35 +304,25 @@ async def test_model(
         )
 
     try:
-        start_time = time.time()
+        start_time = time.monotonic()
         # A models-list request is not proof that the configured model can
-        # answer. Always exercise the same chat-completion path as a real
+        # answer. Always exercise the same configured protocol as a real
         # investigation, even for legacy records that requested models_list.
-        runtime_model = build_pydantic_model(
-            {
-                "model": resolved.model,
-                "api_key": resolved.api_key,
-                "base_url": resolved.base_url,
-                "api_format": resolved.api_format,
-                "source_provider": resolved.source_provider,
-                "headers": resolved.headers,
-                "query_params": resolved.query_params,
-            }
-        )
-        healthcheck_agent = Agent(
-            runtime_model,
-            output_type=str,
-            instructions="Reply with exactly OK.",
-        )
-        await asyncio.wait_for(healthcheck_agent.run("OK"), timeout=10)
-        elapsed_ms = int((time.time() - start_time) * 1000)
+        async with asyncio.timeout(10), model_session(resolved) as runtime_model:
+            healthcheck_agent = Agent(
+                runtime_model,
+                output_type=str,
+                instructions="Reply with exactly OK.",
+            )
+            await healthcheck_agent.run("OK")
+        elapsed_ms = int((time.monotonic() - start_time) * 1000)
         return await _finish_model_test(
             db,
             model,
             success=True,
             response_time_ms=elapsed_ms,
             message="连接成功",
-            resolved_provider=resolved.litellm_provider,
+            source_provider=resolved.source_provider,
             resolved_base_url=_public_base_url(resolved.base_url),
             api_format=resolved.api_format,
             api_key_required=resolved.api_key_required,
@@ -340,7 +333,7 @@ async def test_model(
             model,
             success=False,
             message="测试失败: 请求超时",
-            resolved_provider=resolved.litellm_provider,
+            source_provider=resolved.source_provider,
             resolved_base_url=_public_base_url(resolved.base_url),
             api_format=resolved.api_format,
             api_key_required=resolved.api_key_required,
@@ -355,7 +348,7 @@ async def test_model(
             model,
             success=False,
             message=f"测试失败: {error_msg}",
-            resolved_provider=resolved.litellm_provider,
+            source_provider=resolved.source_provider,
             resolved_base_url=_public_base_url(resolved.base_url),
             api_format=resolved.api_format,
             api_key_required=resolved.api_key_required,

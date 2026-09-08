@@ -10,15 +10,14 @@ import pytest
 from pydantic_ai import ModelRetry
 
 from app.models import SSEEvent, SSEEventType
-from app.services import analyst_runtime
+from app.models.analysis import AnalysisReport
 from app.services.analysis_checkpoint import CheckpointDriftError, stable_payload_hash
-from app.services.analyst_runtime import (
-    AnalysisReport,
-    PydanticAnalystRuntime,
-    _ensure_result_budget,
-)
+from app.services.analyst import result_store
+from app.services.analyst.result_store import _ensure_result_budget
+from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.chat_runtime import ChatEventAccumulator
 from app.services.project_context import ProjectRuntimeContext
+from tests.model_fixtures import synthetic_model_config
 
 
 def _deps(dataframes: dict[str, object] | None = None) -> SimpleNamespace:
@@ -45,7 +44,7 @@ def test_result_budget_rejects_thirteenth_result_without_polluting_run_state():
 def test_result_budget_counts_rows_across_all_retained_results(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(analyst_runtime, "RUN_RESULT_MAX_ROWS", 3)
+    monkeypatch.setattr(result_store, "RUN_RESULT_MAX_ROWS", 3)
     deps = _deps({"first": [{"value": 1}, {"value": 2}]})
 
     with pytest.raises(ModelRetry, match="4 行"):
@@ -60,7 +59,7 @@ def test_result_budget_counts_rows_across_all_retained_results(
 def test_result_budget_estimates_dataframe_bytes(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(analyst_runtime, "RUN_RESULT_MAX_BYTES", 256)
+    monkeypatch.setattr(result_store, "RUN_RESULT_MAX_BYTES", 256)
     deps = _deps()
     frame = pd.DataFrame({"payload": ["x" * 512]})
 
@@ -83,7 +82,7 @@ async def test_over_budget_checkpoint_is_rejected_before_restoring_dependencies(
         for index, (name, rows) in enumerate(rows_by_name.items())
     ]
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="旧检查点预算项目"),
         resume_state={
             "manifest": {"replay_journal": journal},
@@ -101,13 +100,13 @@ async def test_over_budget_checkpoint_is_rejected_before_restoring_dependencies(
 @pytest.mark.asyncio
 async def test_analyst_result_sse_contains_only_a_bounded_preview():
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="预览预算项目"),
     )
     rows = [{"index": index} for index in range(150)]
 
     class PreviewAgent:
-        async def run(self, prompt, deps):
+        async def run(self, prompt, deps, model):
             del prompt
             deps.dataframes["fallback_result"] = rows
             deps.result_metadata["fallback_result"] = {"truncated": False}

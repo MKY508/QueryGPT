@@ -3,6 +3,7 @@
 import asyncio
 import json
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
 import httpx
@@ -13,6 +14,7 @@ from app.services import model_engine
 from app.services.model_engine import model_session
 from app.services.model_runtime import ModelRuntimeConfigurationError
 from app.services.run_control import AnalystStoppedError, run_with_controls
+from tests.model_fixtures import synthetic_model_config
 
 
 class TrackedTransport(httpx.MockTransport):
@@ -23,7 +25,7 @@ class TrackedTransport(httpx.MockTransport):
         await super().aclose()
 
 
-CONFIG = {"model": "test-model", "base_url": "https://model.invalid/v1", "api_key": "test-only"}
+CONFIG = synthetic_model_config()
 
 
 def reply(request):
@@ -88,7 +90,7 @@ class ModelSessionTests(unittest.IsolatedAsyncioTestCase):
                 with patch.object(
                     model_engine, "create_async_http_client", return_value=client
                 ) as factory:
-                    scope = model_session({**CONFIG, "api_format": protocol})
+                    scope = model_session(replace(CONFIG, api_format=protocol))
                     factory.assert_not_called()
                     async with scope as model:
                         agent = Agent(model)
@@ -115,7 +117,7 @@ class ModelSessionTests(unittest.IsolatedAsyncioTestCase):
                     )
                 )
                 client = httpx.AsyncClient(transport=transport)
-                config = {**CONFIG, "api_format": "unsupported"} if invalid else CONFIG
+                config = replace(CONFIG, api_format="unsupported") if invalid else CONFIG
                 with patch.object(model_engine, "create_async_http_client", return_value=client):
                     with self.assertRaises(Exception) as failed:
                         async with model_session(config) as model:
@@ -189,7 +191,7 @@ class ModelSessionTests(unittest.IsolatedAsyncioTestCase):
             "create_async_http_client",
             side_effect=AssertionError("Unexpected HTTP allocation"),
         ):
-            async with model_session({}, model=injected) as model:
+            async with model_session(synthetic_model_config(), model=injected) as model:
                 self.assertIs(model, injected)
                 self.assertEqual(
                     (await Agent(model).run("No HTTP needed")).output, "Injected model"

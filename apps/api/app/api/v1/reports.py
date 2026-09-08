@@ -30,6 +30,7 @@ from app.db.tables import (
     ReportDocument,
     ReportPage,
 )
+from app.models.analysis import ChartSpec
 from app.models.common import APIResponse
 from app.models.reports import (
     ReportBlockCreate,
@@ -57,7 +58,6 @@ from app.services.analysis_playbook_runner import (
     AnalysisPlaybookRunResult,
     run_analysis_playbook,
 )
-from app.services.analyst_runtime import ChartSpec
 from app.services.golden_regression import normalize_query_key
 from app.services.project_context import load_project_context
 from app.services.report_draft import generate_report_draft_plan

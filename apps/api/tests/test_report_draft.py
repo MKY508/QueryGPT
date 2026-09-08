@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from app.db.tables import Project
 from app.models.workspace import ReportDraftCurrentReportContext
 from app.services import report_draft
 from app.services.report_draft import ReportDraftPlan
+from tests.model_fixtures import synthetic_model_config
 
 
 @pytest.mark.asyncio
@@ -112,7 +114,7 @@ async def test_planner_builds_dynamic_sections_and_filters_artifact_ids(monkeypa
         return artifacts
 
     async def fake_resolve_model(*_args, **_kwargs):
-        return {"api_key_required": False}
+        return synthetic_model_config(api_key_required=False)
 
     class FakeAgent:
         def __init__(self, _model, *, output_type, instructions, retries):
@@ -127,7 +129,7 @@ async def test_planner_builds_dynamic_sections_and_filters_artifact_ids(monkeypa
     monkeypatch.setattr(report_draft, "_require_run", fake_require_run)
     monkeypatch.setattr(report_draft, "_load_artifacts", fake_load_artifacts)
     monkeypatch.setattr(report_draft, "_resolve_model", fake_resolve_model)
-    monkeypatch.setattr(report_draft, "build_pydantic_model", lambda _config: object())
+    monkeypatch.setattr(report_draft, "model_session", lambda _config, **_kwargs: nullcontext(object()))
     monkeypatch.setattr(report_draft, "Agent", FakeAgent)
 
     current_report = ReportDraftCurrentReportContext(
@@ -217,7 +219,7 @@ async def test_planner_supports_summary_only_runs_and_repairs_blank_section_copy
         return []
 
     async def fake_resolve_model(*_args, **_kwargs):
-        return {"api_key_required": False}
+        return synthetic_model_config(api_key_required=False)
 
     class FakeAgent:
         def __init__(self, *_args, **_kwargs):
@@ -229,7 +231,7 @@ async def test_planner_supports_summary_only_runs_and_repairs_blank_section_copy
     monkeypatch.setattr(report_draft, "_require_run", fake_require_run)
     monkeypatch.setattr(report_draft, "_load_artifacts", fake_load_artifacts)
     monkeypatch.setattr(report_draft, "_resolve_model", fake_resolve_model)
-    monkeypatch.setattr(report_draft, "build_pydantic_model", lambda _config: object())
+    monkeypatch.setattr(report_draft, "model_session", lambda _config, **_kwargs: nullcontext(object()))
     monkeypatch.setattr(report_draft, "Agent", FakeAgent)
 
     plan = await report_draft.generate_report_draft_plan(

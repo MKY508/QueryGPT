@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from copy import deepcopy
 from datetime import UTC, datetime
 from uuid import UUID
@@ -24,6 +25,7 @@ from app.services.standing_workspace import (
     StandingWorkspaceError,
     validate_playbook_execution_evidence,
 )
+from tests.model_fixtures import synthetic_model_config
 
 
 async def _seed_validated_run(
@@ -1090,8 +1092,8 @@ async def test_runtime_context_exposes_compact_candidate_and_prompt_requires_rev
         & {"source_id", "sql", "code", "last_run_id", "row_count", "truncated"}
     )
 
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: TestModel())
-    runtime = PydanticAnalystRuntime(model_config={}, project_context=context)
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     try:
         instructions = runtime._instructions()
     finally:

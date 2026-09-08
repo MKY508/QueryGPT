@@ -125,7 +125,7 @@
     "lastDiagnostic": "最近一次诊断",
     "result": "结果",
     "latency": "耗时",
-    "resolvedProvider": "识别到的服务商",
+    "sourceProvider": "服务商",
     "apiFormat": "API 格式",
     "baseUrl": "接口地址",
     "errorCategoryLabel": "错误分类",

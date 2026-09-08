@@ -1,28 +1,25 @@
 """Model protocol boundary shared by investigations and presentation tasks.
 
 Reuse PydanticAI's model implementations; business tools never select an SDK.
-Provider identity chooses defaults, while the explicit API format chooses the wire
-protocol. See docs/architecture/ARCHITECTURE.md for the architectural references.
+Configuration is resolved before entering this boundary; the explicit API format
+chooses the wire protocol. See docs/architecture/ARCHITECTURE.md for references.
 """
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, nullcontext
-from typing import Any
 
 import httpx
 from pydantic_ai.models import Model, create_async_http_client
 
 from app.services.model_runtime import (
     ModelRuntimeConfigurationError,
-    default_api_format,
-    default_base_url,
-    normalize_runtime_base_url,
+    ResolvedModelConfig,
 )
 
 
 @asynccontextmanager
 async def model_session(
-    config: dict[str, Any],
+    config: ResolvedModelConfig,
     *,
     model: Model | None = None,
     http_client: httpx.AsyncClient | None = None,
@@ -45,11 +42,11 @@ async def model_session(
         yield _build_model(config, http_client=client)
 
 
-def _build_model(config: dict[str, Any], *, http_client: httpx.AsyncClient) -> Model:
+def _build_model(config: ResolvedModelConfig, *, http_client: httpx.AsyncClient) -> Model:
     """Build an SDK adapter using the session's explicitly owned or borrowed pool."""
 
-    provider = str(config.get("source_provider") or "openai")
-    api_format = config.get("api_format") or default_api_format(provider)
+    provider = config.source_provider
+    api_format = config.api_format
     if api_format not in {
         "openai_compatible",
         "openai_responses",
@@ -58,16 +55,12 @@ def _build_model(config: dict[str, Any], *, http_client: httpx.AsyncClient) -> M
         "custom",
     }:
         raise ModelRuntimeConfigurationError("Unsupported model API format")
-    base_url = config.get("base_url") or default_base_url(provider)
-    if not base_url:
-        raise ModelRuntimeConfigurationError("Model service requires an explicit base URL")
-    base_url = normalize_runtime_base_url(base_url, provider=provider, api_format=api_format)
-    model_name = str(config.get("model") or "gpt-4o")
+    model_name = config.model
     client_options = {
-        "api_key": config.get("api_key") or "not-needed",
-        "base_url": base_url,
-        "default_headers": config.get("headers") or None,
-        "default_query": config.get("query_params") or None,
+        "api_key": config.api_key or "not-needed",
+        "base_url": config.base_url,
+        "default_headers": config.headers or None,
+        "default_query": config.query_params or None,
         "http_client": http_client,
     }
 

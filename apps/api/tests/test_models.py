@@ -1,5 +1,6 @@
 """Model configuration API tests"""
 
+from contextlib import nullcontext
 from uuid import UUID
 
 import pytest
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1 import models as models_api
 from app.db.tables import AppSettings, Model
+from tests.model_fixtures import synthetic_model_config
 
 
 @pytest.mark.asyncio
@@ -198,7 +200,7 @@ async def test_legacy_models_list_mode_still_proves_real_chat_completion(
 
     def fake_build(config):
         observed["config"] = config
-        return "runtime-model"
+        return nullcontext("runtime-model")
 
     class FakeAgent:
         def __init__(self, runtime_model, **_kwargs):
@@ -208,7 +210,7 @@ async def test_legacy_models_list_mode_still_proves_real_chat_completion(
             observed["prompt"] = prompt
             return "OK"
 
-    monkeypatch.setattr(models_api, "build_pydantic_model", fake_build)
+    monkeypatch.setattr(models_api, "model_session", fake_build)
     monkeypatch.setattr(models_api, "Agent", FakeAgent)
 
     response = await client.post(f"/api/v1/config/models/{model_id}/test")
@@ -218,15 +220,14 @@ async def test_legacy_models_list_mode_still_proves_real_chat_completion(
     assert response.json()["data"]["message"] == "连接成功"
     assert observed["runtime_model"] == "runtime-model"
     assert observed["prompt"] == "OK"
-    assert observed["config"] == {
-        "model": "custom-model",
-        "api_key": "saved-key",
-        "base_url": "https://gateway.example.com/v1",
-        "api_format": "openai_compatible",
-        "source_provider": "custom",
-        "headers": {},
-        "query_params": {},
-    }
+    assert observed["config"] == synthetic_model_config(
+        model="custom-model",
+        model_id=model_id,
+        display_name="List-capable gateway",
+        api_key="saved-key",
+        base_url="https://gateway.example.com/v1",
+        source_provider="custom",
+    )
 
     listed = (await client.get("/api/v1/config/models")).json()["data"][0]
     assert listed["health_status"] == "healthy"
@@ -256,7 +257,7 @@ async def test_model_healthcheck_never_reflects_raw_provider_error(
     )
     model_id = created.json()["data"]["id"]
 
-    monkeypatch.setattr(models_api, "build_pydantic_model", lambda _config: "runtime-model")
+    monkeypatch.setattr(models_api, "model_session", lambda _config, **_kwargs: nullcontext("runtime-model"))
 
     class FailingAgent:
         def __init__(self, *_args, **_kwargs):

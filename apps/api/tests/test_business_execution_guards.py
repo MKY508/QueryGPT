@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path
 
@@ -22,15 +23,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.tables import AnalysisRun, Conversation, Project, ProjectDataSource, SemanticEntry
 from app.services import analyst_runtime
 from app.services.analysis_checkpoint import CheckpointDriftError, stable_payload_hash
-from app.services.analyst_runtime import (
-    PydanticAnalystRuntime,
-    _enforce_relationship_acceptance,
-    _result_profile,
-)
+from app.services.analyst import knowledge_tools, python_tools
+from app.services.analyst.relationships import _enforce_relationship_acceptance
+from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.data_preflight import run_preflight
 from app.services.metric_formula import aggregate_decimal_metric, apply_metric_formula
 from app.services.project_context import ProjectRuntimeContext
 from app.services.result_filters import resolve_confirmed_rule_strategy
+from app.services.result_profile import profile_result
+from tests.model_fixtures import synthetic_model_config
 
 
 def _write_orders(path: Path) -> None:
@@ -302,7 +303,7 @@ def test_confirmed_rule_uses_stored_strategy_without_model_filter_parameters():
 )
 def test_result_validation_rejects_requested_missing_columns(keys: list[str], numeric: list[str]):
     with pytest.raises(ValueError, match="不存在"):
-        _result_profile(
+        profile_result(
             [{"store": "一店", "amount": 12}],
             key_columns=keys,
             numeric_columns=numeric,
@@ -311,7 +312,7 @@ def test_result_validation_rejects_requested_missing_columns(keys: list[str], nu
 
 def test_result_validation_rejects_numeric_column_without_finite_values():
     with pytest.raises(ValueError, match="有限数值"):
-        _result_profile(
+        profile_result(
             [{"amount": "N/A"}, {"amount": None}, {"amount": float("inf")}],
             key_columns=[],
             numeric_columns=["amount"],
@@ -351,11 +352,11 @@ async def test_python_join_is_rejected_before_execution_or_history_pollution(
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="Python 关联门禁"),
     )
     runtime.deps.dataframes.update(
@@ -377,7 +378,7 @@ async def test_python_join_is_rejected_before_execution_or_history_pollution(
         executed += 1
         raise AssertionError("Python join must be rejected before execution")
 
-    monkeypatch.setattr(runtime, "_execute_python_code", should_not_execute)
+    monkeypatch.setattr(python_tools, "execute_python_code", should_not_execute)
 
     with capture_run_messages() as messages:
         _ = [event async for event in runtime.execute(query="检查这段 Python 关联")]
@@ -494,10 +495,10 @@ async def test_required_relationship_candidate_can_trial_and_complete_only_after
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
-    runtime = PydanticAnalystRuntime(model_config={}, project_context=context)
+    runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     runtime.deps.dataframes.update(
         {
             "orders": [{"order_id": "O-1", "store_id": "S-1", "amount": 32}],
@@ -636,10 +637,10 @@ async def test_ordinary_candidate_is_not_auto_selected_or_post_bound_by_join(
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
-    runtime = PydanticAnalystRuntime(model_config={}, project_context=context)
+    runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     runtime.deps.dataframes.update(
         {
             "orders": [{"order_id": "O-1", "store_id": "S-1", "amount": 32}],
@@ -737,11 +738,11 @@ async def test_metric_column_strategy_blocks_wrong_amount_aggregate_and_recovers
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="净收入门禁"),
     )
     runtime.deps.dataframes["policy_rows"] = [
@@ -855,16 +856,16 @@ async def test_metric_formula_is_materialized_and_aggregated_with_decimal(
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     monkeypatch.setattr(
-        analyst_runtime,
+        knowledge_tools,
         "resolve_confirmed_rule_strategy",
         lambda *_args, **_kwargs: definition,
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="公式指标门禁",
             confirmed_knowledge=[knowledge],
@@ -1047,8 +1048,8 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
 
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(lambda _messages, _info: ModelResponse(parts=[])),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(lambda _messages, _info: ModelResponse(parts=[]))),
     )
     monkeypatch.setattr(
         analyst_runtime,
@@ -1060,7 +1061,7 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
         confirmed_knowledge=[knowledge],
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=project_context,
         resume_state={
             "manifest": deepcopy(manifest),
@@ -1076,7 +1077,7 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
     drifted_definition["action"]["null_policy"] = "zero"
     project_context.confirmed_knowledge[0]["definition"] = drifted_definition
     drifted_runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=project_context,
         resume_state={
             "manifest": deepcopy(manifest),
@@ -1162,11 +1163,11 @@ async def test_checkpoint_replay_filters_legacy_unscoped_relationship_proposals(
     }
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(lambda _messages, _info: ModelResponse(parts=[])),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(lambda _messages, _info: ModelResponse(parts=[]))),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="旧关系证据恢复"),
         resume_state={
             "manifest": manifest,

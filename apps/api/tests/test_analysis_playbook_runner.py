@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,6 +14,7 @@ from pydantic import ValidationError
 from pydantic_ai import ModelRetry
 from pydantic_ai.models.test import TestModel
 
+from app.models.analysis import AnalysisReport
 from app.models.workspace import AnalysisPlaybookResponse
 from app.services import analysis_playbook_runner, analyst_runtime, structured_query
 from app.services.analysis_checkpoint import stable_payload_hash
@@ -21,18 +23,15 @@ from app.services.analysis_playbook_runner import (
     AnalysisPlaybookRunnerError,
     run_analysis_playbook,
 )
-from app.services.analyst_runtime import (
-    AnalysisReport,
-    AnalystStoppedError,
-    PydanticAnalystRuntime,
-    _ensure_result_write_allowed,
-)
+from app.services.analyst.result_store import _ensure_result_write_allowed
+from app.services.analyst_runtime import AnalystStoppedError, PydanticAnalystRuntime
 from app.services.project_context import ProjectRuntimeContext
 from app.services.standing_workspace import (
     StandingWorkspaceError,
     validate_playbook_execution_evidence,
 )
 from app.services.structured_query import profile_schema_signature
+from tests.model_fixtures import synthetic_model_config
 
 
 def _file_source(path: Path) -> dict:
@@ -237,10 +236,10 @@ async def test_runtime_executes_required_v3_result_before_model(
     )
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: TestModel(),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(TestModel()),
     )
-    runtime = PydanticAnalystRuntime(model_config={}, project_context=context)
+    runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     observed: dict[str, object] = {}
 
     async def fake_run_agent(prompt: str, _stop_checker):
@@ -290,10 +289,10 @@ async def test_runtime_can_cancel_system_playbook_before_model(
     )
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: TestModel(),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(TestModel()),
     )
-    runtime = PydanticAnalystRuntime(model_config={}, project_context=context)
+    runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     try:
         with pytest.raises(AnalystStoppedError, match="已停止"):
             async for _event in runtime.execute(
@@ -323,11 +322,11 @@ async def test_runtime_rejects_poisoned_resumed_system_result(
     )
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: TestModel(),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(TestModel()),
     )
-    original = PydanticAnalystRuntime(model_config={}, project_context=context)
-    poisoned = PydanticAnalystRuntime(model_config={}, project_context=context)
+    original = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
+    poisoned = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     try:
         await original._prepare_required_system_analysis()
         fake_rows = [{"category": "poison", "revenue": 999.0}]

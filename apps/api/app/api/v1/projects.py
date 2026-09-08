@@ -120,7 +120,6 @@ from app.models.workspace import (
     validate_semantic_definition_compatibility,
 )
 from app.services.analysis_checkpoint import stable_payload_hash
-from app.services.analyst_runtime import build_pydantic_model
 from app.services.app_settings import get_or_create_app_settings, settings_to_dict
 from app.services.business_decision_slots import canonicalize_decision_key
 from app.services.correction_targets import (
@@ -144,6 +143,7 @@ from app.services.database_value_preflight import (
 from app.services.dependency_manager import ProjectDependencyManager
 from app.services.execution_context import ExecutionContextResolver
 from app.services.golden_regression import normalize_query_key
+from app.services.model_engine import model_session
 from app.services.project_context import (
     _view_name,
     load_project_context,
@@ -2674,19 +2674,17 @@ async def _ai_suggestions(
         settings_data=settings_to_dict(settings_record),
     )
     model_config = await resolver.get_model_config()
-    if model_config.get("api_key_required") and not model_config.get("api_key"):
+    if not model_config.credentials_available:
         return None
-    agent = Agent(
-        build_pydantic_model(model_config),
-        output_type=_SuggestedQuestionSet,
-        instructions=_SUGGESTION_AI_INSTRUCTIONS[payload.locale],
-        retries={"output": 2},
-    )
     try:
-        result = await asyncio.wait_for(
-            agent.run(json.dumps(context, ensure_ascii=False, default=str)),
-            timeout=15,
-        )
+        async with asyncio.timeout(15), model_session(model_config) as runtime_model:
+            agent = Agent(
+                runtime_model,
+                output_type=_SuggestedQuestionSet,
+                instructions=_SUGGESTION_AI_INSTRUCTIONS[payload.locale],
+                retries={"output": 2},
+            )
+            result = await agent.run(json.dumps(context, ensure_ascii=False, default=str))
     except Exception as exc:
         logger.info("AI suggestions unavailable, using preflight fallback: %s", exc)
         return None

@@ -15,6 +15,7 @@ from app.services.model_runtime import (
     ModelCredentialError,
     ModelRuntimeConfigurationError,
     ModelSelectionError,
+    ResolvedModelConfig,
     resolve_model_runtime,
 )
 
@@ -40,7 +41,7 @@ class ExecutionContextResolver:
         self.allow_default_connection_fallback = allow_default_connection_fallback
         self._resolved_model_record: Model | None = None
         self._resolved_connection_record: Connection | None = None
-        self._resolved_model_config: dict[str, Any] | None = None
+        self._resolved_model_config: ResolvedModelConfig | None = None
         self._resolved_connection_config: dict[str, Any] | None = None
 
     def workspace_settings(self) -> dict[str, Any]:
@@ -123,13 +124,13 @@ class ExecutionContextResolver:
         if commit:
             await self.db.commit()
 
-    async def get_model_config(self) -> dict[str, Any]:
+    async def get_model_config(self) -> ResolvedModelConfig:
         if self._resolved_model_config is not None:
             return self._resolved_model_config
 
         model = await self.get_model_record()
         try:
-            resolved, extra_options = resolve_model_runtime(
+            resolved, _ = resolve_model_runtime(
                 model,
                 fallback_model=settings.DEFAULT_MODEL,
                 fallback_api_key=settings.OPENAI_API_KEY if model is None else None,
@@ -142,22 +143,7 @@ class ExecutionContextResolver:
             await self.record_model_health(healthy=False, error_category="model_endpoint")
             raise
 
-        self._resolved_model_config = {
-            "provider": resolved.litellm_provider,
-            "resolved_provider": resolved.litellm_provider,
-            "source_provider": resolved.source_provider,
-            "model": resolved.model,
-            "display_name": resolved.display_name,
-            "base_url": resolved.base_url,
-            "api_key": resolved.api_key,
-            "api_format": resolved.api_format,
-            "api_key_required": resolved.api_key_required,
-            "headers": resolved.headers,
-            "query_params": resolved.query_params,
-            "healthcheck_mode": resolved.healthcheck_mode,
-            "extra_options": extra_options.model_dump(),
-            "model_id": str(model.id) if model else None,
-        }
+        self._resolved_model_config = resolved
         return self._resolved_model_config
 
     async def get_connection_record(self) -> Connection | None:
@@ -248,27 +234,12 @@ class ExecutionContextResolver:
     async def get_runtime_snapshot(self) -> dict[str, Any]:
         model_config = await self.get_model_config()
         connection = await self.get_connection_record()
-        source_provider = model_config.get("source_provider")
-        resolved_provider = model_config.get("resolved_provider") or model_config.get("provider")
-        api_format = model_config.get("api_format")
-        provider_summary: str | None
-        if source_provider and resolved_provider and source_provider != resolved_provider:
-            provider_summary = f"{source_provider} -> {resolved_provider} · {api_format}"
-        else:
-            provider_summary = f"{source_provider} · {api_format}" if source_provider else None
-
         return {
-            "model_id": model_config.get("model_id"),
-            "model_name": model_config.get("display_name"),
-            "model_identifier": model_config.get("model"),
-            "source_provider": source_provider,
-            "resolved_provider": resolved_provider,
-            "provider_summary": provider_summary,
+            **model_config.public_snapshot(diagnostics=True),
             "connection_id": str(connection.id) if connection else None,
             "connection_name": connection.name if connection else None,
             "connection_driver": connection.driver if connection else None,
             "connection_host": connection.host if connection else None,
             "database_name": connection.database_name if connection else None,
             "context_rounds": self.context_rounds,
-            "api_format": api_format,
         }

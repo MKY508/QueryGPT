@@ -21,6 +21,7 @@ from app.models.workspace import (
 )
 from app.services.execution import ExecutionService
 from app.services.standing_workspace import canonical_hash
+from tests.model_fixtures import synthetic_model_config
 
 
 def _materiality() -> dict:
@@ -374,7 +375,7 @@ async def test_rejected_standing_result_never_emits_a_completed_terminal_event(
     service = ExecutionService(db_session, project_id=project.id)
 
     class Inputs:
-        model_config = {"model": "test"}
+        model_config = synthetic_model_config(model="test")
         history: list[dict] = []
 
     class FakeEngine:

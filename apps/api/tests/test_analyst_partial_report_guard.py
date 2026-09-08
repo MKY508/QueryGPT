@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from typing import Any
 
 import pytest
@@ -15,15 +16,16 @@ from pydantic_ai import (
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from app.models import SSEEventType
+from app.models.analysis import AnalysisReport
 from app.services import analyst_runtime
 from app.services.analysis_checkpoint import stable_payload_hash
-from app.services.analyst_runtime import (
-    AnalysisReport,
-    PydanticAnalystRuntime,
+from app.services.analyst.report_validation import (
     _allows_honest_partial_report,
     _business_evidence_from_tools,
 )
+from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.project_context import ProjectRuntimeContext
+from tests.model_fixtures import synthetic_model_config
 
 
 def _report(
@@ -136,11 +138,11 @@ def _runtime_with_truncated_sample(
     monkeypatch.setattr(models, "ALLOW_MODEL_REQUESTS", False)
     monkeypatch.setattr(
         analyst_runtime,
-        "build_pydantic_model",
-        lambda _config: FunctionModel(model),
+        "model_session",
+        lambda _config, **_kwargs: nullcontext(FunctionModel(model)),
     )
     runtime = PydanticAnalystRuntime(
-        model_config={},
+        model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(
             name="有限样本门禁",
             sources=[

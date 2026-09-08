@@ -24,9 +24,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.db.tables import AnalysisRun, ArtifactRecord, Project
 from app.models.workspace import ReportDraftCurrentReportContext
-from app.services.analyst_runtime import build_pydantic_model
 from app.services.app_settings import get_or_create_app_settings, settings_to_dict
 from app.services.execution_context import ExecutionContextResolver
+from app.services.model_engine import model_session
+from app.services.model_runtime import ResolvedModelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +205,7 @@ async def _load_artifacts(db: AsyncSession, project_id: UUID, run_id: UUID) -> l
     return list(result.scalars().all())
 
 
-async def _resolve_model(db: AsyncSession, project_id: UUID) -> dict[str, Any] | None:
+async def _resolve_model(db: AsyncSession, project_id: UUID) -> ResolvedModelConfig | None:
     settings_record = await get_or_create_app_settings(db)
     resolver = ExecutionContextResolver(
         db,
@@ -256,30 +257,19 @@ async def generate_report_draft_plan(
         if artifact.kind != "report"
     ]
     model_config = await _resolve_model(db, project_id)
-    if not model_config or (
-        model_config.get("api_key_required") and not model_config.get("api_key")
-    ):
+    if model_config is None or not model_config.credentials_available:
         return None
-
-    try:
-        runtime_model = build_pydantic_model(model_config)
-    except Exception as exc:  # noqa: BLE001
-        logger.info("report_draft: failed to build model: %s", exc)
-        return None
-
-    agent = Agent(
-        runtime_model,
-        output_type=ReportDraftPlan,
-        instructions=_build_instructions(language),
-        retries={"output": 2},
-    )
 
     prompt = _build_prompt(run, artifacts, language, current_report)
     try:
-        result = await asyncio.wait_for(
-            agent.run(prompt),
-            timeout=timeout_seconds,
-        )
+        async with asyncio.timeout(timeout_seconds), model_session(model_config) as runtime_model:
+            agent = Agent(
+                runtime_model,
+                output_type=ReportDraftPlan,
+                instructions=_build_instructions(language),
+                retries={"output": 2},
+            )
+            result = await agent.run(prompt)
     except TimeoutError:
         logger.info("report_draft: LLM timed out after %ss", timeout_seconds)
         return None

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from copy import deepcopy
 from uuid import UUID
 
@@ -11,14 +12,13 @@ from pydantic_ai.models.test import TestModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, Project, ProjectDataSource
+from app.models.analysis import AnalysisReport
 from app.services import analyst_runtime
 from app.services.analysis_checkpoint import stable_payload_hash
-from app.services.analyst_runtime import (
-    AnalysisReport,
-    PydanticAnalystRuntime,
-    _trusted_reference_revalidation_failure,
-)
+from app.services.analyst.report_validation import _trusted_reference_revalidation_failure
+from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.project_context import load_project_context
+from tests.model_fixtures import synthetic_model_config
 
 
 async def _seed_validated_reference_run(
@@ -259,8 +259,8 @@ async def test_historical_numbers_require_a_fresh_query_and_final_validation(
     assert public_reference["historical"] is True
     assert public_reference["requires_current_revalidation"] is True
 
-    monkeypatch.setattr(analyst_runtime, "build_pydantic_model", lambda _: TestModel())
-    runtime = PydanticAnalystRuntime(model_config={}, project_context=context)
+    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     report = AnalysisReport(
         status="completed",
         title="本期订单",

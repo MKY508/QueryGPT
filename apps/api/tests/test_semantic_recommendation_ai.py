@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -11,6 +12,7 @@ from app.services import semantic_recommendation_ai as recommendation_ai
 from app.services.semantic_recommendation_ai import (
     build_semantic_recommendation_enhancer,
 )
+from tests.model_fixtures import synthetic_model_config
 
 
 @pytest.mark.asyncio
@@ -44,7 +46,7 @@ async def test_ai_semantic_enhancer_uses_selected_model_and_only_returns_copy(
             captured.update(kwargs)
 
         async def get_model_config(self):
-            return {"provider": "test", "api_key_required": False}
+            return synthetic_model_config(api_key_required=False)
 
     class _Agent:
         def __init__(self, runtime_model, **_kwargs):
@@ -66,8 +68,8 @@ async def test_ai_semantic_enhancer_uses_selected_model_and_only_returns_copy(
     monkeypatch.setattr(recommendation_ai, "ExecutionContextResolver", _Resolver)
     monkeypatch.setattr(
         recommendation_ai,
-        "build_pydantic_model",
-        lambda _config: "runtime-model",
+        "model_session",
+        lambda _config, **_kwargs: nullcontext("runtime-model"),
     )
     monkeypatch.setattr(recommendation_ai, "Agent", _Agent)
 

@@ -7,8 +7,9 @@ from types import SimpleNamespace
 import pytest
 
 from app.models import SSEEvent, SSEEventType
+from app.models.analysis import AnalysisReport
 from app.services.analysis_checkpoint import stable_payload_hash
-from app.services.analyst_runtime import AnalysisReport, _bind_structured_visualization
+from app.services.analyst.report_validation import _bind_structured_visualization
 
 
 def _deps_with_result(
@@ -42,6 +43,24 @@ def _report(visualization: dict) -> AnalysisReport:
         summary="销售额已按月汇总。",
         visualization=visualization,
     )
+
+
+def test_chart_spec_binds_exact_numeric_strings_without_rewriting_values_or_hash() -> None:
+    rows = [{"category": "001", "amount": "9007199254740993.0123"}]
+    deps = _deps_with_result("amounts", rows)
+    report = _report(
+        {
+            "type": "bar",
+            "result_name": "amounts",
+            "encoding": {"x": {"field": "category"}, "y": [{"field": "amount"}]},
+        }
+    )
+    bound = _bind_structured_visualization(deps, report, "amounts")
+    assert bound is not None
+    assert bound.data == rows
+    assert bound.data_ref.result_hash == stable_payload_hash(rows)
+    report.visualization.encoding.y[0].field = "category"
+    assert _bind_structured_visualization(deps, report, "amounts") is None
 
 
 def test_chart_spec_replaces_model_rows_and_result_hash() -> None:
@@ -112,7 +131,7 @@ def test_chart_spec_drops_unknown_measures_and_rejects_unknown_x_field() -> None
 
 
 def test_chart_spec_rejects_non_numeric_measures_and_scatter_categories() -> None:
-    rows = [{"品类": "办公用品", "文本金额": "180", "是否有效": True, "销售额": 180.0}]
+    rows = [{"品类": "办公用品", "文本金额": "180元", "是否有效": True, "销售额": 180.0}]
     deps = _deps_with_result("category_sales", rows)
     report = _report(
         {

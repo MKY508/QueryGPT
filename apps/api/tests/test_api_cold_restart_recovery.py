@@ -16,6 +16,7 @@ import os
 import secrets
 import subprocess
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -160,7 +161,7 @@ def _resume_after_cold_start(seed: dict[str, Any]) -> dict[str, Any]:
             "summary": "已从退出前的安全检查点恢复，并完成剩余整理。",
         },
     )
-    analyst_runtime.build_pydantic_model = lambda _config: test_model
+    analyst_runtime.model_session = lambda _config, **_kwargs: nullcontext(test_model)
 
     project_id = seed["project_id"]
     conversation_id = seed["conversation_id"]

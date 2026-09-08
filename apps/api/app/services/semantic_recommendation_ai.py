@@ -2,8 +2,8 @@
 
 The deterministic recommendation service owns candidate identity and every
 executable binding.  This module only lets the configured model improve names,
-descriptions, examples, and synonyms.  Provider failures return a truthful
-``None`` fallback and never block an inventory job.
+descriptions, examples, and synonyms. The factory returns ``None`` when AI is
+unavailable; invocation failures are handled by the deterministic consumer.
 """
 
 from __future__ import annotations
@@ -18,9 +18,9 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.analyst_runtime import build_pydantic_model
 from app.services.app_settings import get_or_create_app_settings, settings_to_dict
 from app.services.execution_context import ExecutionContextResolver
+from app.services.model_engine import model_session
 from app.services.semantic_recommendations import (
     SemanticRecommendationEnhancement,
     SemanticRecommendationEnhancer,
@@ -79,22 +79,14 @@ async def build_semantic_recommendation_enhancer(
             settings_data=settings_to_dict(settings_record),
         )
         model_config = await resolver.get_model_config()
-        if model_config.get("api_key_required") and not model_config.get("api_key"):
+        if not model_config.credentials_available:
             return None
-        runtime_model = build_pydantic_model(model_config)
     except Exception as exc:  # noqa: BLE001 - optional enhancement must fail open
         logger.info(
             "Semantic recommendation model unavailable; using deterministic presentation",
             error_type=type(exc).__name__,
         )
         return None
-
-    agent = Agent(
-        runtime_model,
-        output_type=_SemanticRecommendationEnhancementSet,
-        instructions=_AI_INSTRUCTIONS[locale],
-        retries={"output": 2},
-    )
 
     async def enhance(
         items: list[dict[str, object]],
@@ -109,10 +101,14 @@ async def build_semantic_recommendation_enhancer(
                 "synonyms",
             ],
         }
-        result = await asyncio.wait_for(
-            agent.run(json.dumps(prompt, ensure_ascii=False, default=str)),
-            timeout=15,
-        )
+        async with asyncio.timeout(15), model_session(model_config) as runtime_model:
+            agent = Agent(
+                runtime_model,
+                output_type=_SemanticRecommendationEnhancementSet,
+                instructions=_AI_INSTRUCTIONS[locale],
+                retries={"output": 2},
+            )
+            result = await agent.run(json.dumps(prompt, ensure_ascii=False, default=str))
         return result.output.items
 
     return enhance
