@@ -51,6 +51,7 @@ from app.services.chat_runtime import (
     resolve_chat_request,
 )
 from app.services.checkpoint_contract import stable_payload_hash
+from app.services.conversation_state import ConversationTurnState
 from app.services.execution import (
     DecisionSlotConflictError,
     ExecutionService,
@@ -222,11 +223,20 @@ async def _chat_stream_response(
             client_stream_id=client_stream_id,
         )
         stream_attempt_id = uuid4().hex
+        turn_state = ConversationTurnState(current_conversation_id, stream_attempt_id)
         accumulator: ChatEventAccumulator | None = None
         assistant_message_persisted = False
         completion: AnalysisCompletion | None = None
+        execution_service: ExecutionService | None = None
 
         try:
+            async with AnalysisCompletion(db).transaction():
+                claimed = await turn_state.claim(
+                    db, is_current=partial(active_query_registry.is_current, query_key)
+                )
+            if not claimed:
+                yield SSEEvent.error("CANCELLED", t("error.cancelled", language)).to_sse()
+                return
             yield SSEEvent.progress(
                 "start",
                 get_progress_message("start", language),
@@ -250,12 +260,20 @@ async def _chat_stream_response(
                 context_rounds=request_config.context_rounds,
                 settings_data=settings_data,
                 project_id=request_config.project_id,
+                stream_attempt_id=stream_attempt_id,
                 semantic_validation_selection=[
                     item.model_dump(mode="json") for item in (semantic_validation_selection or [])
                 ],
             )
 
             runtime_snapshot = await execution_service.get_runtime_snapshot()
+            async with AnalysisCompletion(db).transaction():
+                activated = await turn_state.apply(
+                    db, partial(apply_runtime_snapshot, runtime_snapshot=runtime_snapshot)
+                )
+            if not activated:
+                yield SSEEvent.error("CANCELLED", t("error.cancelled", language)).to_sse()
+                return
             yield SSEEvent.progress(
                 "context_ready",
                 get_progress_message("context_ready", language),
@@ -264,15 +282,12 @@ async def _chat_stream_response(
                 execution_context=runtime_snapshot,
             ).to_sse()
 
-            apply_runtime_snapshot(conversation, runtime_snapshot)
-            await db.commit()
-
             accumulator = ChatEventAccumulator(
                 original_query=effective_query,
                 runtime_snapshot=runtime_snapshot,
             )
             accumulator.metadata["stream_attempt_id"] = stream_attempt_id
-            turn = ChatTurn(current_conversation_id, accumulator)
+            turn = ChatTurn(turn_state, accumulator)
             completion = AnalysisCompletion(db, stage_transcript=partial(turn.stage, db))
             terminal_events: list[SSEEvent] = []
             async with aclosing(
@@ -336,23 +351,17 @@ async def _chat_stream_response(
             if assistant_message_persisted or (completion is not None and completion.committed):
                 raise
             with CancelScope(shield=True):
-                conversation = await db.get(Conversation, current_conversation_id)
-                if conversation is not None:
-                    mark_conversation_exception(conversation, t("error.cancelled", language))
-                run_result = await db.execute(
-                    select(AnalysisRun)
-                    .where(
-                        AnalysisRun.conversation_id == current_conversation_id,
-                        AnalysisRun.state == "needs_attention",
-                    )
-                    .order_by(AnalysisRun.updated_at.desc())
+                await turn_state.apply(
+                    db, partial(mark_conversation_exception, message=t("error.cancelled", language))
                 )
-                interrupted_run = run_result.scalars().first()
+                run_id = execution_service.analysis_run_id if execution_service is not None else None
+                interrupted_run = await db.get(AnalysisRun, run_id) if run_id is not None else None
                 if interrupted_run is not None:
                     await ensure_recovery_message(
                         db,
                         interrupted_run,
                         reason="client_disconnected",
+                        expected_attempt_id=stream_attempt_id,
                     )
                 await db.commit()
             raise
@@ -426,7 +435,15 @@ async def _chat_stream_response(
                     },
                 )
             )
-            conversation.status = "error"
+            await turn_state.apply(
+                db,
+                partial(
+                    mark_conversation_error,
+                    runtime_snapshot={},
+                    query=effective_query,
+                    error_payload=failure_event.data,
+                ),
+            )
             await db.commit()
             yield failure_event.to_sse()
         except Exception:
@@ -463,7 +480,6 @@ async def _chat_stream_response(
             ):
                 try:
                     await db.rollback()
-                    conversation = await db.get(Conversation, current_conversation_id)
                     existing_result = await db.execute(
                         select(Message)
                         .where(
@@ -495,13 +511,15 @@ async def _chat_stream_response(
                     else:
                         existing_message.content = accumulator.build_assistant_content()
                         existing_message.extra_data = failure_metadata
-                    if conversation is not None:
-                        mark_conversation_error(
-                            conversation,
+                    await turn_state.apply(
+                        db,
+                        partial(
+                            mark_conversation_error,
                             runtime_snapshot=accumulator.runtime_snapshot,
                             query=effective_query,
                             error_payload=accumulator.error_payload,
-                        )
+                        ),
+                    )
                     await db.commit()
                 except Exception:
                     await db.rollback()

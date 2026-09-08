@@ -20,7 +20,7 @@ ReceiptBI 不是“模型先写一段 SQL，再固定执行一段 Python”的�
 | 模型引擎 | `model_engine.py` 的 `model_session` 按任务管理连接池；显式协议选择 Chat Completions、Responses 或 Anthropic 适配器，支持借用外部 `Model` / HTTP 客户端 | 供应商模型目录、上下文与图像等逐模型能力发现 |
 | 任务控制 | `run_control.py` 持有并收束子任务，统一截止时间与停止检查；进度等待由事件或任务完成唤醒 | 执行服务、检查点与前端运行状态收敛到一个任务合同 |
 | 数据工具 | `query_compiler.py` 编译、`file_query.py` 读取、`result_profile.py` 校验结果；Agent 与保存方法执行器复用同一实现 | 收敛来源查询的取消和资源生命周期 |
-| 工具与会话 | `analyst/toolsets.py` 用 PydanticAI 工具集组合 15 个独立工具；`session.py` 持有当前调查状态；`recovery.py` 校验并装入恢复状态；`report_validation.py` 独立验收报告 | 运行所有权与恢复调度仍需收敛 |
+| 工具与会话 | `analyst/toolsets.py` 用 PydanticAI 工具集组合 15 个独立工具；`session.py` 持有当前调查状态；`recovery.py` 校验并装入恢复状态；`report_validation.py` 独立验收报告 | 检查点写入与恢复调度仍需收敛 |
 | 数据合同 | `models/analysis.py` 定义报告与图表，`models/query.py` 定义工具输入；`models/analysis_state.py` 定义前后端共用的调查状态；`analysis_completion.py` 统一提交结果与聊天记录 | 进度、中断和启动恢复的事务边界收敛 |
 
 这不是“已经可随意切换 Codex/Hermes/Pi 引擎”的声明。当前直接复用已安装的 PydanticAI；外部编程 Agent 没有接入，也没有新增运行时依赖。
@@ -35,7 +35,9 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 
 调查流逐层拥有下层资源：`AnalysisStreamResponse` 关闭聊天流，聊天流关闭执行流，执行流关闭运行时，运行时先收束模型任务再清理 Python 工作区。提前关闭、处理事件失败与 ASGI 断连都经过同一释放链；异步清理和中断记录不受 ASGI 已取消作用域再次打断。
 
-`analysis_completion.py` 拥有完成事务。执行服务只准备运行状态、报告、产物记录和相关语义变更，`ChatTurn` 从事件副本生成聊天记录及会话状态，随后一次提交。正常结果、待确认、校验拒绝和已验证表格报告共用此入口；无项目聊天也先提交完整终态批次。准备或消息写入失败会回滚整批数据库变更，不把未提交报告带入错误消息。终态事件只在提交成功后发送；提交已开始时，任务取消须等待数据库操作结束再传播，已提交的完成或拒绝不会被流关闭改写为中断。运行所有权、进度与中断恢复的事务，以及数据库回滚后的图像文件回收仍未统一。
+`analysis_completion.py` 拥有完成事务。执行服务只准备运行状态、报告、产物记录和相关语义变更，`ChatTurn` 从事件副本生成聊天记录及会话状态，随后一次提交。正常结果、待确认、校验拒绝和已验证表格报告共用此入口；无项目聊天也先提交完整终态批次。准备或消息写入失败会回滚整批数据库变更，不把未提交报告带入错误消息。终态事件只在提交成功后发送；提交已开始时，任务取消须等待数据库操作结束再传播，已提交的完成或拒绝不会被流关闭改写为中断。进度、检查点和启动恢复的事务，以及数据库回滚后的图像文件回收仍未统一。
+
+`conversation_state.py` 单独管理会话当前态。每次请求把轮次标识写入现有会话元数据，运行检查点保留同一标识；后续上下文、完成、错误和恢复只在归属匹配时更新会话。条件 UPDATE 在事务内取得当前行，避免从旧 ORM 对象复制过期元数据；历史消息仍归各自轮次保存。断连只处理执行服务记录的本轮 run，旧轮次不能把已恢复的新轮次标成失败。恢复消息按 run 与轮次去重；没有轮次标识的历史任务只追加恢复消息，不猜测当前会话归属。注册表先判定请求是否有效，重复、已释放或预先停止的流不能挤掉现有任务；释放最新任务也不恢复旧任务的所有权。
 
 `checkpoint_contract.py` 只定义检查点值、版本、错误与稳定哈希，不依赖数据库、文件存储或模型 SDK。`analysis_checkpoint.py` 负责落盘、完整性读取与数据库结果重新核对；执行服务将 `RestoredCheckpoint` 直接传给运行时，不再转换成无类型字典。`analyst/recovery.py` 按查询、关联、汇总、业务规则、结果和图表分别校验工具记录，随后把独立副本一次性装入空会话。校验失败不装入旧记录或候选知识；恢复后的行、元数据和记录不与检查点或其他会话共享可变对象。自由 Python 状态仍不可恢复。
 
@@ -47,6 +49,7 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 - [Pi contracts](https://github.com/badlogic/pi-mono/blob/main/packages/agent/src/types.ts) 与 [模型类型](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/types.ts)：分别定义供应商、协议、配置、工具和循环。ReceiptBI 使用领域类型传递配置与结果，查询及报告 API 不反向依赖分析 Agent；未复制第三方源码。
 - [Codex App Server](https://openai.com/index/unlocking-the-codex-harness/)：线程、轮次、事件分别有明确生命周期，客户端消费稳定事件。作为后续任务合同的参考，当前未移植其 JSON-RPC 服务。
 - [Codex Turn 合同](https://github.com/openai/codex/blob/main/codex-rs/app-server-protocol/schema/typescript/v2/Turn.ts)：运行状态与条目分开，客户端使用生成的类型；ReceiptBI 采用状态单一来源与前端生成物，不复制外部业务状态或依赖。
+- [Codex 任务清理](https://github.com/openai/codex/blob/main/codex-rs/core/src/tasks/mod.rs)：参考按 turn id 中止任务、仅在原任务仍占用当前槽位时清理的方式；持久回写采用 [SQLAlchemy 条件版本更新](https://docs.sqlalchemy.org/en/20/orm/versioning.html) 的匹配原则，使用现有 JSON 中的轮次而非新增版本列。未复制 Rust 代码，数据库交错行为本轮只实测 SQLite。
 - [Hermes agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop)：调用可中断，工具结果回到任务状态。ReceiptBI 共享可变分析状态的工具仍顺序执行，不照搬并发策略。
 - [PydanticAI models](https://pydantic.dev/docs/ai/models/openai/)：直接复用现有依赖中的协议、工具循环、结构化输出与 DeepSeek profile，没有拷贝第三方实现到仓库。
 - [PydanticAI 连接所有权](https://pydantic.dev/docs/ai/models/overview/#http-client-lifecycle) 与 [HTTPX 异步连接池](https://www.python-httpx.org/async/#opening-and-closing-clients)：采用任务作用域和显式借用，复用已安装 PydanticAI 1.107.1 的客户端工厂，不在工具循环里逐轮建连接。
@@ -68,7 +71,7 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 - `.venv/bin/python -m unittest tests.test_model_configuration tests.test_model_probe -q`：保存配置经解析器分别进入执行和连接检查，验证供应商、协议、地址、请求头及查询参数；检查配置不可变与普通/诊断快照的字段边界，以及真实 SDK 的工具往返、无效输出、超时/取消释放、配置变更后的结果作废和 CI 模拟网关。
 
 - `.venv/bin/python -m unittest tests.test_analysis_stream_lifetime -q`：离线 SDK 请求的提前关闭、事件投影异常、任务与作用域取消；ASGI 发送中和等待事件时断连的清理顺序；聊天提交前不发布终态，发布后断连保留完成状态。
-- `.venv/bin/python -m unittest tests.test_analysis_completion -q`：临时中文路径 SQLite 上运行真实执行服务与聊天持久化，独立连接观察提交前后；检查消息插入失败、提交前/提交中取消、提交后断连、校验拒绝、待确认、已验证表格报告和无项目聊天。模型及输入准备使用离线替身，不验证云端分析能力。
+- `.venv/bin/python -m unittest tests.test_analysis_completion -q`：临时中文路径 SQLite 上运行真实执行服务与聊天持久化；验证完成提交与取消、旧轮次晚完成/失败/断连不覆盖新会话、重复流不抢占、同一 run 不同轮次的恢复消息，以及旧中断不改写已恢复的 run。模型及输入准备使用离线替身，不验证云端分析能力。
 - `.venv/bin/python -m unittest tests.test_analysis_state_contract -q`：工作步骤和提示文字不决定运行状态；终态先保存后发布；拒绝缺失、活动中或与报告不符的结果状态。在仓库根目录运行 `apps/api/.venv/bin/python scripts/generate-analysis-state.py --check` 核对前端生成物。
 
 以上为离线边界验证，不代替全部业务回归或云端实测。

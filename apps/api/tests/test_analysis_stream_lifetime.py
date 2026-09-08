@@ -14,11 +14,12 @@ import httpx
 
 from app.api.v1 import chat as chat_api
 from app.core.config import settings
-from app.db.tables import Message
+from app.db.tables import AnalysisRun, Conversation, Message
 from app.models import SSEEvent
 from app.services import model_engine
 from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.chat_runtime import ActiveQueryRegistry
+from app.services.conversation_state import ConversationTurnState
 from app.services.execution import ExecutionInputs, ExecutionService
 from app.services.project_context import ProjectRuntimeContext
 from app.services.run_control import owned_task
@@ -32,6 +33,14 @@ class AnalysisStreamLifetimeTests(unittest.IsolatedAsyncioTestCase):
         workspace = patch.object(settings, "WORKSPACE_ROOT", Path(directory.name) / "中文项目")
         workspace.start()
         self.addCleanup(workspace.stop)
+        self.enterContext(patch.object(ConversationTurnState, "claim", AsyncMock(return_value=True)))
+
+        async def apply(state, db, mutation):
+            conversation = await db.get(Conversation, state.conversation_id)
+            mutation(conversation)
+            return True
+
+        self.enterContext(patch.object(ConversationTurnState, "apply", apply))
 
     async def test_consumer_exit_settles_the_model_before_recording_interruption(self):
         for mode in ("close", "publish_error", "cancel", "scope_cancel"):
@@ -155,7 +164,7 @@ class AnalysisStreamLifetimeTests(unittest.IsolatedAsyncioTestCase):
                 result.scalars.return_value.first.return_value = run
                 db = AsyncMock()
                 db.execute.return_value = result
-                db.get.return_value = conversation
+                db.get.side_effect = lambda table, _id: run if table is AnalysisRun else conversation
 
                 async def persist_recovery(*_args, **_kwargs):
                     # Cancellation must not interrupt awaited finalization work.
@@ -181,6 +190,7 @@ class AnalysisStreamLifetimeTests(unittest.IsolatedAsyncioTestCase):
                         await asyncio.wait({task})
 
                 service = Mock()
+                service.analysis_run_id = run.id
                 service.get_runtime_snapshot = AsyncMock(return_value={})
                 # Preserve the producer reference, as the ASGI response does.
                 stream = events()
@@ -263,6 +273,7 @@ class AnalysisStreamLifetimeTests(unittest.IsolatedAsyncioTestCase):
 
                 db.commit.side_effect = commit
                 service = Mock()
+                service.analysis_run_id = None
                 service.get_runtime_snapshot = AsyncMock(return_value={})
 
                 async def events(*, completion, **_kwargs):

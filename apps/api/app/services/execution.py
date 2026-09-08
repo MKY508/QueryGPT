@@ -624,8 +624,11 @@ class ExecutionService:
         settings_data: dict[str, Any] | None = None,
         project_id: UUID | None = None,
         semantic_validation_selection: list[dict[str, Any]] | None = None,
+        stream_attempt_id: str | None = None,
     ):
         self.db = db
+        self.stream_attempt_id = stream_attempt_id or uuid4().hex
+        self.analysis_run_id: UUID | None = None
         self.model_name = model_name
         self.connection_id = connection_id
         self.language = language
@@ -1059,7 +1062,7 @@ class ExecutionService:
                 if self.semantic_validation_selection:
                     raise SemanticValidationSelectionError("批量验证必须绑定到候选所属项目")
                 return None, query, None, None
-            checkpoint: dict[str, Any] = {}
+            checkpoint: dict[str, Any] = {"stream_attempt_id": self.stream_attempt_id}
             if self.semantic_validation_selection:
                 checkpoint["semantic_validation_selection"] = list(
                     self.semantic_validation_selection
@@ -1097,6 +1100,7 @@ class ExecutionService:
         if run.conversation_id != conversation_id:
             raise CheckpointError("调查不属于当前对话")
         checkpoint = dict(run.checkpoint or {})
+        checkpoint["stream_attempt_id"] = self.stream_attempt_id
 
         standing_analysis = checkpoint.get("standing_analysis")
         if (
@@ -2831,6 +2835,7 @@ class ExecutionService:
                 resume_run_id=resume_run_id,
                 correction_id=correction_id,
             )
+            self.analysis_run_id = run.id if run is not None else None
             confirmation_receipt = stored_confirmation_receipt
             if confirmation_receipt is None and resume_run_id is None:
                 confirmation_receipt = await self._persist_explicit_confirmation(
@@ -3244,6 +3249,20 @@ class ExecutionService:
         try:
             if isinstance(error, SQLAlchemyError):
                 await self.db.rollback()
+            await self.db.refresh(run)
+            owned = await self.db.execute(
+                update(AnalysisRun)
+                .where(
+                    AnalysisRun.id == run.id,
+                    AnalysisRun.checkpoint["stream_attempt_id"].as_string()
+                    == self.stream_attempt_id,
+                )
+                .values(updated_at=AnalysisRun.updated_at)
+                .returning(AnalysisRun.id)
+                .execution_options(synchronize_session=False)
+            )
+            if owned.scalar_one_or_none() is None:
+                return
             await self.db.refresh(run)
             if run.state in {"completed", "waiting_confirmation"}:
                 return

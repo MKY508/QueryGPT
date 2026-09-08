@@ -32,6 +32,7 @@ from app.services.checkpoint_contract import (
     RestoredCheckpoint,
     stable_payload_hash,
 )
+from app.services.conversation_state import ConversationTurnState
 from app.services.database import create_database_manager
 
 
@@ -487,22 +488,24 @@ async def ensure_recovery_message(
     run: AnalysisRun,
     *,
     reason: str,
+    expected_attempt_id: str | None = None,
 ) -> None:
     """Persist one business-facing interrupted message for a recoverable run."""
 
-    if run.conversation_id is None:
+    if run.conversation_id is None or run.state != "needs_attention":
         return
-    result = await db.execute(
-        select(Message)
-        .where(
-            Message.conversation_id == run.conversation_id,
-            Message.role == "assistant",
-        )
-        .order_by(Message.created_at.desc())
+    attempt_id = (run.checkpoint or {}).get("stream_attempt_id")
+    if expected_attempt_id is not None and attempt_id != expected_attempt_id:
+        return
+    existing = select(Message.id).where(
+        Message.conversation_id == run.conversation_id,
+        Message.role == "assistant",
+        Message.extra_data["analysis_run_id"].as_string() == str(run.id),
     )
-    for message in result.scalars():
-        if str((message.extra_data or {}).get("analysis_run_id") or "") == str(run.id):
-            return
+    if attempt_id:
+        existing = existing.where(Message.extra_data["stream_attempt_id"].as_string() == attempt_id)
+    if (await db.execute(existing.limit(1))).scalar_one_or_none() is not None:
+        return
 
     checkpoint = dict(run.checkpoint or {})
     project_dir = settings.WORKSPACE_ROOT / str(run.project_id)
@@ -520,6 +523,7 @@ async def ensure_recovery_message(
             extra_data={
                 "analysis_state": "needs_attention",
                 "analysis_run_id": str(run.id),
+                "stream_attempt_id": attempt_id,
                 "project_id": str(run.project_id),
                 "original_query": run.query,
                 "resumable": resumable,
@@ -529,14 +533,17 @@ async def ensure_recovery_message(
             },
         )
     )
-    conversation = await db.get(Conversation, run.conversation_id)
-    if conversation is not None:
+
+    def mark_recovery(conversation: Conversation) -> None:
         conversation.status = "error"
         conversation.extra_data = {
             **(conversation.extra_data or {}),
             "last_error": content,
             "last_analysis_run_id": str(run.id),
         }
+
+    if isinstance(attempt_id, str) and attempt_id:
+        await ConversationTurnState(run.conversation_id, attempt_id).apply(db, mark_recovery)
 
 
 async def recover_interrupted_analysis_runs(db: AsyncSession) -> int:

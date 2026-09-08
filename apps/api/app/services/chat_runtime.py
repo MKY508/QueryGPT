@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Callable, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import partial
 from threading import RLock
 from typing import Any
 from uuid import UUID, uuid4
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import Conversation, Message
 from app.models import SSEEvent
+from app.services.conversation_state import ConversationTurnState
 
 RESULT_DATA_PREVIEW_MAX_ROWS = 100
 _CLIENT_STREAM_TOMBSTONE_LIMIT = 4096
@@ -35,7 +37,6 @@ class ActiveQueryRegistry:
         self._query_client_streams: dict[str, str] = {}
         self._client_stream_queries: dict[tuple[str, str], str] = {}
         self._client_stream_tombstones: dict[tuple[str, str], str] = {}
-        self._conversation_queries: dict[str, list[str]] = {}
         self._current_query: dict[str, str] = {}
         self._shutdown_requested = False
         self._lock = RLock()
@@ -58,32 +59,28 @@ class ActiveQueryRegistry:
     ) -> str:
         with self._lock:
             conversation_key = str(conversation_id)
-            previous = self._current_query.get(conversation_key)
-            if previous is not None and self._queries.get(previous) == _QUERY_ACTIVE:
-                self._queries[previous] = _QUERY_STOPPED
             query_key = f"{conversation_key}:{uuid4().hex}"
             initial_state = _QUERY_STOPPED if self._shutdown_requested else _QUERY_ACTIVE
             self._query_conversations[query_key] = conversation_key
             if client_stream_id:
                 client_key = (conversation_key, client_stream_id)
                 previous_client_query = self._client_stream_queries.get(client_key)
-                if (
-                    previous_client_query is not None
-                    and self._queries.get(previous_client_query) == _QUERY_ACTIVE
-                ):
-                    self._queries[previous_client_query] = _QUERY_STOPPED
                 tombstone = self._client_stream_tombstones.pop(client_key, None)
-                if tombstone is not None:
+                if previous_client_query is not None or tombstone is not None:
                     # Stream ids are one-shot generations. A pre-start stop is
                     # consumed here; a released id is never reused as new work.
                     initial_state = _QUERY_STOPPED
                 self._query_client_streams[query_key] = client_stream_id
-                self._client_stream_queries[client_key] = query_key
+                if previous_client_query is None:
+                    self._client_stream_queries[client_key] = query_key
             # A request racing with shutdown or an exact pre-start stop is still
             # registered so its generator can emit cancellation and release.
             self._queries[query_key] = initial_state
-            self._conversation_queries.setdefault(conversation_key, []).append(query_key)
-            self._current_query[conversation_key] = query_key
+            if initial_state == _QUERY_ACTIVE:
+                previous = self._current_query.get(conversation_key)
+                if previous is not None and self._queries.get(previous) == _QUERY_ACTIVE:
+                    self._queries[previous] = _QUERY_STOPPED
+                self._current_query[conversation_key] = query_key
             return query_key
 
     @property
@@ -183,6 +180,14 @@ class ActiveQueryRegistry:
             query_key = key if key in self._queries else self._current_query.get(key, "")
             return self._queries.get(query_key) in {_QUERY_ACTIVE, _QUERY_FINALIZING}
 
+    def is_current(self, query_key: str) -> bool:
+        with self._lock:
+            conversation_key = self._query_conversations.get(query_key)
+            return (
+                conversation_key is not None
+                and self._current_query.get(conversation_key) == query_key
+            )
+
     def stop_checker(self, conversation_id: UUID | str) -> Callable[[], bool]:
         query_key = str(conversation_id)
         return lambda: not self.is_active(query_key)
@@ -199,19 +204,9 @@ class ActiveQueryRegistry:
                 client_key = (conversation_key, client_stream_id)
                 if self._client_stream_queries.get(client_key) == query_key:
                     self._client_stream_queries.pop(client_key, None)
-                self._remember_client_stream(client_key, _STREAM_RELEASED)
-            tokens = self._conversation_queries.get(conversation_key, [])
-            self._conversation_queries[conversation_key] = [
-                token for token in tokens if token != query_key
-            ]
-            if not self._conversation_queries[conversation_key]:
-                self._conversation_queries.pop(conversation_key, None)
+                    self._remember_client_stream(client_key, _STREAM_RELEASED)
             if self._current_query.get(conversation_key) == query_key:
-                remaining = self._conversation_queries.get(conversation_key, [])
-                if remaining:
-                    self._current_query[conversation_key] = remaining[-1]
-                else:
-                    self._current_query.pop(conversation_key, None)
+                self._current_query.pop(conversation_key, None)
 
 
 def merge_metadata(base: dict[str, Any], updates: dict[str, Any]) -> dict[str, Any]:
@@ -406,7 +401,7 @@ class ChatEventAccumulator:
 class ChatTurn:
     """Project one terminal batch without exposing uncommitted output as history."""
 
-    conversation_id: UUID
+    state: ConversationTurnState
     accumulator: ChatEventAccumulator
     message_id: UUID | None = None
 
@@ -416,32 +411,30 @@ class ChatTurn:
             snapshot.consume(event)
         if not snapshot.has_result and not snapshot.has_error:
             raise ValueError("A chat completion requires a result or an error")
-        conversation = await db.get(Conversation, self.conversation_id)
-        if conversation is None:
-            raise ValueError("The investigation conversation no longer exists")
         metadata = snapshot.build_metadata()
         message = Message(
             id=uuid4(),
-            conversation_id=self.conversation_id,
+            conversation_id=self.state.conversation_id,
             role="assistant",
             content=snapshot.build_assistant_content(),
             extra_data=metadata,
         )
         db.add(message)
         if snapshot.has_error:
-            mark_conversation_error(
-                conversation,
+            mutation = partial(
+                mark_conversation_error,
                 runtime_snapshot=snapshot.runtime_snapshot,
                 query=snapshot.original_query,
                 error_payload=snapshot.error_payload,
             )
         else:
-            mark_conversation_completed(
-                conversation,
+            mutation = partial(
+                mark_conversation_completed,
                 runtime_snapshot=snapshot.runtime_snapshot,
                 query=snapshot.original_query,
                 metadata=metadata,
             )
+        await self.state.apply(db, mutation)
         self.message_id = message.id
 
 

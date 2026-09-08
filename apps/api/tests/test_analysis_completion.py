@@ -19,8 +19,13 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.tables import AnalysisRun, ArtifactRecord, Conversation, Message, Project
 from app.models import SSEEvent
+from app.services.analysis_checkpoint import (
+    ensure_recovery_message,
+    recover_interrupted_analysis_runs,
+)
 from app.services.chat_runtime import ActiveQueryRegistry, ChatTurn
 from app.services.checkpoint_contract import stable_payload_hash
+from app.services.conversation_state import ACTIVE_STREAM_ATTEMPT, ConversationTurnState
 from app.services.execution import ExecutionInputs, ExecutionService
 from tests.model_fixtures import synthetic_model_config
 
@@ -36,7 +41,7 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(self.engine.dispose)
         async with self.engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
-        self.sessions = async_sessionmaker(self.engine, expire_on_commit=False)
+        self.sessions = async_sessionmaker(self.engine, expire_on_commit=False, autoflush=False)
         self.db = self.sessions()
         self.addAsyncCleanup(self.db.close)
         self.project_id, self.conversation_id, self.run_id = uuid4(), uuid4(), uuid4()
@@ -68,13 +73,15 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
             )
             return run, conversation, artifacts, messages
 
-    async def make_stream(self, *, state="completed", fallback=False, project=True):
+    async def make_stream(self, *, state="completed", fallback=False, project=True, failure=None):
         run = await self.db.get(AnalysisRun, self.run_id)
         report = {"status": state, "title": "销售结果", "summary": "销售额为 42"}
         rows = [{"sales": 42}]
 
         async def events(**_kwargs):
             yield SSEEvent.progress("read_files", "读取数据", analysis_state="investigating")
+            if failure is not None:
+                raise failure
             if fallback:
                 class Output(BaseModel):
                     required: str
@@ -114,13 +121,24 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
         service._load_execution_inputs = AsyncMock(
             return_value=ExecutionInputs(synthetic_model_config(), None, [])
         )
-        service._prepare_analysis_run = AsyncMock(
-            return_value=(run if project else None, "查看销售", None, None)
-        )
+        async def prepare(**_kwargs):
+            if project:
+                run.checkpoint = {
+                    **(run.checkpoint or {}),
+                    "stream_attempt_id": service.stream_attempt_id,
+                }
+                await service.db.commit()
+            return run if project else None, "查看销售", None, None
+
+        service._prepare_analysis_run = AsyncMock(side_effect=prepare)
         service._persist_explicit_confirmation = AsyncMock(return_value=None)
         service._build_engine = Mock(return_value=runtime)
         service.get_runtime_snapshot = AsyncMock(return_value={})
-        self.enterContext(patch.object(chat_api, "ExecutionService", return_value=service))
+        def create_service(**kwargs):
+            service.stream_attempt_id = kwargs["stream_attempt_id"]
+            return service
+
+        self.enterContext(patch.object(chat_api, "ExecutionService", side_effect=create_service))
         self.enterContext(patch.object(chat_api, "get_or_create_app_settings", AsyncMock()))
         self.enterContext(patch.object(chat_api, "settings_to_dict", return_value={}))
         response = await chat_api._chat_stream_response(
@@ -131,7 +149,7 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
             project_id=self.project_id if project else None,
             resume_run_id=None,
             correction_id=None,
-            client_stream_id="completion-test",
+            client_stream_id=f"completion-{uuid4().hex}",
             language="zh",
             context_rounds=3,
             db=self.db,
@@ -325,6 +343,147 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(artifacts, [])
         self.assertEqual(len(messages), 1)
         self.assertEqual(messages[0].extra_data["python_output"], "Calculation finished")
+
+    async def _check_superseded_stream(self, mode):
+        old_run_id = self.run_id
+        old_stream = await self.make_stream(
+            failure=RuntimeError("Synthetic old provider failure") if mode == "error" else None
+        )
+        async for raw in old_stream:
+            item = json.loads(raw["data"])
+            if item["data"].get("stage") == "read_files":
+                break
+        if mode == "completed":
+            self.assertTrue(self.registry.begin_finalization(self.conversation_id))
+
+        # A second request uses its own session while the first still holds
+        # an older Conversation identity-map snapshot.
+        self.db = self.sessions()
+        self.addAsyncCleanup(self.db.close)
+        self.run_id = uuid4()
+        self.db.add(
+            AnalysisRun(
+                id=self.run_id,
+                project_id=self.project_id,
+                conversation_id=self.conversation_id,
+                query="更新后的调查",
+                state="investigating",
+                stage="read_files",
+            )
+        )
+        await self.db.commit()
+        new_stream = await self.make_stream()
+        new_events = [json.loads(raw["data"]) async for raw in new_stream]
+        self.assertEqual(new_events[-1]["type"], "done")
+        _, newest_conversation, _, _ = await self.observe()
+        newest_metadata = dict(newest_conversation.extra_data)
+
+        if mode == "disconnect":
+            await old_stream.aclose()
+        else:
+            old_events = [json.loads(raw["data"]) async for raw in old_stream]
+            self.assertEqual(old_events[-1]["type"], "done" if mode == "completed" else "error")
+        latest_run, conversation, _, messages = await self.observe()
+        self.assertEqual((latest_run.state, conversation.status), ("completed", "completed"))
+        self.assertEqual(conversation.extra_data, newest_metadata)
+        self.assertFalse(self.registry.is_active(self.conversation_id))
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(
+            {message.extra_data["analysis_run_id"] for message in messages},
+            {str(old_run_id), str(self.run_id)},
+        )
+        async with self.sessions() as observer:
+            old_run = await observer.get(AnalysisRun, old_run_id)
+            self.assertEqual(old_run.state, "completed" if mode == "completed" else "needs_attention")
+
+    async def test_older_completion_keeps_history_without_replacing_current_conversation(self):
+        await self._check_superseded_stream("completed")
+
+    async def test_older_failure_does_not_reopen_the_newer_completed_conversation(self):
+        await self._check_superseded_stream("error")
+
+    async def test_older_disconnect_recovers_its_own_run_not_the_latest_run(self):
+        await self._check_superseded_stream("disconnect")
+
+    async def test_releasing_a_new_generation_never_reinstates_the_old_owner(self):
+        first = self.registry.start(self.conversation_id)
+        self.assertTrue(self.registry.begin_finalization(first))
+        second = self.registry.start(self.conversation_id)
+        second_state = ConversationTurnState(self.conversation_id, "new-attempt")
+        self.assertTrue(
+            await second_state.claim(self.db, is_current=lambda: self.registry.is_current(second))
+        )
+        await self.db.commit()
+        self.registry.release(second)
+        self.assertFalse(self.registry.is_current(first))
+        first_state = ConversationTurnState(self.conversation_id, "old-attempt")
+        self.assertFalse(
+            await first_state.claim(self.db, is_current=lambda: self.registry.is_current(first))
+        )
+        await self.db.commit()
+        self.registry.release(first)
+        _, conversation, _, _ = await self.observe()
+        self.assertEqual(conversation.extra_data[ACTIVE_STREAM_ATTEMPT], "new-attempt")
+
+    async def test_duplicate_and_already_stopped_requests_cannot_displace_the_owner(self):
+        for mode in ("duplicate", "released", "stopped_before_start"):
+            with self.subTest(mode=mode):
+                registry = ActiveQueryRegistry()
+                if mode == "released":
+                    stale = registry.start(self.conversation_id, client_stream_id="stale")
+                    registry.release(stale)
+                elif mode == "stopped_before_start":
+                    registry.stop(self.conversation_id, client_stream_id="stale")
+                owner = registry.start(self.conversation_id, client_stream_id="current")
+                rejected = registry.start(
+                    self.conversation_id,
+                    client_stream_id="current" if mode == "duplicate" else "stale",
+                )
+                self.assertFalse(registry.is_current(rejected))
+                self.assertTrue(registry.is_current(owner))
+                self.assertFalse(registry.stop_checker(owner)())
+                registry.release(rejected)
+                self.assertTrue(registry.is_current(owner))
+                self.assertTrue(registry.stop(self.conversation_id, client_stream_id="current"))
+                registry.release(owner)
+
+    async def test_restart_recovery_is_scoped_to_the_owning_attempt(self):
+        run = await self.db.get(AnalysisRun, self.run_id)
+        run.checkpoint = {"stream_attempt_id": "old-attempt"}
+        new_state = ConversationTurnState(self.conversation_id, "new-attempt")
+        await new_state.claim(self.db, is_current=lambda: True)
+        await new_state.apply(self.db, lambda conversation: setattr(conversation, "status", "completed"))
+        await self.db.commit()
+        self.assertEqual(await recover_interrupted_analysis_runs(self.db), 1)
+        await self.db.commit()
+        _, conversation, _, messages = await self.observe()
+        self.assertEqual(conversation.status, "completed")
+        self.assertEqual(len(messages), 1)
+        self.assertEqual(messages[0].extra_data["stream_attempt_id"], "old-attempt")
+        await ensure_recovery_message(self.db, run, reason="process_interrupted")
+        await self.db.commit()
+        self.assertEqual(len((await self.observe())[3]), 1)
+
+        # Resuming the same run creates a distinct attempt, not a duplicate
+        # recovery message for the preceding invocation.
+        run.checkpoint = {"stream_attempt_id": "new-attempt"}
+        await ensure_recovery_message(self.db, run, reason="process_interrupted")
+        await self.db.commit()
+        _, conversation, _, messages = await self.observe()
+        self.assertEqual(conversation.status, "error")
+        self.assertEqual(len(messages), 2)
+
+    async def test_late_interruption_cannot_overwrite_a_resumed_run(self):
+        run = await self.db.get(AnalysisRun, self.run_id)
+        run.checkpoint = {"stream_attempt_id": "new-attempt", "reason": "restoring"}
+        await self.db.commit()
+        old_service = ExecutionService(self.db, stream_attempt_id="old-attempt")
+        await old_service._mark_run_needs_attention(run, RuntimeError("Old request failed"))
+        await self.db.commit()
+        restored_run, _, _, messages = await self.observe()
+        self.assertEqual(restored_run.state, "investigating")
+        self.assertEqual(restored_run.checkpoint["reason"], "restoring")
+        self.assertEqual(messages, [])
 
 
 if __name__ == "__main__":
