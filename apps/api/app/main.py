@@ -24,7 +24,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.security import encryptor
 from app.db import AsyncSessionLocal, engine
-from app.services.analysis_checkpoint import recover_interrupted_analysis_runs
+from app.services.analysis_run_recovery import recover_interrupted_analysis_runs
 from app.services.credential_migration import rotate_legacy_desktop_credentials
 from app.services.engine_diagnostics import categorize_sql_error
 from app.services.legacy_ts_model_import import (
@@ -173,6 +173,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                     migrated_credentials,
                     unreadable_credentials,
                 ) = await rotate_legacy_desktop_credentials(session)
+            await session.commit()
             recovered_runs = await recover_interrupted_analysis_runs(session)
             recovered_inventory_job_ids = await recover_semantic_inventory_jobs(session)
             recovered_validation_job_ids = await recover_semantic_validation_jobs(session)

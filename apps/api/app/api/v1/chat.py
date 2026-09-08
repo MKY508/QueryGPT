@@ -34,8 +34,8 @@ from app.models import (
 )
 from app.models.analysis_state import AnalysisState
 from app.models.chat import SemanticValidationSelectionItem
-from app.services.analysis_checkpoint import ensure_recovery_message
 from app.services.analysis_completion import AnalysisCompletion
+from app.services.analysis_run_recovery import ensure_recovery_message
 from app.services.app_settings import get_or_create_app_settings, settings_to_dict
 from app.services.business_decision_slots import canonicalize_decision_key
 from app.services.chat_runtime import (

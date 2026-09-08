@@ -19,11 +19,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pandas as pd
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.db.tables import AnalysisRun, Conversation, Message
 from app.models.analysis_state import AnalysisState
 from app.services.checkpoint_contract import (
     CHECKPOINT_VERSION,
@@ -32,7 +28,6 @@ from app.services.checkpoint_contract import (
     RestoredCheckpoint,
     stable_payload_hash,
 )
-from app.services.conversation_state import ConversationTurnState
 from app.services.database import create_database_manager
 
 
@@ -481,95 +476,3 @@ def checkpoint_manifest_is_readable(project_dir: Path, checkpoint: dict[str, Any
         # Recovery discovery is a fail-closed status check. Corrupt parquet or
         # Python artifacts must never be advertised to an ordinary user as resumable.
         return False
-
-
-async def ensure_recovery_message(
-    db: AsyncSession,
-    run: AnalysisRun,
-    *,
-    reason: str,
-    expected_attempt_id: str | None = None,
-) -> None:
-    """Persist one business-facing interrupted message for a recoverable run."""
-
-    if run.conversation_id is None or run.state != "needs_attention":
-        return
-    attempt_id = (run.checkpoint or {}).get("stream_attempt_id")
-    if expected_attempt_id is not None and attempt_id != expected_attempt_id:
-        return
-    existing = select(Message.id).where(
-        Message.conversation_id == run.conversation_id,
-        Message.role == "assistant",
-        Message.extra_data["analysis_run_id"].as_string() == str(run.id),
-    )
-    if attempt_id:
-        existing = existing.where(Message.extra_data["stream_attempt_id"].as_string() == attempt_id)
-    if (await db.execute(existing.limit(1))).scalar_one_or_none() is not None:
-        return
-
-    checkpoint = dict(run.checkpoint or {})
-    project_dir = settings.WORKSPACE_ROOT / str(run.project_id)
-    resumable = checkpoint_manifest_is_readable(project_dir, checkpoint)
-    content = (
-        "上次调查因应用退出而暂停，已经完成的安全步骤已保存，可以从检查点继续。"
-        if resumable
-        else "上次调查因应用退出而中断，没有完整的安全检查点，请重新调查。"
-    )
-    db.add(
-        Message(
-            conversation_id=run.conversation_id,
-            role="assistant",
-            content=content,
-            extra_data={
-                "analysis_state": "needs_attention",
-                "analysis_run_id": str(run.id),
-                "stream_attempt_id": attempt_id,
-                "project_id": str(run.project_id),
-                "original_query": run.query,
-                "resumable": resumable,
-                "checkpoint_reason": reason,
-                "error_code": "PROCESS_INTERRUPTED",
-                "error_category": "interrupted",
-            },
-        )
-    )
-
-    def mark_recovery(conversation: Conversation) -> None:
-        conversation.status = "error"
-        conversation.extra_data = {
-            **(conversation.extra_data or {}),
-            "last_error": content,
-            "last_analysis_run_id": str(run.id),
-        }
-
-    if isinstance(attempt_id, str) and attempt_id:
-        await ConversationTurnState(run.conversation_id, attempt_id).apply(db, mark_recovery)
-
-
-async def recover_interrupted_analysis_runs(db: AsyncSession) -> int:
-    """Move runs left active by a dead process to a durable attention state."""
-
-    result = await db.execute(
-        select(AnalysisRun).where(AnalysisRun.state.in_({"understanding", "investigating"}))
-    )
-    runs = list(result.scalars())
-    interrupted_count = 0
-    for run in runs:
-        checkpoint = dict(run.checkpoint or {})
-        if run.stage == "prepared" and isinstance(checkpoint.get("standing_analysis"), dict):
-            # This run has only been claimed; no model or tool work started yet. Leaving it
-            # prepared makes an app restart idempotent instead of inventing a failed run.
-            continue
-        project_dir = settings.WORKSPACE_ROOT / str(run.project_id)
-        resumable = checkpoint_manifest_is_readable(project_dir, checkpoint)
-        run.state = "needs_attention"
-        run.stage = "needs_attention"
-        run.error = "应用退出时调查尚未完成"
-        run.checkpoint = {
-            **checkpoint,
-            "resumable": resumable,
-            "reason": "process_interrupted",
-        }
-        await ensure_recovery_message(db, run, reason="process_interrupted")
-        interrupted_count += 1
-    return interrupted_count

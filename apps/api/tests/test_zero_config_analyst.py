@@ -38,11 +38,11 @@ from app.services.analysis_checkpoint import (
     _reserve_checkpoint_revision,
     checkpoint_manifest_is_readable,
     load_runtime_checkpoint,
-    recover_interrupted_analysis_runs,
     save_runtime_checkpoint,
     source_fingerprint_map,
     validate_source_fingerprints,
 )
+from app.services.analysis_run_recovery import recover_interrupted_analysis_runs
 from app.services.analyst.python_tools import (
     _build_result_chart_code,
     _render_result_chart,

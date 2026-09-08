@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
 from inspect import isawaitable
-from typing import Any, cast
+from typing import Any
 from uuid import UUID, uuid4
 
 import structlog
@@ -20,8 +20,7 @@ from anyio import CancelScope
 from pydantic import ValidationError as PydanticValidationError
 from pydantic_ai import UnexpectedModelBehavior
 from pydantic_ai.exceptions import ToolRetryError
-from sqlalchemy import delete, select, update
-from sqlalchemy.engine import CursorResult
+from sqlalchemy import delete, select
 from sqlalchemy.exc import OperationalError, ProgrammingError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -305,14 +304,6 @@ async def _build_run_owned_semantic_transitions(
         transitions,
         key=lambda item: (item["semantic_entry_id"], item["from_revision_id"]),
     )
-
-
-def _canonical_confirmation_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
-    canonical = dict(receipt)
-    raw_key = str(canonical.get("key") or "").strip()
-    if raw_key:
-        canonical["key"] = canonicalize_decision_key(raw_key)
-    return canonical
 
 
 _NEGATED_OPTION_PREFIX = re.compile(
@@ -1060,254 +1051,30 @@ class ExecutionService:
                 stage="understanding",
                 checkpoint=checkpoint,
             )
-            self.db.add(run)
-            await self.db.commit()
-            await self.db.refresh(run)
+            async with AnalysisCompletion(self.db).transaction():
+                self.db.add(run)
+                await self.db.flush()
+                self._run_journal = AnalysisRunJournal(self.db, run, self.stream_attempt_id)
+                self.analysis_run_id = self._run_journal.run_id
             return run, query, None, None
 
-        resumed_run = await self.db.get(AnalysisRun, resume_run_id)
         if correction_id is not None:
             raise CheckpointError("继续同一次调查时不能同时换用另一条报告修正")
-        if resumed_run is None:
-            raise CheckpointError("要恢复的调查不存在")
-        run = resumed_run
-        if self.project_id is None or run.project_id != self.project_id:
-            raise CheckpointError("调查不属于当前项目")
-        if run.conversation_id != conversation_id:
-            raise CheckpointError("调查不属于当前对话")
-        checkpoint = dict(run.checkpoint or {})
-        checkpoint["stream_attempt_id"] = self.stream_attempt_id
-
-        standing_analysis = checkpoint.get("standing_analysis")
-        if (
-            run.state == "understanding"
-            and run.stage == "prepared"
-            and isinstance(standing_analysis, dict)
-        ):
-            transition = cast(
-                CursorResult[Any],
-                await self.db.execute(
-                    update(AnalysisRun)
-                    .where(
-                        AnalysisRun.id == run.id,
-                        AnalysisRun.state == "understanding",
-                        AnalysisRun.stage == "prepared",
-                    )
-                    .values(
-                        stage="understanding",
-                        error=None,
-                        checkpoint={
-                            **checkpoint,
-                            "standing_analysis": {
-                                **standing_analysis,
-                                "started_at": datetime.now(UTC).isoformat(),
-                            },
-                            "reason": "standing_analysis_started",
-                        },
-                    )
-                    .execution_options(synchronize_session=False)
-                ),
-            )
-            if transition.rowcount != 1:
-                await self.db.rollback()
-                raise CheckpointError("这次持续分析已在运行或已经完成")
-            await self.db.commit()
-            await self.db.refresh(run)
-            return run, run.query, None, None
-
-        if run.state == "waiting_confirmation":
-            stored_receipt = checkpoint.get("confirmation_receipt")
-            receipt = (
-                _canonical_confirmation_receipt(stored_receipt)
-                if isinstance(stored_receipt, dict)
-                else stored_receipt
-            )
-            receipt_status = checkpoint.get("confirmation_receipt_status")
-            if (
-                run.stage != "confirmation_received"
-                or not isinstance(receipt, dict)
-                or receipt_status != "pending"
-                or not receipt.get("applied")
-                or receipt.get("conflict")
-            ):
-                raise CheckpointError("这次调查尚未收到可用的业务确认")
-            consumed_checkpoint = {
-                **checkpoint,
-                "confirmation_receipt": receipt,
-                "confirmation_receipt_status": "in_progress",
-                "confirmation_consumed_at": datetime.now(UTC).isoformat(),
-                "continuation_kind": "confirmation",
-                "resumable": True,
-                "reason": "confirmation_in_progress",
-            }
-            transition = cast(
-                CursorResult[Any],
-                await self.db.execute(
-                    update(AnalysisRun)
-                    .where(
-                        AnalysisRun.id == run.id,
-                        AnalysisRun.state == "waiting_confirmation",
-                        AnalysisRun.stage == "confirmation_received",
-                    )
-                    .values(
-                        state="understanding",
-                        stage="confirmation_received",
-                        error=None,
-                        checkpoint=consumed_checkpoint,
-                    )
-                    .execution_options(synchronize_session=False)
-                ),
-            )
-            if transition.rowcount != 1:
-                await self.db.rollback()
-                raise CheckpointError("这次调查已在继续或已经完成")
-            await self.db.commit()
-            await self.db.refresh(run)
-            selected = str(receipt.get("selected_value") or receipt.get("value") or "")
-            effective_query = (
-                f"{run.query}\n\n用户已确认业务口径：{receipt.get('key')} = {selected}"
-            )
-            return run, effective_query, None, dict(receipt)
-
-        if run.state == "needs_attention" and checkpoint.get("reason") == "awaiting_data":
-            transition = cast(
-                CursorResult[Any],
-                await self.db.execute(
-                    update(AnalysisRun)
-                    .where(
-                        AnalysisRun.id == run.id,
-                        AnalysisRun.state == "needs_attention",
-                    )
-                    .values(
-                        state="understanding",
-                        stage="data_received",
-                        error=None,
-                        checkpoint={
-                            **checkpoint,
-                            "continuation_kind": "data",
-                            "resumable": True,
-                            "reason": "data_in_progress",
-                        },
-                    )
-                    .execution_options(synchronize_session=False)
-                ),
-            )
-            if transition.rowcount != 1:
-                await self.db.rollback()
-                raise CheckpointError("这次调查已在继续或已经完成")
-            await self.db.commit()
-            await self.db.refresh(run)
-            return run, run.query, None, None
-
-        if run.state == "needs_attention" and checkpoint.get("continuation_kind") in {
-            "confirmation",
-            "data",
-        }:
-            continuation_kind = str(checkpoint["continuation_kind"])
-            stored_receipt = checkpoint.get("confirmation_receipt")
-            receipt = (
-                _canonical_confirmation_receipt(stored_receipt)
-                if isinstance(stored_receipt, dict)
-                else stored_receipt
-            )
-            if continuation_kind == "confirmation" and (
-                not isinstance(receipt, dict)
-                or not receipt.get("applied")
-                or receipt.get("conflict")
-            ):
-                raise CheckpointError("这次调查没有可重新使用的业务确认")
-            transition = cast(
-                CursorResult[Any],
-                await self.db.execute(
-                    update(AnalysisRun)
-                    .where(
-                        AnalysisRun.id == run.id,
-                        AnalysisRun.state == "needs_attention",
-                    )
-                    .values(
-                        state="understanding",
-                        stage=(
-                            "confirmation_received"
-                            if continuation_kind == "confirmation"
-                            else "data_received"
-                        ),
-                        error=None,
-                        checkpoint={
-                            **checkpoint,
-                            **(
-                                {"confirmation_receipt": receipt}
-                                if isinstance(receipt, dict)
-                                else {}
-                            ),
-                            "confirmation_receipt_status": (
-                                "in_progress"
-                                if continuation_kind == "confirmation"
-                                else checkpoint.get("confirmation_receipt_status")
-                            ),
-                            "resumable": True,
-                            "reason": f"{continuation_kind}_in_progress",
-                        },
-                    )
-                    .execution_options(synchronize_session=False)
-                ),
-            )
-            if transition.rowcount != 1:
-                await self.db.rollback()
-                raise CheckpointError("这次调查已在继续或已经完成")
-            await self.db.commit()
-            await self.db.refresh(run)
-            if continuation_kind == "confirmation":
-                if not isinstance(receipt, dict):
-                    raise CheckpointError("这次调查没有可重新使用的业务确认")
-                selected = str(receipt.get("selected_value") or receipt.get("value") or "")
-                effective_query = (
-                    f"{run.query}\n\n用户已确认业务口径：{receipt.get('key')} = {selected}"
-                )
-                return run, effective_query, None, dict(receipt)
-            return run, run.query, None, None
-
-        if run.state != "needs_attention" or not checkpoint.get("resumable"):
-            raise CheckpointError("这次调查当前没有可恢复的安全检查点")
-
-        stored_receipt = checkpoint.get("confirmation_receipt")
-        receipt = (
-            _canonical_confirmation_receipt(stored_receipt)
-            if isinstance(stored_receipt, dict)
-            else stored_receipt
+        async with AnalysisRunJournal.resume(
+            self.db,
+            run_id=resume_run_id,
+            project_id=self.project_id,
+            conversation_id=conversation_id,
+            attempt_id=self.stream_attempt_id,
+        ) as (journal, continuation):
+            self._run_journal = journal
+            self.analysis_run_id = journal.run_id
+        return (
+            journal.run,
+            continuation.query,
+            dict(journal.run.checkpoint) if continuation.restore_snapshot else None,
+            continuation.receipt,
         )
-        restoring_checkpoint = {
-            **checkpoint,
-            **({"confirmation_receipt": receipt} if isinstance(receipt, dict) else {}),
-        }
-        transition = cast(
-            CursorResult[Any],
-            await self.db.execute(
-                update(AnalysisRun)
-                .where(
-                    AnalysisRun.id == run.id,
-                    AnalysisRun.state == "needs_attention",
-                )
-                .values(
-                    state="understanding",
-                    stage="restoring",
-                    error=None,
-                    checkpoint=restoring_checkpoint,
-                )
-                .execution_options(synchronize_session=False)
-            ),
-        )
-        if transition.rowcount != 1:
-            await self.db.rollback()
-            raise CheckpointError("这次调查已经在恢复或已经完成")
-        await self.db.commit()
-        await self.db.refresh(run)
-        if isinstance(receipt, dict) and receipt.get("applied") and not receipt.get("conflict"):
-            selected = str(receipt.get("selected_value") or receipt.get("value") or "")
-            effective_query = (
-                f"{run.query}\n\n用户已确认业务口径：{receipt.get('key')} = {selected}"
-            )
-            return run, effective_query, restoring_checkpoint, dict(receipt)
-        return run, run.query, restoring_checkpoint, None
 
     async def _persist_explicit_confirmation(
         self,
@@ -3218,7 +2985,7 @@ class ExecutionService:
 
     def _run_event_context(self, run: AnalysisRun | None) -> dict[str, Any]:
         if run is None:
-            return {}
+            return self._run_journal.event_context if self._run_journal is not None else {}
         return self._journal_for(run).event_context
 
     async def _mark_run_needs_attention(
@@ -3227,7 +2994,9 @@ class ExecutionService:
         error: BaseException,
     ) -> None:
         if run is None:
-            return
+            if self._run_journal is None:
+                return
+            run = self._run_journal.run
         journal = self._journal_for(run)
         try:
             if isinstance(error, SQLAlchemyError):

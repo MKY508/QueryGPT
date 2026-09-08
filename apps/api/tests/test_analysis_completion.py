@@ -19,7 +19,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.tables import AnalysisRun, ArtifactRecord, Conversation, Message, Project
 from app.models import SSEEvent
-from app.services.analysis_checkpoint import (
+from app.services.analysis_run_recovery import (
     ensure_recovery_message,
     recover_interrupted_analysis_runs,
 )
@@ -467,6 +467,7 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
         # Resuming the same run creates a distinct attempt, not a duplicate
         # recovery message for the preceding invocation.
         run.checkpoint = {"stream_attempt_id": "new-attempt"}
+        await self.db.commit()
         await ensure_recovery_message(self.db, run, reason="process_interrupted")
         await self.db.commit()
         _, conversation, _, messages = await self.observe()
