@@ -50,10 +50,6 @@ export function ModelSettingsForm({
     if (value === "ollama_local") return t("form.protocolOllamaLocal");
     return t("form.protocolCustom");
   };
-  const healthcheckLabel = (value: ModelFormData["healthcheck_mode"]) =>
-    value === "models_list"
-      ? t("form.healthcheckModelList")
-      : t("form.healthcheckTestRequest");
 
   return (
     <form
@@ -248,27 +244,6 @@ export function ModelSettingsForm({
             <p className="mt-1 text-xs text-muted-foreground">
               {t("currentFormat")}: {apiFormatLabel(activePreset.api_format)}
             </p>
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              {t("form.healthcheck")}
-            </label>
-            <select
-              value={formData.healthcheck_mode}
-              onChange={(event) =>
-                onChange({
-                  ...formData,
-                  healthcheck_mode: event.target.value as ModelFormData["healthcheck_mode"],
-                })
-              }
-              data-testid="model-healthcheck-mode-select"
-              className={fieldClassName}
-            >
-              <option value="chat_completion">
-                {healthcheckLabel("chat_completion")}
-              </option>
-              <option value="models_list">{healthcheckLabel("models_list")}</option>
-            </select>
           </div>
           <label className="flex cursor-pointer items-center gap-2 self-end pb-2 text-sm text-foreground">
             <input

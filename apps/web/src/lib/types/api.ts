@@ -38,7 +38,6 @@ export interface ModelExtraOptions {
   headers?: Record<string, string>;
   query_params?: Record<string, string>;
   api_key_optional?: boolean;
-  healthcheck_mode?: "chat_completion" | "models_list";
 }
 
 export type ConnectionSSLMode =
@@ -95,6 +94,8 @@ export interface ModelSummary {
     | "model_not_found"
     | "rate_limited"
     | "provider_format"
+    | "tool_calling"
+    | "structured_output"
     | "unknown"
     | null;
   last_response_time_ms?: number | null;

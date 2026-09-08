@@ -7,9 +7,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
-ModelProvider = Literal["openai", "anthropic", "deepseek", "groq", "qwen", "orcarouter", "ollama", "custom"]
-ModelAPIFormat = Literal["openai_compatible", "openai_responses", "anthropic_native", "ollama_local", "custom"]
-ModelHealthcheckMode = Literal["chat_completion", "models_list"]
+ModelProvider = Literal[
+    "openai", "anthropic", "deepseek", "groq", "qwen", "orcarouter", "ollama", "custom"
+]
+ModelAPIFormat = Literal[
+    "openai_compatible", "openai_responses", "anthropic_native", "ollama_local", "custom"
+]
 ModelCredentialState = Literal["missing", "readable", "unreadable", "not_required"]
 ModelHealthStatus = Literal["unknown", "healthy", "unhealthy"]
 ConnectionSSLMode = Literal["disable", "prefer", "require", "verify-ca", "verify-full"]
@@ -79,10 +82,6 @@ class ModelExtraOptions(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict, description="额外请求头")
     query_params: dict[str, str] = Field(default_factory=dict, description="额外查询参数")
     api_key_optional: bool = Field(default=False, description="是否允许不配置 API Key")
-    healthcheck_mode: ModelHealthcheckMode = Field(
-        default="chat_completion",
-        description="测试连接时的健康检查方式",
-    )
 
     @field_validator("headers", "query_params", mode="before")
     @classmethod

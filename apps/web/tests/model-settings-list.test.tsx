@@ -63,6 +63,7 @@ describe("ModelSettingsList", () => {
         model({ health_status: "unhealthy", last_error_category: "connection" })
       )
     ).toBe("temporarily_unavailable");
+    expect(getModelServiceState(model({ health_status: "unhealthy", last_error_category: "tool_calling" }))).toBe("needs_configuration");
     expect(getModelServiceState(model({ credential_state: "unreadable" }))).toBe(
       "configuration_unreadable"
     );
@@ -73,11 +74,15 @@ describe("ModelSettingsList", () => {
       success: "success",
       credentials: "credentials",
       configuration: "configuration",
+      capability: "capability",
       temporary: "temporary",
       failed: "failed",
     };
 
     expect(getModelTestResultMessage({ success: true }, copy)).toBe("success");
+    for (const category of ["tool_calling", "structured_output"]) {
+      expect(getModelTestResultMessage({ success: false, error_category: category }, copy)).toBe("capability");
+    }
     expect(
       getModelTestResultMessage({ success: false, error_category: "auth" }, copy)
     ).toBe("credentials");

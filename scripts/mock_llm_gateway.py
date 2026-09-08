@@ -48,6 +48,37 @@ def build_chat_response(content: str) -> dict[str, Any]:
     }
 
 
+def build_probe_response(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Complete only the synthetic connection probe, not arbitrary analysis."""
+    names = [tool.get("function", {}).get("name") for tool in payload.get("tools", [])]
+    if "read_check_value" not in names or "final_result" not in names:
+        return None
+    returns = [
+        message["content"]
+        for message in payload.get("messages", [])
+        if message.get("role") == "tool"
+    ]
+    name = "final_result" if returns else "read_check_value"
+    arguments = json.loads(returns[-1]) if returns else {}
+    response = build_chat_response("")
+    response["choices"][0] = {
+        "index": 0,
+        "message": {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "ci-probe",
+                    "type": "function",
+                    "function": {"name": name, "arguments": json.dumps(arguments)},
+                }
+            ],
+        },
+        "finish_reason": "tool_calls",
+    }
+    return response
+
+
 def build_stream_chunks(content: str) -> list[bytes]:
     timestamp = int(time.time())
     chunks: list[bytes] = []
@@ -151,7 +182,9 @@ class MockGatewayHandler(BaseHTTPRequestHandler):
                 time.sleep(0.02)
             return
 
-        self._send_json(HTTPStatus.OK, build_chat_response(content))
+        self._send_json(
+            HTTPStatus.OK, build_probe_response(payload) or build_chat_response(content)
+        )
 
 
 def main() -> None:

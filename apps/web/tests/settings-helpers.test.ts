@@ -44,7 +44,6 @@ describe("settings helpers", () => {
       api_key_optional: false,
       headersText: '{"x-test":"1"}',
       queryParamsText: '{"temperature":0.1}',
-      healthcheck_mode: "chat_completion",
     });
 
     expect(payload.name).toBe("DeepSeek");

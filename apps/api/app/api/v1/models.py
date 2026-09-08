@@ -1,15 +1,10 @@
 """模型配置管理 API"""
 
-import asyncio
-import time
-from datetime import UTC, datetime
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic_ai import Agent
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import encryptor
@@ -17,50 +12,17 @@ from app.core.config import settings
 from app.db import get_db
 from app.db.tables import AppSettings, Model
 from app.models import APIResponse, ModelCreate, ModelResponse, ModelTest
-from app.models.config import ModelAPIFormat, ModelHealthStatus
 from app.services.app_settings import get_or_create_app_settings
-from app.services.model_engine import model_session
+from app.services.model_probe import probe_failure, probe_model
 from app.services.model_runtime import (
     ModelCredentialError,
     ModelRuntimeConfigurationError,
-    categorize_model_exception,
     default_api_format,
     normalize_runtime_base_url,
     resolve_model_runtime,
 )
 
 router = APIRouter(prefix="/models", tags=["models"])
-
-
-def _public_base_url(value: str | None) -> str | None:
-    """Keep endpoint diagnostics useful without reflecting query-string secrets."""
-
-    if not value:
-        return None
-    try:
-        parsed = urlsplit(value)
-        hostname = parsed.hostname
-        port = parsed.port
-    except ValueError:
-        return None
-    if not hostname:
-        return None
-    public_host = f"[{hostname}]" if ":" in hostname else hostname
-    netloc = f"{public_host}:{port}" if port is not None else public_host
-    return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
-
-
-def _safe_test_error_message(category: str) -> str:
-    messages = {
-        "auth": "API Key 无效",
-        "timeout": "请求超时",
-        "connection": "连接失败，请检查网络或 Base URL",
-        "model_not_found": "模型不存在或该网关不支持此模型",
-        "model_endpoint": "模型服务地址不可用，请检查 Base URL 与协议设置",
-        "rate_limited": "模型服务请求过于频繁，请稍后重试",
-        "provider_format": "模型服务返回格式不兼容，请检查协议设置",
-    }
-    return messages.get(category, "连接测试失败，请检查服务地址、协议和模型配置")
 
 
 async def _get_model_or_404(db: AsyncSession, model_id: UUID) -> Model:
@@ -103,43 +65,6 @@ def _reset_model_health(model: Model) -> None:
     model.last_checked_at = None
     model.last_error_category = None
     model.last_response_time_ms = None
-
-
-async def _finish_model_test(
-    db: AsyncSession,
-    model: Model,
-    *,
-    success: bool,
-    message: str,
-    response_time_ms: int | None = None,
-    source_provider: str | None = None,
-    resolved_base_url: str | None = None,
-    api_format: ModelAPIFormat | None = None,
-    api_key_required: bool = True,
-    error_category: str | None = None,
-) -> APIResponse[ModelTest]:
-    checked_at = datetime.now(UTC)
-    health_status: ModelHealthStatus = "healthy" if success else "unhealthy"
-    model.health_status = health_status
-    model.last_checked_at = checked_at
-    model.last_error_category = None if success else (error_category or "unknown")
-    model.last_response_time_ms = response_time_ms if success else None
-    await db.commit()
-    return APIResponse.ok(
-        data=ModelTest(
-            success=success,
-            model_name=model.model_id if success else None,
-            response_time_ms=response_time_ms,
-            message=message,
-            source_provider=source_provider,
-            resolved_base_url=resolved_base_url,
-            api_format=api_format,
-            api_key_required=api_key_required,
-            error_category=error_category,
-            health_status=health_status,
-            checked_at=checked_at,
-        )
-    )
 
 
 def _stored_base_url(model_in: ModelCreate) -> str | None:
@@ -260,97 +185,51 @@ async def test_model(
     model_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[ModelTest]:
-    """测试模型配置"""
+    """Check a fixed configuration and persist only evidence for that revision."""
     model = await _get_model_or_404(db, model_id)
+    revision = model.updated_at
     try:
         resolved, _ = resolve_model_runtime(
             model,
             fallback_model=settings.DEFAULT_MODEL,
-            # Persisted models are explicit provider boundaries. Environment
-            # OpenAI settings are reserved for the model=None legacy path.
             fallback_api_key=None,
             fallback_base_url=None,
         )
     except ModelCredentialError:
-        return await _finish_model_test(
-            db,
-            model,
-            success=False,
+        outcome = probe_failure(
+            "auth",
             message="保存的 API Key 无法读取，请重新输入",
-            resolved_base_url=_public_base_url(model.base_url),
-            error_category="auth",
+            base_url=model.base_url,
         )
     except ModelRuntimeConfigurationError:
-        return await _finish_model_test(
-            db,
-            model,
-            success=False,
+        outcome = probe_failure(
+            "model_endpoint",
             message="模型服务配置不完整，请重新填写 Base URL",
-            resolved_base_url=_public_base_url(model.base_url),
-            error_category="model_endpoint",
+            base_url=model.base_url,
         )
+    else:
+        # The immutable config owns the request. Do not hold a database
+        # transaction or consult an expiring ORM object during model IO.
+        await db.rollback()
+        outcome = await probe_model(resolved)
 
-    if not resolved.credentials_available:
-        return await _finish_model_test(
-            db,
-            model,
-            success=False,
-            message="未配置 API Key",
-            source_provider=resolved.source_provider,
-            resolved_base_url=_public_base_url(resolved.base_url),
-            api_format=resolved.api_format,
-            api_key_required=resolved.api_key_required,
-            error_category="auth",
+    recorded = await db.execute(
+        update(Model)
+        .where(Model.id == model_id, Model.updated_at == revision)
+        .values(
+            health_status=outcome.health_status,
+            last_checked_at=outcome.checked_at,
+            last_error_category=outcome.error_category,
+            last_response_time_ms=outcome.response_time_ms,
         )
-
-    try:
-        start_time = time.monotonic()
-        # A models-list request is not proof that the configured model can
-        # answer. Always exercise the same configured protocol as a real
-        # investigation, even for legacy records that requested models_list.
-        async with asyncio.timeout(10), model_session(resolved) as runtime_model:
-            healthcheck_agent = Agent(
-                runtime_model,
-                output_type=str,
-                instructions="Reply with exactly OK.",
-            )
-            await healthcheck_agent.run("OK")
-        elapsed_ms = int((time.monotonic() - start_time) * 1000)
-        return await _finish_model_test(
-            db,
-            model,
-            success=True,
-            response_time_ms=elapsed_ms,
-            message="连接成功",
-            source_provider=resolved.source_provider,
-            resolved_base_url=_public_base_url(resolved.base_url),
-            api_format=resolved.api_format,
-            api_key_required=resolved.api_key_required,
+        .returning(Model.id)
+        .execution_options(synchronize_session=False)
+    )
+    if recorded.scalar_one_or_none() is None:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="模型配置或检查结果已更新，请重新检查",
         )
-    except TimeoutError:
-        return await _finish_model_test(
-            db,
-            model,
-            success=False,
-            message="测试失败: 请求超时",
-            source_provider=resolved.source_provider,
-            resolved_base_url=_public_base_url(resolved.base_url),
-            api_format=resolved.api_format,
-            api_key_required=resolved.api_key_required,
-            error_category="timeout",
-        )
-    except Exception as e:
-        error_category = categorize_model_exception(e)
-        error_msg = _safe_test_error_message(error_category)
-
-        return await _finish_model_test(
-            db,
-            model,
-            success=False,
-            message=f"测试失败: {error_msg}",
-            source_provider=resolved.source_provider,
-            resolved_base_url=_public_base_url(resolved.base_url),
-            api_format=resolved.api_format,
-            api_key_required=resolved.api_key_required,
-            error_category=error_category,
-        )
+    await db.commit()
+    return APIResponse.ok(data=outcome)

@@ -17,7 +17,7 @@ ReceiptBI 不是“模型先写一段 SQL，再固定执行一段 Python”的�
 
 | 边界 | 当前落地 | 后续替换工作 |
 |---|---|---|
-| 模型引擎 | `model_engine.py` 的 `model_session` 按任务管理连接池；显式协议选择 Chat Completions、Responses 或 Anthropic 适配器，支持借用外部 `Model` / HTTP 客户端 | 供应商能力发现与结构化输出验证 |
+| 模型引擎 | `model_engine.py` 的 `model_session` 按任务管理连接池；显式协议选择 Chat Completions、Responses 或 Anthropic 适配器，支持借用外部 `Model` / HTTP 客户端 | 供应商模型目录、上下文与图像等逐模型能力发现 |
 | 任务控制 | `run_control.py` 持有并收束子任务，统一截止时间与停止检查；进度等待由事件或任务完成唤醒 | 执行服务、检查点与前端运行状态收敛到一个任务合同 |
 | 数据工具 | `query_compiler.py` 编译、`file_query.py` 读取、`result_profile.py` 校验结果；Agent 与保存方法执行器复用同一实现 | 收敛来源查询的取消和资源生命周期 |
 | 工具与会话 | `analyst/toolsets.py` 用 PydanticAI 工具集组合 15 个独立工具；`session.py` 持有当前调查状态、进度与检查点；`report_validation.py` 独立验收报告 | 检查点恢复仍在运行时中，需与任务事件合同一起收敛 |
@@ -30,6 +30,8 @@ ReceiptBI 不是“模型先写一段 SQL，再固定执行一段 Python”的�
 Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的百炼工作空间地址。未做供应商真实 API 调用，离线 SDK 测试不能证明账号、配额或具体模型在线可用。
 
 调查、报告草稿、问题建议、语义文案和连接检查都通过 `model_session` 调用模型。连接池只在实际调用时创建，同一任务内的工具轮次复用；完成、异常、超时或取消后释放。等待业务确认和只创建建议回调不会分配连接。调用方注入的模型或 HTTP 客户端仍由调用方关闭，不跨任务缓存凭证。
+
+`model_probe.py` 独立检查分析所需的工具往返和结构化输出，复用同一引擎与 PydanticAI 的 Tool Output、输出校验器。检查只使用临时值，不读取项目数据；最多三次模型请求、一次工具执行，整体截止时间为 30 秒。普通文字回复或臆造结果不能通过，失败分别归类为工具调用、结果格式、凭证或连接问题。路由在远端请求前释放数据库事务，检查结果仅写回原配置版本；配置、已有检查结果被更新或模型被删除时返回冲突，不覆盖现状。界面不再提供模型列表检查模式。通过只证明本次基础能力检查，不保证任意调查质量或后续服务可用性。
 
 调查流逐层拥有下层资源：`AnalysisStreamResponse` 关闭聊天流，聊天流关闭执行流，执行流关闭运行时，运行时先收束模型任务再清理 Python 工作区。提前关闭、处理事件失败与 ASGI 断连都经过同一释放链；异步清理和中断记录不受 ASGI 已取消作用域再次打断。项目结果和完整聊天记录保存后才发布终态事件，保存失败不发布成功结果；发布后断连不改写已保存的会话状态。跨模块状态转移事务与恢复调度仍需收敛。
 
@@ -44,6 +46,7 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 - [Hermes agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop)：调用可中断，工具结果回到任务状态。ReceiptBI 共享可变分析状态的工具仍顺序执行，不照搬并发策略。
 - [PydanticAI models](https://pydantic.dev/docs/ai/models/openai/)：直接复用现有依赖中的协议、工具循环、结构化输出与 DeepSeek profile，没有拷贝第三方实现到仓库。
 - [PydanticAI 连接所有权](https://pydantic.dev/docs/ai/models/overview/#http-client-lifecycle) 与 [HTTPX 异步连接池](https://www.python-httpx.org/async/#opening-and-closing-clients)：采用任务作用域和显式借用，复用已安装 PydanticAI 1.107.1 的客户端工厂，不在工具循环里逐轮建连接。
+- [PydanticAI Tool Output 与输出校验](https://pydantic.dev/docs/ai/core-concepts/output/#tool-output)：连接检查使用与调查一致的类型化输出；基础工具循环按 [Groq 官方流程](https://console.groq.com/docs/tool-use/overview#how-tool-use-works) 验证工具返回值再次进入模型，不把模型列表或纯文字当作分析能力证据。
 - [PydanticAI toolsets](https://pydantic.dev/docs/ai/tools-toolsets/toolsets/) 与 [dependencies](https://pydantic.dev/docs/ai/core-concepts/dependencies/)：工具按项目语义、来源查询、结果、关系、知识和可选 Python 六组组合；每次调用通过 `RunContext[AnalystSession]` 取得当前会话，不捕获创建 Agent 时的运行时。工具集保留超时和顺序执行约束，关闭的 Python 能力不向模型发布。
 - [Python aclosing](https://docs.python.org/3/library/contextlib.html#aclosing) 与 [AnyIO finalization](https://anyio.readthedocs.io/en/stable/cancellation.html#finalization)：显式关闭提前结束的生成器，只在退出清理期间屏蔽作用域取消；SSE 编码、断连监听和心跳继续复用现有 sse-starlette。
 - 接入参数以 [Groq](https://console.groq.com/docs/openai) 与 [百炼](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope) 官方说明为准（核对日期：2026-09-08）。
@@ -55,7 +58,7 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 - `.venv/bin/python -m unittest tests.test_analysis_module_boundaries -q`：数据模块不加载模型 SDK；中文路径下真实 DuckDB 查询与结果校验；注入 TestModel 后的产品报告输出。
 - `.venv/bin/python -m unittest tests.test_analyst_toolsets -q`：工具不导入模型引擎或调查运行时；同一 Agent 并发执行两个独立项目的文件查询、汇总、校验和报告；检查点快照隔离、不可恢复状态保持和关闭能力不发布。
 - `.venv/bin/python -m unittest tests.test_model_session tests.test_model_session_consumers -q`：真实 SDK 配合离线 HTTP transport，检查三种协议的连接复用与释放、失败/停止/超时/取消、外部资源所有权、待确认调查零连接、并发建议各自持有连接。
-- `.venv/bin/python -m unittest tests.test_model_configuration -q`：保存配置经解析器分别进入执行和连接检查，验证供应商、协议、地址、请求头及查询参数；检查配置不可变与普通/诊断快照的字段边界。
+- `.venv/bin/python -m unittest tests.test_model_configuration tests.test_model_probe -q`：保存配置经解析器分别进入执行和连接检查，验证供应商、协议、地址、请求头及查询参数；检查配置不可变与普通/诊断快照的字段边界，以及真实 SDK 的工具往返、无效输出、超时/取消释放、配置变更后的结果作废和 CI 模拟网关。
 
 - `.venv/bin/python -m unittest tests.test_analysis_stream_lifetime -q`：离线 SDK 请求的提前关闭、事件投影异常、任务与作用域取消；ASGI 发送中和等待事件时断连的清理顺序；聊天提交前不发布终态，发布后断连保留完成状态。
 - `.venv/bin/python -m unittest tests.test_analysis_state_contract -q`：工作步骤和提示文字不决定运行状态；终态先保存后发布；拒绝缺失、活动中或与报告不符的结果状态。在仓库根目录运行 `apps/api/.venv/bin/python scripts/generate-analysis-state.py --check` 核对前端生成物。

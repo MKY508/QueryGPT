@@ -82,9 +82,7 @@ describe("ModelSettingsForm i18n", () => {
     expect(
       screen.getByRole("option", { name: "OpenAI compatible" })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: "Send a test request" })
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId("model-healthcheck-mode-select")).not.toBeInTheDocument();
     expect(screen.queryByText("openai_compatible")).not.toBeInTheDocument();
     expect(screen.queryByText("chat_completion")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close form" })).toBeInTheDocument();
@@ -100,7 +98,7 @@ describe("ModelSettingsForm i18n", () => {
     expect(screen.getByText("显示名称")).toBeInTheDocument();
     expect(screen.getByText("高级连接选项")).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "OpenAI 兼容" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "发送测试请求" })).toBeInTheDocument();
+    expect(screen.queryByTestId("model-healthcheck-mode-select")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "关闭表单" })).toBeInTheDocument();
   });
 

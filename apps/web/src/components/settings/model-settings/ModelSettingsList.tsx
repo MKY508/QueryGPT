@@ -20,6 +20,7 @@ export type ModelServiceState =
   | "available"
   | "unchecked"
   | "reconnect"
+  | "needs_configuration"
   | "temporarily_unavailable"
   | "configuration_unreadable";
 
@@ -27,6 +28,7 @@ export interface ModelTestResultMessages {
   success: string;
   credentials: string;
   configuration: string;
+  capability: string;
   temporary: string;
   failed: string;
 }
@@ -37,6 +39,9 @@ export function getModelTestResultMessage(
 ): string {
   if (result.success) return messages.success;
   if (result.error_category === "auth") return messages.credentials;
+  if (result.error_category === "tool_calling" || result.error_category === "structured_output") {
+    return messages.capability;
+  }
   if (
     result.error_category === "model_endpoint" ||
     result.error_category === "model_not_found" ||
@@ -71,6 +76,9 @@ export function getModelServiceState(model: ConfiguredModel): ModelServiceState 
   if (credentialState === "missing") return "reconnect";
   if (model.health_status === "healthy") return "available";
   if (model.health_status === "unhealthy") {
+    if (["tool_calling", "structured_output", "provider_format", "model_endpoint", "model_not_found"].includes(model.last_error_category ?? "")) {
+      return "needs_configuration";
+    }
     return model.last_error_category === "auth" ? "reconnect" : "temporarily_unavailable";
   }
   return "unchecked";
@@ -117,6 +125,7 @@ export function ModelSettingsList({
     success: t("testResultSuccess"),
     credentials: t("testResultCredentials"),
     configuration: t("testResultConfiguration"),
+    capability: t("testResultCapability"),
     temporary: t("testResultTemporary"),
     failed: t("testResultFailed"),
   };
@@ -159,6 +168,12 @@ export function ModelSettingsList({
           reconnect: {
             label: t("statusReconnect"),
             hint: t("statusReconnectHint"),
+            className: "bg-warning/10 text-warning",
+            Icon: AlertCircle,
+          },
+          needs_configuration: {
+            label: t("statusNeedsConfiguration"),
+            hint: t("statusNeedsConfigurationHint"),
             className: "bg-warning/10 text-warning",
             Icon: AlertCircle,
           },

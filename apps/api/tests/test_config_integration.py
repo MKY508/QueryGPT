@@ -174,7 +174,6 @@ async def test_model_healthcheck_against_mock_gateway(client: AsyncClient):
             "api_key": "ci-test-key",
             "extra_options": {
                 "api_format": "openai_compatible",
-                "healthcheck_mode": "chat_completion",
             },
             "is_default": True,
         },

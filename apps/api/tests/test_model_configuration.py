@@ -3,7 +3,7 @@
 import json
 import unittest
 from dataclasses import FrozenInstanceError
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import httpx
@@ -16,7 +16,7 @@ from app.services import model_engine
 from app.services.execution_context import ExecutionContextResolver
 from app.services.model_engine import model_session
 from app.services.model_runtime import ResolvedModelConfig, resolve_model_runtime
-from tests.test_model_session import reply
+from tests.model_probe_fixtures import probe_reply
 
 
 class ModelConfigurationTests(unittest.IsolatedAsyncioTestCase):
@@ -47,6 +47,7 @@ class ModelConfigurationTests(unittest.IsolatedAsyncioTestCase):
                     },
                 )
                 db = AsyncMock()
+                db.execute.return_value = MagicMock()
                 resolver = ExecutionContextResolver(db, allow_default_connection_fallback=False)
                 resolver._resolved_model_record = saved
                 config = await resolver.get_model_config()
@@ -67,7 +68,7 @@ class ModelConfigurationTests(unittest.IsolatedAsyncioTestCase):
                     body = json.loads(request.content)
                     self.assertEqual(body["model"], "test-model")
                     requests.append(request)
-                    return reply(request)
+                    return probe_reply(request)
 
                 def client_factory():
                     client = httpx.AsyncClient(transport=httpx.MockTransport(respond))
@@ -86,7 +87,7 @@ class ModelConfigurationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(response.data.success)
                 self.assertEqual(response.data.source_provider, provider)
                 self.assertEqual(response.data.api_format, protocol)
-                self.assertEqual(len(requests), 2)
+                self.assertEqual(len(requests), 3)
                 self.assertEqual(len(clients), 2)
                 self.assertTrue(all(client.is_closed for client in clients))
 

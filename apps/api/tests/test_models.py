@@ -1,14 +1,17 @@
 """Model configuration API tests"""
 
 from contextlib import nullcontext
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+from pydantic_ai.messages import ModelResponse, ToolCallPart, ToolReturnPart
+from pydantic_ai.models.function import FunctionModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1 import models as models_api
 from app.db.tables import AppSettings, Model
+from app.services import model_probe
 from tests.model_fixtures import synthetic_model_config
 
 
@@ -177,7 +180,7 @@ async def test_openai_compatible_urls_are_normalized_without_duplicate_endpoint(
 
 
 @pytest.mark.asyncio
-async def test_legacy_models_list_mode_still_proves_real_chat_completion(
+async def test_connection_check_proves_tool_round_trip_and_structured_output(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -189,37 +192,36 @@ async def test_legacy_models_list_mode_still_proves_real_chat_completion(
             "model_id": "custom-model",
             "base_url": "https://gateway.example.com/v1",
             "api_key": "saved-key",
-            "extra_options": {
-                "api_format": "openai_compatible",
-                "healthcheck_mode": "models_list",
-            },
+            "extra_options": {"api_format": "openai_compatible"},
         },
     )
     model_id = created.json()["data"]["id"]
     observed: dict[str, object] = {}
 
+    def answer(messages, info):
+        returns = [
+            part
+            for message in messages
+            for part in message.parts
+            if isinstance(part, ToolReturnPart)
+        ]
+        if not returns:
+            return ModelResponse(parts=[ToolCallPart("read_check_value", {})])
+        observed["receipt"] = returns[-1].content["receipt"]
+        return ModelResponse(parts=[ToolCallPart(info.output_tools[0].name, returns[-1].content)])
+
     def fake_build(config):
         observed["config"] = config
-        return nullcontext("runtime-model")
+        return nullcontext(FunctionModel(answer))
 
-    class FakeAgent:
-        def __init__(self, runtime_model, **_kwargs):
-            observed["runtime_model"] = runtime_model
-
-        async def run(self, prompt):
-            observed["prompt"] = prompt
-            return "OK"
-
-    monkeypatch.setattr(models_api, "model_session", fake_build)
-    monkeypatch.setattr(models_api, "Agent", FakeAgent)
+    monkeypatch.setattr(model_probe, "model_session", fake_build)
 
     response = await client.post(f"/api/v1/config/models/{model_id}/test")
 
     assert response.status_code == 200
     assert response.json()["data"]["success"] is True
     assert response.json()["data"]["message"] == "连接成功"
-    assert observed["runtime_model"] == "runtime-model"
-    assert observed["prompt"] == "OK"
+    assert observed["receipt"]
     assert observed["config"] == synthetic_model_config(
         model="custom-model",
         model_id=model_id,
@@ -251,22 +253,17 @@ async def test_model_healthcheck_never_reflects_raw_provider_error(
             "api_key": "saved-key",
             "extra_options": {
                 "api_format": "openai_compatible",
-                "healthcheck_mode": "models_list",
             },
         },
     )
     model_id = created.json()["data"]["id"]
 
-    monkeypatch.setattr(models_api, "model_session", lambda _config, **_kwargs: nullcontext("runtime-model"))
+    def fail(_messages, _info):
+        raise RuntimeError("provider exploded with secret-token at ?token=secret-query")
 
-    class FailingAgent:
-        def __init__(self, *_args, **_kwargs):
-            pass
-
-        async def run(self, _prompt):
-            raise RuntimeError("provider exploded with secret-token at ?token=secret-query")
-
-    monkeypatch.setattr(models_api, "Agent", FailingAgent)
+    monkeypatch.setattr(
+        model_probe, "model_session", lambda _config: nullcontext(FunctionModel(fail))
+    )
 
     response = await client.post(f"/api/v1/config/models/{model_id}/test")
     data = response.json()["data"]
@@ -330,7 +327,7 @@ async def test_connection_changes_reset_health_but_renaming_does_not(
     model = await db_session.get(Model, model_id)
     assert model is not None
     model.health_status = "healthy"
-    model.last_checked_at = models_api.datetime.now(models_api.UTC)
+    model.last_checked_at = datetime.now(UTC)
     model.last_response_time_ms = 25
     await db_session.commit()
 

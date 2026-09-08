@@ -55,6 +55,7 @@ export function ModelSettings() {
     success: t("testResultSuccess"),
     credentials: t("testResultCredentials"),
     configuration: t("testResultConfiguration"),
+    capability: t("testResultCapability"),
     temporary: t("testResultTemporary"),
     failed: t("testResultFailed"),
   };
@@ -77,7 +78,6 @@ export function ModelSettings() {
       api_format: preset.api_format,
       base_url: preset.base_url,
       api_key_optional: preset.api_key_optional,
-      healthcheck_mode: preset.healthcheck_mode,
     }));
   };
 
