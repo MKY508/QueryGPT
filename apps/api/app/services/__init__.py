@@ -1,5 +1,1 @@
-"""服务层"""
-
-from app.services.execution import ExecutionService
-
-__all__ = ["ExecutionService"]
+"""Application services; import each service from its owning module."""
