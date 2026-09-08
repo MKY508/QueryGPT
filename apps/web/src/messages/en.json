@@ -506,6 +506,10 @@
     "itemsCount": "{count} items"
   },
   "analysisProgress": {
+    "stopping": "Stopping the investigation",
+    "stoppingDesc": "Waiting for the current operation to end",
+    "finalizing": "Finalizing the result",
+    "finalizingDesc": "Saving this investigation's result",
     "awaiting": "Awaiting your confirmation",
     "awaitingDesc": "A business decision that affects the conclusion needs your confirmation",
     "needsAttention": "This investigation needs attention",

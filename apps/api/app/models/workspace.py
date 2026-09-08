@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Discriminator, Field, StringConstraints, Tag, model_validator
 
+from app.models.analysis_state import AnalysisState
+
 KnowledgeState = Literal["candidate", "confirmed", "locked"]
 RelationshipValidity = Literal["active", "unverified", "stale"]
 SemanticEntryAction = Literal["ignore", "queue_validation", "remember", "restore", "attest"]
@@ -29,9 +31,6 @@ SemanticSourceScope = Literal[
     "unresolved",
 ]
 SemanticScopeKind = Literal["project", "source", "table", "context", "period"]
-AnalysisState = Literal[
-    "understanding", "waiting_confirmation", "investigating", "completed", "needs_attention"
-]
 SanitationRevisionState = Literal["candidate", "confirmed", "reverted"]
 
 SemanticSynonym = Annotated[

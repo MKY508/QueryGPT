@@ -10,6 +10,7 @@ import type {
 import { getErrorMessage } from "@/lib/types/api";
 import type { ChatMessage } from "@/lib/types/chat";
 import { runtimeMessage } from "@/i18n/runtime";
+import { parseAnalysisState } from "@/lib/analysis-state";
 
 export type ChatStreamEventPayload = Exclude<SSEEventData, { type: "error" | "done" }>;
 export type ChatStreamErrorPayload = Extract<SSEEventData, { type: "error" }>;
@@ -112,7 +113,7 @@ export function mapApiMessage(msg: APIMessage): ChatMessage {
     ),
     originalQuery: msg.metadata?.original_query,
     report: msg.metadata?.report,
-    analysisState: msg.metadata?.analysis_state,
+    analysisState: parseAnalysisState(msg.metadata?.analysis_state),
     analysisRunId: msg.metadata?.analysis_run_id,
     projectId: msg.metadata?.project_id,
     resumable: msg.metadata?.resumable,
@@ -205,7 +206,7 @@ export function applyStreamEvent(
       thinkingStage: progressStage || message.thinkingStage,
       analysisRunId: payload.data.analysis_run_id || message.analysisRunId,
       projectId: payload.data.project_id || message.projectId,
-      analysisState: payload.data.analysis_state || message.analysisState,
+      analysisState: parseAnalysisState(payload.data.analysis_state) ?? message.analysisState,
       resumable: payload.data.resumable ?? message.resumable,
       executionContext: mergeExecutionContext(message.executionContext, executionContext),
       diagnostics: mergeDiagnostics(message.diagnostics, diagnosticEntry ? [diagnosticEntry] : undefined),
@@ -226,7 +227,7 @@ export function applyStreamEvent(
       executionContext: mergeExecutionContext(message.executionContext, executionContext),
       diagnostics: mergeDiagnostics(message.diagnostics, diagnostics),
       report: payload.data.report || message.report,
-      analysisState: payload.data.analysis_state || message.analysisState,
+      analysisState: parseAnalysisState(payload.data.analysis_state) ?? message.analysisState,
       analysisRunId: payload.data.analysis_run_id || message.analysisRunId,
       projectId: payload.data.project_id || message.projectId,
       resumable: payload.data.resumable ?? message.resumable,
@@ -299,7 +300,7 @@ export function applyStreamErrorEvent(
     failedStage: typeof errorData.failed_stage === "string" ? errorData.failed_stage : undefined,
     canRetry: wasCancelled || recovery === "retry",
     originalQuery: query,
-    analysisState: errorData.analysis_state || "needs_attention",
+    analysisState: parseAnalysisState(errorData.analysis_state) ?? "needs_attention",
     analysisRunId: errorData.analysis_run_id || message.analysisRunId,
     projectId: errorData.project_id || message.projectId,
     resumable: errorData.resumable ?? message.resumable,

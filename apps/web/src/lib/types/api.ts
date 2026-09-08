@@ -8,6 +8,7 @@ import type {
   LegacyVisualization,
 } from "@/lib/charts";
 import { runtimeMessage } from "@/i18n/runtime";
+import type { AnalysisState } from "@/lib/types/analysis-state";
 
 export type {
   ChartAggregation,
@@ -818,7 +819,7 @@ export interface AnalysisRunSummary {
   project_id: string;
   conversation_id?: string | null;
   query: string;
-  state: "understanding" | "waiting_confirmation" | "investigating" | "completed" | "needs_attention";
+  state: AnalysisState;
   stage: string;
   report: {
     title?: string;
@@ -991,7 +992,7 @@ export interface SSEProgressData {
   diagnostic_entry?: AgentTraceEntry;
   analysis_run_id?: string;
   project_id?: string;
-  analysis_state?: "understanding" | "waiting_confirmation" | "investigating" | "completed" | "needs_attention";
+  analysis_state?: AnalysisState;
   resumable?: boolean;
 }
 
@@ -1006,7 +1007,7 @@ export interface SSEResultData {
   execution_context?: ExecutionContextSummary;
   diagnostics?: AgentTraceEntry[];
   report?: AnalysisReport;
-  analysis_state?: "understanding" | "waiting_confirmation" | "investigating" | "completed" | "needs_attention";
+  analysis_state?: AnalysisState;
   analysis_run_id?: string;
   project_id?: string;
   resumable?: boolean;
@@ -1096,7 +1097,7 @@ export interface MessageMetadata {
   execution_context?: ExecutionContextSummary;
   diagnostics?: AgentTraceEntry[];
   report?: AnalysisReport;
-  analysis_state?: string;
+  analysis_state?: AnalysisState;
   analysis_run_id?: string;
   project_id?: string;
   resumable?: boolean;

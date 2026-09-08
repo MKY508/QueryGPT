@@ -6,6 +6,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.models.analysis_state import (
+    TERMINAL_ANALYSIS_STATES,
+    AnalysisState,
+    parse_analysis_state,
+)
+
 
 class SSEEventType(StrEnum):
     """SSE 事件类型"""
@@ -18,19 +24,6 @@ class SSEEventType(StrEnum):
     PYTHON_IMAGE = "python_image"  # Python 图表
     ERROR = "error"
     DONE = "done"
-
-
-class ProgressStage(StrEnum):
-    """进度阶段"""
-
-    START = "start"
-    ANALYZING = "analyzing"
-    ROUTING = "routing"
-    GENERATING_SQL = "generating_sql"
-    EXECUTING = "executing"
-    PROCESSING = "processing"
-    VISUALIZING = "visualizing"
-    SUMMARIZING = "summarizing"
 
 
 class SSEEvent(BaseModel):
@@ -49,11 +42,28 @@ class SSEEvent(BaseModel):
         return {"data": json.dumps(payload, ensure_ascii=False)}
 
     @classmethod
-    def progress(cls, stage: str, message: str, **extra: Any) -> "SSEEvent":
-        """创建进度事件"""
+    def progress(
+        cls,
+        stage: str,
+        message: str,
+        *,
+        analysis_state: AnalysisState | None = None,
+        **extra: Any,
+    ) -> "SSEEvent":
+        """Keep the product state distinct from the current work step and prose."""
+        state = analysis_state if analysis_state is not None else parse_analysis_state(stage)
+        if state is not None:
+            extra["analysis_state"] = AnalysisState(state).value
         return cls(
             type=SSEEventType.PROGRESS,
             data={"stage": stage, "message": message, **extra},
+        )
+
+    @property
+    def is_terminal_progress(self) -> bool:
+        return (
+            self.type == SSEEventType.PROGRESS
+            and parse_analysis_state(self.data.get("analysis_state")) in TERMINAL_ANALYSIS_STATES
         )
 
     @classmethod

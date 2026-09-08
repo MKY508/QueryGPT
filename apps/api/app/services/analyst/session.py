@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.i18n import get_progress_message
+from app.models.analysis_state import AnalysisState
 from app.services.dependency_manager import ProjectDependencyManager
 from app.services.execution_policy import ExecutionPolicy
 from app.services.project_context import (
@@ -61,7 +62,7 @@ class AnalystSession:
         self._last_progress_message = normalized
         self.progress_queue.put_nowait(
             {
-                "stage": "investigating",
+                "stage": AnalysisState.INVESTIGATING,
                 "step": normalized,
                 "message": get_progress_message(normalized, self.language),
             }
@@ -84,7 +85,8 @@ class AnalystSession:
         snapshot = copy.deepcopy(
             {
                 "safe_boundary": "after_tool",
-                "stage": "investigating",
+                "stage": AnalysisState.INVESTIGATING,
+                "analysis_state": AnalysisState.INVESTIGATING,
                 # Resumability is monotonic within a run. Once Python or package
                 # installation introduces state we cannot replay, a later SQL or
                 # knowledge tool must not accidentally advertise a safe resume.

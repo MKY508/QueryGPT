@@ -31,6 +31,7 @@ from app.models import (
     MessageResponse,
     SSEEvent,
 )
+from app.models.analysis_state import AnalysisState
 from app.models.chat import SemanticValidationSelectionItem
 from app.services.analysis_checkpoint import ensure_recovery_message, stable_payload_hash
 from app.services.app_settings import get_or_create_app_settings, settings_to_dict
@@ -225,6 +226,7 @@ async def _chat_stream_response(
             yield SSEEvent.progress(
                 "start",
                 get_progress_message("start", language),
+                analysis_state=AnalysisState.UNDERSTANDING,
                 conversation_id=str(current_conversation_id),
             ).to_sse()
 
@@ -253,6 +255,7 @@ async def _chat_stream_response(
             yield SSEEvent.progress(
                 "context_ready",
                 get_progress_message("context_ready", language),
+                analysis_state=AnalysisState.UNDERSTANDING,
                 conversation_id=str(current_conversation_id),
                 execution_context=runtime_snapshot,
             ).to_sse()
@@ -285,11 +288,7 @@ async def _chat_stream_response(
                     elif (
                         terminal_events
                         or accumulator.has_result
-                        or event.data.get("stage") in {
-                            "completed",
-                            "waiting_confirmation",
-                            "needs_attention",
-                        }
+                        or event.is_terminal_progress
                     ):
                         terminal_events.append(event)
                     else:

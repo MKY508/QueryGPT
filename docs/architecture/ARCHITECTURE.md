@@ -21,7 +21,7 @@ ReceiptBI 不是“模型先写一段 SQL，再固定执行一段 Python”的�
 | 任务控制 | `run_control.py` 持有并收束子任务，统一截止时间与停止检查；进度等待由事件或任务完成唤醒 | 执行服务、检查点与前端运行状态收敛到一个任务合同 |
 | 数据工具 | `query_compiler.py` 编译、`file_query.py` 读取、`result_profile.py` 校验结果；Agent 与保存方法执行器复用同一实现 | 收敛来源查询的取消和资源生命周期 |
 | 工具与会话 | `analyst/toolsets.py` 用 PydanticAI 工具集组合 15 个独立工具；`session.py` 持有当前调查状态、进度与检查点；`report_validation.py` 独立验收报告 | 检查点恢复仍在运行时中，需与任务事件合同一起收敛 |
-| 数据合同 | `models/analysis.py` 定义报告与图表；`models/query.py` 定义工具查询输入；数据模块不导入 Agent 或模型 SDK | 任务事件与持久化运行状态统一 |
+| 数据合同 | `models/analysis.py` 定义报告与图表，`models/query.py` 定义工具输入；`models/analysis_state.py` 定义前后端共用的调查状态 | 全部状态转移与中断恢复的事务边界收敛 |
 
 这不是“已经可随意切换 Codex/Hermes/Pi 引擎”的声明。当前直接复用已安装的 PydanticAI；外部编程 Agent 没有接入，也没有新增运行时依赖。
 
@@ -31,13 +31,16 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 
 调查、报告草稿、问题建议、语义文案和连接检查都通过 `model_session` 调用模型。连接池只在实际调用时创建，同一任务内的工具轮次复用；完成、异常、超时或取消后释放。等待业务确认和只创建建议回调不会分配连接。调用方注入的模型或 HTTP 客户端仍由调用方关闭，不跨任务缓存凭证。
 
-调查流逐层拥有下层资源：`AnalysisStreamResponse` 关闭聊天流，聊天流关闭执行流，执行流关闭运行时，运行时先收束模型任务再清理 Python 工作区。提前关闭、处理事件失败与 ASGI 断连都经过同一释放链；异步清理和中断记录不受 ASGI 已取消作用域再次打断。项目结果和完整聊天记录保存后才发布终态事件，保存失败不发布成功结果；发布后断连不改写已保存的会话状态。任务状态与检查点仍使用现有合同，尚未统一重构。
+调查流逐层拥有下层资源：`AnalysisStreamResponse` 关闭聊天流，聊天流关闭执行流，执行流关闭运行时，运行时先收束模型任务再清理 Python 工作区。提前关闭、处理事件失败与 ASGI 断连都经过同一释放链；异步清理和中断记录不受 ASGI 已取消作用域再次打断。项目结果和完整聊天记录保存后才发布终态事件，保存失败不发布成功结果；发布后断连不改写已保存的会话状态。跨模块状态转移事务与恢复调度仍需收敛。
+
+`AnalysisState` 保留五种业务状态。进度通过 `analysis_state` 更新当前运行，`stage` / `step` 只描述工作；检查点携带同一状态，终态仍须等待结果持久化。缺失、非终态或与报告不符的结果状态不能写成完成。前端状态类型由 `scripts/generate-analysis-state.py` 生成；进度组件只按状态与已登记工作步骤选择本地文案，不解析服务端提示。“正在停止”和“正在整理结果”是客户端等待状态，不新增数据库状态。
 
 ### 成熟实现的取舍依据
 
 - [Pi agent loop](https://github.com/badlogic/pi-mono/blob/main/packages/agent/src/agent-loop.ts)：在模型调用边界注入模型/流函数，业务消息不直接绑定某家 SDK。这里采用依赖注入原则，不复制 TypeScript 循环。
 - [Pi contracts](https://github.com/badlogic/pi-mono/blob/main/packages/agent/src/types.ts) 与 [模型类型](https://github.com/badlogic/pi-mono/blob/main/packages/ai/src/types.ts)：分别定义供应商、协议、配置、工具和循环。ReceiptBI 使用领域类型传递配置与结果，查询及报告 API 不反向依赖分析 Agent；未复制第三方源码。
 - [Codex App Server](https://openai.com/index/unlocking-the-codex-harness/)：线程、轮次、事件分别有明确生命周期，客户端消费稳定事件。作为后续任务合同的参考，当前未移植其 JSON-RPC 服务。
+- [Codex Turn 合同](https://github.com/openai/codex/blob/main/codex-rs/app-server-protocol/schema/typescript/v2/Turn.ts)：运行状态与条目分开，客户端使用生成的类型；ReceiptBI 采用状态单一来源与前端生成物，不复制外部业务状态或依赖。
 - [Hermes agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop)：调用可中断，工具结果回到任务状态。ReceiptBI 共享可变分析状态的工具仍顺序执行，不照搬并发策略。
 - [PydanticAI models](https://pydantic.dev/docs/ai/models/openai/)：直接复用现有依赖中的协议、工具循环、结构化输出与 DeepSeek profile，没有拷贝第三方实现到仓库。
 - [PydanticAI 连接所有权](https://pydantic.dev/docs/ai/models/overview/#http-client-lifecycle) 与 [HTTPX 异步连接池](https://www.python-httpx.org/async/#opening-and-closing-clients)：采用任务作用域和显式借用，复用已安装 PydanticAI 1.107.1 的客户端工厂，不在工具循环里逐轮建连接。
@@ -55,6 +58,7 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 - `.venv/bin/python -m unittest tests.test_model_configuration -q`：保存配置经解析器分别进入执行和连接检查，验证供应商、协议、地址、请求头及查询参数；检查配置不可变与普通/诊断快照的字段边界。
 
 - `.venv/bin/python -m unittest tests.test_analysis_stream_lifetime -q`：离线 SDK 请求的提前关闭、事件投影异常、任务与作用域取消；ASGI 发送中和等待事件时断连的清理顺序；聊天提交前不发布终态，发布后断连保留完成状态。
+- `.venv/bin/python -m unittest tests.test_analysis_state_contract -q`：工作步骤和提示文字不决定运行状态；终态先保存后发布；拒绝缺失、活动中或与报告不符的结果状态。在仓库根目录运行 `apps/api/.venv/bin/python scripts/generate-analysis-state.py --check` 核对前端生成物。
 
 以上为离线边界验证，不代替全部业务回归或云端实测。
 

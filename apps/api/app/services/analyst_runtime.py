@@ -21,6 +21,7 @@ from app.models.analysis import (
     ConfirmationRequest,
     ReportAction,
 )
+from app.models.analysis_state import REPORT_ANALYSIS_STATES, AnalysisState
 from app.services.analysis_checkpoint import CheckpointDriftError, stable_payload_hash
 from app.services.analyst.confirmation import (
     _REVENUE_INTENT_TERMS,
@@ -146,6 +147,7 @@ class PydanticAnalystRuntime:
         return SSEEvent.progress(
             stage,
             get_progress_message(step, self.language),
+            analysis_state=AnalysisState(stage),
             step=step,
         )
 
@@ -937,11 +939,7 @@ class PydanticAnalystRuntime:
                 ) from exc
             report.primary_result = protected_name
         self.last_report = report
-        state = {
-            "waiting_confirmation": "waiting_confirmation",
-            "needs_data": "needs_attention",
-            "completed": "completed",
-        }[report.status]
+        state = REPORT_ANALYSIS_STATES[report.status]
         if state == "waiting_confirmation":
             yield self._progress_event("waiting_confirmation", "confirmation_required")
         elif report.status == "needs_data":

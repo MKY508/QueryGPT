@@ -7,6 +7,8 @@ import type {
   Visualization,
 } from "@/lib/types/api";
 
+import type { AnalysisState } from "@/lib/types/analysis-state";
+
 export interface ChatMessage {
   id?: string;
   streamId?: string;
@@ -33,7 +35,7 @@ export interface ChatMessage {
   canRetry?: boolean;
   originalQuery?: string;
   report?: AnalysisReport;
-  analysisState?: string;
+  analysisState?: AnalysisState;
   analysisRunId?: string;
   projectId?: string;
   resumable?: boolean;

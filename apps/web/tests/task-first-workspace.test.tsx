@@ -326,7 +326,7 @@ describe("task-first workspace", () => {
       <NextIntlClientProvider locale="zh" messages={messages}>
         <AnalysisProgress
           state="investigating"
-          status="running Python tool against SQL schema"
+          stage="running Python tool against SQL schema"
         />
       </NextIntlClientProvider>
     );
@@ -349,7 +349,6 @@ describe("task-first workspace", () => {
         <AnalysisProgress
           state="investigating"
           stage="read_files"
-          status="正在读取服务端固定进度"
         />
       </NextIntlClientProvider>
     );
@@ -361,27 +360,25 @@ describe("task-first workspace", () => {
     expect(progress).not.toHaveTextContent("正在读取服务端固定进度");
   });
 
-  it("preserves same-language business progress but hides an unknown cross-language status", () => {
+  it("uses only registered work steps in either language", () => {
     const { rerender } = render(
       <NextIntlClientProvider locale="en" messages={enMessages}>
         <AnalysisProgress
           state="investigating"
-          stage="investigating"
-          status="Reading the July customer ledger"
+          stage="Reading the July customer ledger"
         />
       </NextIntlClientProvider>
     );
 
     expect(
       screen.getByRole("region", { name: "Current investigation progress" })
-    ).toHaveTextContent("Reading the July customer ledger");
+    ).not.toHaveTextContent("Reading the July customer ledger");
 
     rerender(
       <NextIntlClientProvider locale="zh" messages={messages}>
         <AnalysisProgress
           state="investigating"
-          stage="investigating"
-          status="Reading the July customer ledger"
+          stage="Reading the July customer ledger"
         />
       </NextIntlClientProvider>
     );
@@ -396,7 +393,7 @@ describe("task-first workspace", () => {
     ["investigating", "正在核对发现"],
     ["completed", "调查已完成"],
     ["needs_attention", "这份调查需要处理"],
-  ])("renders the %s product state", (state, label) => {
+  ] as const)("renders the %s product state", (state, label) => {
     render(
       <NextIntlClientProvider locale="zh" messages={messages}>
         <AnalysisProgress state={state} />
@@ -454,7 +451,7 @@ describe("task-first workspace", () => {
       role: "assistant" as const,
       content: "",
       isLoading: true,
-      analysisState: "investigating",
+      analysisState: "investigating" as const,
     };
     const commonProps = {
       isLoading: true,

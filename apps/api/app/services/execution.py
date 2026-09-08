@@ -36,6 +36,12 @@ from app.db.tables import (
 )
 from app.i18n import get_progress_message, t
 from app.models import SSEEvent
+from app.models.analysis_state import (
+    REPORT_ANALYSIS_STATES,
+    TERMINAL_ANALYSIS_STATES,
+    AnalysisState,
+    parse_analysis_state,
+)
 from app.services.analysis_checkpoint import (
     CheckpointDriftError,
     CheckpointError,
@@ -1019,6 +1025,9 @@ class ExecutionService:
                         manifest["correction_context"] = correction_context
                     run.checkpoint = manifest
                     run.stage = str(snapshot.get("stage") or run.stage)
+                    checkpoint_state = parse_analysis_state(snapshot.get("analysis_state"))
+                    if checkpoint_state is not None and run.state not in TERMINAL_ANALYSIS_STATES:
+                        run.state = checkpoint_state
                     await self.db.commit()
                     return manifest
 
@@ -1516,7 +1525,11 @@ class ExecutionService:
     ) -> ResultPersistenceOutcome:
         self.execution_policy.validate_result_boundary(result_data)
         report = dict(result_data.get("report") or {})
-        state = result_data.get("analysis_state") or "completed"
+        state = AnalysisState(result_data.get("analysis_state"))
+        if state not in TERMINAL_ANALYSIS_STATES:
+            raise ValueError("A final result must carry a terminal investigation state")
+        if report.get("status") and REPORT_ANALYSIS_STATES.get(report["status"]) != state:
+            raise ValueError("Report status does not match the investigation state")
         tool_history: list[dict[str, Any]] = []
         for raw_item in result_data.get("tool_history") or []:
             if not isinstance(raw_item, dict):
@@ -2828,18 +2841,13 @@ class ExecutionService:
                     buffer_event = bool(buffered_terminal_events)
                     if run and event.type.value == "progress":
                         next_stage = str(event.data.get("stage") or run.stage)
-                        product_states = {
-                            "understanding",
-                            "waiting_confirmation",
-                            "investigating",
-                            "completed",
-                            "needs_attention",
-                        }
-                        if next_stage in {"waiting_confirmation", "completed", "needs_attention"}:
+                        if event.is_terminal_progress:
                             buffer_event = True
                         else:
                             run.stage = next_stage
-                            run.state = next_stage if next_stage in product_states else run.state
+                            next_state = parse_analysis_state(event.data.get("analysis_state"))
+                            if next_state is not None:
+                                run.state = next_state
                             await self.db.commit()
                     if run and event.type.value == "result":
                         if (event.data.get("report") or {}).get("status") == "needs_data":

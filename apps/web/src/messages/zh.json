@@ -506,6 +506,10 @@
     "itemsCount": "{count} 项"
   },
   "analysisProgress": {
+    "stopping": "正在停止调查",
+    "stoppingDesc": "正在等待当前操作结束",
+    "finalizing": "正在整理结果",
+    "finalizingDesc": "正在保存本次调查结果",
     "awaiting": "等待你的确认",
     "awaitingDesc": "有一项会影响结论的业务判断需要你确认",
     "needsAttention": "这份调查需要处理",

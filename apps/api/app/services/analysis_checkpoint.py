@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.tables import AnalysisRun, Conversation, Message
+from app.models.analysis_state import AnalysisState
 from app.services.database import create_database_manager
 
 CHECKPOINT_VERSION = 1
@@ -333,6 +334,9 @@ def _write_checkpoint_sync(
                 "revision": revision,
                 "safe_boundary": snapshot.get("safe_boundary") or "after_tool",
                 "stage": snapshot.get("stage") or "investigating",
+                "analysis_state": AnalysisState(
+                    snapshot.get("analysis_state") or AnalysisState.INVESTIGATING
+                ).value,
                 "resumable": resumable,
                 "reason": reason,
                 "source_fingerprints": snapshot.get("source_fingerprints") or {},
@@ -366,6 +370,7 @@ def _write_checkpoint_sync(
         "manifest_sha256": manifest_sha256,
         "safe_boundary": manifest["safe_boundary"],
         "stage": manifest["stage"],
+        "analysis_state": manifest["analysis_state"],
         "resumable": resumable,
         "reason": reason,
         "source_fingerprints": manifest["source_fingerprints"],

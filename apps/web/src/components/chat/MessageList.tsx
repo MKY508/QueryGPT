@@ -421,7 +421,8 @@ export function MessageList({
                         <AnalysisProgress
                           state={message.analysisState}
                           stage={message.thinkingStage}
-                          status={message.status}
+                          pending
+                          finalizing={Boolean(message.report)}
                         />
                       </div>
                     ) : (
