@@ -13,7 +13,7 @@ import {
   createReportBlocksCopy,
   reportBlockOptions,
   reportFilterFields,
-} from "./report-blocks";
+} from "@/lib/report-blocks";
 
 interface ReportPropertyPanelProps {
   page: ReportPage;

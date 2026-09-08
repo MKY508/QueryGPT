@@ -31,7 +31,7 @@ import {
   artifactToReportBlock,
   createReportBlocksCopy,
   reflowBlocks,
-} from "./report-blocks";
+} from "@/lib/report-blocks";
 import { useModalFocus } from "@/lib/use-modal-focus";
 
 export type InvestigationPickerMode = "smart" | "manual";

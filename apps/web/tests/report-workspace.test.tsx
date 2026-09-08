@@ -14,7 +14,7 @@ import {
   applyStaticReportFilters,
   artifactToReportBlock as convertArtifactToReportBlock,
   createReportBlocksCopy,
-} from "@/components/reports/report-blocks";
+} from "@/lib/report-blocks";
 import {
   ReportDraftUnavailableError,
   type ReportDocument,

@@ -65,19 +65,17 @@ import {
   type ReportDraftCopy,
 } from "./report-draft";
 import {
-  applyReportBlockUpdates,
   blockTypeLabel,
   createReportBlocksCopy,
   createLocalId,
   createManualBlock,
   createReportPage,
   reportBlockOptions,
-  reflowBlocks,
-} from "./report-blocks";
+} from "@/lib/report-blocks";
+import { editReportDocument, type ReportPageCommand } from "@/lib/report-editing";
 
 type SaveState = "idle" | "saving" | "saved" | "error" | "conflict";
 
-const WIDTH_STEPS = [3, 4, 6, 8, 12];
 const REPORT_COMPACT_WORKSPACE_QUERY = "(max-width: 1279px)";
 const REPORT_OUTLINE_IN_FLOW_QUERY = "(min-width: 1280px)";
 const REPORT_PROPERTIES_IN_FLOW_QUERY = "(min-width: 1536px)";
@@ -579,18 +577,18 @@ function ReportWorkspaceSession({ projectId, reportId, initialRunId }: ReportWor
     [blocksCopy, locale, tDraft]
   );
   const mutateReport = useCallback((updater: (current: ReportDocument) => ReportDocument) => {
-    if (refreshInFlightRef.current) return;
+    const current = reportRef.current;
+    if (!current || refreshInFlightRef.current) return;
+    const next = updater(current);
+    if (next === current) return;
+    reportRef.current = next;
     editRevisionRef.current += 1;
-    setReport((current) => {
-      if (!current) return current;
-      const next = updater(current);
-      reportRef.current = next;
-      return next;
-    });
+    setReport(next);
     setDirty(true);
     setSaveState((current) => (current === "saving" ? current : "idle"));
     setSaveError(null);
     setRefreshError(null);
+    return next;
   }, []);
 
   const scrollReportToTop = useCallback(() => {
@@ -614,43 +612,26 @@ function ReportWorkspaceSession({ projectId, reportId, initialRunId }: ReportWor
     [scrollReportToTop]
   );
 
-  const replacePage = useCallback(
-    (pageId: string, updater: (page: ReportPage) => ReportPage) => {
-      mutateReport((current) => ({
-        ...current,
-        pages: current.pages.map((page) => (page.id === pageId ? updater(page) : page)),
-      }));
-    },
+  const editPage = useCallback(
+    (pageId: string, command: ReportPageCommand) =>
+      mutateReport(current => editReportDocument(current, pageId, command)),
     [mutateReport]
   );
 
   const changePage = (updates: Partial<ReportPage>) => {
     if (refreshInFlightRef.current || !activePage) return;
-    replacePage(activePage.id, (page) => ({ ...page, ...updates }));
+    editPage(activePage.id, { type: "update-page", updates });
   };
 
   const changeBlock = (updates: Partial<ReportBlock>) => {
     if (refreshInFlightRef.current || !activePage || !selectedBlock) return;
-    replacePage(activePage.id, (page) => {
-      const blocks = page.blocks.map((block) =>
-        block.id === selectedBlock.id
-          ? applyReportBlockUpdates(block, updates)
-          : block
-      );
-      return {
-        ...page,
-        blocks: updates.layout ? reflowBlocks(blocks) : blocks,
-      };
-    });
+    editPage(activePage.id, { type: "update-block", blockId: selectedBlock.id, updates });
   };
 
   const addBlock = (type: ReportBlockType) => {
     if (refreshInFlightRef.current || !activePage) return;
     const block = createManualBlock(type, blocksCopy);
-    replacePage(activePage.id, (page) => ({
-      ...page,
-      blocks: reflowBlocks([...page.blocks, block]),
-    }));
+    if (!editPage(activePage.id, { type: "append-blocks", blocks: [block] })) return;
     setSelectedBlockId(block.id);
     setPropertiesOpen(true);
     if (window.matchMedia(REPORT_COMPACT_WORKSPACE_QUERY).matches) {
@@ -687,10 +668,7 @@ function ReportWorkspaceSession({ projectId, reportId, initialRunId }: ReportWor
         },
       }))
     );
-    replacePage(activePage.id, (page) => ({
-      ...page,
-      blocks: reflowBlocks([...page.blocks, ...preparedBlocks]),
-    }));
+    if (!editPage(activePage.id, { type: "append-blocks", blocks: preparedBlocks })) return;
     setSelectedBlockId(preparedBlocks[0].id);
     setPropertiesOpen(true);
     if (window.matchMedia(REPORT_COMPACT_WORKSPACE_QUERY).matches) {
@@ -759,68 +737,29 @@ function ReportWorkspaceSession({ projectId, reportId, initialRunId }: ReportWor
 
   const moveBlock = (blockId: string, direction: -1 | 1) => {
     if (refreshInFlightRef.current || !activePage) return;
-    replacePage(activePage.id, (page) => {
-      const index = page.blocks.findIndex((block) => block.id === blockId);
-      const target = index + direction;
-      if (index < 0 || target < 0 || target >= page.blocks.length) return page;
-      const blocks = [...page.blocks];
-      [blocks[index], blocks[target]] = [blocks[target], blocks[index]];
-      return { ...page, blocks: reflowBlocks(blocks) };
-    });
+    editPage(activePage.id, { type: "move-block", blockId, direction });
   };
 
   const resizeBlock = (blockId: string, direction: -1 | 1) => {
     if (refreshInFlightRef.current || !activePage) return;
-    replacePage(activePage.id, (page) => {
-      const blocks = page.blocks.map((block) => {
-        if (block.id !== blockId) return block;
-        const currentIndex = Math.max(0, WIDTH_STEPS.indexOf(block.layout.w));
-        const nextIndex = Math.max(0, Math.min(WIDTH_STEPS.length - 1, currentIndex + direction));
-        return { ...block, layout: { ...block.layout, w: WIDTH_STEPS[nextIndex] } };
-      });
-      return { ...page, blocks: reflowBlocks(blocks) };
-    });
+    editPage(activePage.id, { type: "resize-block", blockId, direction });
   };
 
   const duplicateBlock = (blockId: string) => {
     if (refreshInFlightRef.current || !activePage) return;
+    const source = activePage.blocks.find(block => block.id === blockId);
+    if (!source) return;
     const duplicateId = createLocalId("block");
-    replacePage(activePage.id, (page) => {
-      const index = page.blocks.findIndex((block) => block.id === blockId);
-      if (index < 0) return page;
-      const source = page.blocks[index];
-      const copiedConfig = structuredClone(source.config);
-      delete copiedConfig.manual_override;
-      const copy: ReportBlock = {
-        ...source,
-        id: duplicateId,
-        title: t("duplicateTitle", { title: source.title }),
-        source_kind: "manual",
-        analysis_run_id: null,
-        artifact_id: null,
-        content: structuredClone(source.content),
-        config: copiedConfig,
-        layout: { ...source.layout },
-      };
-      delete copy.source_ref;
-      delete copy.source_available;
-      delete copy.version;
-      delete copy.created_at;
-      delete copy.updated_at;
-      const blocks = [...page.blocks];
-      blocks.splice(index + 1, 0, copy);
-      return { ...page, blocks: reflowBlocks(blocks) };
-    });
-    setSelectedBlockId(duplicateId);
+    if (editPage(activePage.id, {
+      type: "duplicate-block", blockId, newBlockId: duplicateId,
+      title: t("duplicateTitle", { title: source.title }),
+      connectionKeys: { interaction_key: crypto.randomUUID(), filter_target_key: crypto.randomUUID() },
+    })) setSelectedBlockId(duplicateId);
   };
 
   const deleteBlock = (blockId: string) => {
     if (refreshInFlightRef.current || !activePage) return;
-    replacePage(activePage.id, (page) => ({
-      ...page,
-      blocks: reflowBlocks(page.blocks.filter((block) => block.id !== blockId)),
-    }));
-    if (selectedBlockId === blockId) setSelectedBlockId(null);
+    if (editPage(activePage.id, { type: "remove-block", blockId }) && selectedBlockId === blockId) setSelectedBlockId(null);
   };
 
   const addPage = () => {

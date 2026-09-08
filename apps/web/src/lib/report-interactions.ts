@@ -3,7 +3,7 @@ import { reportContentRows } from "./report-rows";
 import {
   applyReportBlockUpdates, applyStaticReportFilters,
   type ActiveReportFilter, type ReportFilterOperator,
-} from "@/components/reports/report-blocks";
+} from "@/lib/report-blocks";
 
 export type CrossFilterValue = string | number | boolean | null;
 export interface CrossFilterRule {

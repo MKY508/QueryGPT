@@ -7,7 +7,7 @@ import {
   createReportPage,
   reflowBlocks,
   type ReportBlocksCopy,
-} from "./report-blocks";
+} from "@/lib/report-blocks";
 
 export interface InvestigationReportDraft {
   title: string;

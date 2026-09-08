@@ -1,6 +1,6 @@
 import type { ReportBlock, ReportDocument, ReportPage } from "./reports";
 import { interactionFields, pageReportFilters } from "./report-interactions";
-import { applyReportBlockUpdates, type ActiveReportFilter } from "@/components/reports/report-blocks";
+import { applyReportBlockUpdates, type ActiveReportFilter } from "@/lib/report-blocks";
 
 interface FilterTarget { key: string; field: string }
 export interface ConnectedReportFilter {

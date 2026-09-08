@@ -1,3 +1,4 @@
+/** Report block models and transformations; no component or React dependencies. */
 import type { AnalysisArtifact, AnalysisRunSummary } from "@/lib/types/api";
 import { normalizeChartSpec } from "@/lib/charts";
 import { reportContentRows as contentRows } from "@/lib/report-rows";
@@ -259,7 +260,7 @@ export function reflowBlocks(blocks: ReportBlock[]): ReportBlock[] {
   let x = 0;
   let y = 0;
   let rowHeight = 1;
-  return blocks.map((block, orderIndex) => {
+  const arranged = blocks.map((block, orderIndex) => {
     const requestedWidth = Math.max(3, Math.min(12, Math.round(block.layout.w || 6)));
     const w = block.block_type === "table" ? 12 : requestedWidth;
     const minimumHeight =
@@ -276,7 +277,9 @@ export function reflowBlocks(blocks: ReportBlock[]): ReportBlock[] {
       y += rowHeight;
       rowHeight = 1;
     }
-    const next = { ...block, order_index: orderIndex, layout: { x, y, w, h } };
+    const next = block.order_index === orderIndex && block.layout.x === x && block.layout.y === y &&
+      block.layout.w === w && block.layout.h === h ? block
+      : { ...block, order_index: orderIndex, layout: { x, y, w, h } };
     x += w;
     rowHeight = Math.max(rowHeight, h);
     if (x >= 12) {
@@ -286,6 +289,7 @@ export function reflowBlocks(blocks: ReportBlock[]): ReportBlock[] {
     }
     return next;
   });
+  return arranged.every((block, index) => block === blocks[index]) ? blocks : arranged;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

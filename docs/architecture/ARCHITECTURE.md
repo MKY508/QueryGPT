@@ -97,7 +97,9 @@ flowchart TD
 - `apps/web/src/components/chat/` 组合项目、数据来源、项目理解与整理记录、横向报告历史、纠正和继续追问。
 - 文件来源可以在普通工作台打开可视化整理面板：用户从受控步骤中组合操作，先查看有界的前后样本和变化数量，再明确应用；已有的人工步骤也可以修改或清空。
 - 结构化图表使用版本化的 [`CHART_SPEC.md`](CHART_SPEC.md) 合同。Agent 只推荐图型和字段绑定，系统绑定已验证结果，前端用固定 React 组件渲染；报告工作台允许在同一合同内手动调整，而不接受模型生成的 JavaScript 或任意渲染器配置。
-- 报表阅读状态与文档编辑分离；筛选、联动和静态输出的模块合同见 [报表阅读层](../REPORT_READING.md)。普通界面只展示业务状态与依据，技术定义留在高级入口。
+- `apps/web/src/lib/report-blocks.ts` 拥有区块模型、来源保留、排版与调查内容转换，不依赖 React 或组件目录。编辑器、阅读联动与报告编排直接使用此模块，不保留组件层转发入口。
+- `report-editing.ts` 接受明确页面和类型化动作，统一修改、追加、移动、缩放、复制和删除；无变化返回原对象。工作区只在文档接受动作后更新选择，保存和历史仍由既有编辑会话管理。单卡复制是独立内容，整页复制的来源语义保持原合同。
+- 阅读筛选、联动和静态输出见 [报表阅读层](../REPORT_READING.md)；不进入文档历史。普通界面只展示业务状态与依据，技术定义留在高级入口。动作／结果分工参考 [Excalidraw 的 ActionResult](https://github.com/excalidraw/excalidraw/blob/master/packages/excalidraw/actions/types.ts)，未引入其运行时或复制源码。
 
 ### 应用与 Agent 层
 

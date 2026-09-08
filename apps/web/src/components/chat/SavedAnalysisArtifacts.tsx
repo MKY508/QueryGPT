@@ -8,7 +8,7 @@ import type { AnalysisArtifact } from "@/lib/types/api";
 import {
   artifactToReportBlock,
   createReportBlocksCopy,
-} from "@/components/reports/report-blocks";
+} from "@/lib/report-blocks";
 import { ReportBlockCard } from "@/components/reports/ReportBlockCard";
 
 interface SavedAnalysisArtifactsProps {

@@ -7,7 +7,7 @@
 - `report-reading.ts` 保存纯阅读状态与 reducer：字段值、图表选择、清除、保存后的身份对齐。它不写报告，不调用 API，不进入文档历史或恢复草稿。
 - `useReportReading` 连接当前报告和页面，集中接受阅读动作。会话由工作区的项目／报告 key 隔离；普通切页保留各页选择，重新载入、恢复或合并文档时明确重置。进入编辑清除图表选择，但保留字段筛选。
 - `readReportPage` 是画布、PDF 和图片的共用投影。输出筛选后卡片、有效联动、跨页筛选入口和连接数量；保留原始报告内容。当前页面和所选导出页不能先从完整报告中裁掉，否则会丢失其他页面提供的筛选。
-- `report-interactions.ts` 维护页内图表连接和精确值匹配；`report-filter-connections.ts` 维护报告级显式字段映射。渲染组件不重复解释规则。
+- `report-interactions.ts` 维护页内图表连接和精确值匹配；`report-filter-connections.ts` 维护报告级显式字段映射。两者直接依赖 `lib/report-blocks.ts` 的区块模型，不反向加载编辑组件；渲染组件不重复解释规则。
 - `report-chart-interactions.tsx` 接收 Recharts 的未知点对象，读取原始 payload；不以绘图近似值、标签或数组位置代替业务值。`chart-source-value.ts` 和 `report-rows.ts` 是无界面、无数值转换依赖的读取边界。
 
 ## 动作规则
