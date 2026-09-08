@@ -43,16 +43,19 @@ from app.models.analysis_state import (
     parse_analysis_state,
 )
 from app.services.analysis_checkpoint import (
-    CheckpointDriftError,
-    CheckpointError,
     load_runtime_checkpoint,
     revalidate_database_replay_journal,
     save_runtime_checkpoint,
     source_fingerprint_map,
-    stable_payload_hash,
     validate_source_fingerprints,
 )
 from app.services.business_decision_slots import canonicalize_decision_key
+from app.services.checkpoint_contract import (
+    CheckpointDriftError,
+    CheckpointError,
+    RestoredCheckpoint,
+    stable_payload_hash,
+)
 from app.services.correction_completion import (
     CorrectionCompletionError,
     build_correction_application_receipt,
@@ -969,26 +972,20 @@ class ExecutionService:
             project_context.required_correction = await self._required_correction_contract(
                 correction
             )
-        resume_state: dict[str, Any] | None = None
+        resume_state: RestoredCheckpoint | None = None
         if resume_checkpoint is not None:
             validate_source_fingerprints(
                 dict(resume_checkpoint.get("source_fingerprints") or {}),
                 project_context.sources,
             )
-            restored = await load_runtime_checkpoint(
+            resume_state = await load_runtime_checkpoint(
                 project_context.project_dir,
                 resume_checkpoint,
             )
             await revalidate_database_replay_journal(
-                restored.manifest,
+                resume_state.manifest,
                 project_context.connection_configs,
             )
-            resume_state = {
-                "manifest": restored.manifest,
-                "dataframes": restored.dataframes,
-                "python_output": restored.python_output,
-                "python_images": restored.python_images,
-            }
 
         checkpoint_callback = None
         if run is not None and self.execution_policy.diagnostics_enabled:

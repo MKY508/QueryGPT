@@ -34,7 +34,7 @@ from app.models.workspace import (
     StandingBaselineRef,
     ValidatedResultSnapshot,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.metric_lineage import prove_metric_application_lineage
 from app.services.standing_analysis import canonical_input_token
 

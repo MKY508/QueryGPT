@@ -38,7 +38,7 @@ from app.models.workspace import (
     SemanticValidationJobResponse,
     SemanticValidationProgress,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.database import create_database_manager
 from app.services.metric_formula import metric_formula_columns
 from app.services.result_filters import (

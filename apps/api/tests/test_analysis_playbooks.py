@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.tables import AnalysisRun, Project, ProjectDataSource
 from app.models.workspace import AnalysisPlaybookResponse, AnalysisPlaybookStep
 from app.services import analyst_runtime
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst_runtime import PydanticAnalystRuntime
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.project_context import load_project_context
 from app.services.standing_workspace import (
     StandingWorkspaceError,

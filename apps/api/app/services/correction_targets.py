@@ -18,8 +18,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, SemanticEntry
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.business_decision_slots import canonicalize_decision_key
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.correction_completion import is_reusable_full_relationship_evidence
 from app.services.semantic_learning import discover_metric_column_correction_candidates
 

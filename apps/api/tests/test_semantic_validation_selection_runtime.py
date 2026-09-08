@@ -11,7 +11,7 @@ from app.api.v1 import chat as chat_api
 from app.db.tables import AnalysisRun, Project, SemanticEntry
 from app.models.chat import ChatStreamRequest, SSEEvent
 from app.services import project_context as project_context_service
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.execution import (
     ExecutionService,
     SemanticValidationSelectionError,

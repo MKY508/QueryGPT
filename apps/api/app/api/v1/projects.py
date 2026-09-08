@@ -119,9 +119,9 @@ from app.models.workspace import (
     is_executable_semantic_definition,
     validate_semantic_definition_compatibility,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.app_settings import get_or_create_app_settings, settings_to_dict
 from app.services.business_decision_slots import canonicalize_decision_key
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.correction_targets import (
     discover_metric_column_correction_options,
     discover_report_correction_targets,

@@ -15,7 +15,7 @@ from app.db.tables import (
     ProjectDataSource,
     SemanticEntry,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.execution import ExecutionService
 from app.services.semantic_revisions import append_semantic_revision
 

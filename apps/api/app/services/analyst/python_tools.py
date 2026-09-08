@@ -9,10 +9,10 @@ from typing import Any, Literal
 
 from pydantic_ai import ModelRetry, RunContext
 
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst.session import (
     AnalystSession,
 )
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.python_runtime import validate_python_code
 from app.services.python_sandbox import PythonSandbox
 

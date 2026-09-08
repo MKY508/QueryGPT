@@ -20,7 +20,7 @@ ReceiptBI 不是“模型先写一段 SQL，再固定执行一段 Python”的�
 | 模型引擎 | `model_engine.py` 的 `model_session` 按任务管理连接池；显式协议选择 Chat Completions、Responses 或 Anthropic 适配器，支持借用外部 `Model` / HTTP 客户端 | 供应商模型目录、上下文与图像等逐模型能力发现 |
 | 任务控制 | `run_control.py` 持有并收束子任务，统一截止时间与停止检查；进度等待由事件或任务完成唤醒 | 执行服务、检查点与前端运行状态收敛到一个任务合同 |
 | 数据工具 | `query_compiler.py` 编译、`file_query.py` 读取、`result_profile.py` 校验结果；Agent 与保存方法执行器复用同一实现 | 收敛来源查询的取消和资源生命周期 |
-| 工具与会话 | `analyst/toolsets.py` 用 PydanticAI 工具集组合 15 个独立工具；`session.py` 持有当前调查状态、进度与检查点；`report_validation.py` 独立验收报告 | 检查点恢复仍在运行时中，需与任务事件合同一起收敛 |
+| 工具与会话 | `analyst/toolsets.py` 用 PydanticAI 工具集组合 15 个独立工具；`session.py` 持有当前调查状态；`recovery.py` 校验并装入恢复状态；`report_validation.py` 独立验收报告 | 持久状态事务与恢复调度仍需收敛 |
 | 数据合同 | `models/analysis.py` 定义报告与图表，`models/query.py` 定义工具输入；`models/analysis_state.py` 定义前后端共用的调查状态 | 全部状态转移与中断恢复的事务边界收敛 |
 
 这不是“已经可随意切换 Codex/Hermes/Pi 引擎”的声明。当前直接复用已安装的 PydanticAI；外部编程 Agent 没有接入，也没有新增运行时依赖。
@@ -35,6 +35,8 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 
 调查流逐层拥有下层资源：`AnalysisStreamResponse` 关闭聊天流，聊天流关闭执行流，执行流关闭运行时，运行时先收束模型任务再清理 Python 工作区。提前关闭、处理事件失败与 ASGI 断连都经过同一释放链；异步清理和中断记录不受 ASGI 已取消作用域再次打断。项目结果和完整聊天记录保存后才发布终态事件，保存失败不发布成功结果；发布后断连不改写已保存的会话状态。跨模块状态转移事务与恢复调度仍需收敛。
 
+`checkpoint_contract.py` 只定义检查点值、版本、错误与稳定哈希，不依赖数据库、文件存储或模型 SDK。`analysis_checkpoint.py` 负责落盘、完整性读取与数据库结果重新核对；执行服务将 `RestoredCheckpoint` 直接传给运行时，不再转换成无类型字典。`analyst/recovery.py` 按查询、关联、汇总、业务规则、结果和图表分别校验工具记录，随后把独立副本一次性装入空会话。校验失败不装入旧记录或候选知识；恢复后的行、元数据和记录不与检查点或其他会话共享可变对象。自由 Python 状态仍不可恢复。
+
 `AnalysisState` 保留五种业务状态。进度通过 `analysis_state` 更新当前运行，`stage` / `step` 只描述工作；检查点携带同一状态，终态仍须等待结果持久化。缺失、非终态或与报告不符的结果状态不能写成完成。前端状态类型由 `scripts/generate-analysis-state.py` 生成；进度组件只按状态与已登记工作步骤选择本地文案，不解析服务端提示。“正在停止”和“正在整理结果”是客户端等待状态，不新增数据库状态。
 
 ### 成熟实现的取舍依据
@@ -46,6 +48,7 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 - [Hermes agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop)：调用可中断，工具结果回到任务状态。ReceiptBI 共享可变分析状态的工具仍顺序执行，不照搬并发策略。
 - [PydanticAI models](https://pydantic.dev/docs/ai/models/openai/)：直接复用现有依赖中的协议、工具循环、结构化输出与 DeepSeek profile，没有拷贝第三方实现到仓库。
 - [PydanticAI 连接所有权](https://pydantic.dev/docs/ai/models/overview/#http-client-lifecycle) 与 [HTTPX 异步连接池](https://www.python-httpx.org/async/#opening-and-closing-clients)：采用任务作用域和显式借用，复用已安装 PydanticAI 1.107.1 的客户端工厂，不在工具循环里逐轮建连接。
+- [LangGraph checkpointers](https://docs.langchain.com/oss/python/langgraph/checkpointers#checkpoints)：参考在完整步骤边界保存状态快照、恢复成功步骤的分工；ReceiptBI 继续使用已有磁盘检查点与确定性校验，没有引入 LangGraph，也不重放模型思维。
 - [PydanticAI Tool Output 与输出校验](https://pydantic.dev/docs/ai/core-concepts/output/#tool-output)：连接检查使用与调查一致的类型化输出；基础工具循环按 [Groq 官方流程](https://console.groq.com/docs/tool-use/overview#how-tool-use-works) 验证工具返回值再次进入模型，不把模型列表或纯文字当作分析能力证据。
 - [PydanticAI toolsets](https://pydantic.dev/docs/ai/tools-toolsets/toolsets/) 与 [dependencies](https://pydantic.dev/docs/ai/core-concepts/dependencies/)：工具按项目语义、来源查询、结果、关系、知识和可选 Python 六组组合；每次调用通过 `RunContext[AnalystSession]` 取得当前会话，不捕获创建 Agent 时的运行时。工具集保留超时和顺序执行约束，关闭的 Python 能力不向模型发布。
 - [Python aclosing](https://docs.python.org/3/library/contextlib.html#aclosing) 与 [AnyIO finalization](https://anyio.readthedocs.io/en/stable/cancellation.html#finalization)：显式关闭提前结束的生成器，只在退出清理期间屏蔽作用域取消；SSE 编码、断连监听和心跳继续复用现有 sse-starlette。
@@ -56,6 +59,7 @@ Groq 使用官方 OpenAI 兼容地址；Qwen 要求填写与密钥同地域的�
 在 `apps/api` 按修改边界选择运行：
 
 - `.venv/bin/python -m unittest tests.test_analysis_module_boundaries -q`：数据模块不加载模型 SDK；中文路径下真实 DuckDB 查询与结果校验；注入 TestModel 后的产品报告输出。
+- `.venv/bin/python -m unittest tests.test_analyst_recovery -q`：检查点合同与恢复模块的导入边界、中文路径落盘恢复、独立会话副本、无效记录/预算/图表的原子拒绝，以及校验完成后才进入模型。
 - `.venv/bin/python -m unittest tests.test_analyst_toolsets -q`：工具不导入模型引擎或调查运行时；同一 Agent 并发执行两个独立项目的文件查询、汇总、校验和报告；检查点快照隔离、不可恢复状态保持和关闭能力不发布。
 - `.venv/bin/python -m unittest tests.test_model_session tests.test_model_session_consumers -q`：真实 SDK 配合离线 HTTP transport，检查三种协议的连接复用与释放、失败/停止/超时/取消、外部资源所有权、待确认调查零连接、并发建议各自持有连接。
 - `.venv/bin/python -m unittest tests.test_model_configuration tests.test_model_probe -q`：保存配置经解析器分别进入执行和连接检查，验证供应商、协议、地址、请求头及查询参数；检查配置不可变与普通/诊断快照的字段边界，以及真实 SDK 的工具往返、无效输出、超时/取消释放、配置变更后的结果作废和 CI 模拟网关。
@@ -108,7 +112,7 @@ flowchart TD
 
 - `apps/api/app/api/v1/projects.py` 提供项目、来源、预检、语义知识、纠正、分析运行和产物接口。
 - `apps/api/app/services/execution.py` 组装模型、项目上下文和分析运行时。
-- `apps/api/app/services/analyst_runtime.py` 负责调查指令、预执行、恢复和产品事件；工具组合、会话状态和报告验收位于 `services/analyst/`，详见上方 Harness 边界。
+- `apps/api/app/services/analyst_runtime.py` 负责调查指令、预执行和产品事件；工具组合、会话状态、检查点恢复和报告验收位于 `services/analyst/`，详见上方 Harness 边界。
 - `apps/api/app/services/analysis_playbook_runner.py` 执行 AnalysisPlaybook v3 的窄安全通道：只接受单来源、单类型化查询和最终校验，绑定当前数据后生成不含 SQL 的执行回执；回执把方法形状、当前来源、结果、画像和校验相互绑定。
 - `apps/api/app/services/structured_query.py` 承担该通道复用的结构化查询校验、只读编译与当前来源执行；分析就绪的文件通过 DuckDB 查询，数据库走对应只读适配器。保存的方法只携带声明式查询意图，不保存物理来源 ID 或编译后的 SQL。
 - `apps/api/app/services/project_context.py` 只加载当前项目的数据源、候选/已确认/锁定知识与可执行关系，避免跨项目串用。

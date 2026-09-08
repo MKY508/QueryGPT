@@ -18,7 +18,7 @@ from app.db.tables import (
     SemanticEntryRevision,
 )
 from app.models.workspace import AggregateMetricDefinition, SemanticEntryCreate
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.execution import ExecutionService
 from app.services.metric_candidate_learning import learn_verified_aggregate_metric_candidate
 from app.services.result_filters import stable_field_binding_candidates

@@ -37,8 +37,8 @@ from app.models.workspace import (
     SemanticInventoryJobResponse,
     SemanticRecommendationScope,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.app_settings import get_or_create_app_settings
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.database import create_database_manager
 from app.services.database_value_preflight import (
     DatabaseValuePreflightBudget,

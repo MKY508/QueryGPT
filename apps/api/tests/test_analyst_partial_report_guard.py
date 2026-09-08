@@ -18,12 +18,12 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from app.models import SSEEventType
 from app.models.analysis import AnalysisReport
 from app.services import analyst_runtime
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst.report_validation import (
     _allows_honest_partial_report,
     _business_evidence_from_tools,
 )
 from app.services.analyst_runtime import PydanticAnalystRuntime
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.project_context import ProjectRuntimeContext
 from tests.model_fixtures import synthetic_model_config
 

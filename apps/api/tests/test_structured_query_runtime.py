@@ -25,7 +25,6 @@ from app.models.query import (
     StructuredQuerySort,
 )
 from app.services import analyst_runtime
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst import semantics
 from app.services.analyst.semantics import (
     _compile_semantic_dimension_filter,
@@ -40,6 +39,7 @@ from app.services.analyst.semantics import (
 )
 from app.services.analyst.session import AnalystSession
 from app.services.analyst_runtime import PydanticAnalystRuntime
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.file_query import query_project_file_rows
 from app.services.project_context import ProjectRuntimeContext
 from app.services.query_compiler import (

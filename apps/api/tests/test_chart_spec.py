@@ -8,8 +8,8 @@ import pytest
 
 from app.models import SSEEvent, SSEEventType
 from app.models.analysis import AnalysisReport
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst.report_validation import _bind_structured_visualization
+from app.services.checkpoint_contract import stable_payload_hash
 
 
 def _deps_with_result(

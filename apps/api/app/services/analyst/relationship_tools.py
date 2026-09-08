@@ -7,7 +7,6 @@ from typing import Any, Literal
 
 from pydantic_ai import ModelRetry, RunContext
 
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst.relationships import (
     _enforce_relationship_acceptance,
     _join_result_rows,
@@ -24,6 +23,7 @@ from app.services.analyst.result_store import (
 from app.services.analyst.session import (
     AnalystSession,
 )
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.correction_completion import (
     is_reusable_full_relationship_evidence,
 )

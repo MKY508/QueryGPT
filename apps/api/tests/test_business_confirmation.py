@@ -27,7 +27,7 @@ from app.db.tables import (
     SemanticEntry,
 )
 from app.models import SSEEvent
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.correction_targets import discover_report_correction_targets
 from app.services.data_preflight import fingerprint_file
 from app.services.execution import ExecutionService

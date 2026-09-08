@@ -22,10 +22,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, Conversation, Project, ProjectDataSource, SemanticEntry
 from app.services import analyst_runtime
-from app.services.analysis_checkpoint import CheckpointDriftError, stable_payload_hash
-from app.services.analyst import knowledge_tools, python_tools
+from app.services.analyst import knowledge_tools, python_tools, recovery
+from app.services.analyst.recovery import restore_session_checkpoint
 from app.services.analyst.relationships import _enforce_relationship_acceptance
 from app.services.analyst_runtime import PydanticAnalystRuntime
+from app.services.checkpoint_contract import (
+    CheckpointDriftError,
+    RestoredCheckpoint,
+    stable_payload_hash,
+)
 from app.services.data_preflight import run_preflight
 from app.services.metric_formula import aggregate_decimal_metric, apply_metric_formula
 from app.services.project_context import ProjectRuntimeContext
@@ -1052,7 +1057,7 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
         lambda _config, **_kwargs: nullcontext(FunctionModel(lambda _messages, _info: ModelResponse(parts=[]))),
     )
     monkeypatch.setattr(
-        analyst_runtime,
+        recovery,
         "resolve_confirmed_rule_strategy",
         lambda *_args, **_kwargs: definition,
     )
@@ -1063,14 +1068,9 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=project_context,
-        resume_state={
-            "manifest": deepcopy(manifest),
-            "dataframes": deepcopy(dataframes),
-            "python_output": [],
-            "python_images": [],
-        },
+        resume_state=RestoredCheckpoint(manifest=deepcopy(manifest), dataframes=deepcopy(dataframes), python_output=[], python_images=[]),
     )
-    await runtime.replay_checkpoint()
+    restore_session_checkpoint(runtime.deps, runtime.resume_state)
     assert runtime.deps.dataframes["net_revenue_by_store"] == aggregate_rows
 
     drifted_definition = deepcopy(definition)
@@ -1079,15 +1079,10 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
     drifted_runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=project_context,
-        resume_state={
-            "manifest": deepcopy(manifest),
-            "dataframes": deepcopy(dataframes),
-            "python_output": [],
-            "python_images": [],
-        },
+        resume_state=RestoredCheckpoint(manifest=deepcopy(manifest), dataframes=deepcopy(dataframes), python_output=[], python_images=[]),
     )
     with pytest.raises(CheckpointDriftError, match="语义定义已经变化"):
-        await drifted_runtime.replay_checkpoint()
+        restore_session_checkpoint(drifted_runtime.deps, drifted_runtime.resume_state)
 
 
 @pytest.mark.asyncio
@@ -1169,15 +1164,10 @@ async def test_checkpoint_replay_filters_legacy_unscoped_relationship_proposals(
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="旧关系证据恢复"),
-        resume_state={
-            "manifest": manifest,
-            "dataframes": {"orders": rows},
-            "python_output": [],
-            "python_images": [],
-        },
+        resume_state=RestoredCheckpoint(manifest=manifest, dataframes={'orders': rows}, python_output=[], python_images=[]),
     )
 
-    await runtime.replay_checkpoint()
+    restore_session_checkpoint(runtime.deps, runtime.resume_state)
 
     assert [item["key"] for item in runtime.deps.knowledge_proposals] == [
         "revenue_refund_policy",

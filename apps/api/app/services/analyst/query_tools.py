@@ -17,7 +17,6 @@ from app.models.query import (
     StructuredQueryMetric,
     StructuredQuerySort,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst.result_store import (
     _ensure_result_budget,
     _ensure_result_write_allowed,
@@ -35,6 +34,7 @@ from app.services.analyst.semantics import (
 from app.services.analyst.session import (
     AnalystSession,
 )
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.database import create_database_manager
 from app.services.file_query import query_project_file_rows
 from app.services.query_compiler import (

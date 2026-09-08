@@ -17,7 +17,6 @@ from pydantic_ai.models.test import TestModel
 from app.models.analysis import AnalysisReport
 from app.models.workspace import AnalysisPlaybookResponse
 from app.services import analysis_playbook_runner, analyst_runtime, structured_query
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analysis_playbook_runner import (
     AnalysisPlaybookExecutionReceipt,
     AnalysisPlaybookRunnerError,
@@ -25,6 +24,7 @@ from app.services.analysis_playbook_runner import (
 )
 from app.services.analyst.result_store import _ensure_result_write_allowed
 from app.services.analyst_runtime import AnalystStoppedError, PydanticAnalystRuntime
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.project_context import ProjectRuntimeContext
 from app.services.standing_workspace import (
     StandingWorkspaceError,

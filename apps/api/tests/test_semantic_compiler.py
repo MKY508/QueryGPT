@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, ArtifactRecord, Project, ProjectDataSource, SemanticEntry
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.result_filters import resolve_confirmed_rule_strategy
 from app.services.semantic_learning import (
     _relationship_schema_signature,

@@ -12,7 +12,7 @@ from app.models.query import (
     StructuredQueryMetric,
     StructuredQuerySort,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.metric_formula import metric_formula_columns, validate_metric_formula_action
 
 

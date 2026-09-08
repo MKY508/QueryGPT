@@ -7,11 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from app.services.analysis_checkpoint import (
-    CheckpointDriftError,
-    revalidate_database_replay_journal,
-    stable_payload_hash,
-)
+from app.services.analysis_checkpoint import revalidate_database_replay_journal
+from app.services.checkpoint_contract import CheckpointDriftError, stable_payload_hash
 
 
 def _create_store_database(path: Path) -> list[dict[str, object]]:

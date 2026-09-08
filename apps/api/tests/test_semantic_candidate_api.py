@@ -15,7 +15,7 @@ from app.db.tables import (
     SemanticEntry,
     SemanticEntryRevision,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.semantic_revisions import append_semantic_revision
 
 

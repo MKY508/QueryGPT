@@ -26,7 +26,7 @@ _RESULT_PREFIX = "RECEIPTBI_COLD_RESTART_RESULT="
 
 
 def _checkpoint_snapshot() -> dict[str, Any]:
-    from app.services.analysis_checkpoint import stable_payload_hash
+    from app.services.checkpoint_contract import stable_payload_hash
 
     rows = [{"门店": "线上一店", "订单数": 12}]
     metadata = {

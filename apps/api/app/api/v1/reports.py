@@ -52,12 +52,12 @@ from app.models.workspace import (
     ReportDraftPlanRequest,
     ReportDraftPlanResponse,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analysis_playbook_runner import (
     AnalysisPlaybookRunnerError,
     AnalysisPlaybookRunResult,
     run_analysis_playbook,
 )
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.golden_regression import normalize_query_key
 from app.services.project_context import load_project_context
 from app.services.report_draft import generate_report_draft_plan

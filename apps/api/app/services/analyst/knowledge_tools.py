@@ -7,7 +7,6 @@ from typing import Any, Literal
 
 from pydantic_ai import ModelRetry, RunContext
 
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst.confirmation import (
     _canonical_confirmation_key,
 )
@@ -24,6 +23,7 @@ from app.services.analyst.session import (
 from app.services.business_decision_slots import (
     canonicalize_decision_key,
 )
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.metric_formula import (
     apply_metric_formula,
 )

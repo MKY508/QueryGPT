@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, SemanticEntry
 from app.models.workspace import RelationshipDefinition
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.metric_formula import metric_formula_columns, parse_explicit_metric_formula
 from app.services.result_filters import (
     build_revenue_refund_option_strategies,

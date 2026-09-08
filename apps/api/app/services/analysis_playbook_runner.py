@@ -17,7 +17,7 @@ from app.models.workspace import (
     AnalysisPlaybookSourceRole,
     AnalysisPlaybookStructuredQueryPlan,
 )
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.result_profile import profile_result
 from app.services.structured_query import (
     StructuredQueryExecutionError,

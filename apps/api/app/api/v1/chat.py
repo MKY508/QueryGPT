@@ -33,7 +33,7 @@ from app.models import (
 )
 from app.models.analysis_state import AnalysisState
 from app.models.chat import SemanticValidationSelectionItem
-from app.services.analysis_checkpoint import ensure_recovery_message, stable_payload_hash
+from app.services.analysis_checkpoint import ensure_recovery_message
 from app.services.app_settings import get_or_create_app_settings, settings_to_dict
 from app.services.business_decision_slots import canonicalize_decision_key
 from app.services.chat_runtime import (
@@ -48,6 +48,7 @@ from app.services.chat_runtime import (
     mark_conversation_exception,
     resolve_chat_request,
 )
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.execution import (
     DecisionSlotConflictError,
     ExecutionService,

@@ -8,10 +8,10 @@ import json
 import re
 import threading
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any, Literal, cast
+from typing import Any
 
 import structlog
-from pydantic_ai import Agent, ModelRetry
+from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
 from app.i18n import get_progress_message, t
@@ -22,23 +22,15 @@ from app.models.analysis import (
     ReportAction,
 )
 from app.models.analysis_state import REPORT_ANALYSIS_STATES, AnalysisState
-from app.services.analysis_checkpoint import CheckpointDriftError, stable_payload_hash
 from app.services.analyst.confirmation import (
     _REVENUE_INTENT_TERMS,
     _canonical_confirmation_key,
     _localized_preflight_confirmation,
-    _restore_safe_knowledge_proposals,
 )
 from app.services.analyst.presentation import (
     _report_markdown,
 )
-from app.services.analyst.python_tools import (
-    _build_result_chart_code,
-)
-from app.services.analyst.relationships import (
-    _candidate_relationship_by_key,
-    _current_runtime_relationship,
-)
+from app.services.analyst.recovery import restore_session_checkpoint
 from app.services.analyst.report_validation import (
     validate_report,
 )
@@ -58,26 +50,19 @@ from app.services.business_decision_slots import (
     REVENUE_REFUND_POLICY,
     canonicalize_decision_key,
 )
+from app.services.checkpoint_contract import RestoredCheckpoint
 from app.services.conversation_context import (
     build_conversation_context,
     render_conversation_context,
 )
 from app.services.dependency_manager import ProjectDependencyManager
 from app.services.execution_policy import ExecutionPolicy
-from app.services.metric_formula import (
-    aggregate_decimal_metric,
-    apply_metric_formula,
-    validate_metric_formula_action,
-)
 from app.services.model_engine import model_session
 from app.services.model_runtime import ResolvedModelConfig
 from app.services.project_context import (
     ProjectRuntimeContext,
 )
 from app.services.python_sandbox import PythonSandbox
-from app.services.result_filters import (
-    resolve_confirmed_rule_strategy,
-)
 from app.services.run_control import (
     AnalystStoppedError,
     next_task_progress,
@@ -100,7 +85,7 @@ class PydanticAnalystRuntime:
         language: str = "zh",
         timeout: int = 300,
         checkpoint_callback: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]] | None = None,
-        resume_state: dict[str, Any] | None = None,
+        resume_state: RestoredCheckpoint | None = None,
         model: Model | None = None,
     ):
         self.model_config = model_config
@@ -121,13 +106,6 @@ class PydanticAnalystRuntime:
             language=language,
             checkpoint_callback=checkpoint_callback,
         )
-        if resume_state:
-            manifest = resume_state.get("manifest") or {}
-            self.deps.tool_history = list(manifest.get("tool_history") or [])
-            self.deps.replay_journal = list(manifest.get("replay_journal") or [])
-            self.deps.knowledge_proposals = _restore_safe_knowledge_proposals(
-                list(manifest.get("knowledge_proposals") or [])
-            )
         self.last_report: AnalysisReport | None = None
         self.model_request_succeeded = False
         self.agent = self._build_agent()
@@ -330,364 +308,10 @@ class PydanticAnalystRuntime:
                     continue
         return None
 
-    @staticmethod
-    def _require_replay_hash(step: dict[str, Any], key: str, value: Any) -> None:
-        expected = str(step.get(key) or "")
-        actual = stable_payload_hash(value)
-        if not expected or expected != actual:
-            raise CheckpointDriftError(
-                f"恢复步骤 {step.get('op') or 'unknown'} 的结果与暂停时不一致，不能继续混用。"
-            )
-
-    async def replay_checkpoint(self) -> None:
-        """Restore verified tool outputs in journal order, never model reasoning."""
-
-        if not self.resume_state:
-            return
-        manifest = self.resume_state.get("manifest") or {}
-        saved_dataframes = self.resume_state.get("dataframes") or {}
-        saved_python_output = list(self.resume_state.get("python_output") or [])
-        saved_python_images = list(self.resume_state.get("python_images") or [])
-        journal = list(manifest.get("replay_journal") or [])
-        if not journal:
-            raise CheckpointDriftError("调查检查点没有可恢复的安全工具步骤")
-        if (
-            saved_python_output
-            or saved_python_images
-            or any(str(step.get("op") or "") == "render_chart" for step in journal)
-        ):
-            self.execution_policy.require_python("Python 图表恢复")
-        if not all(isinstance(item, str) for item in saved_python_output) or not all(
-            isinstance(item, str) for item in saved_python_images
-        ):
-            raise CheckpointDriftError("调查检查点的图表产物无效")
-
-        allowed = {
-            "query_source_data",
-            "query_database",
-            "query_project_files",
-            "join_results",
-            "aggregate_result",
-            "apply_confirmed_rule",
-            "validate_result",
-            "validate_relationship",
-            "render_chart",
-        }
-        available_results: set[str] = set()
-        replayed_validations: set[str] = set()
-        final_hashes: dict[str, str] = {}
-        next_output_index = 0
-        next_image_index = 0
-        for step in journal:
-            operation = str(step.get("op") or "")
-            if operation not in allowed:
-                raise CheckpointDriftError(
-                    f"检查点包含不可恢复的工具步骤：{operation or 'unknown'}"
-                )
-            if operation in {"query_source_data", "query_database", "query_project_files"}:
-                if not step.get("planned_sql") or not step.get("result_hash"):
-                    raise CheckpointDriftError("查询检查点缺少实际 SQL 或结果指纹")
-            elif operation == "join_results":
-                if not {str(step.get("left_result")), str(step.get("right_result"))}.issubset(
-                    available_results
-                ):
-                    raise CheckpointDriftError("关联检查点缺少上游结果")
-                if not step.get("how") or not step.get("normalization"):
-                    raise CheckpointDriftError("关联检查点参数不完整")
-                relationship_key = str(step.get("relationship_key") or "")
-                candidate_key = str(step.get("candidate_relationship_key") or "")
-                current_relationship = (
-                    _current_runtime_relationship(self.deps.project, relationship_key)
-                    if relationship_key
-                    else _candidate_relationship_by_key(self.deps.project, candidate_key)
-                    if candidate_key
-                    else None
-                )
-                if (relationship_key or candidate_key) and (
-                    current_relationship is None
-                    or str(current_relationship.get("definition_hash") or "")
-                    != str(step.get("definition_hash") or "")
-                ):
-                    raise CheckpointDriftError("关联检查点对应的当前关系定义已经变化")
-            elif operation == "aggregate_result":
-                source_result = str(step.get("source_result") or "")
-                if source_result not in available_results:
-                    raise CheckpointDriftError("汇总检查点缺少上游结果")
-                if step.get("required_metric_action_kind") == "metric_formula" and step.get(
-                    "metric_policy_satisfied"
-                ):
-                    required_column = str(step.get("required_metric_column") or "")
-                    definition_hash = str(step.get("required_metric_definition_hash") or "")
-                    metric_input_column = str(step.get("metric_input_column") or "")
-                    source_metric_metadata = (manifest.get("result_metadata") or {}).get(
-                        source_result, {}
-                    )
-                    if (
-                        not required_column
-                        or not definition_hash
-                        or definition_hash
-                        != str(source_metric_metadata.get("required_metric_definition_hash") or "")
-                        or not metric_input_column
-                        or metric_input_column
-                        != str(
-                            source_metric_metadata.get("metric_output_column")
-                            or source_metric_metadata.get("required_metric_column")
-                            or ""
-                        )
-                        or step.get("value_column") != metric_input_column
-                        or step.get("operation") not in {"sum", "mean", "min", "max"}
-                        or step.get("numeric_backend") != "decimal"
-                        or step.get("metric_output_column") != step.get("output_column")
-                    ):
-                        raise CheckpointDriftError("指标公式汇总检查点参数不完整")
-                    try:
-                        raw_null_policy = str(
-                            (step.get("decimal_aggregate_evidence") or {}).get("null_policy")
-                            or "propagate"
-                        )
-                        if raw_null_policy not in {"propagate", "zero", "error"}:
-                            raise ValueError("指标公式汇总空值策略无效")
-                        replayed_rows, replayed_evidence = aggregate_decimal_metric(
-                            saved_dataframes.get(source_result) or [],
-                            value_column=metric_input_column,
-                            operation=step["operation"],
-                            group_by=step.get("group_by") or [],
-                            output_column=str(step.get("output_column") or ""),
-                            limit=int(step.get("limit") or 5000),
-                            null_policy=cast(
-                                Literal["propagate", "zero", "error"], raw_null_policy
-                            ),
-                        )
-                    except (TypeError, ValueError) as exc:
-                        raise CheckpointDriftError(
-                            "指标公式汇总检查点无法用 Decimal 安全重放"
-                        ) from exc
-                    self._require_replay_hash(step, "result_hash", replayed_rows)
-                    if replayed_rows and not all(
-                        str(step.get("metric_output_column") or "") in row for row in replayed_rows
-                    ):
-                        raise CheckpointDriftError("指标公式汇总结果丢失派生指标列")
-                    if stable_payload_hash(replayed_evidence) != stable_payload_hash(
-                        step.get("decimal_aggregate_evidence") or {}
-                    ):
-                        raise CheckpointDriftError("指标公式汇总证据与暂停时不一致")
-            elif operation == "apply_confirmed_rule":
-                source_result = str(step.get("source_result") or "")
-                if source_result not in available_results:
-                    raise CheckpointDriftError("业务规则检查点缺少上游结果")
-                action_kind = str(step.get("action_kind") or "value_filter")
-                semantic_entry_id = str(step.get("semantic_entry_id") or "")
-                rule_key = str(step.get("rule_key") or "")
-                canonical_rule_key = canonicalize_decision_key(rule_key)
-                current_entry = next(
-                    (
-                        item
-                        for item in self.deps.project.confirmed_knowledge
-                        if (semantic_entry_id and str(item.get("id") or "") == semantic_entry_id)
-                        or (
-                            not semantic_entry_id
-                            and canonicalize_decision_key(str(item.get("key") or ""))
-                            == canonical_rule_key
-                        )
-                    ),
-                    None,
-                )
-                current_definition = (
-                    current_entry.get("definition") if current_entry is not None else None
-                )
-                if not isinstance(current_definition, dict) or stable_payload_hash(
-                    current_definition
-                ) != str(step.get("definition_hash") or ""):
-                    raise CheckpointDriftError(
-                        "业务规则检查点对应的当前语义定义已经变化，不能继续混用。"
-                    )
-                try:
-                    current_strategy = resolve_confirmed_rule_strategy(
-                        current_entry,
-                        saved_dataframes.get(source_result) or [],
-                        source_refs=(
-                            (manifest.get("result_metadata") or {})
-                            .get(source_result, {})
-                            .get("source_refs", [])
-                        ),
-                        source_catalog=self.deps.project.sources,
-                    )
-                except ValueError as exc:
-                    raise CheckpointDriftError(
-                        "业务规则检查点与当前数据源或语义定义不一致。"
-                    ) from exc
-                current_action = current_strategy.get("action") or {}
-                if str(current_action.get("kind") or "") != action_kind:
-                    raise CheckpointDriftError("业务规则检查点动作类型已经变化")
-                if action_kind == "metric_formula":
-                    try:
-                        current_formula = validate_metric_formula_action(current_action)
-                        journal_formula = validate_metric_formula_action(step.get("action"))
-                    except ValueError as exc:
-                        raise CheckpointDriftError("指标公式检查点参数不完整") from exc
-                    has_valid_action = stable_payload_hash(current_formula) == stable_payload_hash(
-                        journal_formula
-                    )
-                    if has_valid_action:
-                        try:
-                            replayed_rows, replayed_evidence = apply_metric_formula(
-                                saved_dataframes.get(source_result) or [],
-                                rule_key=rule_key,
-                                rule_value=str(step.get("rule_value") or ""),
-                                action=current_formula,
-                            )
-                        except ValueError as exc:
-                            raise CheckpointDriftError(
-                                "指标公式检查点无法按当前定义安全重放"
-                            ) from exc
-                        self._require_replay_hash(
-                            step, "input_hash", saved_dataframes[source_result]
-                        )
-                        self._require_replay_hash(step, "result_hash", replayed_rows)
-                        if replayed_evidence.get("formula_hash") != step.get("formula_hash"):
-                            raise CheckpointDriftError("指标公式检查点定义指纹不一致")
-                else:
-                    has_valid_action = action_kind in {"identity", "metric_column"} or (
-                        action_kind == "value_filter"
-                        and step.get("operator") in {"include", "exclude"}
-                        and bool(step.get("values"))
-                    )
-                    has_valid_action = has_valid_action and str(
-                        current_action.get("column") or ""
-                    ) == str(step.get("column") or "")
-                if not step.get("rule_key") or not step.get("column") or not has_valid_action:
-                    raise CheckpointDriftError("业务规则检查点参数不完整")
-            elif operation == "validate_result":
-                validated_name = str(step.get("result_name") or "")
-                if validated_name not in available_results:
-                    raise CheckpointDriftError("校验检查点缺少目标结果")
-                if str(step.get("result_hash") or "") != final_hashes.get(validated_name):
-                    raise CheckpointDriftError("校验检查点与当时的结果不一致")
-                replayed_validations.add(validated_name)
-            elif operation == "validate_relationship":
-                if not {str(step.get("left_result")), str(step.get("right_result"))}.issubset(
-                    available_results
-                ):
-                    raise CheckpointDriftError("关联校验检查点缺少上游结果")
-                relationship_key = str(step.get("relationship_key") or "")
-                candidate_key = str(step.get("candidate_relationship_key") or "")
-                current_relationship = (
-                    _current_runtime_relationship(self.deps.project, relationship_key)
-                    if relationship_key
-                    else _candidate_relationship_by_key(self.deps.project, candidate_key)
-                    if candidate_key
-                    else None
-                )
-                if (relationship_key or candidate_key) and (
-                    current_relationship is None
-                    or str(current_relationship.get("definition_hash") or "")
-                    != str(step.get("definition_hash") or "")
-                ):
-                    raise CheckpointDriftError("关联校验对应的当前关系定义已经变化")
-            elif operation == "render_chart":
-                chart_result = str(step.get("result_name") or "")
-                if chart_result not in available_results or chart_result not in saved_dataframes:
-                    raise CheckpointDriftError("图表检查点缺少上游结果")
-                if not step.get("purpose") or not step.get("x") or not step.get("title"):
-                    raise CheckpointDriftError("图表检查点参数不完整")
-                chart_type = str(step.get("chart_type") or "")
-                if chart_type not in {
-                    "heatmap",
-                    "bar",
-                    "line",
-                    "scatter",
-                    "histogram",
-                    "box",
-                }:
-                    raise CheckpointDriftError("图表检查点类型无效")
-                self._require_replay_hash(
-                    step,
-                    "input_hash",
-                    saved_dataframes[chart_result],
-                )
-                try:
-                    generated_code = _build_result_chart_code(
-                        saved_dataframes[chart_result],
-                        chart_type=chart_type,
-                        x=str(step.get("x") or ""),
-                        y=step.get("y"),
-                        value=step.get("value"),
-                        color=step.get("color"),
-                        title=str(step.get("title") or ""),
-                    )
-                except (KeyError, ValueError) as exc:
-                    raise CheckpointDriftError("图表检查点与当前数据不一致") from exc
-                self._require_replay_hash(step, "code_hash", generated_code)
-
-                output_index = step.get("output_index")
-                image_start = step.get("image_start")
-                image_count = step.get("image_count")
-                if (
-                    type(output_index) is not int
-                    or type(image_start) is not int
-                    or type(image_count) is not int
-                    or image_count <= 0
-                    or output_index != next_output_index
-                    or image_start != next_image_index
-                ):
-                    raise CheckpointDriftError("图表检查点的产物顺序无效")
-                if output_index >= len(saved_python_output):
-                    raise CheckpointDriftError("图表检查点缺少输出产物")
-                chart_images = saved_python_images[image_start : image_start + image_count]
-                if len(chart_images) != image_count:
-                    raise CheckpointDriftError("图表检查点缺少图像产物")
-                self._require_replay_hash(
-                    step,
-                    "output_hash",
-                    saved_python_output[output_index],
-                )
-                expected_image_hashes = step.get("image_hashes")
-                actual_image_hashes = [stable_payload_hash(image) for image in chart_images]
-                if expected_image_hashes != actual_image_hashes:
-                    raise CheckpointDriftError("图表检查点的图像与暂停时不一致")
-                next_output_index += 1
-                next_image_index += image_count
-
-            result_name = str(step.get("result_name") or "")
-            if operation in {
-                "query_source_data",
-                "query_database",
-                "query_project_files",
-                "join_results",
-                "aggregate_result",
-                "apply_confirmed_rule",
-            }:
-                if not result_name:
-                    raise CheckpointDriftError("工具检查点缺少结果名称")
-                available_results.add(result_name)
-                final_hashes[result_name] = str(step.get("result_hash") or "")
-                replayed_validations.discard(result_name)
-
-        if available_results != set(saved_dataframes):
-            raise CheckpointDriftError("检查点清单和中间结果文件不一致")
-        for name, expected_hash in final_hashes.items():
-            if not expected_hash or stable_payload_hash(saved_dataframes[name]) != expected_hash:
-                raise CheckpointDriftError(f"中间结果 {name} 与工具检查点不一致")
-        if next_output_index != len(saved_python_output) or next_image_index != len(
-            saved_python_images
-        ):
-            raise CheckpointDriftError("检查点包含没有安全工具记录的图表产物")
-
-        restored_dataframes = {str(name): list(rows) for name, rows in saved_dataframes.items()}
-        try:
-            _ensure_result_budget(self.deps, restored_dataframes)
-        except ModelRetry as exc:
-            raise CheckpointDriftError("检查点保留的中间结果超过当前运行预算") from exc
-        self.deps.dataframes = restored_dataframes
-        self.deps.result_metadata = dict(manifest.get("result_metadata") or {})
-        self.deps.validated_results = replayed_validations
-        self.deps.python_output = saved_python_output
-        self.deps.python_images = saved_python_images
-
     def _resume_summary(self) -> str:
         if not self.resume_state:
             return ""
-        rows = self.resume_state.get("dataframes") or {}
+        rows = self.deps.dataframes
         summary = {
             "completed_steps": [
                 {
@@ -871,7 +495,7 @@ class PydanticAnalystRuntime:
         if stop_checker and stop_checker():
             raise AnalystStoppedError("分析已停止")
         if self.resume_state:
-            await self.replay_checkpoint()
+            restore_session_checkpoint(self.deps, self.resume_state)
         system_verified_result: dict[str, Any] | None = None
         if self._requires_system_playbook_execution():
             yield self._progress_event("investigating", "check_saved_method")

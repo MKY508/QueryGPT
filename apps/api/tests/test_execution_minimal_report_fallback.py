@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.tables import AnalysisRun, ArtifactRecord, Conversation, Project
 from app.models import SSEEvent, SSEEventType
 from app.models.analysis import AnalysisReport
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.execution import ExecutionService
 from tests.model_fixtures import synthetic_model_config
 

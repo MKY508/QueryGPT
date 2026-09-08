@@ -11,11 +11,16 @@ from pydantic_ai import ModelRetry
 
 from app.models import SSEEvent, SSEEventType
 from app.models.analysis import AnalysisReport
-from app.services.analysis_checkpoint import CheckpointDriftError, stable_payload_hash
 from app.services.analyst import result_store
+from app.services.analyst.recovery import restore_session_checkpoint
 from app.services.analyst.result_store import _ensure_result_budget
 from app.services.analyst_runtime import PydanticAnalystRuntime
 from app.services.chat_runtime import ChatEventAccumulator
+from app.services.checkpoint_contract import (
+    CheckpointDriftError,
+    RestoredCheckpoint,
+    stable_payload_hash,
+)
 from app.services.project_context import ProjectRuntimeContext
 from tests.model_fixtures import synthetic_model_config
 
@@ -84,15 +89,12 @@ async def test_over_budget_checkpoint_is_rejected_before_restoring_dependencies(
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="旧检查点预算项目"),
-        resume_state={
-            "manifest": {"replay_journal": journal},
-            "dataframes": rows_by_name,
-        },
+        resume_state=RestoredCheckpoint(manifest={'replay_journal': journal}, dataframes=rows_by_name),
     )
     assert runtime.deps.dataframes == {}
 
     with pytest.raises(CheckpointDriftError, match="超过当前运行预算"):
-        await runtime.replay_checkpoint()
+        restore_session_checkpoint(runtime.deps, runtime.resume_state)
 
     assert runtime.deps.dataframes == {}
 

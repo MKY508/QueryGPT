@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, ProjectDataSource, SemanticEntry
 from app.models.workspace import AggregateMetricDefinition
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 from app.services.result_filters import stable_field_binding_candidates
 from app.services.semantic_revisions import append_semantic_revision
 from app.services.validated_result_evidence import (

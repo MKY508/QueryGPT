@@ -9,10 +9,10 @@ from typing import Any
 import pandas as pd
 from pydantic_ai import ModelRetry
 
-from app.services.analysis_checkpoint import stable_payload_hash
 from app.services.analyst.session import (
     AnalystSession,
 )
+from app.services.checkpoint_contract import stable_payload_hash
 
 RUN_RESULT_MAX_RESULTS = 12
 RUN_RESULT_MAX_ROWS = 50_000

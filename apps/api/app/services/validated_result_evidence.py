@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import AnalysisRun, ArtifactRecord, ProjectDataSource
-from app.services.analysis_checkpoint import stable_payload_hash
+from app.services.checkpoint_contract import stable_payload_hash
 
 DATA_PRODUCER_KINDS = frozenset(
     {

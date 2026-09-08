@@ -14,7 +14,6 @@ import hashlib
 import json
 import os
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -26,38 +25,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.db.tables import AnalysisRun, Conversation, Message
 from app.models.analysis_state import AnalysisState
+from app.services.checkpoint_contract import (
+    CHECKPOINT_VERSION,
+    CheckpointDriftError,
+    CheckpointError,
+    RestoredCheckpoint,
+    stable_payload_hash,
+)
 from app.services.database import create_database_manager
-
-CHECKPOINT_VERSION = 1
-
-
-class CheckpointError(RuntimeError):
-    """Base error for a checkpoint that cannot be resumed safely."""
-
-
-class CheckpointDriftError(CheckpointError):
-    """Raised when sources or deterministic replay outputs have changed."""
-
-
-@dataclass(slots=True)
-class RestoredCheckpoint:
-    manifest: dict[str, Any]
-    dataframes: dict[str, list[dict[str, Any]]]
-    python_output: list[str]
-    python_images: list[str]
-
-
-def stable_payload_hash(value: Any) -> str:
-    """Return a deterministic digest for tool inputs and outputs."""
-
-    payload = json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-        default=str,
-    ).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
 
 
 def source_fingerprint_map(sources: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:

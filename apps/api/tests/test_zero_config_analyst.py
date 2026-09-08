@@ -35,14 +35,12 @@ from app.db.tables import (
 from app.models import SSEEvent, SSEEventType
 from app.services import analyst_runtime
 from app.services.analysis_checkpoint import (
-    CheckpointError,
     _reserve_checkpoint_revision,
     checkpoint_manifest_is_readable,
     load_runtime_checkpoint,
     recover_interrupted_analysis_runs,
     save_runtime_checkpoint,
     source_fingerprint_map,
-    stable_payload_hash,
     validate_source_fingerprints,
 )
 from app.services.analyst.python_tools import (
@@ -50,6 +48,7 @@ from app.services.analyst.python_tools import (
     _render_result_chart,
     execute_python_code,
 )
+from app.services.analyst.recovery import restore_session_checkpoint
 from app.services.analyst.relationships import (
     _join_result_rows,
     _matching_candidate_relationship,
@@ -58,6 +57,11 @@ from app.services.analyst.relationships import (
     _required_trial_relationship,
 )
 from app.services.analyst_runtime import PydanticAnalystRuntime
+from app.services.checkpoint_contract import (
+    CheckpointError,
+    RestoredCheckpoint,
+    stable_payload_hash,
+)
 from app.services.data_preflight import fingerprint_file, run_preflight
 from app.services.dependency_manager import ProjectDependencyManager
 from app.services.execution import ExecutionService
@@ -2793,14 +2797,9 @@ async def test_render_chart_checkpoint_restores_verified_artifacts_and_rejects_t
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="恢复图表项目"),
-        resume_state={
-            "manifest": restored.manifest,
-            "dataframes": restored.dataframes,
-            "python_output": restored.python_output,
-            "python_images": restored.python_images,
-        },
+        resume_state=RestoredCheckpoint(manifest=restored.manifest, dataframes=restored.dataframes, python_output=restored.python_output, python_images=restored.python_images),
     )
-    await runtime.replay_checkpoint()
+    restore_session_checkpoint(runtime.deps, runtime.resume_state)
     assert runtime.deps.python_output == [output]
     assert runtime.deps.python_images == [image]
 
@@ -2808,15 +2807,10 @@ async def test_render_chart_checkpoint_restores_verified_artifacts_and_rejects_t
     drifted_runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="漂移图表项目"),
-        resume_state={
-            "manifest": restored.manifest,
-            "dataframes": restored.dataframes,
-            "python_output": restored.python_output,
-            "python_images": restored.python_images,
-        },
+        resume_state=RestoredCheckpoint(manifest=restored.manifest, dataframes=restored.dataframes, python_output=restored.python_output, python_images=restored.python_images),
     )
     with pytest.raises(CheckpointError, match="暂停时不一致"):
-        await drifted_runtime.replay_checkpoint()
+        restore_session_checkpoint(drifted_runtime.deps, drifted_runtime.resume_state)
 
     manifest_path = tmp_path / str(checkpoint["manifest_path"])
     image_path = manifest_path.parent / restored.manifest["python_artifacts"]["images"][0]["path"]
