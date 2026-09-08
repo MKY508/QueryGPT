@@ -17,12 +17,11 @@ const resourceState = vi.hoisted(() => ({
 
 vi.mock("@/components/settings/hooks/useModelSettingsResource", () => ({
   useModelSettingsResource: () => ({
-    models: [],
+    models: [{ id: "service-a", name: "Daily analysis", provider: "groq", model_id: "analysis-model", credential_state: "readable", health_status: "unknown", is_default: true, created_at: "2026-09-09T00:00:00Z" }],
     isLoading: false,
     error: null,
-    testResult: resourceState.testResult,
+    checks: resourceState.testResult ? { [resourceState.testResult.id]: { status: "complete", result: resourceState.testResult } } : {},
     isSubmitting: false,
-    testingModelId: null,
     deletePending: false,
     clearError: vi.fn(),
     addModel: vi.fn(),

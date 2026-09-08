@@ -1,13 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle, ChevronDown, Plus, X, XCircle } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { ModelSettingsForm } from "@/components/settings/model-settings/ModelSettingsForm";
-import {
-  ModelSettingsList,
-  getModelTestResultMessage,
-  type ModelTestResultMessages,
-} from "@/components/settings/model-settings/ModelSettingsList";
+import { ModelSettingsList } from "@/components/settings/model-settings/ModelSettingsList";
 import { useModelSettingsResource } from "@/components/settings/hooks/useModelSettingsResource";
 import {
   MODEL_PRESETS,
@@ -26,9 +22,8 @@ export function ModelSettings() {
     models,
     isLoading,
     error,
-    testResult,
+    checks,
     isSubmitting,
-    testingModelId,
     deletePending,
     clearError,
     addModel,
@@ -36,8 +31,6 @@ export function ModelSettings() {
     deleteModel,
     testModel,
   } = useModelSettingsResource({
-    connectionCheckFailed: t("testFailed"),
-    savedButConnectionCheckFailed: t("savedButConnectionCheckFailed"),
     addModelFailed: t("addModelFailed"),
     updateModelFailed: t("updateModelFailed"),
     deleteModelFailed: t("deleteModelFailed"),
@@ -51,14 +44,6 @@ export function ModelSettings() {
     [formData.provider]
   );
   const displayError = validationError ?? error;
-  const testResultMessages: ModelTestResultMessages = {
-    success: t("testResultSuccess"),
-    credentials: t("testResultCredentials"),
-    configuration: t("testResultConfiguration"),
-    capability: t("testResultCapability"),
-    temporary: t("testResultTemporary"),
-    failed: t("testResultFailed"),
-  };
 
   const resetForm = () => {
     setShowForm(false);
@@ -173,75 +158,12 @@ export function ModelSettings() {
         />
       )}
 
-      {testResult && (
-        <div
-          data-testid="model-test-summary"
-          data-status={testResult.success ? "success" : "error"}
-          className="border-y border-border bg-card px-4 py-4"
-        >
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            {testResult.success ? (
-              <CheckCircle size={16} className="text-primary" />
-            ) : (
-              <XCircle size={16} className="text-destructive" />
-            )}
-            {t("latestConnectionCheck")}
-          </div>
-          <div className="mt-3 grid gap-2 text-sm text-muted-foreground md:grid-cols-2">
-            <div>
-              {t("result") + ":"}{" "}
-              <span className="text-foreground">
-                {getModelTestResultMessage(testResult, testResultMessages)}
-              </span>
-            </div>
-            <div>
-              {t("latency") + ":"} <span className="text-foreground">{testResult.response_time_ms || "-"} ms</span>
-            </div>
-          </div>
-          <details
-            data-testid="model-test-advanced"
-            className="group mt-4 border-t border-border pt-3"
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-xs text-muted-foreground marker:content-none">
-              <span>
-                <span className="font-semibold text-foreground">
-                  {t("advancedConnectionDetails")}
-                </span>
-                <span className="ml-2 hidden text-muted-foreground sm:inline">
-                  {t("advancedConnectionDetailsHint")}
-                </span>
-              </span>
-              <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
-            </summary>
-            <div className="mt-3 grid gap-2 border-l-2 border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground md:grid-cols-2">
-              <div>
-                {t("sourceProvider") + ":"}{" "}
-                <span className="text-foreground">{testResult.source_provider || "-"}</span>
-              </div>
-              <div>
-                {t("apiFormat") + ":"}{" "}
-                <span className="text-foreground">{testResult.api_format || "-"}</span>
-              </div>
-              <div className="md:col-span-2">
-                {t("baseUrl") + ":"}{" "}
-                <span className="text-foreground">{testResult.resolved_base_url || "-"}</span>
-              </div>
-              {!testResult.success && (
-                <div className="md:col-span-2">
-                  {t("errorCategoryLabel") + ":"}{" "}
-                  <span className="text-foreground">{testResult.error_category || "unknown"}</span>
-                </div>
-              )}
-            </div>
-          </details>
-        </div>
-      )}
-
       <ModelSettingsList
         models={models}
         isLoading={isLoading}
-        testResult={testResult}
-        testingModelId={testingModelId ?? undefined}
+        checks={checks}
+        editingId={editingId}
+        actionsDisabled={isSubmitting || deletePending}
         deletePending={deletePending}
         onTest={testModel}
         onEdit={handleEdit}

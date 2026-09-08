@@ -1,0 +1,6 @@
+.collection { container: settings-collection / inline-size; }
+.search { flex-basis: 100%; }
+@container settings-collection (min-width: 720px) {
+  .search { flex: 1 1 0%; }
+  .filter { max-width: 11rem; }
+}

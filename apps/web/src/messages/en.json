@@ -153,8 +153,8 @@
     "extraHeaders": "Extra Headers",
     "extraQueryParams": "Extra Query Params",
     "ms": "ms",
-    "noModels": "No model configurations yet",
-    "selectPresetFirst": "Select an adapter preset first, then add your first model",
+    "noModels": "Your first analysis service",
+    "selectPresetFirst": "Add a service to start working with your data.",
     "statusAvailable": "Available",
     "statusUnchecked": "Not checked",
     "statusReconnect": "Reconnect required",
@@ -184,9 +184,6 @@
     "updateModelFailed": "Failed to update model, please check config",
     "deleteModelFailed": "Failed to delete model",
     "addService": "Add service",
-    "latestConnectionCheck": "Latest connection check",
-    "advancedConnectionDetails": "Advanced connection details",
-    "advancedConnectionDetailsHint": "Review only when troubleshooting a compatible service or gateway.",
     "form": {
       "chooseService": "Choose a service",
       "chooseServiceHint": "Start with a common service. Choose Custom Gateway when its address or protocol differs.",
@@ -209,7 +206,11 @@
       "headers": "Additional request headers (JSON)",
       "params": "Additional query parameters (JSON)",
       "close": "Close form"
-    }
+    },
+    "loadingServices": "Loading analysis services",
+    "checkingService": "Checking the model’s analysis capabilities…",
+    "connectionDetails": "Connection details",
+    "connectionDetailsFor": "Connection details for {name}"
   },
   "connectionSettings": {
     "title": "Database Connections",
@@ -1797,5 +1798,28 @@
     "unaffected": "Unaffected",
     "clear": "Clear {title}",
     "clearValue": "Clear"
+  },
+  "settingsCollection": {
+    "searchModels": "Find an analysis service",
+    "searchConnections": "Find a data connection",
+    "modelFilter": "Filter analysis services",
+    "connectionFilter": "Filter database types",
+    "allModels": "All services",
+    "allConnections": "All databases",
+    "defaultModels": "Default service",
+    "needsAttention": "Needs attention",
+    "default": "Default",
+    "editItem": "Edit {name}",
+    "deleteItem": "Delete {name}",
+    "checkConnection": "Check data connection {name}",
+    "check": "Check",
+    "clearSearch": "Clear list search",
+    "clearFilters": "Clear filters",
+    "noMatches": "No matching configurations",
+    "count": "{count, plural, one {# item} other {# items}}",
+    "filteredCount": "{count} of {total}",
+    "range": "{start}–{end} of {total}",
+    "previous": "Previous configurations",
+    "next": "Next configurations"
   }
 }

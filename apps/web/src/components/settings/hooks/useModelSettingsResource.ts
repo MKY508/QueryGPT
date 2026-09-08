@@ -6,13 +6,12 @@ import { api } from "@/lib/api/client";
 import {
   buildModelPayload,
   type ModelFormData,
-  type ModelTestResult,
 } from "@/lib/settings/models";
 import type { ConfiguredModel } from "@/lib/types/api";
+import { useSettingsWriteGuard } from "./useSettingsWriteGuard";
+import { useModelServiceChecks } from "./useModelServiceChecks";
 
 export interface ModelSettingsResourceMessages {
-  connectionCheckFailed: string;
-  savedButConnectionCheckFailed: string;
   addModelFailed: string;
   updateModelFailed: string;
   deleteModelFailed: string;
@@ -20,40 +19,15 @@ export interface ModelSettingsResourceMessages {
 
 export function useModelSettingsResource(messages: ModelSettingsResourceMessages) {
   const [error, setError] = useState<string | null>(null);
-  const [testResult, setTestResult] = useState<ModelTestResult | null>(null);
   const queryClient = useQueryClient();
+  const guardWrite = useSettingsWriteGuard();
+  const { checks, checkModel, invalidateCheck } = useModelServiceChecks();
 
-  const { data: models, isLoading } = useQuery({
+  const modelsQuery = useQuery({
     queryKey: ["models"],
-    queryFn: async () => {
-      const response = await api.get("/api/v1/config/models");
+    queryFn: async ({ signal }) => {
+      const response = await api.get("/api/v1/config/models", { signal });
       return response.data.data as ConfiguredModel[];
-    },
-  });
-
-  const testMutation = useMutation({
-    mutationFn: async ({ id }: { id: string; afterSave?: boolean }) => {
-      const response = await api.post(`/api/v1/config/models/${id}/test`);
-      return { id, ...response.data.data } as ModelTestResult;
-    },
-    onMutate: () => {
-      setError(null);
-      setTestResult(null);
-    },
-    onSuccess: (result) => {
-      setError(null);
-      setTestResult(result);
-    },
-    onError: (error, variables) => {
-      void error;
-      setError(
-        variables.afterSave
-          ? messages.savedButConnectionCheckFailed
-          : messages.connectionCheckFailed
-      );
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["models"] });
     },
   });
 
@@ -62,10 +36,11 @@ export function useModelSettingsResource(messages: ModelSettingsResourceMessages
       const response = await api.post("/api/v1/config/models", buildModelPayload(data));
       return response.data.data as ConfiguredModel;
     },
-    onSuccess: (model) => {
+    onSuccess: async (model) => {
       setError(null);
+      await queryClient.cancelQueries({ queryKey: ["models"], exact: true });
       queryClient.invalidateQueries({ queryKey: ["models"] });
-      testMutation.mutate({ id: model.id, afterSave: true });
+      checkModel(model.id, true);
     },
     onError: () => {
       setError(messages.addModelFailed);
@@ -77,10 +52,11 @@ export function useModelSettingsResource(messages: ModelSettingsResourceMessages
       const response = await api.put(`/api/v1/config/models/${id}`, buildModelPayload(data));
       return response.data.data as ConfiguredModel;
     },
-    onSuccess: (model) => {
+    onSuccess: async (model) => {
       setError(null);
+      await queryClient.cancelQueries({ queryKey: ["models"], exact: true });
       queryClient.invalidateQueries({ queryKey: ["models"] });
-      testMutation.mutate({ id: model.id, afterSave: true });
+      checkModel(model.id, true);
     },
     onError: () => {
       setError(messages.updateModelFailed);
@@ -91,8 +67,9 @@ export function useModelSettingsResource(messages: ModelSettingsResourceMessages
     mutationFn: async (id: string) => {
       await api.delete(`/api/v1/config/models/${id}`);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setError(null);
+      await queryClient.cancelQueries({ queryKey: ["models"], exact: true });
       queryClient.invalidateQueries({ queryKey: ["models"] });
     },
     onError: () => {
@@ -100,19 +77,27 @@ export function useModelSettingsResource(messages: ModelSettingsResourceMessages
     },
   });
 
+  const write = <T,>(action: () => Promise<T>, id?: string) => guardWrite(() => {
+    if (id) invalidateCheck(id);
+    setError(null);
+    return action();
+  });
+
   return {
-    models: models || [],
-    isLoading,
+    models: modelsQuery.data || [],
+    isLoading: modelsQuery.isPending,
+    loadFailed: modelsQuery.isError,
+    hasLoaded: modelsQuery.data !== undefined,
+    refreshing: modelsQuery.isFetching,
+    refresh: () => modelsQuery.refetch(),
     error,
-    testResult,
+    checks,
     isSubmitting: addMutation.isPending || updateMutation.isPending,
-    testingModelId: testMutation.isPending ? testMutation.variables?.id : null,
     deletePending: deleteMutation.isPending,
     clearError: () => setError(null),
-    clearTestResult: () => setTestResult(null),
-    addModel: (data: ModelFormData) => addMutation.mutateAsync(data),
-    updateModel: (id: string, data: ModelFormData) => updateMutation.mutateAsync({ id, data }),
-    deleteModel: (id: string) => deleteMutation.mutate(id),
-    testModel: (id: string) => testMutation.mutate({ id }),
+    addModel: (data: ModelFormData) => write(() => addMutation.mutateAsync(data)),
+    updateModel: (id: string, data: ModelFormData) => write(() => updateMutation.mutateAsync({ id, data }), id),
+    deleteModel: (id: string) => { void write(() => deleteMutation.mutateAsync(id), id).catch(() => {}); },
+    testModel: (id: string) => checkModel(id),
   };
 }

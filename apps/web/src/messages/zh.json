@@ -153,8 +153,8 @@
     "extraHeaders": "附加请求头",
     "extraQueryParams": "附加查询参数",
     "ms": "ms",
-    "noModels": "暂无模型配置",
-    "selectPresetFirst": "先选择一个适配预设，再添加第一个模型",
+    "noModels": "添加你的第一个分析服务",
+    "selectPresetFirst": "连接服务，开始分析你的数据。",
     "statusAvailable": "可用",
     "statusUnchecked": "未检查",
     "statusReconnect": "需要重新连接",
@@ -184,9 +184,6 @@
     "updateModelFailed": "更新模型失败，请检查配置",
     "deleteModelFailed": "删除模型失败",
     "addService": "添加服务",
-    "latestConnectionCheck": "最近一次连接检查",
-    "advancedConnectionDetails": "高级连接详情",
-    "advancedConnectionDetailsHint": "排查兼容服务或网关问题时再查看。",
     "form": {
       "chooseService": "选择服务",
       "chooseServiceHint": "先选常用服务；地址或协议不同的服务可选“其他兼容服务”。",
@@ -209,7 +206,11 @@
       "headers": "附加请求头（JSON）",
       "params": "附加请求参数（JSON）",
       "close": "关闭表单"
-    }
+    },
+    "loadingServices": "正在读取分析服务",
+    "checkingService": "正在检查模型的分析能力…",
+    "connectionDetails": "连接详情",
+    "connectionDetailsFor": "{name}的连接详情"
   },
   "connectionSettings": {
     "title": "数据库连接",
@@ -1797,5 +1798,28 @@
     "unaffected": "不受影响",
     "clear": "清除{title}",
     "clearValue": "清除"
+  },
+  "settingsCollection": {
+    "searchModels": "查找分析服务",
+    "searchConnections": "查找数据连接",
+    "modelFilter": "筛选分析服务",
+    "connectionFilter": "筛选数据库类型",
+    "allModels": "所有服务",
+    "allConnections": "所有数据库",
+    "defaultModels": "默认服务",
+    "needsAttention": "需要处理",
+    "default": "默认",
+    "editItem": "编辑 {name}",
+    "deleteItem": "删除 {name}",
+    "checkConnection": "检查数据连接 {name}",
+    "check": "检查",
+    "clearSearch": "清除列表搜索",
+    "clearFilters": "清除筛选",
+    "noMatches": "没有匹配的配置",
+    "count": "{count} 项",
+    "filteredCount": "{count} / {total} 项",
+    "range": "{start}–{end} / {total}",
+    "previous": "上一页配置",
+    "next": "下一页配置"
   }
 }

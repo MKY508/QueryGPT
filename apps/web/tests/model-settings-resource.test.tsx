@@ -57,10 +57,67 @@ function resourceMessages(locale: "en" | "zh") {
   };
 }
 
+function deferred() {
+  let resolve!: (value: unknown) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
 describe("useModelSettingsResource", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.get).mockResolvedValue({ data: { data: [] } });
+  });
+
+  it("deduplicates the same service while independent checks keep their own outcomes", async () => {
+    const first = deferred(), second = deferred();
+    vi.mocked(api.post).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { result } = renderHook(() => useModelSettingsResource(resourceMessages("en")), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => {
+      result.current.testModel("first"); result.current.testModel("first"); result.current.testModel("second");
+    });
+    expect(api.post).toHaveBeenCalledTimes(2);
+    expect(result.current.checks.first).toEqual({ status: "checking" });
+    await act(async () => { second.resolve({ data: { data: { success: true, id: "wrong-response-id" } } }); });
+    await act(async () => { first.reject(new Error("Raw network failure")); });
+    expect(result.current.checks).toEqual({
+      first: { status: "failed", afterSave: false },
+      second: { status: "complete", result: { id: "second", success: true } },
+    });
+    expect(result.current.error).toBeNull();
+  });
+
+  it("invalidates an old check when the service is edited without losing another receipt", async () => {
+    const old = deferred(), current = deferred();
+    vi.mocked(api.post).mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce({ data: { data: { success: true } } }).mockReturnValueOnce(current.promise);
+    vi.mocked(api.put).mockResolvedValue({ data: { data: savedModel } });
+    const { result } = renderHook(() => useModelSettingsResource(resourceMessages("en")), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => { result.current.testModel(savedModel.id); result.current.testModel("other"); });
+    await waitFor(() => expect(result.current.checks.other.status).toBe("complete"));
+    await act(async () => { await result.current.updateModel(savedModel.id, initialModelFormData); });
+    expect(result.current.checks[savedModel.id].status).toBe("checking");
+    await act(async () => { old.resolve({ data: { data: failedCheck } }); });
+    expect(result.current.checks[savedModel.id].status).toBe("checking");
+    await act(async () => { current.resolve({ data: { data: { success: true } } }); });
+    expect(result.current.checks[savedModel.id]).toMatchObject({ status: "complete", result: { success: true } });
+    expect(result.current.checks.other.status).toBe("complete");
+  });
+
+  it("does not revive a deleted service receipt when its request finishes late", async () => {
+    const pending = deferred();
+    vi.mocked(api.post).mockReturnValue(pending.promise);
+    vi.mocked(api.delete).mockResolvedValue({});
+    const { result, unmount } = renderHook(() => useModelSettingsResource(resourceMessages("en")), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => { result.current.testModel(savedModel.id); result.current.deleteModel(savedModel.id); });
+    await waitFor(() => expect(result.current.deletePending).toBe(false));
+    await act(async () => { pending.resolve({ data: { data: { success: true } } }); });
+    expect(result.current.checks[savedModel.id]).toBeUndefined();
+    unmount();
   });
 
   it("checks a newly saved service without turning a failed check into a failed save", async () => {
@@ -89,7 +146,7 @@ describe("useModelSettingsResource", () => {
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(`/api/v1/config/models/${savedModel.id}/test`)
     );
-    await waitFor(() => expect(result.current.testResult).toMatchObject(failedCheck));
+    await waitFor(() => expect(result.current.checks[savedModel.id]).toMatchObject({ status: "complete", result: failedCheck }));
     expect(result.current.error).toBeNull();
     expect(vi.mocked(api.get).mock.calls.length).toBeGreaterThanOrEqual(2);
   });
@@ -130,10 +187,10 @@ describe("useModelSettingsResource", () => {
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith(`/api/v1/config/models/${savedModel.id}/test`)
     );
-    await waitFor(() => expect(result.current.testResult?.success).toBe(true));
+    await waitFor(() => expect(result.current.checks[savedModel.id]).toMatchObject({ status: "complete", result: { success: true } }));
   });
 
-  it("uses the English catalog when a manual connection check cannot finish", async () => {
+  it("keeps a manual check failure on its service without exposing server prose", async () => {
     vi.mocked(api.post).mockRejectedValueOnce({
       response: { data: { error: { message: "固定中文服务错误" } } },
     });
@@ -146,11 +203,11 @@ describe("useModelSettingsResource", () => {
 
     act(() => result.current.testModel(savedModel.id));
 
-    await waitFor(() => expect(result.current.error).toBe("Connection check failed"));
-    expect(result.current.error).not.toBe("固定中文服务错误");
+    await waitFor(() => expect(result.current.checks[savedModel.id]).toEqual({ status: "failed", afterSave: false }));
+    expect(result.current.error).toBeNull();
   });
 
-  it("uses the Chinese catalog when a saved service check cannot finish", async () => {
+  it("distinguishes a saved service with an unfinished check from a failed save", async () => {
     vi.mocked(api.post)
       .mockResolvedValueOnce({ data: { data: savedModel } })
       .mockRejectedValueOnce({
@@ -173,9 +230,9 @@ describe("useModelSettingsResource", () => {
     });
 
     await waitFor(() =>
-      expect(result.current.error).toBe("服务已保存，但连接检查未完成")
+      expect(result.current.checks[savedModel.id]).toEqual({ status: "failed", afterSave: true })
     );
-    expect(result.current.error).not.toBe("Raw provider failure");
+    expect(result.current.error).toBeNull();
   });
 
   it("uses a safe localized save error instead of a raw server message", async () => {

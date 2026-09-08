@@ -1,0 +1,86 @@
+.card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border: 1px solid hsl(var(--border) / .7);
+  border-radius: 14px;
+  background: hsl(var(--card));
+}
+
+.card[data-editing="true"] {
+  border-color: hsl(var(--primary) / .5);
+  box-shadow: inset 3px 0 hsl(var(--primary));
+}
+
+.heading {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 20px 20px 12px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 0 20px 12px;
+}
+
+.feedback {
+  flex: 1 1 200px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: hsl(var(--muted-foreground));
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.details {
+  border-top: 1px solid hsl(var(--border) / .5);
+}
+
+.details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 20px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.details summary::-webkit-details-marker { display: none; }
+.details summary:hover { color: hsl(var(--foreground)); }
+.details summary:focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: -3px; }
+.details[open] summary svg { transform: rotate(180deg); }
+
+.definition {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 10px 16px;
+  padding: 4px 20px 20px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.definition dt { color: hsl(var(--muted-foreground)); }
+.definition dd { min-width: 0; }
+
+@container (max-width: 480px) {
+  .heading { grid-template-columns: 36px minmax(0, 1fr); padding: 16px 16px 12px; }
+  .status { grid-column: 2; }
+  .footer { padding: 0 16px 12px; }
+  .feedback { flex-basis: 100%; }
+  .details summary { padding-inline: 16px; }
+  .definition { padding-inline: 16px; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .definition dd + dt { margin-top: 8px; }
+}
