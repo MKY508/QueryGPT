@@ -952,7 +952,7 @@ async def test_completed_full_relationship_observation_keeps_its_report_target(
     outcome = await ExecutionService(
         db_session,
         project_id=UUID(project["id"]),
-    )._persist_project_result(
+    )._stage_project_result(
         run,
         {
             "analysis_state": "completed",

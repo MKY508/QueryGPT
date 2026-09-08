@@ -178,7 +178,7 @@ async def _persist(
     run = AnalysisRun(project_id=project.id, query=query)
     db.add(run)
     await db.commit()
-    await ExecutionService(db, project_id=project.id)._persist_project_result(run, payload)
+    await ExecutionService(db, project_id=project.id)._stage_project_result(run, payload)
     return run
 
 
@@ -388,7 +388,7 @@ async def test_metric_learning_failure_does_not_reject_verified_report(
     outcome = await ExecutionService(
         db_session,
         project_id=project.id,
-    )._persist_project_result(run, payload)
+    )._stage_project_result(run, payload)
 
     assert outcome.accepted is True
     await db_session.refresh(run)

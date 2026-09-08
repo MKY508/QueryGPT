@@ -49,6 +49,7 @@ from app.services.analysis_checkpoint import (
     source_fingerprint_map,
     validate_source_fingerprints,
 )
+from app.services.analysis_completion import AnalysisCompletion
 from app.services.business_decision_slots import canonicalize_decision_key
 from app.services.checkpoint_contract import (
     CheckpointDriftError,
@@ -1515,11 +1516,12 @@ class ExecutionService:
             snapshot["project_id"] = str(self.project_id)
         return snapshot
 
-    async def _persist_project_result(
+    async def _stage_project_result(
         self,
         run: AnalysisRun,
         result_data: dict[str, Any],
     ) -> ResultPersistenceOutcome:
+        """Stage the result and related records in the caller's completion transaction."""
         self.execution_policy.validate_result_boundary(result_data)
         report = dict(result_data.get("report") or {})
         state = AnalysisState(result_data.get("analysis_state"))
@@ -1625,7 +1627,7 @@ class ExecutionService:
                     ),
                 )
             )
-            await self.db.commit()
+            await self.db.flush()
             return ResultPersistenceOutcome(
                 accepted=False,
                 error_code="SEMANTIC_VALIDATION_INCOMPLETE",
@@ -1767,7 +1769,7 @@ class ExecutionService:
                         ),
                     )
                 )
-                await self.db.commit()
+                await self.db.flush()
                 return ResultPersistenceOutcome(
                     accepted=False,
                     error_code="CORRECTION_RESULT_REJECTED",
@@ -1867,7 +1869,7 @@ class ExecutionService:
                     ),
                 )
             )
-            await self.db.commit()
+            await self.db.flush()
             return ResultPersistenceOutcome(
                 accepted=False,
                 error_code="CONFIRMATION_RESULT_REJECTED",
@@ -1989,7 +1991,7 @@ class ExecutionService:
                     ),
                 )
             )
-            await self.db.commit()
+            await self.db.flush()
             return ResultPersistenceOutcome(
                 accepted=False,
                 error_code=error_code,
@@ -2616,19 +2618,18 @@ class ExecutionService:
                                 tool_history
                             )
                         }
-        await self.db.commit()
+        await self.db.flush()
         return ResultPersistenceOutcome()
 
-    async def _try_minimal_verified_report_fallback(
+    async def _build_minimal_verified_report(
         self,
         *,
         run: AnalysisRun | None,
         engine: Any,
         error: BaseException,
         confirmation_receipt: dict[str, Any] | None,
-        finalization_guard: Callable[[], bool] | None = None,
-    ) -> tuple[dict[str, Any], ResultPersistenceOutcome] | None:
-        """Persist a table-only report after a report-schema failure, or fail closed."""
+    ) -> dict[str, Any] | None:
+        """Build a table-only report from verified evidence after a schema failure."""
 
         if run is None or not _is_structured_report_output_error(error):
             return None
@@ -2736,20 +2737,48 @@ class ExecutionService:
             ),
             "report_fallback": fallback_marker,
         }
-        if finalization_guard is not None and not finalization_guard():
-            raise _AnalysisFinalizationStoppedError("分析已在结果保存前停止")
-        try:
-            persistence = await self._persist_project_result(run, result_data)
-        except _AnalysisFinalizationStoppedError:
-            raise
-        except Exception:
-            await self.db.rollback()
-            logger.exception(
-                "Unable to persist a minimal verified report fallback",
-                analysis_run_id=str(run.id),
+        return result_data
+
+    async def _complete_result(
+        self,
+        run: AnalysisRun | None,
+        result_data: dict[str, Any],
+        events: list[SSEEvent],
+        completion: AnalysisCompletion,
+    ) -> list[SSEEvent]:
+        async with completion.transaction():
+            outcome = (
+                await self._stage_project_result(run, result_data)
+                if run is not None
+                else ResultPersistenceOutcome()
             )
-            return None
-        return result_data, persistence
+            if outcome.accepted:
+                terminal_events = []
+                for event in events:
+                    if event.type.value == "result":
+                        event.data.update(
+                            {
+                                key: value
+                                for key, value in result_data.items()
+                                if key not in {"python_images", "visualization", "report_fallback"}
+                            }
+                        )
+                    public_event = self._public_event(event)
+                    if public_event is not None:
+                        terminal_events.append(public_event)
+            else:
+                terminal_events = [
+                    SSEEvent.error(
+                        outcome.error_code or "VERIFIED_RESULT_REJECTED",
+                        outcome.message or "这次结果未通过可信检查",
+                        error_category="validation",
+                        failed_stage="validation",
+                        correction_application=outcome.correction_application,
+                        **self._run_event_context(run),
+                    )
+                ]
+            await completion.stage(terminal_events)
+        return terminal_events
 
     async def execute_stream(
         self,
@@ -2760,6 +2789,7 @@ class ExecutionService:
         finalization_guard: Callable[[], bool] | None = None,
         resume_run_id: UUID | None = None,
         correction_id: UUID | None = None,
+        completion: AnalysisCompletion | None = None,
     ) -> AsyncGenerator[SSEEvent, None]:
         """Stream execution results with proper error handling per D-03, D-04.
 
@@ -2774,6 +2804,7 @@ class ExecutionService:
         engine: Any | None = None
         confirmation_receipt: dict[str, Any] | None = None
         finalization_claimed = False
+        completion = completion or AnalysisCompletion(self.db)
 
         def claim_finalization() -> bool:
             nonlocal finalization_claimed
@@ -2835,7 +2866,7 @@ class ExecutionService:
                         event.data["analysis_run_id"] = str(run.id)
                         event.data["project_id"] = str(run.project_id)
                         event.data["resumable"] = bool((run.checkpoint or {}).get("resumable"))
-                    buffer_event = bool(buffered_terminal_events)
+                    buffer_event = bool(buffered_terminal_events) or event.is_terminal_progress
                     if run and event.type.value == "progress":
                         next_stage = str(event.data.get("stage") or run.stage)
                         if event.is_terminal_progress:
@@ -2846,7 +2877,7 @@ class ExecutionService:
                             if next_state is not None:
                                 run.state = next_state
                             await self.db.commit()
-                    if run and event.type.value == "result":
+                    if event.type.value == "result":
                         if (event.data.get("report") or {}).get("status") == "needs_data":
                             event.data["resumable"] = True
                         event.data["confirmed_corrections"] = (
@@ -2858,15 +2889,13 @@ class ExecutionService:
                         )
                         project_result_data = dict(event.data)
                         buffer_event = True
-                    elif event.type.value == "result" and not claim_finalization():
-                        raise _AnalysisFinalizationStoppedError("分析已在结果发布前停止")
-                    if run and event.type.value == "python_image":
+                    if event.type.value == "python_image":
                         image = event.data.get("image")
                         if image:
                             project_python_images.append(str(image))
-                    if run and event.type.value == "visualization":
+                    if event.type.value == "visualization":
                         project_visualization = event.data.get("chart")
-                    if run and buffer_event:
+                    if buffer_event:
                         buffered_terminal_events.append(event)
                     else:
                         public_event = self._public_event(event)
@@ -2878,38 +2907,23 @@ class ExecutionService:
             # sufficient evidence.
             if bool(getattr(engine, "model_request_succeeded", False)):
                 await self.resolver.record_model_health(healthy=True, commit=False)
-            if run and project_result_data is not None:
+            if project_result_data is not None:
                 project_result_data["python_images"] = project_python_images
                 project_result_data["visualization"] = project_visualization
                 if not claim_finalization():
                     raise _AnalysisFinalizationStoppedError("分析已在结果保存前停止")
-                try:
-                    persistence = await self._persist_project_result(run, project_result_data)
-                except BaseException:
-                    # Persistence stages several related rows before one final commit.
-                    # Never let the subsequent failure-state write commit that partial unit.
-                    await self.db.rollback()
-                    raise
-                if persistence.accepted:
-                    for event in buffered_terminal_events:
-                        public_event = self._public_event(event)
-                        if public_event is not None:
-                            yield public_event
-                else:
-                    yield SSEEvent.error(
-                        persistence.error_code or "STANDING_RESULT_REJECTED",
-                        persistence.message or "这次变化结果未通过可信检查",
-                        error_category="validation",
-                        failed_stage="validation",
-                        correction_application=persistence.correction_application,
-                        **self._run_event_context(run),
-                    )
-            elif run and buffered_terminal_events:
+                terminal_events = await self._complete_result(
+                    run, project_result_data, buffered_terminal_events, completion
+                )
+                for event in terminal_events:
+                    yield event
+            elif buffered_terminal_events:
                 raise RuntimeError("调查结束前没有生成可持久化的最终结果")
 
         except (asyncio.CancelledError, GeneratorExit) as exc:
-            with CancelScope(shield=True):
-                await self._mark_run_needs_attention(run, exc)
+            if not completion.committed:
+                with CancelScope(shield=True):
+                    await self._mark_run_needs_attention(run, exc)
             raise
 
         except _AnalysisFinalizationStoppedError as exc:
@@ -3061,14 +3075,42 @@ class ExecutionService:
                     **self._run_event_context(run),
                 )
                 return
+            fallback_events: list[SSEEvent] | None = None
             try:
-                fallback = await self._try_minimal_verified_report_fallback(
+                fallback_result = await self._build_minimal_verified_report(
                     run=run,
                     engine=engine,
                     error=exc,
                     confirmation_receipt=confirmation_receipt,
-                    finalization_guard=claim_finalization,
                 )
+                if fallback_result is not None:
+                    assert run is not None
+                    if not claim_finalization():
+                        raise _AnalysisFinalizationStoppedError("分析已在结果保存前停止")
+                    context = {
+                        "analysis_run_id": str(run.id),
+                        "project_id": str(run.project_id),
+                        "analysis_state": "completed",
+                        "resumable": False,
+                    }
+                    completed_progress = SSEEvent.progress(
+                        "completed",
+                        get_progress_message("business_explanation_unavailable", self.language),
+                        step="business_explanation_unavailable",
+                        **context,
+                    )
+                    report = fallback_result["report"]
+                    content = "\n\n".join(
+                        [
+                            f"## {report['title']}",
+                            str(report["summary"]),
+                            "\n".join(f"- {finding}" for finding in report.get("findings") or []),
+                        ]
+                    )
+                    result_event = SSEEvent.result(content, **context)
+                    fallback_events = await self._complete_result(
+                        run, fallback_result, [completed_progress, result_event], completion
+                    )
             except _AnalysisFinalizationStoppedError as cancellation:
                 await self.db.rollback()
                 await self._mark_run_needs_attention(run, cancellation)
@@ -3080,73 +3122,18 @@ class ExecutionService:
                     **self._run_event_context(run),
                 )
                 return
-            except asyncio.CancelledError as cancellation:
+            except (asyncio.CancelledError, GeneratorExit) as cancellation:
                 with CancelScope(shield=True):
                     await self.db.rollback()
                     await self._mark_run_needs_attention(run, cancellation)
                 raise
-            if fallback is not None:
-                fallback_result, persistence = fallback
-                assert run is not None
-                if persistence.accepted:
-                    logger.warning(
-                        "Completed with a minimal verified report after invalid model output",
-                        analysis_run_id=str(run.id),
-                        result_name=fallback_result.get("result_name"),
-                    )
-                    completed_progress = SSEEvent.progress(
-                        "completed",
-                        get_progress_message(
-                            "business_explanation_unavailable",
-                            self.language,
-                        ),
-                        step="business_explanation_unavailable",
-                    )
-                    completed_progress.data.update(
-                        {
-                            "analysis_run_id": str(run.id),
-                            "project_id": str(run.project_id),
-                            "resumable": False,
-                        }
-                    )
-                    yield completed_progress
-                    report = dict(fallback_result["report"])
-                    result_event = SSEEvent.result(
-                        "\n\n".join(
-                            [
-                                f"## {report['title']}",
-                                str(report["summary"]),
-                                "\n".join(
-                                    f"- {finding}" for finding in report.get("findings") or []
-                                ),
-                            ]
-                        ),
-                        sql=fallback_result.get("sql"),
-                        python=None,
-                        data=fallback_result.get("data") or [],
-                        rows_count=fallback_result.get("rows_count"),
-                        result_name=fallback_result.get("result_name"),
-                        report=report,
-                        analysis_state="completed",
-                        tool_history=fallback_result.get("tool_history") or [],
-                        knowledge_proposals=[],
-                        semantic_engine=fallback_result.get("semantic_engine") or "internal",
-                        analysis_run_id=str(run.id),
-                        project_id=str(run.project_id),
-                        resumable=False,
-                    )
-                    public_result_event = self._public_event(result_event)
-                    if public_result_event is not None:
-                        yield public_result_event
-                else:
-                    yield SSEEvent.error(
-                        persistence.error_code or "VERIFIED_RESULT_REJECTED",
-                        persistence.message or "这次结果未通过可信检查",
-                        error_category="validation",
-                        failed_stage="validation",
-                        correction_application=persistence.correction_application,
-                        **self._run_event_context(run),
-                    )
+            except Exception as fallback_error:
+                await self.db.rollback()
+                logger.exception("Unable to complete the verified table-only report")
+                exc = fallback_error
+            if fallback_events is not None:
+                for event in fallback_events:
+                    yield event
                 return
             logger.exception(
                 "Runtime error during execution",

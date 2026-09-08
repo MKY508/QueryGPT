@@ -155,6 +155,7 @@ class AnalysisStreamLifetimeTests(unittest.IsolatedAsyncioTestCase):
                 result.scalars.return_value.first.return_value = run
                 db = AsyncMock()
                 db.execute.return_value = result
+                db.get.return_value = conversation
 
                 async def persist_recovery(*_args, **_kwargs):
                     # Cancellation must not interrupt awaited finalization work.
@@ -264,10 +265,16 @@ class AnalysisStreamLifetimeTests(unittest.IsolatedAsyncioTestCase):
                 service = Mock()
                 service.get_runtime_snapshot = AsyncMock(return_value={})
 
-                async def events(**_kwargs):
-                    yield SSEEvent.progress("completed", "报告完成")
-                    yield SSEEvent.result("销售额为 42", analysis_state="completed")
-                    yield SSEEvent.python_output("Synthetic calculation output")
+                async def events(*, completion, **_kwargs):
+                    terminal = [
+                        SSEEvent.progress("completed", "报告完成"),
+                        SSEEvent.result("销售额为 42", analysis_state="completed"),
+                        SSEEvent.python_output("Synthetic calculation output"),
+                    ]
+                    async with completion.transaction():
+                        await completion.stage(terminal)
+                    for item in terminal:
+                        yield item
 
                 service.execute_stream.side_effect = events
                 request = SimpleNamespace(

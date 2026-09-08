@@ -948,7 +948,7 @@ async def test_analysis_run_persists_report_table_chart_and_hidden_evidence(
     service = ExecutionService(db_session, project_id=project.id)
     image = base64.b64encode(b"\x89PNG\r\n\x1a\nreceiptbi").decode()
 
-    await service._persist_project_result(
+    await service._stage_project_result(
         run,
         {
             "analysis_state": "completed",
@@ -1058,7 +1058,7 @@ async def test_structured_chart_artifact_keeps_legacy_result_reference(
     db_session.add(run)
     await db_session.commit()
 
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         run,
         {
             "analysis_state": "completed",
@@ -1124,7 +1124,7 @@ async def test_explicit_confirmation_creates_golden_contract_without_model_propo
         values=["已退款"],
     )
 
-    await service._persist_project_result(
+    await service._stage_project_result(
         run,
         {
             "analysis_state": "completed",
@@ -1198,7 +1198,7 @@ async def test_refund_confirmation_without_execution_evidence_is_not_learned_as_
     db_session.add(run)
     await db_session.commit()
 
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         run,
         {
             "analysis_state": "completed",
@@ -3257,7 +3257,7 @@ async def test_terminal_events_are_not_emitted_when_result_persistence_fails(
 
     monkeypatch.setattr(service, "_load_execution_inputs", fake_load_inputs)
     monkeypatch.setattr(service, "_build_engine", fake_build_engine)
-    monkeypatch.setattr(service, "_persist_project_result", fail_after_staging)
+    monkeypatch.setattr(service, "_stage_project_result", fail_after_staging)
 
     events = [
         event

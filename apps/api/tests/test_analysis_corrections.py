@@ -351,7 +351,7 @@ async def test_required_relationship_correction_can_trial_only_its_user_candidat
             },
         ],
     }
-    outcome = await service._persist_project_result(
+    outcome = await service._stage_project_result(
         rerun,
         {
             "analysis_state": "completed",
@@ -882,7 +882,7 @@ async def test_verified_correction_receipt_promotes_execution_state_atomically(
     assert rerun is not None
     definition_hash = stable_payload_hash(entry.definition)
     rows = [{"revenue": 100}]
-    result = await service._persist_project_result(
+    result = await service._stage_project_result(
         rerun,
         {
             "analysis_state": "completed",
@@ -952,7 +952,7 @@ async def test_verified_correction_receipt_promotes_execution_state_atomically(
         correction_id=UUID(correction["id"]),
     )
     assert failed_run is not None
-    rejected = await service._persist_project_result(
+    rejected = await service._stage_project_result(
         failed_run,
         {
             "analysis_state": "completed",

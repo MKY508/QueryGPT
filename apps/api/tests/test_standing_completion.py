@@ -246,7 +246,7 @@ async def test_completed_runs_create_briefs_and_advance_the_rolling_baseline(
     august_claim = await _prepare(client, project.id, standing["id"])
     august_run = await db_session.get(AnalysisRun, UUID(august_claim["run_id"]))
     assert august_run is not None
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         august_run,
         _result(
             [
@@ -281,7 +281,7 @@ async def test_completed_runs_create_briefs_and_advance_the_rolling_baseline(
     september_claim = await _prepare(client, project.id, standing["id"])
     september_run = await db_session.get(AnalysisRun, UUID(september_claim["run_id"]))
     assert september_run is not None
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         september_run,
         _result(
             [
@@ -325,7 +325,7 @@ async def test_invalid_completion_keeps_the_prior_baseline_and_marks_attention(
     run = await db_session.get(AnalysisRun, UUID(claim["run_id"]))
     assert run is not None
 
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         run,
         _result(
             [
@@ -436,7 +436,7 @@ async def test_completion_rejects_a_same_shape_result_from_the_wrong_source_role
         "unrelated_orders"
     )
 
-    outcome = await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    outcome = await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         run, result
     )
 
@@ -466,7 +466,7 @@ async def test_completed_force_request_is_idempotent_after_the_claim_is_cleared(
     )
     run = await db_session.get(AnalysisRun, UUID(prepared.json()["data"]["run_id"]))
     assert run is not None
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         run,
         _result(
             [
@@ -503,7 +503,7 @@ async def test_waiting_run_keeps_its_claim_even_after_the_lease_time_passes(
     run = await db_session.get(AnalysisRun, UUID(claim["run_id"]))
     assert run is not None
 
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         run,
         _waiting_result(),
     )
@@ -571,7 +571,7 @@ async def test_superseded_run_cannot_advance_baseline_or_clear_the_new_claim(
     second_run = await db_session.get(AnalysisRun, UUID(second_claim["run_id"]))
     assert second_run is not None and second_run.id != first_run.id
 
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         first_run,
         _result(
             [
@@ -586,7 +586,7 @@ async def test_superseded_run_cannot_advance_baseline_or_clear_the_new_claim(
     assert after_stale["baseline"] == july_baseline
     assert after_stale["in_flight"]["analysis_run_id"] == str(second_run.id)
 
-    await ExecutionService(db_session, project_id=project.id)._persist_project_result(
+    await ExecutionService(db_session, project_id=project.id)._stage_project_result(
         second_run,
         _result(
             [

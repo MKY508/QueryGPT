@@ -74,7 +74,7 @@ class AnalysisStateContractTests(unittest.IsolatedAsyncioTestCase):
             run.state = AnalysisState.COMPLETED
             return ResultPersistenceOutcome(accepted=True)
 
-        service._persist_project_result = AsyncMock(side_effect=persist)
+        service._stage_project_result = AsyncMock(side_effect=persist)
         stream = service.execute_stream("查看销售", uuid4())
         first = await anext(stream)
         self.assertEqual(first.data["analysis_state"], "investigating")
@@ -82,7 +82,7 @@ class AnalysisStateContractTests(unittest.IsolatedAsyncioTestCase):
         remaining = [event async for event in stream]
         self.assertTrue(remaining[0].is_terminal_progress)
         self.assertEqual(run.state, "completed")
-        service._persist_project_result.assert_awaited_once()
+        service._stage_project_result.assert_awaited_once()
 
     async def test_missing_active_or_mismatched_result_states_cannot_be_saved_as_completed(self):
         service = ExecutionService(AsyncMock())
@@ -93,7 +93,7 @@ class AnalysisStateContractTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.subTest(state=state, report_status=status):
                 with self.assertRaises(ValueError):
-                    await service._persist_project_result(
+                    await service._stage_project_result(
                         SimpleNamespace(),
                         {"analysis_state": state, "report": {"status": status}},
                     )

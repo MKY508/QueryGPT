@@ -277,7 +277,7 @@ class TestExecutionService:
         )
         service._prepare_analysis_run = AsyncMock(return_value=(run, "show revenue", None, None))
         service._mark_run_needs_attention = AsyncMock()
-        service._persist_project_result = AsyncMock()
+        service._stage_project_result = AsyncMock()
 
         class FakeEngine:
             model_request_succeeded = False
@@ -298,7 +298,7 @@ class TestExecutionService:
 
         assert [event.type for event in events] == [SSEEventType.ERROR]
         assert events[0].data["code"] == "CANCELLED"
-        service._persist_project_result.assert_not_awaited()
+        service._stage_project_result.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_explicit_missing_model_fails_closed_without_environment_fallback(

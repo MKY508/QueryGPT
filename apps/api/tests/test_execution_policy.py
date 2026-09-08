@@ -170,7 +170,7 @@ async def test_diagnostics_off_never_persists_raw_execution_material(
         },
     )
 
-    await service._persist_project_result(
+    await service._stage_project_result(
         run,
         {
             "analysis_state": "completed",
@@ -263,7 +263,7 @@ async def test_python_disabled_rejects_python_result_at_persistence_boundary(
     )
 
     with pytest.raises(ExecutionPolicyError, match="拒绝写入"):
-        await service._persist_project_result(
+        await service._stage_project_result(
             run,
             {
                 "analysis_state": "completed",

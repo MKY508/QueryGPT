@@ -1,7 +1,8 @@
 """Helpers for chat SSE session state and persistence."""
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from copy import deepcopy
 from dataclasses import dataclass, field
 from threading import RLock
 from typing import Any
@@ -399,6 +400,49 @@ class ChatEventAccumulator:
     @property
     def has_error(self) -> bool:
         return self.error_payload is not None
+
+
+@dataclass
+class ChatTurn:
+    """Project one terminal batch without exposing uncommitted output as history."""
+
+    conversation_id: UUID
+    accumulator: ChatEventAccumulator
+    message_id: UUID | None = None
+
+    async def stage(self, db: AsyncSession, events: Sequence[SSEEvent]) -> None:
+        snapshot = deepcopy(self.accumulator)
+        for event in events:
+            snapshot.consume(event)
+        if not snapshot.has_result and not snapshot.has_error:
+            raise ValueError("A chat completion requires a result or an error")
+        conversation = await db.get(Conversation, self.conversation_id)
+        if conversation is None:
+            raise ValueError("The investigation conversation no longer exists")
+        metadata = snapshot.build_metadata()
+        message = Message(
+            id=uuid4(),
+            conversation_id=self.conversation_id,
+            role="assistant",
+            content=snapshot.build_assistant_content(),
+            extra_data=metadata,
+        )
+        db.add(message)
+        if snapshot.has_error:
+            mark_conversation_error(
+                conversation,
+                runtime_snapshot=snapshot.runtime_snapshot,
+                query=snapshot.original_query,
+                error_payload=snapshot.error_payload,
+            )
+        else:
+            mark_conversation_completed(
+                conversation,
+                runtime_snapshot=snapshot.runtime_snapshot,
+                query=snapshot.original_query,
+                metadata=metadata,
+            )
+        self.message_id = message.id
 
 
 @dataclass(frozen=True)

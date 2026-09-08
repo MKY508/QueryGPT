@@ -272,7 +272,7 @@ async def test_incomplete_batch_does_not_mark_selected_entry_verified(
     await db_session.commit()
     service = ExecutionService(db=db_session, project_id=project.id)
 
-    outcome = await service._persist_project_result(
+    outcome = await service._stage_project_result(
         run,
         {
             "analysis_state": "completed",
@@ -342,7 +342,7 @@ async def test_exact_full_relation_evidence_marks_only_that_revision_verified(
     }
     service = ExecutionService(db=db_session, project_id=project.id)
 
-    outcome = await service._persist_project_result(
+    outcome = await service._stage_project_result(
         run,
         {
             "analysis_state": "completed",

@@ -810,7 +810,7 @@ async def test_executable_confirmation_accepts_canonical_or_alias_application_ev
     definition_hash = stable_payload_hash(definition)
     service = ExecutionService(db_session, project_id=project.id)
 
-    outcome = await service._persist_project_result(
+    outcome = await service._stage_project_result(
         run,
         {
             "analysis_state": "completed",
@@ -908,7 +908,7 @@ async def test_definition_only_confirmation_does_not_require_application_evidenc
     await db_session.commit()
     service = ExecutionService(db_session, project_id=project.id)
 
-    outcome = await service._persist_project_result(
+    outcome = await service._stage_project_result(
         run,
         {
             "analysis_state": "completed",
