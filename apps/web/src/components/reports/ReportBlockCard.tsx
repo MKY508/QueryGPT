@@ -42,6 +42,11 @@ import type { ReportBlock } from "@/lib/reports";
 import { cn } from "@/lib/utils";
 import { useLocale, useTranslations } from "next-intl";
 
+import type { ChartSelectionControl } from "@/lib/report-interactions";
+import { chartMarkSelection, renderReportSelectionDot } from "./report-chart-interactions";
+import { ReportSelectionControl } from "./ReportSelectionControl";
+import { ReportFilterControl } from "./ReportFilterControl";
+
 interface ReportBlockCardProps {
   block: ReportBlock;
   editing: boolean;
@@ -56,6 +61,8 @@ interface ReportBlockCardProps {
   refreshDisabled?: boolean;
   refreshing?: boolean;
   filterValue?: string;
+  filterConnectedCount?: number;
+  interaction?: ChartSelectionControl;
   onFilterValueChange?: (value: string) => void;
 }
 
@@ -273,10 +280,12 @@ function ChartBlock({
   block,
   editing = false,
   staticRendering = false,
+  interaction,
 }: {
   block: ReportBlock;
   editing?: boolean;
   staticRendering?: boolean;
+  interaction?: ChartSelectionControl;
 }) {
   const locale = useLocale();
   const t = useTranslations("reportBlocks");
@@ -377,6 +386,11 @@ function ChartBlock({
       key ? seriesLabel(key) : String(name ?? ""),
     ];
   };
+  const selectMark = interaction && !editing && !staticRendering ? (mark: unknown) => {
+    const value = chartMarkSelection(mark, interaction.field);
+    if (value !== undefined) interaction.onSelect(value);
+  } : undefined;
+  const selectionDot = selectMark ? (mark: unknown) => renderReportSelectionDot(mark, selectMark, colors[0]) : undefined;
   const common = (
     <>
       <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
@@ -423,7 +437,8 @@ function ChartBlock({
                 isAnimationActive={!staticRendering}
                 stroke={colors[index % colors.length]}
                 strokeWidth={2}
-                dot={{ r: 2, fill: colors[index % colors.length] }}
+                dot={selectionDot ?? { r: 2, fill: colors[index % colors.length] }}
+                activeDot={selectionDot}
               >
                 {showLabels && (
                   <LabelList
@@ -454,6 +469,8 @@ function ChartBlock({
                 fillOpacity={0.14}
                 strokeWidth={2}
                 stackId={stackId}
+                dot={selectionDot ?? false}
+                activeDot={selectionDot}
               >
                 {showLabels && (
                   <LabelList
@@ -482,6 +499,8 @@ function ChartBlock({
               innerRadius="46%"
               outerRadius="78%"
               paddingAngle={1}
+              onClick={selectMark}
+              className={selectMark ? "cursor-pointer" : undefined}
               label={
                 showLabels
                   ? ({ name, value }) =>
@@ -519,6 +538,8 @@ function ChartBlock({
               data={rows}
               name={seriesLabel(scatterYKey)}
               fill={colors[0]}
+              onClick={selectMark}
+              className={selectMark ? "cursor-pointer" : undefined}
               isAnimationActive={!staticRendering}
             >
               {showLabels && (
@@ -549,7 +570,7 @@ function ChartBlock({
             <Tooltip formatter={tooltipFormatter} />
             {keys.ys.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
             {keys.ys.map((key, index) => (
-              <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={colors[index % colors.length]} radius={[0, 2, 2, 0]} isAnimationActive={!staticRendering} stackId={stackId}>
+              <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={colors[index % colors.length]} radius={[0, 2, 2, 0]} isAnimationActive={!staticRendering} stackId={stackId} onClick={selectMark} className={selectMark ? "cursor-pointer" : undefined}>
                 {showLabels && (
                   <LabelList
                     dataKey={key}
@@ -568,7 +589,7 @@ function ChartBlock({
           >
             {common}
             {keys.ys.map((key, index) => (
-              <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={colors[index % colors.length]} radius={[2, 2, 0, 0]} isAnimationActive={!staticRendering} stackId={stackId}>
+              <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={colors[index % colors.length]} radius={[2, 2, 0, 0]} isAnimationActive={!staticRendering} stackId={stackId} onClick={selectMark} className={selectMark ? "cursor-pointer" : undefined}>
                 {showLabels && (
                   <LabelList
                     dataKey={key}
@@ -760,49 +781,6 @@ function EvidenceBlock({ block }: { block: ReportBlock }) {
   );
 }
 
-function FilterBlock({
-  block,
-  value = "",
-  onChange,
-  staticRendering = false,
-}: {
-  block: ReportBlock;
-  value?: string;
-  onChange?: (value: string) => void;
-  staticRendering?: boolean;
-}) {
-  const t = useTranslations("reportBlocks");
-  const placeholder = textValue(block.config, ["placeholder"]) || t("all");
-  const field = textValue(block.config, ["field"]);
-  if (staticRendering) {
-    return (
-      <div className="flex items-baseline justify-between gap-4 border-b border-border pb-2 text-xs">
-        <span className="font-medium text-muted-foreground">{block.title}</span>
-        <span className="font-mono tabular-nums text-foreground">
-          {field ? value || t("all") : t("notSet")}
-        </span>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-wrap items-end gap-3">
-      <label className="min-w-44 text-xs font-medium text-muted-foreground">
-        {block.title}
-        <input
-          value={value}
-          onChange={(event) => onChange?.(event.target.value)}
-          disabled={!field}
-          placeholder={field ? placeholder : t("chooseFilterField")}
-          className="mt-2 h-9 w-full border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-primary disabled:bg-muted/35"
-        />
-        <span className="mt-1.5 block text-[10px] font-normal text-muted-foreground">
-          {field ? t("currentPageField", { field }) : t("unsetField")}
-        </span>
-      </label>
-    </div>
-  );
-}
-
 export function ReportBlockCard({
   block,
   editing,
@@ -817,6 +795,8 @@ export function ReportBlockCard({
   refreshDisabled = false,
   refreshing = false,
   filterValue,
+  filterConnectedCount,
+  interaction,
   onFilterValueChange,
 }: ReportBlockCardProps) {
   const t = useTranslations("reportBlocks");
@@ -952,8 +932,10 @@ export function ReportBlockCard({
           "overflow-auto"
       )}>
         {block.block_type === "metric" && <KpiBlock block={block} compact={editing} />}
+        {block.block_type === "chart" && !editing && !staticRendering && interaction && <ReportSelectionControl control={interaction} />}
         {block.block_type === "chart" && (
           <ChartBlock
+            interaction={interaction}
             block={block}
             editing={editing}
             staticRendering={staticRendering}
@@ -969,7 +951,8 @@ export function ReportBlockCard({
         {block.block_type === "text" && <TextBlock block={block} />}
         {block.block_type === "evidence" && <EvidenceBlock block={block} />}
         {block.block_type === "filter" && (
-          <FilterBlock
+          <ReportFilterControl
+            connectedCount={filterConnectedCount}
             block={block}
             value={filterValue}
             onChange={onFilterValueChange}

@@ -1,23 +1,14 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import type { ReportBlock, ReportDocument, ReportPage } from "@/lib/reports";
+import type { ReportBlock, ReportDocument } from "@/lib/reports";
 import { ReportBlockCard } from "./ReportBlockCard";
-import {
-  applyStaticReportFilters,
-  type ActiveReportFilter,
-  type ReportFilterOperator,
-} from "./report-blocks";
-
-const FILTER_OPERATORS = new Set<ReportFilterOperator>([
-  "contains",
-  "equals",
-  "not_equals",
-  "greater_than",
-  "greater_or_equal",
-  "less_than",
-  "less_or_equal",
-]);
+import { useTranslations } from "next-intl";
+import type { ReportSelection } from "@/lib/report-interactions";
+import { readReportPage } from "@/lib/report-reading";
+import { connectedReportFilters } from "@/lib/report-filter-connections";
+import { selectionLabel } from "./ReportSelectionControl";
+import { ReportFilterControl } from "./ReportFilterControl";
 
 function blockStyle(block: ReportBlock): CSSProperties {
   const width = block.block_type === "table" ? 12 : block.layout.w;
@@ -26,39 +17,19 @@ function blockStyle(block: ReportBlock): CSSProperties {
   } as CSSProperties;
 }
 
-function pageFilters(
-  page: ReportPage,
-  filterValues: Record<string, string>
-): ActiveReportFilter[] {
-  return page.blocks.flatMap((block) => {
-    if (block.block_type !== "filter") return [];
-    const field = typeof block.config.field === "string" ? block.config.field : "";
-    const operator = block.config.operator;
-    const value = filterValues[block.id] || "";
-    if (!field || !value.trim()) return [];
-    return [
-      {
-        field,
-        operator:
-          typeof operator === "string" &&
-          FILTER_OPERATORS.has(operator as ReportFilterOperator)
-            ? (operator as ReportFilterOperator)
-            : "contains",
-        value,
-      },
-    ];
-  });
-}
-
 const noop = () => undefined;
 
 export function ReportPrintView({
   report,
   filterValues,
+  selections = [],
 }: {
   report: ReportDocument;
   filterValues: Record<string, string>;
+  selections?: ReportSelection[];
 }) {
+  const t = useTranslations("reportInteractions");
+  const connected = connectedReportFilters(report);
   const pages = [...report.pages].sort(
     (left, right) => left.order_index - right.order_index
   );
@@ -70,7 +41,8 @@ export function ReportPrintView({
       aria-hidden="true"
     >
       {pages.map((page, pageIndex) => {
-        const filters = pageFilters(page, filterValues);
+        const reading = readReportPage(page, { filters: filterValues, selections }, connected);
+        const { inheritedFilters, selections: activeSelections } = reading;
         const narrative =
           typeof page.config.narrative === "string"
             ? page.config.narrative.trim()
@@ -83,13 +55,19 @@ export function ReportPrintView({
                 <h1>{report.title}</h1>
                 {report.description && <p>{report.description}</p>}
                 {narrative && <p className="report-print-narrative">{narrative}</p>}
+                {!!activeSelections.length && <p className="report-print-narrative">{t("active")}：{activeSelections.map((selection) =>
+                  `${selection.source.title} · ${selection.rule.field}：${selectionLabel(selection.value, t("emptyValue"), t("blankValue"))}`
+                ).join("； ")}</p>}
               </div>
               <span>{pageIndex + 1} / {pages.length}</span>
             </header>
 
             <div className="report-print-grid">
-              {page.blocks.map((block) => {
-                const displayedBlock = applyStaticReportFilters(block, filters);
+              {!!inheritedFilters.length && <div className="col-span-full space-y-2">
+                {inheritedFilters.map(({ block, targets }) => <ReportFilterControl key={block.id} block={block}
+                  value={filterValues[block.id] || ""} connectedCount={targets.length} staticRendering />)}
+              </div>}
+              {reading.blocks.map(({ block, filterConnectedCount }) => {
                 return (
                   <div
                     key={block.id}
@@ -98,7 +76,7 @@ export function ReportPrintView({
                     data-block-type={block.block_type}
                   >
                     <ReportBlockCard
-                      block={displayedBlock}
+                      block={block}
                       editing={false}
                       selected={false}
                       staticRendering
@@ -107,6 +85,7 @@ export function ReportPrintView({
                       onResize={noop}
                       onDuplicate={noop}
                       onDelete={noop}
+                      filterConnectedCount={filterConnectedCount}
                       filterValue={filterValues[block.id] || ""}
                       onFilterValueChange={noop}
                     />

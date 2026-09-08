@@ -1769,5 +1769,34 @@
     "delete": "Delete",
     "deleteAria": "Delete block",
     "highlight": "Highlight"
+  },
+  "reportInteractions": {
+    "title": "Chart filtering",
+    "sourceField": "Filter by",
+    "off": "Off",
+    "unaffected": "Do not filter",
+    "untitled": "Untitled block",
+    "targetField": "Matching field in {title}",
+    "selectValue": "Filter linked blocks by {field}",
+    "allValues": "All values",
+    "emptyValue": "No value",
+    "blankValue": "Empty text",
+    "active": "Chart selections",
+    "clear": "Clear {field}: {value}",
+    "clearAll": "Clear selections"
+  },
+  "reportFilters": {
+    "scope": "Applies to",
+    "pageScope": "Matching fields on this page",
+    "reportScope": "Selected charts across pages",
+    "connectDescription": "Choose the charts to filter together and the corresponding field in each.",
+    "chooseTargets": "Choose connected charts first",
+    "noTargets": "No charts connected",
+    "connectedCount": "{count} connected charts",
+    "targetField": "Field for {title} on {page}",
+    "untitled": "Untitled chart",
+    "unaffected": "Unaffected",
+    "clear": "Clear {title}",
+    "clearValue": "Clear"
   }
 }

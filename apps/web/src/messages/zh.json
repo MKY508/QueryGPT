@@ -1769,5 +1769,34 @@
     "delete": "删除",
     "deleteAria": "删除区块",
     "highlight": "重点"
+  },
+  "reportInteractions": {
+    "title": "图表联动",
+    "sourceField": "筛选字段",
+    "off": "关闭",
+    "unaffected": "不参与筛选",
+    "untitled": "未命名区块",
+    "targetField": "{title}的对应字段",
+    "selectValue": "按{field}筛选联动区块",
+    "allValues": "全部",
+    "emptyValue": "无数据",
+    "blankValue": "空文本",
+    "active": "图表筛选",
+    "clear": "清除{field}：{value}",
+    "clearAll": "清除筛选"
+  },
+  "reportFilters": {
+    "scope": "影响范围",
+    "pageScope": "本页同名字段",
+    "reportScope": "选择图表（可跨页）",
+    "connectDescription": "选择要一起筛选的图表及其对应字段。",
+    "chooseTargets": "请先选择关联图表",
+    "noTargets": "尚未关联图表",
+    "connectedCount": "关联 {count} 个图表",
+    "targetField": "{page} · {title}的对应字段",
+    "untitled": "未命名图表",
+    "unaffected": "不受影响",
+    "clear": "清除{title}",
+    "clearValue": "清除"
   }
 }

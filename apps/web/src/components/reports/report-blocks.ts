@@ -1,5 +1,6 @@
 import type { AnalysisArtifact, AnalysisRunSummary } from "@/lib/types/api";
 import { normalizeChartSpec } from "@/lib/charts";
+import { reportContentRows as contentRows } from "@/lib/report-rows";
 import type {
   ReportBlock,
   ReportBlockLayout,
@@ -147,6 +148,7 @@ export type ReportFilterOperator =
   | "less_or_equal";
 
 export interface ActiveReportFilter {
+  blockId?: string;
   field: string;
   operator: ReportFilterOperator;
   value: string;
@@ -292,20 +294,6 @@ function record(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function contentRows(
-  content: Record<string, unknown>
-): { key: "rows" | "data" | "items" | "values"; rows: Record<string, unknown>[] } | null {
-  for (const key of ["rows", "data", "items", "values"] as const) {
-    const value = content[key];
-    if (!Array.isArray(value)) continue;
-    const rows = value.filter(
-      (item): item is Record<string, unknown> => record(item) !== null
-    );
-    return { key, rows };
-  }
-  return null;
-}
-
 export function reportFilterFields(blocks: ReportBlock[], locale: string): string[] {
   const fields = new Set<string>();
   for (const block of blocks) {
@@ -361,6 +349,7 @@ export function applyStaticReportFilters(
   const sourceRowCount = rows.length;
   let applied = false;
   for (const filter of filters) {
+    if (filter.blockId !== undefined && filter.blockId !== block.id) continue;
     if (!filter.field || !filter.value.trim()) continue;
     if (!rows.some((row) => Object.prototype.hasOwnProperty.call(row, filter.field))) {
       continue;

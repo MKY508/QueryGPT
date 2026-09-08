@@ -55,6 +55,9 @@ import {
 } from "./InvestigationPicker";
 import { ReportBlockCard } from "./ReportBlockCard";
 import { ReportPrintView } from "./ReportPrintView";
+import { useReportReading } from "./useReportReading";
+import { ReportFilterControl } from "./ReportFilterControl";
+import { selectionLabel } from "./ReportSelectionControl";
 import { ReportPropertyPanel } from "./ReportPropertyPanel";
 import {
   balanceMetricWidths,
@@ -63,7 +66,6 @@ import {
 } from "./report-draft";
 import {
   applyReportBlockUpdates,
-  applyStaticReportFilters,
   blockTypeLabel,
   createReportBlocksCopy,
   createLocalId,
@@ -71,8 +73,6 @@ import {
   createReportPage,
   reportBlockOptions,
   reflowBlocks,
-  type ActiveReportFilter,
-  type ReportFilterOperator,
 } from "./report-blocks";
 
 type SaveState = "idle" | "saving" | "saved" | "error" | "conflict";
@@ -81,16 +81,6 @@ const WIDTH_STEPS = [3, 4, 6, 8, 12];
 const REPORT_COMPACT_WORKSPACE_QUERY = "(max-width: 1279px)";
 const REPORT_OUTLINE_IN_FLOW_QUERY = "(min-width: 1280px)";
 const REPORT_PROPERTIES_IN_FLOW_QUERY = "(min-width: 1536px)";
-const FILTER_OPERATORS = new Set<ReportFilterOperator>([
-  "contains",
-  "equals",
-  "not_equals",
-  "greater_than",
-  "greater_or_equal",
-  "less_than",
-  "less_or_equal",
-]);
-
 function errorMessage(
   error: unknown,
   fallback: string,
@@ -318,15 +308,6 @@ function ReportPageNavigator({
   );
 }
 
-function remapValues(
-  values: Record<string, string>,
-  ids: Map<string, string>
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(values).map(([id, value]) => [ids.get(id) || id, value])
-  );
-}
-
 interface SaveReconciliation {
   report: ReportDocument;
   pageIds: Map<string, string>;
@@ -397,15 +378,17 @@ export function reconcileReportAfterSave(
   };
 }
 
-export function ReportWorkspace({
-  projectId,
-  reportId,
-  initialRunId,
-}: {
+interface ReportWorkspaceProps {
   projectId: string;
   reportId: string;
   initialRunId?: string;
-}) {
+}
+
+export function ReportWorkspace(props: ReportWorkspaceProps) {
+  return <ReportWorkspaceSession key={`${props.projectId}:${props.reportId}`} {...props} />;
+}
+
+function ReportWorkspaceSession({ projectId, reportId, initialRunId }: ReportWorkspaceProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const locale = useLocale();
@@ -424,6 +407,17 @@ export function ReportWorkspace({
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const activePage = useMemo(
+    () => report?.pages.find((page) => page.id === activePageId) || report?.pages[0] || null,
+    [activePageId, report]
+  );
+  const reading = useReportReading(report, activePage, editing);
+  const { reset: resetReading, clearSelections, setFilter, remap: remapReading } = reading;
+  const { filters: filterValues, selections: reportSelections } = reading.state;
+  const activeSelections = reading.page?.selections ?? [];
+  const inheritedFilters = reading.page?.inheritedFilters ?? [];
+  const clearPageSelections = () => { if (activePage) clearSelections(activePage.id); };
+  const tInteractions = useTranslations("reportInteractions");
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -441,7 +435,6 @@ export function ReportWorkspace({
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshingBlockId, setRefreshingBlockId] = useState<string | null>(null);
   const [printViewOpen, setPrintViewOpen] = useState(false);
-  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [storedConversationId, setStoredConversationId] = useState<string | null>(null);
   const reportRef = useRef<ReportDocument | null>(null);
   const reportScrollRef = useRef<HTMLElement | null>(null);
@@ -501,12 +494,13 @@ export function ReportWorkspace({
       setRefreshError(null);
       setRefreshingBlockId(null);
       setExportMenuOpen(false);
+      resetReading();
     } catch (error) {
       setLoadError(errorMessage(error, t("loadError"), t("conflictError")));
     } finally {
       setLoading(false);
     }
-  }, [initialRunId, projectId, reportId, serializationCopy, t]);
+  }, [initialRunId, projectId, reportId, serializationCopy, t, resetReading]);
 
   useEffect(() => {
     void load();
@@ -538,10 +532,6 @@ export function ReportWorkspace({
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty]);
 
-  const activePage = useMemo(
-    () => report?.pages.find((page) => page.id === activePageId) || report?.pages[0] || null,
-    [activePageId, report]
-  );
   const visiblePages = useMemo(() => (report ? orderedPages(report) : []), [report]);
   const activePageNumber = Math.max(
     1,
@@ -588,21 +578,6 @@ export function ReportWorkspace({
     }),
     [blocksCopy, locale, tDraft]
   );
-  const activeFilters = useMemo<ActiveReportFilter[]>(() => {
-    if (!activePage) return [];
-    return activePage.blocks.flatMap((block) => {
-      if (block.block_type !== "filter") return [];
-      const field = typeof block.config.field === "string" ? block.config.field.trim() : "";
-      const operatorValue =
-        typeof block.config.operator === "string" ? block.config.operator : "contains";
-      const operator = FILTER_OPERATORS.has(operatorValue as ReportFilterOperator)
-        ? (operatorValue as ReportFilterOperator)
-        : "contains";
-      const value = filterValues[block.id] || "";
-      return field && value.trim() ? [{ field, operator, value }] : [];
-    });
-  }, [activePage, filterValues]);
-
   const mutateReport = useCallback((updater: (current: ReportDocument) => ReportDocument) => {
     if (refreshInFlightRef.current) return;
     editRevisionRef.current += 1;
@@ -776,6 +751,7 @@ export function ReportWorkspace({
     setActivePageId(draftPages[0]?.id || pages[0]?.id || null);
     setSelectedBlockId(null);
     setEditing(true);
+    clearSelections();
     setOutlineOpen(true);
     setPropertiesOpen(false);
     setExportError(null);
@@ -909,7 +885,7 @@ export function ReportWorkspace({
         setSelectedBlockId((current) =>
           current ? identity.blockIds.get(current) || current : current
         );
-        setFilterValues((current) => remapValues(current, identity.blockIds));
+        remapReading(identity.pageIds, identity.blockIds);
         setDirty(false);
         setSaveState("saved");
         return true;
@@ -924,7 +900,7 @@ export function ReportWorkspace({
         setSelectedBlockId((current) =>
           current ? reconciled.blockIds.get(current) || current : current
         );
-        setFilterValues((current) => remapValues(current, reconciled.blockIds));
+        remapReading(reconciled.pageIds, reconciled.blockIds);
         setDirty(true);
         setSaveState("idle");
         return false;
@@ -934,7 +910,7 @@ export function ReportWorkspace({
       setSaveError(errorMessage(error, t("saveError"), t("conflictError")));
       return false;
     }
-  }, [dirty, projectId, report, saveState, serializationCopy, t]);
+  }, [dirty, projectId, report, saveState, serializationCopy, t, remapReading]);
 
   const refreshBlock = useCallback(
     async (pageId: string, blockId: string) => {
@@ -1226,7 +1202,7 @@ export function ReportWorkspace({
               <Eye size={13} />
               <span className="hidden sm:inline">{t("read")}</span>
             </button>
-            <button type="button" aria-pressed={editing} aria-label={t("editReport")} onClick={() => setEditing(true)} className={cn("inline-flex h-7 items-center gap-1.5 px-2.5 text-[11px] font-medium", editing ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+            <button type="button" aria-pressed={editing} aria-label={t("editReport")} onClick={() => { setEditing(true); clearSelections(); }} className={cn("inline-flex h-7 items-center gap-1.5 px-2.5 text-[11px] font-medium", editing ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
               <PencilLine size={13} />
               <span className="hidden sm:inline">{t("edit")}</span>
             </button>
@@ -1393,8 +1369,24 @@ export function ReportWorkspace({
                 aria-busy={reportMutationDisabled}
                 data-editing={editing ? "true" : "false"}
               >
-                {activePage.blocks.map((block) => {
-                  const displayedBlock = applyStaticReportFilters(block, activeFilters);
+                {!!inheritedFilters.length && <div className="col-span-full flex flex-wrap items-start gap-5 border-b border-border pb-4">
+                  {inheritedFilters.map(({ block, targets }) => <ReportFilterControl key={block.id} block={block}
+                    value={filterValues[block.id] || ""} connectedCount={targets.length}
+                    onChange={(value) => setFilter(block.id, value)} />)}
+                </div>}
+                {!!activeSelections.length && <div className="col-span-full flex flex-wrap items-center gap-2 pb-3" aria-label={tInteractions("active")}>
+                  {activeSelections.map((selection) => {
+                    const value = selectionLabel(selection.value, tInteractions("emptyValue"), tInteractions("blankValue"));
+                    return <button key={selection.sourceKey} type="button"
+                      aria-label={tInteractions("clear", { field: selection.rule.field, value })}
+                      onClick={() => clearSelections(selection.pageId, selection.sourceKey)}
+                      className="max-w-full truncate rounded border border-primary/25 bg-primary/5 px-2 py-1 text-xs text-primary">
+                      {selection.source.title} · {selection.rule.field}：{value} ×
+                    </button>;
+                  })}
+                  <button type="button" onClick={clearPageSelections} className="text-xs text-muted-foreground underline underline-offset-2">{tInteractions("clearAll")}</button>
+                </div>}
+                {reading.page?.blocks.map(({ block, selection, filterConnectedCount }) => {
                   return (
                   <div
                     key={block.id}
@@ -1403,7 +1395,7 @@ export function ReportWorkspace({
                     data-block-type={block.block_type}
                   >
                     <ReportBlockCard
-                      block={displayedBlock}
+                      block={block}
                       editing={editing}
                       selected={selectedBlockId === block.id}
                       onSelect={() => {
@@ -1420,10 +1412,10 @@ export function ReportWorkspace({
                       onRefresh={() => void refreshBlock(activePage.id, block.id)}
                       refreshDisabled={dirty || reportMutationDisabled}
                       refreshing={refreshingBlockId === block.id}
+                      interaction={selection ? { ...selection, onSelect: value => reading.select(block.id, value) } : undefined}
+                      filterConnectedCount={filterConnectedCount}
                       filterValue={filterValues[block.id] || ""}
-                      onFilterValueChange={(value) =>
-                        setFilterValues((current) => ({ ...current, [block.id]: value }))
-                      }
+                      onFilterValueChange={(value) => setFilter(block.id, value)}
                     />
                   </div>
                   );
@@ -1466,7 +1458,7 @@ export function ReportWorkspace({
       />
     </main>
     {printViewOpen && (
-      <ReportPrintView report={report} filterValues={filterValues} />
+      <ReportPrintView report={report} filterValues={filterValues} selections={editing ? [] : reportSelections} />
     )}
     </>
   );
