@@ -576,11 +576,20 @@
     "uploadingFileLabel": "正在加入文件",
     "addFileLabel": "添加文件",
     "file": "文件",
-    "dataMobile": "数据",
     "dataSourceDesktop": "数据来源",
     "stopAnalysisAria": "停止调查",
     "stoppingAnalysisAria": "正在停止调查",
-    "startAnalysisAria": "开始调查"
+    "startAnalysisAria": "开始调查",
+    "expandEditor": "展开编辑问题",
+    "editorTitle": "编辑问题",
+    "closeEditor": "关闭问题编辑器",
+    "questionBody": "问题内容",
+    "finishEditing": "完成编辑",
+    "draftUnretained": "草稿暂未保留，刷新或关闭页面可能丢失输入。",
+    "draftUnreadable": "有草稿暂时无法读取。",
+    "retryDraftRetention": "重试",
+    "sendingAria": "正在发送问题",
+    "submitFailed": "暂时未能发送，问题已保留。"
   },
   "chatArea": {
     "modelNotReady": "分析能力尚未就绪。",
@@ -2696,5 +2705,15 @@
     "openAnalysis": "打开这条分析",
     "choose": "回看分析结果",
     "chooseHint": "选择一条记录，查看问题与结果摘要。"
+  },
+  "promptInsertion": {
+    "title": "使用这条问题",
+    "description": "当前问题还未发送，选择追加或替换。",
+    "preview": "比较问题内容",
+    "current": "当前问题",
+    "incoming": "准备使用的问题",
+    "cancel": "取消",
+    "append": "追加到末尾",
+    "replace": "替换当前问题"
   }
 }

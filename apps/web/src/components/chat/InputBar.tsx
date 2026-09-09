@@ -1,26 +1,37 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { ArrowUp, Database, Loader2, Paperclip, Square } from "lucide-react";
+import { ArrowUp, Database, Loader2, Maximize2, Paperclip, Square } from "lucide-react";
 import type { ModelSummary } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
+import { FILE_UPLOAD_ACCEPT } from "@/lib/file-formats";
 import { Button } from "@/components/ui/button";
 import { AnalysisServiceSelector } from "./AnalysisServiceSelector";
+import { QuestionEditorDialog, questionCursor, type QuestionCursor } from "./QuestionEditorDialog";
 
 interface InputBarProps {
   onSubmit: (query: string) => Promise<boolean | void>;
   onStop: () => void;
   onOpenData: () => void;
   onUploadFile: (file: File) => void;
+  onUploadFiles?: (files: File[]) => void;
+  uploadStatus?: ReactNode;
   isLoading: boolean;
   isStopping?: boolean;
   isUploading: boolean;
   projectName?: string;
+  contextKey?: string;
+  onRevealComposer?: () => void;
   dataReady: boolean;
   sourceCount: number;
   input: string;
   onInputChange: (value: string) => void;
+  onAccepted?: () => void;
+  disabled?: boolean;
+  draftUnretained?: boolean;
+  draftUnreadable?: boolean;
+  onRetryDraftRetention?: () => void;
   placement?: "dock" | "surface";
   analysisServices?: ModelSummary[];
   selectedAnalysisServiceId?: string | null;
@@ -33,17 +44,30 @@ interface InputBarProps {
   onAnalysisServiceSelectorOpenChange?: (open: boolean) => void;
 }
 
-export function InputBar({
+export function InputBar(props: InputBarProps) {
+  return <InputBarSession key={props.contextKey ?? "composer"} {...props} />;
+}
+
+function InputBarSession({
   onSubmit,
   onStop,
   onOpenData,
   onUploadFile,
+  onUploadFiles,
+  uploadStatus,
   isLoading,
   isStopping = false,
   isUploading,
+  projectName,
+  onRevealComposer,
   sourceCount,
   input,
   onInputChange,
+  onAccepted,
+  disabled = false,
+  draftUnretained = false,
+  draftUnreadable = false,
+  onRetryDraftRetention,
   placement = "dock",
   analysisServices,
   selectedAnalysisServiceId = null,
@@ -58,20 +82,47 @@ export function InputBar({
   const t = useTranslations("inputBar");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [submitFailed, setSubmitFailed] = useState(false);
+  const [editorCursor, setEditorCursor] = useState<QuestionCursor | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const submitting = useRef(false), mounted = useRef(false);
+  const currentInput = useRef(input), inputRevision = useRef(0);
+  useLayoutEffect(() => { if (currentInput.current !== input) { currentInput.current = input; inputRevision.current++; } }, [input]);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+
+  const acceptFiles = (files: File[]) => {
+    if (!files.length) return;
+    if (onUploadFiles) onUploadFiles(files);
+    else files.forEach(onUploadFile);
+  };
+  const changeInput = (value: string) => {
+    setSubmitFailed(false); currentInput.current = value; inputRevision.current++; onInputChange(value);
+  };
+  const closeEditor = () => { setEditorCursor(null); onRevealComposer?.(); };
 
   const submit = async () => {
+    if (disabled) return;
     if (isLoading) {
       if (!isStopping) onStop();
       return;
     }
-    if (!input.trim() || isSubmitting) return;
+    if (!input.trim() || submitting.current) return;
+    const submittedInput = input, revision = inputRevision.current;
+    submitting.current = true;
     setIsSubmitting(true);
+    setSubmitFailed(false);
     try {
-      const accepted = await onSubmit(input.trim());
-      if (accepted !== false) onInputChange("");
+      const accepted = await onSubmit(submittedInput.trim());
+      if (accepted !== false) {
+        if (onAccepted) onAccepted();
+        else if (mounted.current && currentInput.current === submittedInput && inputRevision.current === revision) onInputChange("");
+      }
+    } catch {
+      if (mounted.current) setSubmitFailed(true);
     } finally {
-      setIsSubmitting(false);
+      submitting.current = false;
+      if (mounted.current) setIsSubmitting(false);
     }
   };
 
@@ -84,6 +135,7 @@ export function InputBar({
       )}
     >
       <div className={cn(placement === "dock" ? "mx-auto max-w-[1080px]" : "w-full")}>
+        {uploadStatus}
         <div
           onDragOver={(event) => {
             event.preventDefault();
@@ -97,11 +149,10 @@ export function InputBar({
           onDrop={(event) => {
             event.preventDefault();
             setIsDragging(false);
-            const file = event.dataTransfer.files?.[0];
-            if (file) onUploadFile(file);
+            acceptFiles(Array.from(event.dataTransfer.files ?? []));
           }}
           className={cn(
-            "relative overflow-visible border bg-card transition-[border-color,background-color] focus-within:border-primary",
+            "relative overflow-visible rounded-xl border bg-card transition-[border-color,background-color] focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10",
             isDragging ? "border-primary bg-primary/[0.03]" : "border-border"
           )}
         >
@@ -110,35 +161,40 @@ export function InputBar({
               {t("dropHint")}
             </div>
           )}
-          <textarea
+          <textarea ref={inputRef}
             value={input}
-            onChange={(event) => onInputChange(event.target.value)}
+            onChange={(event) => changeInput(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
                 event.preventDefault();
                 void submit();
               }
             }}
             data-testid="chat-input"
+            aria-label={t("placeholder")}
             placeholder={t("placeholder")}
-            disabled={isLoading}
+            disabled={isLoading || disabled}
             rows={2}
             className={cn(
-              "max-h-44 w-full resize-none bg-transparent px-3 pb-0 pt-3 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60 sm:px-4 sm:pb-2 sm:pt-4",
+              "max-h-44 w-full resize-none bg-transparent pb-2 pl-4 pr-12 pt-4 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60",
               placement === "surface" ? "min-h-[122px]" : "min-h-[76px]"
             )}
           />
+          <Button variant="ghost" size="icon" disabled={disabled || isLoading || isSubmitting} aria-haspopup="dialog" aria-label={t("expandEditor")} title={t("expandEditor")}
+            onClick={() => { if (!inputRef.current || disabled || isLoading || submitting.current) return; onAnalysisServiceSelectorOpenChange?.(false); setEditorCursor(questionCursor(inputRef.current)); }}
+            className="absolute right-1.5 top-1.5 size-8 text-muted-foreground hover:text-primary"><Maximize2 size={14} /></Button>
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 pb-3">
             <div className="flex min-w-0 flex-1 items-center gap-1">
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.xls,.xlsx,.parquet,.json"
+                multiple
+                accept={FILE_UPLOAD_ACCEPT}
                 className="hidden"
                 onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) onUploadFile(file);
+                  const files = Array.from(event.currentTarget.files ?? []);
                   event.currentTarget.value = "";
+                  acceptFiles(files);
                 }}
               />
               <Button
@@ -182,17 +238,18 @@ export function InputBar({
               variant={isLoading ? "destructive" : "primary"}
               size="icon"
               onClick={() => void submit()}
-              disabled={isStopping || (!input.trim() && !isLoading)}
+              disabled={disabled || isStopping || (!input.trim() && !isLoading) || (isSubmitting && !isLoading)}
               data-testid="chat-submit"
               aria-label={
                 isStopping
                   ? t("stoppingAnalysisAria")
                   : isLoading
                     ? t("stopAnalysisAria")
+                    : isSubmitting ? t("sendingAria")
                     : t("startAnalysisAria")
               }
             >
-              {isStopping ? (
+              {isStopping || (isSubmitting && !isLoading) ? (
                 <Loader2 size={15} className="animate-spin" />
               ) : isLoading ? (
                 <Square size={15} fill="currentColor" />
@@ -202,7 +259,15 @@ export function InputBar({
             </Button>
           </div>
         </div>
+        {(submitFailed || draftUnretained || draftUnreadable) && <div role="alert" className="mt-2 flex flex-wrap items-center justify-between gap-x-3 text-xs leading-5 text-destructive">
+          <p>{t(draftUnretained ? "draftUnretained" : draftUnreadable ? "draftUnreadable" : "submitFailed")}</p>
+          {(draftUnretained || draftUnreadable) && onRetryDraftRetention && <Button variant="ghost" size="sm" onClick={onRetryDraftRetention}>{t("retryDraftRetention")}</Button>}
+        </div>}
       </div>
+      {editorCursor && <QuestionEditorDialog value={input} projectName={projectName}
+        cursor={editorCursor} origin={inputRef} canReturn={() => mounted.current}
+        disabled={disabled || isLoading} onChange={changeInput} onClose={closeEditor}
+        warning={draftUnretained ? "draftUnretained" : draftUnreadable ? "draftUnreadable" : null} onRetry={onRetryDraftRetention} />}
     </div>
   );
 }

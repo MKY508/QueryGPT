@@ -569,17 +569,26 @@
     "settingsAria": "Open settings"
   },
   "inputBar": {
-    "dropHint": "Release to add it to the project",
+    "dropHint": "Release to add files to the project",
     "placeholder": "Ask or describe an analysis task",
     "uploading": "Adding",
-    "uploadingFileLabel": "Adding file",
-    "addFileLabel": "Add file",
+    "uploadingFileLabel": "Adding files",
+    "addFileLabel": "Add files",
     "file": "File",
-    "dataMobile": "Data",
     "dataSourceDesktop": "Data source",
     "stopAnalysisAria": "Stop investigation",
     "stoppingAnalysisAria": "Stopping investigation",
-    "startAnalysisAria": "Start investigation"
+    "startAnalysisAria": "Start investigation",
+    "expandEditor": "Expand question editor",
+    "editorTitle": "Edit question",
+    "closeEditor": "Close question editor",
+    "questionBody": "Question text",
+    "finishEditing": "Finish editing",
+    "draftUnretained": "Some drafts could not be retained and may be lost if you refresh or close this page.",
+    "draftUnreadable": "Some drafts could not be read.",
+    "retryDraftRetention": "Retry",
+    "sendingAria": "Sending question",
+    "submitFailed": "Could not send. Your question has been kept."
   },
   "chatArea": {
     "modelNotReady": "Analysis is not ready.",
@@ -2696,5 +2705,15 @@
     "openAnalysis": "Open this analysis",
     "choose": "Review past analyses",
     "chooseHint": "Select a record to read its question and summary."
+  },
+  "promptInsertion": {
+    "title": "Use this question",
+    "description": "Your current question is unsent. Add to it or replace it.",
+    "preview": "Compare question content",
+    "current": "Current question",
+    "incoming": "Question to use",
+    "cancel": "Cancel",
+    "append": "Add to the end",
+    "replace": "Replace question"
   }
 }

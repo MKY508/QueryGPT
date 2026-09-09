@@ -1,22 +1,24 @@
 "use client";
 
-import type { ReactNode, RefObject } from "react";
+import type { DragEventHandler, ReactNode, RefObject } from "react";
 import { X } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
 import { containModalTab } from "@/lib/use-modal-focus";
 
 /** Desktop task frame. Callers own requests, session identity and native opening. */
-export function TaskDialog({ dialogRef, writingRef, activeRef, busy, blockCancel = false, autoFocusClose = true, title, name, closeLabel, onClose, onEscape, actions, size = "wide", children }: {
+export function TaskDialog({ dialogRef, writingRef, activeRef, busy, blockCancel = false, autoFocusClose = true, title, name, describedBy, closeLabel, onClose, onEscape, onDragOver, onDrop, actions, size = "wide", children }: {
   dialogRef: RefObject<HTMLDialogElement | null>; writingRef: RefObject<boolean>;
   activeRef?: RefObject<boolean>;
   busy: boolean; title: string; name?: string; closeLabel: string;
   blockCancel?: boolean; size?: "wide" | "compact"; actions?: ReactNode;
   autoFocusClose?: boolean;
+  describedBy?: string;
+  onDragOver?: DragEventHandler<HTMLDialogElement>; onDrop?: DragEventHandler<HTMLDialogElement>;
   onClose: () => void; onEscape?: () => void; children: ReactNode;
 }) {
   const close = () => { if (!writingRef.current && (!activeRef || activeRef.current)) onClose(); };
-  return <dialog ref={dialogRef} aria-label={title} aria-modal="true"
+  return <dialog ref={dialogRef} aria-label={title} aria-modal="true" aria-describedby={describedBy} onDragOver={onDragOver} onDrop={onDrop}
     onClose={event => { if (!event.currentTarget.open) close(); }}
     onCancel={event => {
       if (writingRef.current || blockCancel) event.preventDefault();
