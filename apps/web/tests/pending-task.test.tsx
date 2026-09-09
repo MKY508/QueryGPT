@@ -1,10 +1,14 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 import { createPendingTaskStore, parsePendingTask, type PendingTask } from "@/lib/pending-task";
 import { usePendingTask } from "@/components/chat/usePendingTask";
 import { submitWithAnalysisReceipt } from "@/lib/chat-submission";
 import type { ChatMessage } from "@/lib/types/chat";
 import { PENDING_TASK_STORAGE_KEY } from "@/lib/storage/legacy";
+import { PendingTaskSaveNotice } from "@/components/chat/PendingTaskSaveNotice";
+import en from "@/messages/en.json";
+import zh from "@/messages/zh.json";
 
 function setup() {
   const values = new Map<string, string>();
@@ -19,6 +23,44 @@ const task: PendingTask = { query: "  核对收入\n保留原问题  ", projectI
   validationSelection: [{ entry_id: "definition-1", expected_active_revision_id: "revision-1" }] };
 
 describe("parked investigation tasks", () => {
+  it.each(["zh", "en"] as const)("keeps navigation blocked on failure and retries explicitly in %s", locale => {
+    const { store, storage } = setup(); store.write(task);
+    const before = store.getSnapshot(), navigate = vi.fn();
+    const messages = locale === "zh" ? zh : en;
+    function Harness() {
+      const pending = usePendingTask(task.projectId, store);
+      return <NextIntlClientProvider locale={locale} messages={messages}>
+        <button onClick={() => { if (pending.write({ ...task, query: "New question" })) navigate(); }}>Manage service</button>
+        {pending.failedTask && <PendingTaskSaveNotice onRetry={() => { if (pending.retryWrite()) navigate(); }} onDismiss={pending.dismissFailure} />}
+      </NextIntlClientProvider>;
+    }
+    render(<Harness />);
+    storage.setItem.mockImplementationOnce(() => { throw new Error("quota"); });
+    fireEvent.click(screen.getByRole("button", { name: "Manage service" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(messages.messageList.taskSaveFailed);
+    expect(navigate).not.toHaveBeenCalled(); expect(store.getSnapshot()).toBe(before);
+    fireEvent.click(screen.getByRole("button", { name: messages.messageList.stayWithTask }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument(); expect(navigate).not.toHaveBeenCalled();
+    storage.setItem.mockImplementationOnce(() => { throw new Error("quota"); });
+    fireEvent.click(screen.getByRole("button", { name: "Manage service" }));
+    fireEvent.click(screen.getByRole("button", { name: messages.messageList.retryTaskSave }));
+    expect(navigate).toHaveBeenCalledOnce(); expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(JSON.parse(store.getSnapshot()!).query).toBe("New question");
+  });
+
+  it("invalidates an old failed-write retry when another task replaces its baseline", () => {
+    const { store, storage } = setup(); store.write(task);
+    const view = renderHook(() => usePendingTask(task.projectId, store));
+    storage.setItem.mockImplementationOnce(() => { throw new Error("quota"); });
+    act(() => { expect(view.result.current.write({ ...task, query: "Unretained question" })).toBe(false); });
+    const retry = view.result.current.retryWrite;
+    expect(view.result.current.failedTask?.query).toBe("Unretained question");
+    act(() => store.write({ ...task, query: "Later question" }));
+    const later = store.getSnapshot();
+    expect(view.result.current.failedTask).toBeNull(); expect(retry()).toBe(false);
+    expect(store.getSnapshot()).toBe(later);
+  });
+
   it("isolates the project immediately and restores the exact question and validation context after remount", () => {
     const { store } = setup(); store.write(task);
     const view = renderHook(({ projectId }) => usePendingTask(projectId, store), { initialProps: { projectId: "project-1" as string | null } });

@@ -22,6 +22,7 @@ import { DataWorkspacePanel } from "./DataWorkspacePanel";
 import { useChatAreaState } from "./useChatAreaState";
 import { useStandingAnalyses } from "./useStandingAnalyses";
 import { usePendingTask } from "./usePendingTask";
+import { PendingTaskSaveNotice } from "./PendingTaskSaveNotice";
 import type { PendingTask } from "@/lib/pending-task";
 import { submitWithAnalysisReceipt } from "@/lib/chat-submission";
 import { INITIAL_WORKBENCH_PANE, selectWorkbenchPane } from "@/lib/workbench-pane";
@@ -321,7 +322,7 @@ export function ChatArea({
           ? { validationSelection: failedMessage.semanticValidationSelection }
           : {}),
       };
-      parkedTask.write(task);
+      if (!parkedTask.write(task)) return;
     }
     router.push("/settings?tab=models");
   };
@@ -386,6 +387,9 @@ export function ChatArea({
           }
         />
 
+        {parkedTask.failedTask && <PendingTaskSaveNotice
+          onRetry={() => { if (parkedTask.retryWrite()) router.push("/settings?tab=models"); }}
+          onDismiss={parkedTask.dismissFailure} />}
         {projectError && (
           <div
             role="status"

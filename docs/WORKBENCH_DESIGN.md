@@ -82,7 +82,7 @@
 - 已收到结果但尚未收到流终态时显示整理／保存等待，不提前宣称报告已经保存。活动列表只属于当前前端会话，不是完整持久运行日志。
 - 待办页仅保留原始问题、当前服务状态及继续／修改动作；收到问题不显示“已理解”或预造后续流程。`pending-task` 集中读写当前标签页的暂存槽，项目筛选直接从快照派生；每次写入有独立身份，清除须匹配原快照。继续与普通提问共用本次 stream 的运行回执，不以历史中相同问题文字代替接收证明；失败或未接收不清除，新待办不受旧回执影响。问题转入输入框继续复用现有草稿冲突选择。结构参考 [Zulip 独立草稿模型](https://github.com/zulip/zulip/blob/main/web/src/drafts.ts)，没有新增网络草稿或跨重启承诺。
 
-待办的五个定向用例及三个既有回执用例、限定 ESLint 和类型检查通过。Chrome 1180×700 中英文核对离开后恢复原文、编辑回填与焦点交接、12px 卡片；无写请求、页面错误或横向溢出。真实配置保存、模型续跑和存储不可用时的完整提示仍未由这些检查证明。
+待办的八个定向用例、限定 ESLint 和类型检查通过；本次运行接收判断另有三个既有回执用例。Chrome 1180×700 中英文核对离开后恢复原文、编辑回填与焦点交接、12px 卡片。存储写入失败使用 [PatternFly 页内反馈](https://www.patternfly.org/components/alert/design-guidelines/) 的结构：保留原页和旧待办，提供明确重试与留在原页；只有重试成功才打开设置，已有新待办时旧重试失效。模拟写入失败实页验证了这两条动作、关闭后原按钮焦点及 6px 共享按钮，无服务端写请求或页面错误。真实配置保存、模型续跑和存储读取失败仍未由这些检查证明。
 
 命令面板参考 [VS Code](https://code.visualstudio.com/docs/getstarted/userinterface#_command-palette)；运行呈现参考 [Streamlit status](https://docs.streamlit.io/develop/api-reference/status/st.status)，不预造固定流程、百分比或预计耗时。
 

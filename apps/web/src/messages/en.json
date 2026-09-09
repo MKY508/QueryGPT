@@ -663,7 +663,10 @@
     "newProgress": "New progress · jump to latest",
     "timelineAria": "Investigation timeline",
     "returnLatestNewAria": "New progress available; return to latest",
-    "returnLatestAria": "Return to latest"
+    "returnLatestAria": "Return to latest",
+    "taskSaveFailed": "Your question could not be saved. You are still on this page.",
+    "retryTaskSave": "Retry and open settings",
+    "stayWithTask": "Stay here"
   },
   "chatEmpty": {
     "suggestionsTitle": "Questions to start with",

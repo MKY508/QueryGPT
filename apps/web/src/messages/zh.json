@@ -664,7 +664,10 @@
     "newProgress": "有新进展 · 回到最新",
     "timelineAria": "调查时间线",
     "returnLatestNewAria": "有新进展，回到最新位置",
-    "returnLatestAria": "回到最新位置"
+    "returnLatestAria": "回到最新位置",
+    "taskSaveFailed": "问题未能暂存，尚未离开当前页面。",
+    "retryTaskSave": "重试并打开设置",
+    "stayWithTask": "留在这里"
   },
   "chatEmpty": {
     "suggestionsTitle": "从这些问题开始",
