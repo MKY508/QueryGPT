@@ -29,7 +29,8 @@
     "react-syntax-highlighter": "^15.6.6",
     "recharts": "^2.13.0",
     "tailwind-merge": "^2.5.0",
-    "zustand": "^5.0.0"
+    "zustand": "^5.0.0",
+    "cmdk": "1.1.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",

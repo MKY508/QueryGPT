@@ -2636,5 +2636,25 @@
     "conflict": "定义或历史已更新，请刷新后重新比较。",
     "uncertain": "尚未确认恢复结果，请刷新查看当前定义。",
     "reload": "刷新核对"
+  },
+  "workbenchCommands": {
+    "title": "快速操作",
+    "search": "查找操作…",
+    "empty": "没有找到操作，换个词试试。",
+    "investigation": "当前调查",
+    "navigate": "项目工作区",
+    "application": "应用",
+    "continue": "继续提问",
+    "new": "新建调查",
+    "data": "查看项目数据",
+    "understanding": "查看项目理解",
+    "history": "查找历史调查…",
+    "reports": "打开项目报表",
+    "projects": "切换项目…",
+    "settings": "打开设置",
+    "busy": "调查结束后可新建",
+    "choose": "选择",
+    "open": "打开",
+    "close": "关闭"
   }
 }

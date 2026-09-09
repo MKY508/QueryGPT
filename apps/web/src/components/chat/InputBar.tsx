@@ -79,7 +79,7 @@ export function InputBar({
     <div
       className={cn(
         placement === "dock"
-          ? "border-t border-border bg-background px-5 pb-4 pt-2 sm:px-7 sm:pb-5 sm:pt-3"
+          ? "border-t border-border bg-background px-7 pb-5 pt-3"
           : "bg-transparent"
       )}
     >
@@ -125,10 +125,10 @@ export function InputBar({
             rows={2}
             className={cn(
               "max-h-44 w-full resize-none bg-transparent px-3 pb-0 pt-3 text-[15px] leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:opacity-60 sm:px-4 sm:pb-2 sm:pt-4",
-              placement === "surface" ? "min-h-[104px] sm:min-h-[122px]" : "min-h-[52px] sm:min-h-[76px]"
+              placement === "surface" ? "min-h-[122px]" : "min-h-[76px]"
             )}
           />
-          <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2 sm:gap-3 sm:px-3 sm:pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 pb-3">
             <div className="flex min-w-0 flex-1 items-center gap-1">
               <input
                 ref={fileInputRef}
@@ -150,7 +150,7 @@ export function InputBar({
                 className="gap-1.5 px-2 text-xs"
               >
                 {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Paperclip size={14} />}
-                <span className="hidden sm:inline">{isUploading ? t("uploading") : t("file")}</span>
+                <span>{isUploading ? t("uploading") : t("file")}</span>
               </Button>
               <Button
                 variant="ghost"
@@ -160,8 +160,7 @@ export function InputBar({
                 className="gap-1.5 px-2 text-xs"
               >
                 <Database size={14} />
-                <span className="sm:hidden">{t("dataMobile")}{sourceCount > 0 ? ` · ${sourceCount}` : ""}</span>
-                <span className="hidden sm:inline">
+                <span>
                   {t("dataSourceDesktop")}{sourceCount > 0 ? ` · ${sourceCount}` : ""}
                 </span>
               </Button>

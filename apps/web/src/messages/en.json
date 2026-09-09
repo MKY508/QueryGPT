@@ -2636,5 +2636,25 @@
     "conflict": "The definition or history has changed. Refresh to compare again.",
     "uncertain": "The restore result is not confirmed. Refresh to check the current definition.",
     "reload": "Refresh and check"
+  },
+  "workbenchCommands": {
+    "title": "Quick actions",
+    "search": "Find an action…",
+    "empty": "No matching actions. Try another word.",
+    "investigation": "Current investigation",
+    "navigate": "Project workspace",
+    "application": "Application",
+    "continue": "Continue asking",
+    "new": "New investigation",
+    "data": "View project data",
+    "understanding": "View project understanding",
+    "history": "Find past investigations…",
+    "reports": "Open project reports",
+    "projects": "Switch project…",
+    "settings": "Open settings",
+    "busy": "Available when the investigation ends",
+    "choose": "Select",
+    "open": "Open",
+    "close": "Close"
   }
 }
