@@ -7,7 +7,7 @@ export interface ReportVersionItem {
 export interface ReportVersionPage { report_id: string; current_version: number; items: ReportVersionItem[]; next_before: number | null }
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const positive = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
-const base = (project: string, report: string) => `/projects/${project}/reports/${report}/revisions`;
+const base = (project: string, report: string) => `/api/v1/projects/${project}/reports/${report}/revisions`;
 function unwrap(response: unknown): unknown {
   if (!record(response) || !record(response.data)) throw new Error("Invalid history response");
   return response.data.data;

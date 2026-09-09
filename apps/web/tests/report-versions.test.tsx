@@ -92,14 +92,17 @@ describe("saved report version review", () => {
     const get = vi.spyOn(api, "get");
     get.mockResolvedValueOnce({ data: { data: { report_id: "other", current_version: 3, items: [], next_before: null } } });
     await expect(versions.listReportVersions("project", "report")).rejects.toThrow();
+    expect(get.mock.calls[0][0]).toBe("/api/v1/projects/project/reports/report/revisions");
     get.mockResolvedValueOnce({ data: { data: { report_id: "report", current_version: 3, items: [item(1), item(2)], next_before: null } } });
     await expect(versions.listReportVersions("project", "report")).rejects.toThrow();
     get.mockResolvedValueOnce({ data: { data: { ...document, project_id: "other" } } });
     await expect(versions.getReportVersion("project", "report", 1, copy)).rejects.toThrow();
     get.mockResolvedValueOnce({ data: { data: document } });
     await expect(versions.getReportVersion("project", "report", 1, copy)).resolves.toEqual(document);
+    expect(get.mock.lastCall?.[0]).toBe("/api/v1/projects/project/reports/report/revisions/1");
     const post = vi.spyOn(api, "post").mockResolvedValueOnce({ data: { data: { ...document, version: 3 } } });
     await expect(versions.restoreReportVersion("project", "report", 1, 3, copy)).rejects.toThrow();
     expect(post.mock.calls[0][1]).toEqual({ expected_version: 3 });
+    expect(post.mock.calls[0][0]).toBe("/api/v1/projects/project/reports/report/revisions/1/restore");
   });
 });
