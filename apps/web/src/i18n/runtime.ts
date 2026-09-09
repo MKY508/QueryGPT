@@ -36,6 +36,7 @@ const runtimeMessages = {
     noProjectToClean: "There is no project available for data preparation.",
     previewRecipeFirst: "Preview what this recipe will change first.",
     cleaningPreviewFailed: "The prepared-data preview is unavailable. Please retry.",
+    cleaningInProgress: "Please wait for the current data preparation to finish.",
     previewCleaningFirst: "Preview the prepared-data changes first.",
     sourceChangedBeforeApply:
       "The data changed after the preview. Preview it again before applying.",
@@ -90,6 +91,7 @@ const runtimeMessages = {
     noProjectToClean: "当前没有可整理的项目。",
     previewRecipeFirst: "请先查看这套整理方法会带来什么变化。",
     cleaningPreviewFailed: "暂时无法预览整理结果，请重试。",
+    cleaningInProgress: "请等待当前整理完成。",
     previewCleaningFirst: "请先预览整理后的变化。",
     sourceChangedBeforeApply: "数据刚刚发生了变化，请重新预览后再应用。",
     cleaningApplyFailed: "暂时无法应用这次整理，请重试。",

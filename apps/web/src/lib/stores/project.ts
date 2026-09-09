@@ -28,6 +28,7 @@ import type {
 } from "@/lib/types/api";
 
 let refreshGeneration = 0;
+const cleaningApplications = new Set<string>();
 
 interface ProjectBootstrapDefaults {
   name: string;
@@ -598,8 +599,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   previewSourceCleaning: async (sourceId, operations) => {
     const projectId = get().currentProjectId;
     if (!projectId) throw new UserFacingError(runtimeMessage("noProjectToClean"));
+    if (get().cleaningAction || cleaningApplications.has(JSON.stringify([projectId, sourceId]))) {
+      throw new UserFacingError(runtimeMessage("cleaningInProgress"));
+    }
+    const action = { sourceId, kind: "preview" as const };
+    const ownsRequest = () => get().currentProjectId === projectId && get().cleaningAction === action;
+    get().clearSourceCleaningPreview(sourceId);
     set({
-      cleaningAction: { sourceId, kind: "preview" },
+      cleaningAction: action,
       error: null,
     });
     try {
@@ -610,7 +617,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       );
       const preview = response.data.data as VisualCleaningPreview;
       if (
-        get().currentProjectId === projectId &&
+        ownsRequest() &&
         preview.source_id === sourceId
       ) {
         set((state) => ({
@@ -622,15 +629,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       }
       return preview;
     } catch (error) {
-      if (get().currentProjectId === projectId) {
+      if (ownsRequest()) {
         set({ error: runtimeMessage("cleaningPreviewFailed") });
       }
       throw error;
     } finally {
-      if (
-        get().currentProjectId === projectId &&
-        get().cleaningAction?.sourceId === sourceId
-      ) {
+      if (ownsRequest()) {
         set({ cleaningAction: null });
       }
     }
@@ -638,6 +642,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   clearSourceCleaningPreview: (sourceId) => {
     set((state) => ({
+      // Closing/editing invalidates a pending preview as well as its result.
+      // An apply is a committed-write attempt and cannot be cancelled this way.
+      cleaningAction: state.cleaningAction?.sourceId === sourceId && state.cleaningAction.kind === "preview"
+        ? null : state.cleaningAction,
       cleaningPreviewBySource: Object.fromEntries(
         Object.entries(state.cleaningPreviewBySource).filter(
           ([id]) => id !== sourceId
@@ -649,11 +657,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   applySourceCleaning: async (sourceId, operations) => {
     const projectId = get().currentProjectId;
     const preview = get().cleaningPreviewBySource[sourceId];
-    if (!projectId || !preview) {
+    if (!projectId || !preview || !preview.can_apply) {
       throw new UserFacingError(runtimeMessage("previewCleaningFirst"));
     }
+    const applicationKey = JSON.stringify([projectId, sourceId]);
+    if (get().cleaningAction || cleaningApplications.has(applicationKey)) {
+      throw new UserFacingError(runtimeMessage("cleaningInProgress"));
+    }
+    cleaningApplications.add(applicationKey);
+    const action = { sourceId, kind: "apply" as const };
+    const ownsRequest = () => get().currentProjectId === projectId && get().cleaningAction === action;
     set({
-      cleaningAction: { sourceId, kind: "apply" },
+      cleaningAction: action,
       error: null,
     });
     try {
@@ -676,7 +691,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         );
         result = response.data.data as VisualCleaningApplyResult;
       } catch (error) {
-        if (get().currentProjectId === projectId) {
+        if (ownsRequest()) {
+          if (getErrorHttpStatus(error) === 409 || getErrorHttpStatus(error) === 422) {
+            get().clearSourceCleaningPreview(sourceId);
+          }
           set({
             error:
               getErrorHttpStatus(error) === 409 || getErrorHttpStatus(error) === 422
@@ -687,7 +705,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         throw error;
       }
 
-      if (get().currentProjectId === projectId) {
+      if (ownsRequest()) {
         get().clearSourceCleaningPreview(sourceId);
         try {
           await get().refreshCurrent();
@@ -695,14 +713,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           // The mutation is already committed. A follow-up refresh is useful
           // but must never turn a successful apply into a failed apply.
         }
-        if (get().currentProjectId === projectId) set({ error: null });
+        if (ownsRequest()) set({ error: null });
       }
       return result;
     } finally {
-      if (
-        get().currentProjectId === projectId &&
-        get().cleaningAction?.sourceId === sourceId
-      ) {
+      cleaningApplications.delete(applicationKey);
+      if (ownsRequest()) {
         set({ cleaningAction: null });
       }
     }

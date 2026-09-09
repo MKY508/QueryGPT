@@ -788,6 +788,7 @@ export type VisualCleaningOperation =
   | { operation: "fill_missing"; column: string; value: 0 }
   | { operation: "normalize_datetime"; column: string }
   | { operation: "normalize_currency"; column: string }
+  | { operation: "replace_text_values"; column: string; replacements: TextValueReplacement[] }
   | { operation: "drop_exact_duplicates" };
 
 export interface VisualCleaningSnapshot {
