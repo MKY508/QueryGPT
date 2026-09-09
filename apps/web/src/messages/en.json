@@ -1966,7 +1966,21 @@
     "saveBeforeExport": "Save the latest changes before exporting.",
     "pdfExportError": "The PDF could not be exported. Please retry.",
     "excelExportError": "The Excel file could not be exported. Please retry.",
-    "refreshError": "Could not refresh. The previous result has been kept."
+    "refreshError": "Could not refresh. The previous result has been kept.",
+    "pageMoved": "{title} moved to page {number}",
+    "searchOutline": "Search pages or content…",
+    "clearOutlineSearch": "Clear outline search",
+    "outlineNoMatches": "No matching pages or content",
+    "reorderPage": "Move page: {title}",
+    "pageActions": "Page actions: {title}",
+    "movePageUp": "Move page earlier: {title}",
+    "movePageDown": "Move page later: {title}",
+    "duplicatePage": "Duplicate page: {title}",
+    "outlineSearchCount": "{matchedPages} / {pages} pages · {matchedBlocks} / {blocks} items",
+    "outlineCount": "{pages} pages · {blocks} items",
+    "reorderPageHelp": "Drag to reorder, or press Alt and the up or down arrow to move this page.",
+    "collapsePage": "Collapse contents: {title}",
+    "expandPage": "Expand contents: {title}"
   },
   "reportIndex": {
     "clearSearch": "Clear report search",

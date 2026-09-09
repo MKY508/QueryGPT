@@ -189,7 +189,7 @@ export function ReportPropertyPanel({
     block?.block_type === "chart" && typeof block.content.image_url !== "string";
   const filterFields = reportFilterFields(page.blocks, locale);
   return (
-    <aside className="flex h-full min-h-0 w-[min(300px,92vw)] shrink-0 flex-col border-l border-border bg-card">
+    <aside className="flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-border bg-card">
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-5">
         {block ? <Settings2 size={15} className="text-primary" /> : <LayoutPanelTop size={15} className="text-primary" />}
         <h2 className="text-xs font-semibold">{block ? t("blockSettings") : t("pageSettings")}</h2>

@@ -1966,7 +1966,21 @@
     "saveBeforeExport": "请先保存最新修改后再导出。",
     "pdfExportError": "PDF 没有导出，请重试。",
     "excelExportError": "Excel 没有导出，请重试。",
-    "refreshError": "未能刷新，已保留上次结果"
+    "refreshError": "未能刷新，已保留上次结果",
+    "pageMoved": "{title}已移至第 {number} 页",
+    "searchOutline": "搜索页面或内容…",
+    "clearOutlineSearch": "清除目录搜索",
+    "outlineNoMatches": "没有找到相符的页面或内容",
+    "reorderPage": "移动页面：{title}",
+    "pageActions": "页面操作：{title}",
+    "movePageUp": "向前移动页面：{title}",
+    "movePageDown": "向后移动页面：{title}",
+    "duplicatePage": "复制页面：{title}",
+    "outlineSearchCount": "{matchedPages} / {pages} 页 · {matchedBlocks} / {blocks} 项内容",
+    "outlineCount": "{pages} 页 · {blocks} 项内容",
+    "reorderPageHelp": "拖动调整顺序，或按 Alt 加上、下方向键移动页面。",
+    "collapsePage": "收起内容：{title}",
+    "expandPage": "展开内容：{title}"
   },
   "reportIndex": {
     "clearSearch": "清除报告搜索",
