@@ -1,0 +1,8 @@
+:root {
+  --desktop-min-width: 1180px;
+  --shell-sidebar-width: 248px;
+  --shell-header-height: 60px;
+  --radius-control: 6px;
+  --radius-menu: 8px;
+  --radius-surface: 12px;
+}

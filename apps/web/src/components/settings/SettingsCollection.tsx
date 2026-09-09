@@ -1,9 +1,11 @@
 "use client";
 
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import styles from "./SettingsCollection.module.css";
+import { SearchField } from "@/components/ui/SearchField";
+import { Button } from "@/components/ui/button";
 
 export const SETTINGS_PAGE_SIZE = 12;
 /** Only explicitly supplied display fields are searched; never serialize an API object. */
@@ -39,19 +41,13 @@ export function SettingsCollection<T>({ items, searchLabel, filterLabel, options
   const constrained = view.query.trim().length > 0 || view.filter !== "all";
 
   return <section aria-label={searchLabel} className={styles.collection}>
-    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3 sm:px-4">
-      <div className={`${styles.search} relative min-w-0`}>
-        <Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-3.5 text-muted-foreground" />
-        <input ref={searchRef} type="search" aria-label={searchLabel} aria-controls={id} placeholder={searchLabel} value={view.query}
-          onChange={event => { onBrowse(); setView(current => ({ ...current, query: event.target.value, page: 0 })); }}
-          className="h-11 w-full min-w-0 border border-border bg-background pl-9 pr-11 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary [&::-webkit-search-cancel-button]:hidden" />
-        {view.query && <button type="button" aria-label={t("clearSearch")} onClick={() => {
-          onBrowse(); setView(current => ({ ...current, query: "", page: 0 })); searchRef.current?.focus();
-        }} className="absolute right-0 top-0 flex size-11 items-center justify-center text-muted-foreground hover:text-foreground"><X size={16} /></button>}
-      </div>
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+      <SearchField inputRef={searchRef} value={view.query} label={searchLabel} clearLabel={t("clearSearch")}
+        controls={id} className={styles.search}
+        onChange={query => { onBrowse(); setView(current => ({ ...current, query, page: 0 })); }} />
       <select aria-label={filterLabel} aria-controls={id} value={view.filter}
         onChange={event => { onBrowse(); setView(current => ({ ...current, filter: event.target.value, page: 0 })); }}
-        className={`${styles.filter} h-11 min-w-36 flex-1 border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary`}>
+        className={`${styles.filter} h-9 rounded-md min-w-36 flex-1 border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary`}>
         {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
       <div className="flex items-center gap-1">
@@ -59,15 +55,15 @@ export function SettingsCollection<T>({ items, searchLabel, filterLabel, options
           {pages > 1 ? t("range", { start, end, total: filtered.length }) : constrained ? t("filteredCount", { count: filtered.length, total: items.length }) : t("count", { count: items.length })}
         </p>
         {pages > 1 && <>
-          <button type="button" aria-label={t("previous")} disabled={page === 0} onClick={() => paginate(page - 1)} className="flex size-11 items-center justify-center hover:bg-muted disabled:opacity-30"><ChevronLeft size={17} /></button>
-          <button type="button" aria-label={t("next")} disabled={page === pages - 1} onClick={() => paginate(page + 1)} className="flex size-11 items-center justify-center hover:bg-muted disabled:opacity-30"><ChevronRight size={17} /></button>
+          <Button variant="ghost" aria-label={t("previous")} disabled={page === 0} onClick={() => paginate(page - 1)} size="icon"><ChevronLeft size={17} /></Button>
+          <Button variant="ghost" aria-label={t("next")} disabled={page === pages - 1} onClick={() => paginate(page + 1)} size="icon"><ChevronRight size={17} /></Button>
         </>}
       </div>
     </div>
     <div id={id}>
       {filtered.length ? children(filtered.slice(page * SETTINGS_PAGE_SIZE, (page + 1) * SETTINGS_PAGE_SIZE)) : constrained ? <div className="border-b border-border py-12 text-center">
         <p className="text-sm text-muted-foreground">{t("noMatches")}</p>
-        <button type="button" onClick={clear} className="mt-3 min-h-11 px-4 text-sm font-medium text-primary hover:bg-primary/5">{t("clearFilters")}</button>
+        <Button variant="ghost" onClick={clear} className="mt-3 text-primary">{t("clearFilters")}</Button>
       </div> : empty}
     </div>
   </section>;

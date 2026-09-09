@@ -25,8 +25,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /**
- * 全局按钮原语：直角、发丝边框、token 配色，对齐 DESIGN.md 编辑排版风格。
- * 新代码一律使用本组件，不要再手写按钮 class。
+ * Shared button primitive: compact radius, semantic color tokens and focus states.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = "primary", size = "md", className, type = "button", ...props },
@@ -37,7 +36,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center font-medium transition-colors",
+        "inline-flex shrink-0 items-center justify-center rounded-md font-medium transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-60",
         variantClasses[variant],

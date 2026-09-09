@@ -11,7 +11,7 @@ const config: Config = {
     "theme-dawn",
     "theme-midnight",
   ],
-  darkMode: "class",
+  darkMode: ["class", ".theme-midnight"],
   theme: {
     extend: {
       colors: {
@@ -52,9 +52,12 @@ const config: Config = {
         warning: "hsl(var(--warning))",
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        DEFAULT: "var(--radius-control, 6px)",
+        sm: "4px",
+        md: "var(--radius-control, 6px)",
+        lg: "var(--radius-menu, 8px)",
+        xl: "var(--radius-surface, 12px)",
+        "2xl": "16px",
       },
       fontFamily: {
         mono: [
