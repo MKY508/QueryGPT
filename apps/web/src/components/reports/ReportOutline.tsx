@@ -66,7 +66,7 @@ export function ReportOutline({ pages, activePageId, selectedBlockId, disabled, 
     setAnnouncement(t("pageMoved", { title: ordered[at].title, number: at + direction + 1 }));
   };
   const matches = filterReportOutline(pages, query, locale);
-  return <aside ref={outlineRef} data-report-editor-panel tabIndex={-1}
+  return <aside ref={outlineRef} tabIndex={-1}
     aria-label={t("pagesAndBlocks")} className="report-outline flex h-full min-h-0 w-[248px] shrink-0 flex-col border-r border-border bg-card"
     onCompositionStartCapture={() => { composing.current = true; }}
     onCompositionEndCapture={() => { composing.current = false; }}
