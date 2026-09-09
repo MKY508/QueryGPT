@@ -2773,6 +2773,11 @@
     "show": "查看进度"
   },
   "businessConfirmation": {
+    "recordTitle": "本次选择",
+    "title": "需要你确认",
+    "chooseOne": "选择一项",
+    "submit": "确认并继续",
+    "submitting": "正在确认…",
     "confirmed": "已确认"
   },
   "semanticSaveRecovery": {

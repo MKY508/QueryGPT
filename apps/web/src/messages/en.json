@@ -2773,6 +2773,11 @@
     "show": "View progress"
   },
   "businessConfirmation": {
+    "recordTitle": "Your selection",
+    "title": "Your decision",
+    "chooseOne": "Select one option",
+    "submit": "Confirm and continue",
+    "submitting": "Confirming…",
     "confirmed": "Confirmed"
   },
   "semanticSaveRecovery": {
