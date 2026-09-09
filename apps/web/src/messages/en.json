@@ -2519,5 +2519,18 @@
     "untitled": "Untitled content",
     "openResult": "Go to page {page}: {title}",
     "showMore": "Show more · {shown} of {total} shown"
+  },
+  "reportMove": {
+    "clearSearch": "Clear page search",
+    "title": "Move to page",
+    "close": "Cancel move",
+    "untitled": "Untitled content",
+    "search": "Search destination pages…",
+    "destinations": "Destination pages",
+    "moveTo": "Move to {title}",
+    "pageDetail": "Page {number} · {count} items",
+    "noMatches": "No matching pages",
+    "linksHint": "Moving will disconnect chart interactions with the original page.",
+    "filterHint": "This filter will apply to the destination page."
   }
 }

@@ -2519,5 +2519,18 @@
     "untitled": "未命名内容",
     "openResult": "前往第 {page} 页：{title}",
     "showMore": "显示更多 · 已显示 {shown} / {total}"
+  },
+  "reportMove": {
+    "clearSearch": "清除页面搜索",
+    "title": "移动到页面",
+    "close": "取消移动",
+    "untitled": "未命名内容",
+    "search": "搜索目标页…",
+    "destinations": "目标页面",
+    "moveTo": "移到{title}",
+    "pageDetail": "第 {number} 页 · {count} 项内容",
+    "noMatches": "没有匹配的页面",
+    "linksHint": "移动后，与原页图表的联动将取消。",
+    "filterHint": "移动后，这个筛选将作用于目标页。"
   }
 }
