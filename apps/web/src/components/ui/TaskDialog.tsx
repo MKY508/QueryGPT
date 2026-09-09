@@ -4,6 +4,7 @@ import type { ReactNode, RefObject } from "react";
 import { X } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
+import { containModalTab } from "@/lib/use-modal-focus";
 
 /** Desktop task frame. Callers own requests, session identity and native opening. */
 export function TaskDialog({ dialogRef, writingRef, activeRef, busy, blockCancel = false, autoFocusClose = true, title, name, closeLabel, onClose, onEscape, actions, size = "wide", children }: {
@@ -23,6 +24,8 @@ export function TaskDialog({ dialogRef, writingRef, activeRef, busy, blockCancel
     }}
     onKeyDown={event => {
       event.stopPropagation();
+      if (event.defaultPrevented) return;
+      if (!event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) containModalTab(event, event.currentTarget);
       if (event.key === "Escape" && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) {
         event.preventDefault(); return;
       }

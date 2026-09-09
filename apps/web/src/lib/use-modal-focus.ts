@@ -29,6 +29,20 @@ export function focusableElements(container: HTMLElement): HTMLElement[] {
     .filter((element) => element.getAttribute("tabindex") !== "-1" && available(element));
 }
 
+/** Shared by native task frames and overlays that listen at the window boundary. */
+export function containModalTab(event: Pick<KeyboardEvent, "key" | "shiftKey" | "preventDefault">, container: HTMLElement): void {
+  if (event.key !== "Tab") return;
+  const focusable = focusableElements(container);
+  if (!focusable.length) { event.preventDefault(); container.focus(); return; }
+  const active = document.activeElement;
+  const outside = !(active instanceof Node && container.contains(active));
+  if (event.shiftKey && (active === focusable[0] || outside)) {
+    event.preventDefault(); focusable.at(-1)!.focus();
+  } else if (!event.shiftKey && (active === focusable.at(-1) || outside)) {
+    event.preventDefault(); focusable[0].focus();
+  }
+}
+
 /** Inline native dialogs are panels, not overlays that own workspace focus. */
 export function hasModalDialog(except?: Element | null): boolean {
   return Array.from(document.querySelectorAll('dialog[open], [aria-modal="true"]:not(dialog)')).some(node =>
@@ -82,29 +96,7 @@ export function useModalFocus({
         onCloseRef.current();
         return;
       }
-      if (event.key !== "Tab") return;
-
-      const focusable = focusableElements(container);
-      if (!focusable.length) {
-        event.preventDefault();
-        container.focus();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const activeElement = document.activeElement;
-      const focusIsOutside = !(
-        activeElement instanceof Node && container.contains(activeElement)
-      );
-
-      if (event.shiftKey && (activeElement === first || focusIsOutside)) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (activeElement === last || focusIsOutside)) {
-        event.preventDefault();
-        first.focus();
-      }
+      containModalTab(event, container);
     };
 
     window.addEventListener("keydown", handleKeyDown);

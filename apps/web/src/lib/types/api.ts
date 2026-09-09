@@ -866,6 +866,21 @@ export interface AnalysisRunSummary {
   updated_at: string;
 }
 
+export type AnalysisHistoryItem = Pick<AnalysisRunSummary,
+  "id" | "project_id" | "conversation_id" | "query" | "state" | "stage" | "created_at" | "updated_at"> & {
+  report: { title?: string | null; summary?: string | null };
+};
+
+export interface AnalysisHistoryPage {
+  items: AnalysisHistoryItem[];
+  total: number;
+  count: number;
+  page: number;
+  page_size: number;
+  page_count: number;
+  current_run_id: string | null;
+}
+
 export interface AnalysisArtifact {
   id: string;
   project_id: string;
