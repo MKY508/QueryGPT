@@ -2095,7 +2095,7 @@
     "selectReportHint": "Choose a report. Investigation content will be available after it opens.",
     "workspaceLabel": "Report workspace",
     "workspaceTitle": "Turn investigation results into your own report",
-    "reportCount": "{count} reports",
+    "reportCount": "{count, plural, one {# report} other {# reports}}",
     "refreshList": "Refresh list",
     "refreshError": "The list could not be updated. Previous results are still shown.",
     "retry": "Retry",

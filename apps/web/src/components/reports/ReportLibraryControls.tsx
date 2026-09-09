@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { SearchField } from "@/components/ui/SearchField";
 import { Button } from "@/components/ui/button";
+import field from "@/components/ui/FieldControl.module.css";
 import { REPORT_LIBRARY_SEARCH_LIMIT, type ReportLibraryView } from "@/lib/report-library";
 
 export function ReportLibraryControls({ view, onChange }: {
@@ -33,21 +34,21 @@ export function ReportLibraryControls({ view, onChange }: {
         }} />
       <Button variant="outline" size="icon" type="submit" aria-label={t("searchReports")} title={t("searchReports")}><Search size={16} /></Button>
     </form>
-    <select aria-label={t("filterStatus")} value={view.status}
+    <div className="w-[150px] shrink-0"><select aria-label={t("filterStatus")} value={view.status}
       onChange={(event) => onChange({ ...view, status: event.target.value as ReportLibraryView["status"], page: 1 })}
-      className="h-9 w-[150px] rounded-md border border-input bg-card px-3 text-sm">
+      className={field.control}>
       <option value="all">{t("statusAll")}</option>
       <option value="draft">{t("statusDraft")}</option>
       <option value="published">{t("statusPublished")}</option>
       <option value="archived">{t("statusArchived")}</option>
-    </select>
-    <select aria-label={t("sortReports")} value={view.sort}
+    </select></div>
+    <div className="w-[170px] shrink-0"><select aria-label={t("sortReports")} value={view.sort}
       onChange={(event) => onChange({ ...view, sort: event.target.value as ReportLibraryView["sort"], page: 1 })}
-      className="h-9 w-[170px] rounded-md border border-input bg-card px-3 text-sm">
+      className={field.control}>
       <option value="updated">{t("sortUpdated")}</option>
       <option value="created">{t("sortCreated")}</option>
       <option value="title">{t("sortTitle")}</option>
-    </select>
+    </select></div>
     {(view.search || view.status !== "all") && <Button variant="ghost" size="sm" onClick={clear}>
       <X size={14} />{t("clearFilters")}
     </Button>}
