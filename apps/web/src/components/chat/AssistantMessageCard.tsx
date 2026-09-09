@@ -17,6 +17,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { AnalysisMetrics, AnalysisFindings, AnalysisSuggestions } from "./AnalysisReportHighlights";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import type { ChatMessage } from "@/lib/types/chat";
@@ -901,20 +903,17 @@ export function AssistantMessageCard({
   return (
     <article
       data-testid={`assistant-message-card-${index}`}
-      className="relative w-full max-w-[920px] overflow-hidden border border-border bg-card"
+      className="relative w-full max-w-[920px] overflow-hidden rounded-xl border border-border bg-card"
     >
-      {!hasError && (
-        <div className="absolute bottom-0 left-0 top-0 w-[3px] bg-primary" />
-      )}
       <div
-        className={hasError ? "px-6 py-6 md:px-8" : "px-6 py-7 md:px-9 md:py-8"}
+        className={hasError ? "px-8 py-6" : "px-8 py-7"}
       >
         {hasError ? (
           <div
             role="alert"
             aria-labelledby={`investigation-error-title-${index}`}
             aria-describedby={`investigation-error-reason-${index}`}
-            className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"
+            className="flex items-start justify-between gap-5"
           >
             <div className="flex min-w-0 items-start gap-3">
               <AlertCircle
@@ -939,35 +938,35 @@ export function AssistantMessageCard({
             </div>
             {needsAnalysisServiceChange &&
               (onChangeAnalysisService || onManageAnalysisServices) && (
-                <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+                <div className="flex shrink-0 flex-wrap items-center gap-2 justify-end">
                   {onChangeAnalysisService && (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => onChangeAnalysisService(index)}
-                      className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      variant="primary"
                     >
                       {t("switchService")}
-                    </button>
+                    </Button>
                   )}
                   {onManageAnalysisServices && (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => onManageAnalysisServices(index)}
-                      className="rounded-md border border-border bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      variant="outline"
                     >
                       {t("settings")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
             {!needsAnalysisServiceChange && message.canRetry && (
-              <button
+              <Button
                 type="button"
                 onClick={() => onRetry(index)}
-                className="shrink-0 self-start rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                variant="primary" className="self-start"
               >
                 {message.resumable ? t("actionContinue") : t("actionRetry")}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -1008,14 +1007,14 @@ export function AssistantMessageCard({
                     {t("addToReport")}
                   </Link>
                 )}
-                <button
+                <Button
                   onClick={handleLatestDataRerun}
                   disabled={Boolean(message.projectId && correctionsPending)}
-                  className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-wait disabled:opacity-60"
+                  variant="ghost"
                 >
                   <RefreshCw size={13} />
                   {canResume ? t("continueLast") : t("rerunLatest")}
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -1036,7 +1035,7 @@ export function AssistantMessageCard({
         ) : null}
 
         {needsData && report.action?.kind === "add_data" && (
-          <section className="mt-7 rounded-lg border border-primary/25 bg-primary/[0.04] px-5 py-5">
+          <section className="mt-7 rounded-xl border border-primary/25 bg-primary/[0.04] px-5 py-5">
             <div className="flex items-start gap-3">
               <FilePlus2 size={18} className="mt-0.5 shrink-0 text-primary" />
               <div className="min-w-0 flex-1">
@@ -1055,22 +1054,22 @@ export function AssistantMessageCard({
                   ))}
                 </ul>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={onOpenData}
-                    className="inline-flex items-center gap-2 bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                    variant="primary"
                   >
                     {t("addFileOrDb")}
                     <ArrowRight size={14} />
-                  </button>
+                  </Button>
                   {message.resumable && (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => onRetry(index)}
-                      className="border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground hover:border-primary/50 hover:text-primary"
+                      variant="outline"
                     >
                       {t("dataReadyContinue")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -1078,31 +1077,10 @@ export function AssistantMessageCard({
           </section>
         )}
 
-        {report?.metrics?.length ? (
-          <div className="mt-7 grid overflow-hidden rounded-lg border border-border bg-background/45 sm:grid-cols-2 lg:grid-cols-3">
-            {report.metrics.map((metric, metricIndex) => (
-              <div
-                key={`${metric.label}-${metricIndex}`}
-                className="border-b border-border px-4 py-4 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"
-              >
-                <div className="text-xs text-muted-foreground">
-                  {metric.label}
-                </div>
-                <div className="mt-1 text-2xl font-semibold tracking-[-0.025em] text-foreground tabular-nums">
-                  {metric.value}
-                </div>
-                {metric.context && (
-                  <div className="mt-1 text-xs leading-5 text-muted-foreground">
-                    {metric.context}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : null}
+        <AnalysisMetrics metrics={report?.metrics} />
 
         {report?.confirmation && (
-          <section className="mt-7 rounded-lg border border-warning/40 bg-warning/[0.06] px-5 py-5">
+          <section className="mt-7 rounded-xl border border-warning/40 bg-warning/[0.06] px-5 py-5">
             <div className="flex items-start gap-3">
               <CircleDot size={18} className="mt-0.5 shrink-0 text-warning" />
               <div>
@@ -1119,7 +1097,7 @@ export function AssistantMessageCard({
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {report.confirmation.options.map((option) => (
-                    <button
+                    <Button
                       key={option}
                       type="button"
                       onClick={() =>
@@ -1132,7 +1110,7 @@ export function AssistantMessageCard({
                         confirmingOption !== null ||
                         Boolean(message.confirmationResolved)
                       }
-                      className="border border-warning/50 bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-warning/15 disabled:cursor-wait disabled:opacity-60"
+                      variant="outline"
                     >
                       {(() => {
                         const label = localizedPreflightConfirmation?.optionLabel(option) || option;
@@ -1142,7 +1120,7 @@ export function AssistantMessageCard({
                             ? t("definitionSelected", { option: label })
                             : label;
                       })()}
-                    </button>
+                    </Button>
                   ))}
                 </div>
                 {confirmationError && (
@@ -1155,26 +1133,7 @@ export function AssistantMessageCard({
           </section>
         )}
 
-        {report?.findings?.length ? (
-          <section className="mt-7">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {t("keyFindings")}
-            </h3>
-            <div className="mt-3 divide-y divide-border border-y border-border">
-              {report.findings.map((finding, findingIndex) => (
-                <div
-                  key={`${finding}-${findingIndex}`}
-                  className="grid grid-cols-[28px_1fr] gap-3 py-3.5"
-                >
-                  <span className="font-mono text-xs text-primary">
-                    {String(findingIndex + 1).padStart(2, "0")}
-                  </span>
-                  <p className="text-sm leading-6 text-foreground">{finding}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <AnalysisFindings findings={report?.findings} />
 
         {(structuredVisualization || pythonImages.length > 0) && (
           <section className="mt-7">
@@ -1192,7 +1151,7 @@ export function AssistantMessageCard({
                 width={1280}
                 height={720}
                 unoptimized
-                className="mt-4 h-auto max-w-full rounded-lg border border-border bg-white"
+                className="mt-4 h-auto max-w-full rounded-xl border border-border bg-white"
               />
             ))}
           </section>
@@ -1209,13 +1168,13 @@ export function AssistantMessageCard({
             <span className="text-xs text-muted-foreground">
               {t("artifactsNotLoaded")}
             </span>
-            <button
+            <Button
               type="button"
               onClick={() => void refetchArtifacts()}
-              className="text-xs font-semibold text-primary hover:underline"
+              variant="ghost"
             >
               {t("retry")}
-            </button>
+            </Button>
           </section>
         )}
 
@@ -1226,13 +1185,13 @@ export function AssistantMessageCard({
               {t("artifactsSavedCount", { count: artifacts.length })}
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button
+              <Button
                 type="button"
                 onClick={() => setSavedArtifactsOpen(true)}
-                className="text-xs font-semibold text-primary hover:underline"
+                variant="ghost"
               >
                 {t("viewArtifactsCount", { count: artifacts.length })}
-              </button>
+              </Button>
               {savedFiles.map((artifact) => (
                 <a
                   key={artifact.id}
@@ -1256,7 +1215,7 @@ export function AssistantMessageCard({
         />
 
         {canSavePlaybook && (
-          <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+          <section className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
             <div className="flex items-start gap-2.5">
               <ClipboardCheck
                 size={16}
@@ -1274,31 +1233,31 @@ export function AssistantMessageCard({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={() => void handleSavePlaybook()}
                 disabled={playbookState !== "idle"}
-                className="border border-primary/40 bg-background px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/5 disabled:cursor-default disabled:opacity-60"
+                variant="outline"
               >
                 {playbookState === "saving"
                   ? t("savingMethod")
                   : playbookState === "saved"
                     ? t("methodSaved")
                     : t("applyNextTime")}
-              </button>
+              </Button>
               {playbookState === "saved" && (
-                <button
+                <Button
                   type="button"
                   onClick={() => void handleCreateStanding()}
                   disabled={standingState !== "idle"}
-                  className="bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-default disabled:opacity-60"
+                  variant="primary"
                 >
                   {standingState === "saving"
                     ? t("startingStanding")
                     : standingState === "saved"
                       ? t("standingActive")
                       : t("standingWatchChanges")}
-                </button>
+                </Button>
               )}
             </div>
             {playbookError && (
@@ -1321,60 +1280,7 @@ export function AssistantMessageCard({
           </section>
         )}
 
-        {nextActions.length ? (
-          <section className="mt-7">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {t("nextSuggestions")}
-            </h3>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {nextActions.map((action) => (
-                <button
-                  key={action.prompt}
-                  onClick={() => onUsePrompt(action.prompt)}
-                  className="group border border-border bg-background px-4 py-3 text-left transition-colors hover:border-primary/50"
-                >
-                  <span className="flex items-center justify-between gap-3 text-sm font-semibold text-foreground group-hover:text-primary">
-                    <span>{action.label}</span>
-                    {action.recommended ? (
-                      <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-primary">
-                        {t("suggestionDoFirst")}
-                      </span>
-                    ) : (
-                      <ArrowRight
-                        size={13}
-                        className="text-muted-foreground group-hover:text-primary"
-                      />
-                    )}
-                  </span>
-                  <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-                    {action.reason}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : report?.follow_ups?.length ? (
-          <section className="mt-7">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {t("suggestionCanAsk")}
-            </h3>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {report.follow_ups.map((question) => (
-                <button
-                  key={question}
-                  onClick={() => onUsePrompt(question)}
-                  className="group inline-flex items-center gap-2 border border-border bg-background px-3 py-2 text-left text-xs leading-5 text-foreground transition-colors hover:border-primary/50 hover:text-primary"
-                >
-                  {question}
-                  <ArrowRight
-                    size={13}
-                    className="text-muted-foreground group-hover:text-primary"
-                  />
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <AnalysisSuggestions actions={nextActions} questions={report?.follow_ups} onUsePrompt={onUsePrompt} />
 
         {canCorrectReport && (
           <section className="mt-7 border-t border-border pt-5">
@@ -1438,16 +1344,16 @@ export function AssistantMessageCard({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {correctionExecutionVerified ? (
-                    <button
+                    <Button
                       type="button"
                       disabled={correctionState === "deleting"}
                       onClick={onOpenUnderstanding || onOpenData}
-                      className="px-2 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:cursor-wait disabled:opacity-60"
+                      variant="ghost"
                     >
                       {t("manageInData")}
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button
                       type="button"
                       disabled={correctionState === "deleting"}
                       onClick={() => {
@@ -1469,24 +1375,24 @@ export function AssistantMessageCard({
                         setCorrectionState("idle");
                         setCorrectionOpen(true);
                       }}
-                      className="px-2 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:cursor-wait disabled:opacity-60"
+                      variant="ghost"
                     >
                       {t("modify")}
-                    </button>
+                    </Button>
                   )}
                   {persistedCorrection && (
-                    <button
+                    <Button
                       type="button"
                       disabled={correctionState === "deleting"}
                       onClick={() => void handleDeleteCorrection()}
-                      className="px-2 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:cursor-wait disabled:opacity-60"
+                      variant="ghost"
                     >
                       {correctionState === "deleting"
                         ? t("revoking")
                         : t("revokeRecord")}
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
                     type="button"
                     disabled={correctionState === "deleting"}
                     onClick={() =>
@@ -1494,10 +1400,10 @@ export function AssistantMessageCard({
                         correctionId: persistedCorrection?.id,
                       })
                     }
-                    className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-wait disabled:opacity-60"
+                    variant="primary"
                   >
                     {t("rerunWithCorrectionAction")}
-                  </button>
+                  </Button>
                 </div>
                 {correctionError && (
                   <p
@@ -1509,22 +1415,22 @@ export function AssistantMessageCard({
                 )}
               </div>
             ) : !correctionOpen ? (
-              <button
+              <Button
                 type="button"
                 onClick={() => setCorrectionOpen(true)}
-                className="inline-flex items-center gap-2 rounded-md px-1 py-1.5 text-sm text-muted-foreground transition-colors hover:text-primary"
+                variant="ghost"
               >
                 <MessageSquareWarning size={16} />
                 {t("correctionPrompt")}
-              </button>
+              </Button>
             ) : (
-              <div className="rounded-lg border border-warning/30 bg-warning/[0.05] px-4 py-4">
+              <div className="rounded-xl border border-warning/30 bg-warning/[0.05] px-4 py-4">
                 {correctionTargets.length > 0 && (
                   <fieldset>
                     <legend className="text-sm font-semibold text-foreground">
                       {t("whichToCorrect")}
                     </legend>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <div className="mt-3 grid gap-2 grid-cols-2">
                       <label
                         className={`cursor-pointer rounded-md border px-3 py-2.5 transition-colors ${
                           correctionTargetRef === null
@@ -1601,7 +1507,7 @@ export function AssistantMessageCard({
                     <legend className="text-sm font-semibold text-foreground">
                       {t("whatWentWrong")}
                     </legend>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="mt-3 grid gap-2 grid-cols-3">
                       {correctionKinds.map((kind) => {
                         const selected = correctionKind === kind.value;
                         return (
@@ -1723,7 +1629,7 @@ export function AssistantMessageCard({
                           {t("fieldsUnavailable")}
                         </p>
                       ) : correctionTargetOptions.length > 0 ? (
-                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        <div className="mt-2 grid gap-2 grid-cols-2">
                           {correctionTargetOptions.map((option) => {
                             const selected =
                               effectiveMetricSelection?.kind ===
@@ -1771,7 +1677,7 @@ export function AssistantMessageCard({
                     </fieldset>
                   )}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
+                  <Button
                     type="button"
                     disabled={
                       !correctionText.trim() ||
@@ -1781,11 +1687,11 @@ export function AssistantMessageCard({
                       metricSelectionRequired
                     }
                     onClick={() => void handleSaveCorrection()}
-                    className="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    variant="primary"
                   >
                     {correctionState === "saving" ? t("savingCorrection") : t("saveCorrection")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={correctionState === "saving"}
                     onClick={() => {
@@ -1805,10 +1711,10 @@ export function AssistantMessageCard({
                       setCorrectionOpen(false);
                       setCorrectionError(null);
                     }}
-                    className="px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+                    variant="ghost"
                   >
                     {t("cancel")}
-                  </button>
+                  </Button>
                 </div>
                 {correctionError && (
                   <p
