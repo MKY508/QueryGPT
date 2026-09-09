@@ -1396,6 +1396,53 @@
       "nameRequired": "Enter a name.",
       "businessDefinitionRequired": "Enter a business definition.",
       "revisionUnavailable": "The current version did not finish loading. Refresh before editing."
+    },
+    "selection": {
+      "title": "Selected definitions",
+      "review": "Review selection",
+      "count": "{count, plural, one {# definition in this selection} other {# definitions in this selection}}",
+      "capacity": "{count} / {limit} selected",
+      "pageLimit": "This page exceeds the remaining selection limit. Choose items individually.",
+      "elsewhere": "{count, plural, one {# item outside this page} other {# items outside this page}}",
+      "elsewhereItem": "Outside this page",
+      "items": "Selected items",
+      "actionTitle": "Choose an action",
+      "remove": "Deselect {name}",
+      "close": "Close selected definitions",
+      "continue": "Keep selecting",
+      "chooseAction": "Choose an action",
+      "working": "Working…",
+      "availability": "An action is available only when every selected definition supports it.",
+      "changedItem": "Select again after review",
+      "changed": "Some definitions changed or have an unconfirmed result. Deselect them, refresh, then select again.",
+      "unconfirmed": "The result is not confirmed. Refresh the list to check, then select any definitions that still need action.",
+      "actions": {
+        "queue_validation": {
+          "label": "Validate",
+          "description": "Check current definitions against actual data without adopting them.",
+          "confirm": "Validate {count, plural, one {# item} other {# items}}"
+        },
+        "attest": {
+          "label": "Review manually",
+          "description": "Confirm the current definitions are usable, keeping their adoption status.",
+          "confirm": "Review {count, plural, one {# item} other {# items}} manually"
+        },
+        "remember": {
+          "label": "Adopt",
+          "description": "Use these definitions to interpret data in future analyses.",
+          "confirm": "Adopt {count, plural, one {# item} other {# items}}"
+        },
+        "ignore": {
+          "label": "Ignore",
+          "description": "Remove from the current list, keeping their history.",
+          "confirm": "Ignore {count, plural, one {# item} other {# items}}"
+        },
+        "restore": {
+          "label": "Reconsider",
+          "description": "Bring back ignored definitions for further review.",
+          "confirm": "Reconsider {count, plural, one {# item} other {# items}}"
+        }
+      }
     }
   },
   "dataWorkspace": {

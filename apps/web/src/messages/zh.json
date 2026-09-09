@@ -1397,6 +1397,53 @@
       "nameRequired": "请填写名称。",
       "businessDefinitionRequired": "请填写业务定义。",
       "revisionUnavailable": "当前版本信息没有加载完成，请刷新后再编辑。"
+    },
+    "selection": {
+      "title": "已选清单",
+      "review": "查看并处理",
+      "count": "本次处理 {count} 条定义",
+      "capacity": "{count} / {limit} 条",
+      "pageLimit": "本页超过剩余可选数量，请逐条选择。",
+      "elsewhere": "{count} 条不在本页",
+      "elsewhereItem": "不在本页",
+      "items": "已选定义",
+      "actionTitle": "选择操作",
+      "remove": "取消选择 {name}",
+      "close": "关闭已选清单",
+      "continue": "继续选择",
+      "chooseAction": "请选择操作",
+      "working": "正在处理…",
+      "availability": "只有所有已选定义都支持的操作才可用。",
+      "changedItem": "需要重新选择",
+      "changed": "部分定义已有变化或操作结果待核对。请取消这些选择，刷新后重新选择。",
+      "unconfirmed": "操作结果尚未确认。请先刷新列表核对，再重新选择需要处理的定义。",
+      "actions": {
+        "queue_validation": {
+          "label": "验证",
+          "description": "用实际数据验证当前定义，不自动采纳。",
+          "confirm": "验证 {count} 条"
+        },
+        "attest": {
+          "label": "人工核对",
+          "description": "确认当前定义可用，保持原有采用状态。",
+          "confirm": "人工核对 {count} 条"
+        },
+        "remember": {
+          "label": "采纳",
+          "description": "后续分析按这些定义理解数据。",
+          "confirm": "采纳 {count} 条"
+        },
+        "ignore": {
+          "label": "忽略",
+          "description": "移出当前列表，保留历史。",
+          "confirm": "忽略 {count} 条"
+        },
+        "restore": {
+          "label": "重新考虑",
+          "description": "恢复已忽略的定义，以便继续核对。",
+          "confirm": "重新考虑 {count} 条"
+        }
+      }
     }
   },
   "dataWorkspace": {
