@@ -556,6 +556,8 @@ class PreflightIssue(BaseModel):
     severity: Literal["info", "warning", "critical"] = "info"
     automatic: bool = True
     count: int | None = None
+    presentation_code: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    presentation_facts: dict[str, str | int] = Field(default_factory=dict, exclude_if=lambda value: not value)
 
 
 class PreflightAmbiguity(BaseModel):

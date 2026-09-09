@@ -6,6 +6,7 @@ import { AnalysisHistoryDialog } from "@/components/chat/AnalysisHistoryDialog";
 import { api } from "@/lib/api/client";
 import messages from "@/messages/zh.json";
 import type { AnalysisHistoryItem, AnalysisHistoryPage } from "@/lib/types/api";
+import { requestParams } from "./request-params";
 
 vi.mock("@/lib/api/client", () => ({ api: { get: vi.fn() } }));
 const clients: QueryClient[] = [];
@@ -40,7 +41,7 @@ describe("server-backed analysis history", () => {
       query: `收入 ${i}`, state: i === 25 ? "waiting_confirmation" : "completed", stage: "completed",
       report: { title: `历史 ${i}`, summary: i === 25 ? "华东 Ｓａｌｅｓ ２０２６" : "门店" },
       created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z" }));
-    vi.mocked(api.get).mockReset().mockImplementation(async (_url, config) => ({ data: { data: fixture(config?.params) } }));
+    vi.mocked(api.get).mockReset().mockImplementation(async (_url, config) => ({ data: { data: fixture(requestParams(config?.params)) } }));
   });
   afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); });
 
@@ -147,7 +148,7 @@ describe("server-backed analysis history", () => {
     fireEvent.change(search, { target: { value: "2026 华东 sales" } });
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "waiting_confirmation" } });
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("1–1 / 1"));
-    const searches = vi.mocked(api.get).mock.calls.map(([, config]) => config?.params.q).filter(Boolean);
+    const searches = vi.mocked(api.get).mock.calls.map(([, config]) => requestParams(config?.params).q).filter(Boolean);
     expect(searches).toEqual(["2026 华东 sales"]);
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "completed" } });
     await screen.findByText("没有匹配的分析");

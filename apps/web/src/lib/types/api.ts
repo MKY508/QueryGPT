@@ -682,7 +682,7 @@ export interface PreflightIssue {
   automatic: boolean;
   count?: number | null;
   presentation_code?: string;
-  presentation_facts?: Record<string, string>;
+  presentation_facts?: Record<string, string | number>;
 }
 
 export interface PreflightAmbiguity {
