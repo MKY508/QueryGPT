@@ -19,6 +19,7 @@
 
 | 模块 | 已归并的桌面结构 | 尚未完成 |
 | --- | --- | --- |
+| 报表属性与明细分页 | 属性栏按页面／内容编排，图表配置、指标格式及联动组件已归并；模块归属与验证见 [REPORT_PROPERTIES.md](REPORT_PROPERTIES.md)。明细分页复用共享按钮 | 工作区整体整合、真实保存与其他报表类型尚未验收 |
 | 共享控件 | Button、SearchField、TabList、TaskDialog、确认弹窗、主题与圆角变量 | 继续替换其他页面的重复控件 |
 | 业务确认卡 | 原生单选、互斥提交状态、桌面 12px 面板与 6px 选项／共享动作；移除手机全宽按钮和编号 | 暂存源码 4 个用例、13 模块限定类型检查及 ESLint 通过。隔离 Chrome 中英文 1180px 检查不预选、选择不提交、等待锁、回执焦点和圆角，无服务请求；首次依赖热更新出现 React 初始化错误，稳定缓存后完整复查通过。[中文](images/zh/desktop-ui-business-confirmation.png)、[英文](images/zh/desktop-ui-business-confirmation-en.png)。store 确认与真实续跑仍待完整归并 |
 | 报告专注写作 | 1120px 原生报告窗口与固定双列对照，共享按钮／Tab 边界；模式及选区状态独立为 useReportWritingMode，保留报告快捷键归属 | 4 个不同定向用例、暂存依赖类型检查及 ESLint 通过；Chrome 中英文验证圆角、反向选区、保存回调与关闭焦点，无服务请求。详见 [报告写作](REPORT_WRITING.md)，完整报告接线及真实保存未验收 |

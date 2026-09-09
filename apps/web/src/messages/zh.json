@@ -1,4 +1,25 @@
 {
+  "metricDisplay": {
+    "format": "数值格式",
+    "raw": "原样",
+    "number": "数字",
+    "currency": "货币",
+    "percent": "百分比（0.1 → 10%）",
+    "currencyCode": "币种",
+    "decimals": "小数位数",
+    "auto": "自动",
+    "grouping": "千分位分隔",
+    "suffix": "单位后缀",
+    "preview": "显示预览",
+    "currencies": {
+      "CNY": "人民币 CNY",
+      "USD": "美元 USD",
+      "EUR": "欧元 EUR",
+      "GBP": "英镑 GBP",
+      "JPY": "日元 JPY",
+      "HKD": "港币 HKD"
+    }
+  },
   "settingsEditor": {
     "close": "关闭配置编辑",
     "newModel": "添加分析服务",
@@ -2160,6 +2181,14 @@
     "deleteError": "报告没有删除成功，请重试。"
   },
   "reportProperty": {
+    "inspectorScope": "设置对象",
+    "pageTab": "页面",
+    "blockTab": "内容",
+    "closeInspector": "关闭属性面板",
+    "metricField": "数值来源",
+    "metricManual": "手动填写",
+    "chartStructure": "图表结构",
+    "chartAppearance": "显示与格式",
     "blockSettings": "区块设置",
     "pageSettings": "页面设置",
     "pageName": "页面名称",

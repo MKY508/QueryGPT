@@ -1,4 +1,25 @@
 {
+  "metricDisplay": {
+    "format": "Number format",
+    "raw": "As entered",
+    "number": "Number",
+    "currency": "Currency",
+    "percent": "Percent (0.1 → 10%)",
+    "currencyCode": "Currency",
+    "decimals": "Decimal places",
+    "auto": "Automatic",
+    "grouping": "Thousands separator",
+    "suffix": "Unit suffix",
+    "preview": "Display preview",
+    "currencies": {
+      "CNY": "Chinese yuan CNY",
+      "USD": "US dollar USD",
+      "EUR": "Euro EUR",
+      "GBP": "British pound GBP",
+      "JPY": "Japanese yen JPY",
+      "HKD": "Hong Kong dollar HKD"
+    }
+  },
   "settingsEditor": {
     "close": "Close configuration editor",
     "newModel": "Add analysis service",
@@ -2160,6 +2181,14 @@
     "deleteError": "The report could not be deleted. Please retry."
   },
   "reportProperty": {
+    "inspectorScope": "Settings scope",
+    "pageTab": "Page",
+    "blockTab": "Content",
+    "closeInspector": "Close properties panel",
+    "metricField": "Value source",
+    "metricManual": "Manual entry",
+    "chartStructure": "Chart structure",
+    "chartAppearance": "Appearance & format",
     "blockSettings": "Block settings",
     "pageSettings": "Page settings",
     "pageName": "Page name",

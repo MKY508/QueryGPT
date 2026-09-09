@@ -1,13 +1,20 @@
 "use client";
 
-import { LayoutPanelTop, Settings2 } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { Expand, LayoutPanelTop, Settings2, X } from "lucide-react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import {
-  type ChartPaletteId,
-  type ChartValueFormat,
-} from "@/lib/charts";
-import type { ReportBlock, ReportBlockType, ReportPage } from "@/lib/reports";
+import type { ReportBlock, ReportBlockType, ReportDocument, ReportPage } from "@/lib/reports";
+import { hasMetricResultField, metricColumnContent, metricResultColumns } from "@/lib/report-metrics";
+import { ReportInteractionSettings } from "./ReportInteractionSettings";
+import { ChartPropertySettings } from "./ChartPropertySettings";
+import { MetricFormatSettings } from "./MetricFormatSettings";
+import { ReportFilterConnections, type FilterConnectionChange } from "./ReportFilterConnections";
+import { isConnectedReportFilter } from "@/lib/report-filter-connections";
+import { reportBlockText } from "@/lib/report-text";
+import { Button } from "@/components/ui/button";
+import { TabList } from "@/components/ui/TabList";
+import fieldStyles from "@/components/ui/FieldControl.module.css";
+import { cn } from "@/lib/utils";
 import {
   blockTypeLabel,
   createReportBlocksCopy,
@@ -21,181 +28,65 @@ interface ReportPropertyPanelProps {
   disabled?: boolean;
   onChangePage: (updates: Partial<ReportPage>) => void;
   onChangeBlock: (updates: Partial<ReportBlock>) => void;
+  report?: ReportDocument;
+  onChangeFilterConnection?: (change: FilterConnectionChange) => void;
+  onClose?: () => void;
+  onEditText?: () => void;
 }
 
-const CHART_VALUE_FORMATS: readonly ChartValueFormat[] = [
-  "auto",
-  "number",
-  "integer",
-  "compact",
-  "currency",
-  "percent",
-];
-
-const CHART_PALETTE_IDS: readonly ChartPaletteId[] = [
-  "receiptbi",
-  "receiptbi-muted",
-  "categorical",
-  "monochrome",
-];
-
-function chartValueFormat(value: unknown): ChartValueFormat {
-  return CHART_VALUE_FORMATS.includes(value as ChartValueFormat)
-    ? (value as ChartValueFormat)
-    : "auto";
-}
-
-function chartPalette(value: unknown): ChartPaletteId {
-  return CHART_PALETTE_IDS.includes(value as ChartPaletteId)
-    ? (value as ChartPaletteId)
-    : "receiptbi";
-}
-
-function configRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function chartSeriesLabels(value: unknown): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(configRecord(value)).flatMap(([key, label]) =>
-      typeof label === "string" && label.trim() ? [[key, label] as const] : []
-    )
-  );
-}
-
-function chartSeriesFormats(value: unknown): Record<string, ChartValueFormat> {
-  return Object.fromEntries(
-    Object.entries(configRecord(value)).flatMap(([key, format]) =>
-      CHART_VALUE_FORMATS.includes(format as ChartValueFormat)
-        ? [[key, format as ChartValueFormat] as const]
-        : []
-    )
-  );
-}
 
 function FieldLabel({ children }: { children: ReactNode }) {
   return <span className="mb-1.5 block text-[11px] font-medium text-muted-foreground">{children}</span>;
 }
 
-function textContent(block: ReportBlock): string {
-  const keys = block.block_type === "metric" ? ["value"] : ["text", "summary", "description"];
-  for (const key of keys) {
-    const value = block.content[key];
-    if (typeof value === "string" || typeof value === "number") return String(value);
-  }
-  return "";
-}
-
-function blockColumns(block: ReportBlock): string[] {
-  for (const key of ["rows", "data", "items", "values"]) {
-    const rows = block.content[key];
-    if (!Array.isArray(rows)) continue;
-    const first = rows.find(
-      (row): row is Record<string, unknown> =>
-        typeof row === "object" && row !== null && !Array.isArray(row)
-    );
-    if (first) return Object.keys(first);
-  }
-  return [];
-}
-
-function numericBlockColumns(block: ReportBlock): string[] {
-  for (const key of ["rows", "data", "items", "values"]) {
-    const rows = block.content[key];
-    if (!Array.isArray(rows)) continue;
-    const records = rows.filter(
-      (row): row is Record<string, unknown> =>
-        typeof row === "object" && row !== null && !Array.isArray(row)
-    );
-    const columns = new Set<string>();
-    for (const row of records) {
-      for (const [column, value] of Object.entries(row)) {
-        if (typeof value === "number" && Number.isFinite(value)) columns.add(column);
-      }
-    }
-    return [...columns];
-  }
-  return [];
-}
 
 export function ReportPropertyPanel({
   page,
-  block,
+  block: selectedBlock,
   disabled = false,
   onChangePage,
   onChangeBlock,
+  report,
+  onChangeFilterConnection,
+  onClose,
+  onEditText,
 }: ReportPropertyPanelProps) {
+  const tabId = useId();
+  const [inspection, setInspection] = useState({ pageId: page.id, blockId: selectedBlock?.id, scope: selectedBlock ? "block" : "page" });
+  if (inspection.pageId !== page.id || inspection.blockId !== selectedBlock?.id) {
+    setInspection({ pageId: page.id, blockId: selectedBlock?.id, scope: selectedBlock ? "block" : "page" });
+  }
+  const block = inspection.scope === "block" ? selectedBlock : null;
   const locale = useLocale();
   const t = useTranslations("reportProperty");
+  const tWriting = useTranslations("reportWriting");
   const tBlocks = useTranslations("reportBlocks");
   const blocksCopy = useMemo(
     () => createReportBlocksCopy((key, values) => tBlocks(key, values)),
     [tBlocks]
   );
   const blockOptions = useMemo(() => reportBlockOptions(blocksCopy), [blocksCopy]);
-  const chartValueFormatOptions = useMemo(
-    () => [
-      { value: "auto" as const, label: t("formatAuto") },
-      { value: "number" as const, label: t("formatNumber") },
-      { value: "integer" as const, label: t("formatInteger") },
-      { value: "compact" as const, label: t("formatCompact") },
-      { value: "currency" as const, label: t("formatCurrency") },
-      { value: "percent" as const, label: t("formatPercent") },
-    ],
-    [t]
-  );
-  const chartPaletteOptions = useMemo(
-    () => [
-      { value: "receiptbi" as const, label: "ReceiptBI" },
-      { value: "receiptbi-muted" as const, label: t("paletteMuted") },
-      { value: "categorical" as const, label: t("paletteCategorical") },
-      { value: "monochrome" as const, label: t("paletteMonochrome") },
-    ],
-    [t]
-  );
-  const columns = block ? blockColumns(block) : [];
-  const numericColumns = block ? numericBlockColumns(block) : [];
-  const chartType =
-    block && typeof block.config.chart_type === "string"
-      ? block.config.chart_type
-      : "bar";
-  const singleSeriesChart = chartType === "pie" || chartType === "scatter";
-  const configuredSeries = block
-    ? Array.isArray(block.config.y_keys)
-      ? block.config.y_keys.filter(
-          (key): key is string => typeof key === "string" && numericColumns.includes(key)
-        )
-      : typeof block.config.y_key === "string" && numericColumns.includes(block.config.y_key)
-        ? [block.config.y_key]
-        : numericColumns.slice(0, 1)
-    : [];
-  const selectedSeries = singleSeriesChart
-    ? configuredSeries.slice(0, 1)
-    : configuredSeries;
-  const seriesLabels = block ? chartSeriesLabels(block.config.series_labels) : {};
-  const seriesFormats = block ? chartSeriesFormats(block.config.series_formats) : {};
-  const chartOrientation =
-    block &&
-    (block.config.orientation === "vertical" || block.config.orientation === "horizontal")
-      ? block.config.orientation
-      : chartType === "horizontal_bar"
-        ? "horizontal"
-        : "vertical";
-  const supportsOrientation = chartType === "bar" || chartType === "horizontal_bar";
-  const supportsStack = supportsOrientation || chartType === "area";
-  const editableDataChart =
-    block?.block_type === "chart" && typeof block.content.image_url !== "string";
   const filterFields = reportFilterFields(page.blocks, locale);
+  const metricFields = block?.block_type === "metric" ? metricResultColumns(block) : [];
+  const metricFromResult = block ? hasMetricResultField(block) : false;
   return (
-    <aside className="flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-border bg-card">
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-5">
+    <aside className="report-inspector flex h-full min-h-0 w-[320px] shrink-0 flex-col border-l border-border bg-card"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.defaultPrevented && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229 && onClose) {
+          event.preventDefault(); event.stopPropagation(); onClose();
+        }
+      }}>
+      <div className="flex h-[60px] shrink-0 items-center gap-2 border-b border-border px-5">
         {block ? <Settings2 size={15} className="text-primary" /> : <LayoutPanelTop size={15} className="text-primary" />}
-        <h2 className="text-xs font-semibold">{block ? t("blockSettings") : t("pageSettings")}</h2>
+        <h2 className="flex-1 text-[13px] font-semibold">{block ? t("blockSettings") : t("pageSettings")}</h2>
+        {onClose && <Button variant="ghost" size="icon" aria-label={t("closeInspector")} onClick={onClose}><X size={15} /></Button>}
       </div>
-
+      <TabList id={tabId} label={t("inspectorScope")} className="shrink-0 px-2"
+        items={selectedBlock ? [{ value: "page", label: t("pageTab") }, { value: "block", label: t("blockTab") }] : [{ value: "page", label: t("pageTab") }]}
+        value={inspection.scope} onChange={scope => setInspection(current => ({ ...current, scope }))} />
       <fieldset
+        id={`${tabId}-panel`} role="tabpanel" aria-labelledby={`${tabId}-${inspection.scope}`}
+        data-report-history
         disabled={disabled}
         className="min-h-0 flex-1 overflow-y-auto border-0 px-5 py-5 disabled:opacity-60"
       >
@@ -207,7 +98,7 @@ export function ReportPropertyPanel({
                 value={page.title}
                 maxLength={160}
                 onChange={(event) => onChangePage({ title: event.target.value })}
-                className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                className={cn(fieldStyles.control)}
               />
             </label>
             <p className="text-xs leading-5 text-muted-foreground">
@@ -221,7 +112,7 @@ export function ReportPropertyPanel({
               <select
                 value={block.block_type}
                 onChange={(event) => onChangeBlock({ block_type: event.target.value as ReportBlockType })}
-                className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                className={cn(fieldStyles.control)}
               >
                 {blockOptions.map((option) => (
                   <option key={option.type} value={option.type}>{option.label}</option>
@@ -237,30 +128,57 @@ export function ReportPropertyPanel({
                 maxLength={200}
                 onChange={(event) => onChangeBlock({ title: event.target.value })}
                 placeholder={blockTypeLabel(block.block_type, blocksCopy)}
-                className="h-9 w-full border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary"
+                className={cn(fieldStyles.control)}
               />
             </label>
 
             {(block.block_type === "text" || block.block_type === "evidence") && (
-              <label className="block">
+              <div>
+                {onEditText && <Button variant="ghost" size="sm" onClick={onEditText} className="mb-2 text-primary"><Expand size={13} />{tWriting("title")}</Button>}
+                <label className="block">
                 <FieldLabel>{block.block_type === "evidence" ? t("evidenceText") : t("bodyText")}</FieldLabel>
                 <textarea
-                  value={textContent(block)}
+                  value={reportBlockText(block)}
                   onChange={(event) => onChangeBlock({ content: { ...block.content, text: event.target.value } })}
                   rows={8}
-                  className="w-full resize-y border border-input bg-background px-3 py-2.5 text-sm leading-6 outline-none focus:border-primary"
+                  className={cn(fieldStyles.control, "resize-y leading-6")}
                 />
-              </label>
+                </label>
+              </div>
             )}
 
             {block.block_type === "metric" && (
               <>
+                {(metricFields.length > 0 || metricFromResult) && (
+                  <label className="block">
+                    <FieldLabel>{t("metricField")}</FieldLabel>
+                    <select
+                      aria-label={t("metricField")}
+                      value={typeof block.config.metric_column === "string" ? block.config.metric_column : ""}
+                      onChange={(event) => {
+                        const column = event.target.value;
+                        onChangeBlock({
+                          config: { ...block.config, metric_column: column },
+                          ...(column ? { content: metricColumnContent(block, column) } : {}),
+                        });
+                      }}
+                      className={cn(fieldStyles.control)}
+                    >
+                      <option value="">{t("metricManual")}</option>
+                      {metricFields.map((column) => <option key={column} value={column}>{column}</option>)}
+                      {metricFromResult && !metricFields.includes(String(block.config.metric_column)) && (
+                        <option value={String(block.config.metric_column)}>{String(block.config.metric_column)}</option>
+                      )}
+                    </select>
+                  </label>
+                )}
                 <label className="block">
                   <FieldLabel>{t("displayValue")}</FieldLabel>
                   <input
-                    value={textContent(block)}
+                    value={reportBlockText(block)}
+                    readOnly={metricFromResult}
                     onChange={(event) => onChangeBlock({ content: { ...block.content, value: event.target.value } })}
-                    className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                    className={cn(fieldStyles.control)}
                   />
                 </label>
                 <label className="block">
@@ -268,281 +186,25 @@ export function ReportPropertyPanel({
                   <input
                     value={typeof block.content.context === "string" ? block.content.context : ""}
                     onChange={(event) => onChangeBlock({ content: { ...block.content, context: event.target.value } })}
-                    className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                    className={cn(fieldStyles.control)}
                   />
                 </label>
+                <MetricFormatSettings block={block} onChange={onChangeBlock} />
               </>
             )}
 
             {block.block_type === "chart" && (
-              <div className="space-y-4">
-                <label className="block">
-                  <FieldLabel>{t("chartStyle")}</FieldLabel>
-                  {typeof block.content.image_url === "string" ? (
-                    <div className="flex h-9 items-center border border-input bg-muted/30 px-3 text-sm text-muted-foreground">
-                      {t("generatedChartImage")}
-                    </div>
-                  ) : (
-                    <select
-                      aria-label={t("chartStyle")}
-                      value={chartType}
-                      onChange={(event) => {
-                        const nextType = event.target.value;
-                        const nextSingleSeries =
-                          nextType === "pie" || nextType === "scatter";
-                        const nextSeries = nextSingleSeries
-                          ? selectedSeries.slice(0, 1)
-                          : selectedSeries;
-                        const nextSupportsStack =
-                          (nextType === "bar" ||
-                            nextType === "horizontal_bar" ||
-                            nextType === "area") &&
-                          nextSeries.length >= 2;
-                        onChangeBlock({
-                          config: {
-                            ...block.config,
-                            chart_type: nextType,
-                            y_key: nextSeries[0] || "",
-                            y_keys: nextSeries,
-                            orientation:
-                              nextType === "horizontal_bar"
-                                ? "horizontal"
-                                : "vertical",
-                            stack: nextSupportsStack
-                              ? block.config.stack === "normal" ||
-                                block.config.stack === "percent"
-                                ? block.config.stack
-                                : "none"
-                              : "none",
-                          },
-                        });
-                      }}
-                      className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary"
-                    >
-                      <option value="bar">{t("chartBar")}</option>
-                      <option value="horizontal_bar">{t("chartHorizontalBar")}</option>
-                      <option value="line">{t("chartLine")}</option>
-                      <option value="area">{t("chartArea")}</option>
-                      <option value="pie">{t("chartPie")}</option>
-                      <option value="scatter">{t("chartScatter")}</option>
-                    </select>
-                  )}
-                </label>
-                {columns.length > 1 && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <label>
-                      <FieldLabel>{t("categoryAxis")}</FieldLabel>
-                      <select
-                        value={typeof block.config.x_key === "string" ? block.config.x_key : columns[0]}
-                        onChange={(event) => onChangeBlock({ config: { ...block.config, x_key: event.target.value } })}
-                        className="h-9 w-full border border-input bg-background px-2 text-xs outline-none focus:border-primary"
-                      >
-                        {columns.map((column) => <option key={column}>{column}</option>)}
-                      </select>
-                    </label>
-                    <fieldset>
-                      <FieldLabel>{t("valueSeries")}</FieldLabel>
-                      <div className="max-h-28 overflow-y-auto border border-input bg-background px-2 py-1.5">
-                        {numericColumns.map((column) => (
-                          <label key={column} className="flex cursor-pointer items-center gap-2 py-1 text-xs">
-                            <input
-                              type={singleSeriesChart ? "radio" : "checkbox"}
-                              name={singleSeriesChart ? `chart-series-${block.id}` : undefined}
-                              checked={selectedSeries.includes(column)}
-                              onChange={(event) => {
-                                const next = singleSeriesChart
-                                  ? event.target.checked
-                                    ? [column]
-                                    : selectedSeries
-                                  : event.target.checked
-                                    ? [...selectedSeries, column]
-                                    : selectedSeries.filter((item) => item !== column);
-                                onChangeBlock({
-                                  config: {
-                                    ...block.config,
-                                    y_key: next[0] || "",
-                                    y_keys: next,
-                                    stack:
-                                      supportsStack && next.length >= 2
-                                        ? block.config.stack || "none"
-                                        : "none",
-                                  },
-                                });
-                              }}
-                              className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
-                            />
-                            <span className="truncate">{column}</span>
-                          </label>
-                        ))}
-                        {!numericColumns.length && (
-                          <span className="block py-1 text-[11px] text-muted-foreground">
-                            {t("noNumericFields")}
-                          </span>
-                        )}
-                      </div>
-                    </fieldset>
-                  </div>
-                )}
-                {editableDataChart && selectedSeries.length > 0 && (
-                  <div className="space-y-2 border-t border-border pt-4">
-                    <FieldLabel>{t("seriesDisplay")}</FieldLabel>
-                    {selectedSeries.map((series) => (
-                      <div key={series} className="grid grid-cols-[minmax(0,1fr)_112px] gap-2">
-                        <label className="min-w-0">
-                          <span className="sr-only">{t("seriesDisplayName", { series })}</span>
-                          <input
-                            aria-label={t("seriesDisplayName", { series })}
-                            value={seriesLabels[series] || ""}
-                            maxLength={80}
-                            placeholder={series}
-                            onChange={(event) => {
-                              const nextLabels = { ...seriesLabels };
-                              const nextLabel = event.target.value;
-                              if (nextLabel.trim()) nextLabels[series] = nextLabel;
-                              else delete nextLabels[series];
-                              const nextConfig = { ...block.config };
-                              if (Object.keys(nextLabels).length) {
-                                nextConfig.series_labels = nextLabels;
-                              } else {
-                                delete nextConfig.series_labels;
-                              }
-                              onChangeBlock({ config: nextConfig });
-                            }}
-                            className="h-9 w-full border border-input bg-background px-2 text-xs outline-none placeholder:text-muted-foreground focus:border-primary"
-                          />
-                        </label>
-                        <label>
-                          <span className="sr-only">{t("seriesValueFormat", { series })}</span>
-                          <select
-                            aria-label={t("seriesValueFormat", { series })}
-                            value={seriesFormats[series] || ""}
-                            onChange={(event) => {
-                              const nextFormats = { ...seriesFormats };
-                              const nextFormat = event.target.value;
-                              if (nextFormat) {
-                                nextFormats[series] = chartValueFormat(nextFormat);
-                              } else {
-                                delete nextFormats[series];
-                              }
-                              const nextConfig = { ...block.config };
-                              if (Object.keys(nextFormats).length) {
-                                nextConfig.series_formats = nextFormats;
-                              } else {
-                                delete nextConfig.series_formats;
-                              }
-                              onChangeBlock({ config: nextConfig });
-                            }}
-                            className="h-9 w-full border border-input bg-background px-2 text-xs outline-none focus:border-primary"
-                          >
-                            <option value="">{t("followDefault")}</option>
-                            {chartValueFormatOptions.map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {editableDataChart && (
-                  <div className="grid grid-cols-2 gap-3 border-t border-border pt-4">
-                    <label>
-                      <FieldLabel>{t("orientation")}</FieldLabel>
-                      <select
-                        aria-label={t("chartOrientation")}
-                        value={supportsOrientation ? chartOrientation : "vertical"}
-                        disabled={!supportsOrientation}
-                        onChange={(event) =>
-                          onChangeBlock({
-                            config: { ...block.config, orientation: event.target.value },
-                          })
-                        }
-                        className="h-9 w-full border border-input bg-background px-2 text-xs outline-none focus:border-primary disabled:bg-muted/35 disabled:text-muted-foreground"
-                      >
-                        <option value="vertical">{t("vertical")}</option>
-                        <option value="horizontal">{t("horizontal")}</option>
-                      </select>
-                    </label>
-                    <label>
-                      <FieldLabel>{t("stacking")}</FieldLabel>
-                      <select
-                        aria-label={t("chartStacking")}
-                        value={
-                          supportsStack &&
-                          selectedSeries.length >= 2 &&
-                          (block.config.stack === "normal" || block.config.stack === "percent")
-                            ? block.config.stack
-                            : "none"
-                        }
-                        disabled={!supportsStack || selectedSeries.length < 2}
-                        onChange={(event) =>
-                          onChangeBlock({
-                            config: { ...block.config, stack: event.target.value },
-                          })
-                        }
-                        className="h-9 w-full border border-input bg-background px-2 text-xs outline-none focus:border-primary disabled:bg-muted/35 disabled:text-muted-foreground"
-                      >
-                        <option value="none">{t("stackNone")}</option>
-                        <option value="normal">{t("stackNormal")}</option>
-                        <option value="percent">{t("stackPercent")}</option>
-                      </select>
-                    </label>
-                    <label>
-                      <FieldLabel>{t("defaultValueFormat")}</FieldLabel>
-                      <select
-                        aria-label={t("chartValueFormat")}
-                        value={chartValueFormat(block.config.number_format)}
-                        onChange={(event) =>
-                          onChangeBlock({
-                            config: { ...block.config, number_format: event.target.value },
-                          })
-                        }
-                        className="h-9 w-full border border-input bg-background px-2 text-xs outline-none focus:border-primary"
-                      >
-                        {chartValueFormatOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <FieldLabel>{t("palette")}</FieldLabel>
-                      <select
-                        aria-label={t("chartPalette")}
-                        value={chartPalette(block.config.palette)}
-                        onChange={(event) =>
-                          onChangeBlock({
-                            config: { ...block.config, palette: event.target.value },
-                          })
-                        }
-                        className="h-9 w-full border border-input bg-background px-2 text-xs outline-none focus:border-primary"
-                      >
-                        {chartPaletteOptions.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="col-span-2 flex cursor-pointer items-center gap-2 border border-input bg-background px-3 py-2 text-xs">
-                      <input
-                        type="checkbox"
-                        aria-label={t("showDataLabels")}
-                        checked={block.config.show_labels === true}
-                        onChange={(event) =>
-                          onChangeBlock({
-                            config: { ...block.config, show_labels: event.target.checked },
-                          })
-                        }
-                        className="h-3.5 w-3.5 accent-[hsl(var(--primary))]"
-                      />
-                      {t("showDataLabels")}
-                    </label>
-                  </div>
-                )}
+              <div key={block.id}>
+                <ChartPropertySettings block={block} onChangeBlock={onChangeBlock} />
+                {typeof block.content.image_url !== "string" && <ReportInteractionSettings page={page} block={block}
+                  collapsible disabled={disabled} onChange={(next) => onChangePage({ blocks: next.blocks })} />}
               </div>
             )}
 
             {block.block_type === "filter" && (
               <div className="space-y-4">
-                <label className="block">
+                {report && onChangeFilterConnection && <ReportFilterConnections report={report} block={block} onChange={onChangeFilterConnection} />}
+                {!isConnectedReportFilter(block) && <label className="block">
                   <FieldLabel>{t("filterField")}</FieldLabel>
                   <select
                     value={typeof block.config.field === "string" ? block.config.field : ""}
@@ -550,14 +212,14 @@ export function ReportPropertyPanel({
                       onChangeBlock({ config: { ...block.config, field: event.target.value } })
                     }
                     disabled={!filterFields.length}
-                    className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary disabled:text-muted-foreground"
+                    className={cn(fieldStyles.control)}
                   >
                     <option value="">
                       {filterFields.length ? t("selectField") : t("noFilterData")}
                     </option>
                     {filterFields.map((field) => <option key={field}>{field}</option>)}
                   </select>
-                </label>
+                </label>}
                 <label className="block">
                   <FieldLabel>{t("matchMode")}</FieldLabel>
                   <select
@@ -565,7 +227,7 @@ export function ReportPropertyPanel({
                     onChange={(event) =>
                       onChangeBlock({ config: { ...block.config, operator: event.target.value } })
                     }
-                    className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                    className={cn(fieldStyles.control)}
                   >
                     <option value="contains">{t("operatorContains")}</option>
                     <option value="equals">{t("operatorEquals")}</option>
@@ -581,12 +243,12 @@ export function ReportPropertyPanel({
                   <input
                     value={typeof block.config.placeholder === "string" ? block.config.placeholder : ""}
                     onChange={(event) => onChangeBlock({ config: { ...block.config, placeholder: event.target.value } })}
-                    className="h-9 w-full border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                    className={cn(fieldStyles.control)}
                   />
                 </label>
-                <p className="text-[11px] leading-5 text-muted-foreground">
+                {!isConnectedReportFilter(block) && <p className="text-[11px] leading-5 text-muted-foreground">
                   {t("filterDescription")}
-                </p>
+                </p>}
               </div>
             )}
 
@@ -596,7 +258,7 @@ export function ReportPropertyPanel({
                 <select
                   value={block.layout.w}
                   onChange={(event) => onChangeBlock({ layout: { ...block.layout, w: Number(event.target.value) } })}
-                  className="h-9 w-full border border-input bg-background px-2 text-xs outline-none focus:border-primary"
+                  className={cn(fieldStyles.control, "text-xs")}
                 >
                   <option value={3}>{t("widthQuarter")}</option>
                   <option value={4}>{t("widthThird")}</option>
@@ -610,7 +272,7 @@ export function ReportPropertyPanel({
                 <select
                   value={block.layout.h}
                   onChange={(event) => onChangeBlock({ layout: { ...block.layout, h: Number(event.target.value) } })}
-                  className="h-9 w-full border border-input bg-background px-2 text-xs outline-none focus:border-primary"
+                  className={cn(fieldStyles.control, "text-xs")}
                 >
                   <option value={2}>{t("heightCompact")}</option>
                   <option value={3}>{t("heightStandard")}</option>
