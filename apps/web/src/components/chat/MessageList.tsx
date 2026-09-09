@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import ReactMarkdown from "react-markdown";
 import type { ChatMessage } from "@/lib/types/chat";
 import type {
-  AnalysisRunSummary,
   Project,
   ProjectDataSource,
   StandingAnalysis,
@@ -27,13 +26,13 @@ interface MessageListProps {
   project?: Project;
   sources: ProjectDataSource[];
   standingAnalyses: StandingAnalysis[];
-  recentRuns: AnalysisRunSummary[];
   suggestedQuestions?: SuggestedQuestion[];
+  suggestionsGenerated?: boolean;
   suggestionsLoading?: boolean;
   settingsLoaded?: boolean;
   selfAnalysisEnabled?: boolean;
   canGenerateSuggestions?: boolean;
-  suggestionsError?: string | null;
+  suggestionsFailed?: boolean;
   emptyComposer: ReactNode;
   activityLoading: boolean;
   checkingStandingId?: string | null;
@@ -87,13 +86,13 @@ export function MessageList({
   project,
   sources,
   standingAnalyses,
-  recentRuns,
   suggestedQuestions = [],
+  suggestionsGenerated = false,
   suggestionsLoading = false,
   settingsLoaded = true,
   selfAnalysisEnabled = true,
   canGenerateSuggestions = false,
-  suggestionsError,
+  suggestionsFailed = false,
   emptyComposer,
   activityLoading,
   checkingStandingId,
@@ -146,13 +145,13 @@ export function MessageList({
         project={project}
         sources={sources}
         standingAnalyses={standingAnalyses}
-        recentRuns={recentRuns}
         suggestedQuestions={suggestedQuestions}
+        suggestionsGenerated={suggestionsGenerated}
         suggestionsLoading={suggestionsLoading}
         settingsLoaded={settingsLoaded}
         selfAnalysisEnabled={selfAnalysisEnabled}
         canGenerateSuggestions={canGenerateSuggestions}
-        suggestionsError={suggestionsError}
+        suggestionsFailed={suggestionsFailed}
         composer={emptyComposer}
         activityLoading={activityLoading}
         checkingStandingId={checkingStandingId}

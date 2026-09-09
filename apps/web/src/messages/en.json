@@ -659,6 +659,12 @@
     "returnLatestAria": "Return to latest"
   },
   "chatEmpty": {
+    "suggestionsTitle": "Questions to start with",
+    "refreshSuggestions": "Regenerate",
+    "suggestionsCount": "{count, plural, one {# suggested question is ready} other {# suggested questions are ready}}",
+    "suggestionsFailed": "Suggestions could not be generated. Try again shortly.",
+    "suggestionsRefreshFailed": "Suggestions could not be updated. You can still use the questions below.",
+    "suggestionsEmpty": "No suggestions fit the current data yet.",
     "title": "What do you want to move forward on?",
     "description": "Based on the current data",
     "subDescription": "Based on current data",

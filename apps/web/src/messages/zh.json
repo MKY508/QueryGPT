@@ -660,6 +660,12 @@
     "returnLatestAria": "回到最新位置"
   },
   "chatEmpty": {
+    "suggestionsTitle": "从这些问题开始",
+    "refreshSuggestions": "重新生成",
+    "suggestionsCount": "已准备 {count} 个建议问题",
+    "suggestionsFailed": "暂时没有生成建议，请稍后重试。",
+    "suggestionsRefreshFailed": "这次没有更新成功，仍可使用下面的建议。",
+    "suggestionsEmpty": "暂时没有适合当前数据的建议。",
     "title": "现在想推进哪件事？",
     "description": "基于当前数据",
     "subDescription": "基于当前数据",
