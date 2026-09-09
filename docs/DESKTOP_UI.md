@@ -22,6 +22,7 @@
 | 共享控件 | Button、SearchField、TabList、TaskDialog、确认弹窗、主题与圆角变量 | 继续替换其他页面的重复控件 |
 | 项目切换 | 760px 桌面窗口、共享搜索与按钮；目录搜索、分批浏览、新建与重命名、请求结果确认统一归并 | 全站入口及真实项目服务联调 |
 | 工作台与设置 | 导航和配置编辑面板；工作区已有 248px 目录与 420px 编辑区 | 完整页面依赖、草稿会话及离开链路 |
+| 外观偏好 | AppearancePreferences 接回原偏好入口；语言即时切换和失败重试独立维护。主题固定双栏、原生单选、12px 预览卡，配色直接引用应用变量；保存与重试复用 Button | 设置工作区完整导航、持久草稿及原生离开链路仍待整体归并 |
 | 关于 | 统一标题栏、产品与版本双栏、三列项目链接 | 工作区里的版本检查行为 |
 | 项目理解 | 320px 详情区；工作区已改为 200px 目录与单一表格 | 页面历史、选择及保存恢复的整体归并 |
 | 数据来源 | 280px 目录、来源版本解析、字段与样例预览 | 上传、文件准备、来源替换及工作区完整行为 |
@@ -57,6 +58,8 @@
 
 ## 验证证据
 
+外观偏好：暂存入口 3 个用例验证语言完成后刷新、失败重试及主题选择不写运行设置；限定类型检查与 ESLint 通过。工作区额外验证跨栏目保留草稿。Chrome 在 1180px 下查看中英文、浅色和深色，双栏卡片 12px、无横向溢出或页面错误，未写服务数据。[中文浅色](images/zh/desktop-ui-appearance.png)、[英文深色](images/zh/desktop-ui-appearance-en-dark.png)。没有运行全量构建。
+
 检查使用现有已安装依赖。定向测试与隔离 Chrome 预览不是全量构建、全新安装或真实文件处理的交付证明；预览使用虚构数据，不调用模型、不写真实配置或应用整理。
 
 | 范围 | 已检查内容 | 视觉证据 |
@@ -90,6 +93,8 @@
 4. 原生最小宽度已做隔离验证；继续核对窗口恢复的整体归并、全站导航和真实安装包，不能用构造参数检查代替产品运行验收。
 
 ## 参考
+
+- [PatternFly selectable Card](https://www.patternfly.org/components/card/design-guidelines/)：主题以可选择预览卡呈现；使用现有组件与原生单选，不引入已废弃的 Tile 或新依赖。
 
 - [Twenty NavigationDrawer 源码](https://github.com/twentyhq/twenty/blob/main/packages/twenty-front/src/modules/ui/navigation/navigation-drawer/components/NavigationDrawer.tsx)：导航、内容和主题变量的职责划分。只采用桌面分工，没有复制源码或新增其依赖。
 - [PatternFly inline Drawer](https://www.patternfly.org/components/drawer/)：主从内容并排，不采用手机断点或覆盖式切换。

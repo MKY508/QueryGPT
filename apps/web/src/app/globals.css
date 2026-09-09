@@ -12,7 +12,8 @@
 
   /* Dawn: warm paper and forest ink. */
   :root,
-  html.theme-dawn {
+  html.theme-dawn,
+  .appearance-theme-preview[data-theme="dawn"] {
     --background: 45 18% 95%;
     --foreground: 160 12% 15%;
     --card: 45 25% 99%;
@@ -37,7 +38,8 @@
   }
 
   /* 深夜 - 深色主题 */
-  html.theme-midnight {
+  html.theme-midnight,
+  .appearance-theme-preview[data-theme="midnight"] {
     --background: 160 10% 9%;
     --foreground: 220 25% 94%;
     --card: 160 9% 12%;

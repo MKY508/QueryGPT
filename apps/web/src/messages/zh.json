@@ -476,7 +476,8 @@
       "keepDiagnosticsDescription": "保存调查失败与核对记录。",
       "environmentDetails": "环境详情",
       "environmentDescription": "安装档位与可用工具。"
-    }
+    },
+    "languageChangeFailed": "语言切换失败，请重试"
   },
   "about": {
     "back": "返回",

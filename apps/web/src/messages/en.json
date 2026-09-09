@@ -475,7 +475,8 @@
       "keepDiagnosticsDescription": "Save investigation failures and check records.",
       "environmentDetails": "Environment details",
       "environmentDescription": "Install profile and available tools."
-    }
+    },
+    "languageChangeFailed": "Language could not be changed. Please retry."
   },
   "about": {
     "back": "Back",

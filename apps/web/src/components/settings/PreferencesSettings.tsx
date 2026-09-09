@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Loader2, Save } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Loader2, Save } from "lucide-react";
 import { api } from "@/lib/api/client";
 import type { AppSettings, SystemCapabilities } from "@/lib/types/api";
-import { useThemeStore, THEMES, ThemeId } from "@/lib/stores/theme";
 import { cn } from "@/lib/utils";
-import { useLocale, useTranslations } from "next-intl";
-import { setLocale } from "@/lib/actions/locale";
+import { useTranslations } from "next-intl";
+import { AppearancePreferences } from "./AppearancePreferences";
+import { Button } from "@/components/ui/button";
 
 export type PreferencesSection = "appearance" | "execution" | "diagnostics";
 
@@ -85,22 +84,9 @@ export function PreferencesSettings({ section = "appearance" }: PreferencesSetti
   const [formData, setFormData] = useState<AppSettings>(defaultSettings);
   const [baselineSettings, setBaselineSettings] = useState<AppSettings | null>(null);
   const queryClient = useQueryClient();
-  const { theme: currentTheme, setTheme } = useThemeStore();
   const t = useTranslations("preferences");
-  const tTheme = useTranslations("theme");
   const tCommon = useTranslations("common");
-  const locale = useLocale();
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const needsPersistedSettings = section !== "appearance";
-
-  const handleLocaleChange = (newLocale: string) => {
-    if (newLocale === locale) return;
-    startTransition(async () => {
-      await setLocale(newLocale);
-      router.refresh();
-    });
-  };
 
   const settingsQuery = useQuery({
     queryKey: ["app-settings"],
@@ -184,18 +170,13 @@ export function PreferencesSettings({ section = "appearance" }: PreferencesSetti
     return (
       <div
         role="alert"
-        className="flex flex-col items-start gap-3 border-y border-border bg-card px-4 py-5"
+        className="flex flex-col items-start gap-3 rounded-xl border border-border bg-card px-4 py-5"
       >
         <p className="text-sm text-foreground">{t("loadFailed")}</p>
-        <button
-          type="button"
-          onClick={retryLoad}
-          disabled={retryPending}
-          className="flex min-h-11 items-center gap-2 border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button type="button" variant="outline" onClick={retryLoad} disabled={retryPending}>
           {retryPending && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
           {tCommon("retry")}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -217,70 +198,7 @@ export function PreferencesSettings({ section = "appearance" }: PreferencesSetti
   return (
     <div>
       <form onSubmit={handleSubmit} className="space-y-9">
-        {section === "appearance" && (
-          <>
-            <section>
-              <label className="mb-3 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {t("language")}
-              </label>
-              <div className="flex border-l border-t border-border sm:w-fit">
-                {[
-                  { id: "zh", label: t("languageChinese") },
-                  { id: "en", label: t("languageEnglish") },
-                ].map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => handleLocaleChange(option.id)}
-                    disabled={isPending}
-                    className={cn(
-                      "flex min-w-28 items-center justify-center gap-2 border-b border-r border-border px-4 py-2.5 text-sm transition-colors",
-                      locale === option.id
-                        ? "bg-primary/10 font-medium text-primary"
-                        : "bg-card text-muted-foreground hover:bg-muted",
-                      isPending && "opacity-50"
-                    )}
-                  >
-                    {locale === option.id && <Check size={14} />}
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <label className="mb-3 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {t("uiTheme")}
-              </label>
-              <div className="grid border-l border-t border-border sm:grid-cols-2 lg:grid-cols-4">
-                {Object.entries(THEMES).map(([id]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setTheme(id as ThemeId)}
-                    className={cn(
-                      "relative min-h-24 border-b border-r border-border px-4 py-4 text-left transition-colors",
-                      currentTheme === id
-                        ? "bg-primary/10 shadow-[inset_3px_0_0_hsl(var(--primary))]"
-                        : "bg-card hover:bg-muted"
-                    )}
-                  >
-                    {currentTheme === id && (
-                      <Check size={15} className="absolute right-3 top-3 text-primary" />
-                    )}
-                    <div className="pr-5 text-sm font-medium text-foreground">
-                      {tTheme(`${id}.name`)}
-                    </div>
-                    <div className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {tTheme(`${id}.description`)}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-
+        {section === "appearance" && <AppearancePreferences />}
         {section === "execution" && (
           <>
             <section>
@@ -342,7 +260,7 @@ export function PreferencesSettings({ section = "appearance" }: PreferencesSetti
                   {t("diagnostics.environmentDescription")}
                 </span>
               </summary>
-              <div className="mt-4 grid border-l border-t border-border md:grid-cols-2">
+              <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-border">
                 <div className="border-b border-r border-border bg-card px-4 py-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.11em] text-muted-foreground">
                     {t("execution.environment")}
@@ -371,18 +289,14 @@ export function PreferencesSettings({ section = "appearance" }: PreferencesSetti
 
         {needsPersistedSettings && (
           <div className="border-t border-border pt-5">
-            <button
-              type="submit"
-              disabled={!hasChanges || updateMutation.isPending}
-              className="flex items-center gap-2 bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
-            >
+            <Button type="submit" disabled={!hasChanges || updateMutation.isPending}>
               {updateMutation.isPending ? (
                 <Loader2 size={16} className="animate-spin" />
               ) : (
                 <Save size={16} />
               )}
               {t("saveSettings")}
-            </button>
+            </Button>
             {updateMutation.isSuccess && (
               <p role="status" className="mt-2 text-sm text-success">
                 {t("saved")}
