@@ -555,6 +555,7 @@ export interface SemanticValidationJob {
 }
 
 export interface SemanticRevisionSnapshot {
+  scope_id?: string | null;
   key: string;
   value: string;
   entry_type: SemanticEntry["entry_type"];
