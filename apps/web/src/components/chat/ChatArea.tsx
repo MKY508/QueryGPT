@@ -19,7 +19,8 @@ import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
 import { ChatHeader } from "./ChatHeader";
 import { DataWorkspacePanel } from "./DataWorkspacePanel";
-import { useChatAreaState } from "./useChatAreaState";
+import { useComposerDraft } from "./useComposerDraft";
+import { useAnalysisModelSelection } from "./useAnalysisModelSelection";
 import { useAnalysisSettlementRefresh } from "./useAnalysisSettlementRefresh";
 import { useStandingAnalyses } from "./useStandingAnalyses";
 import { usePendingTask } from "./usePendingTask";
@@ -151,16 +152,15 @@ export function ChatArea({
     (modelSelectionLocked ? lastModelId : null);
   const {
     selectedModelId,
-    input,
     modelReady,
-    setInput,
     selectModel,
     modelSelectionSaving,
     modelSelectionError,
-  } = useChatAreaState(models, appSettings, {
+  } = useAnalysisModelSelection(models, appSettings, {
     selectionLocked: selectorLocked,
     lockedModelId,
   });
+  const { input, setInput, onAccepted, unretained, unreadable, retryRetention } = useComposerDraft(currentProjectId, currentConversationId);
   const executionModelId = selectorLocked
     ? lockedModelId || selectedModelId
     : selectedModelId;
@@ -312,6 +312,12 @@ export function ChatArea({
       onUploadFile={(file) => void uploadFile(file)}
       input={input}
       onInputChange={setInput}
+      contextKey={JSON.stringify([currentProjectId, currentConversationId])}
+      onAccepted={onAccepted}
+      disabled={!currentProjectId || isConversationLoading}
+      draftUnretained={unretained}
+      draftUnreadable={unreadable}
+      onRetryDraftRetention={retryRetention}
       analysisServices={models || []}
       selectedAnalysisServiceId={executionModelId}
       onSelectAnalysisService={handleSelectAnalysisService}
@@ -387,13 +393,12 @@ export function ChatArea({
           project={currentProject}
           sources={sources}
           standingAnalyses={standingAnalyses}
-          recentRuns={recentRuns}
           suggestedQuestions={suggestedQuestions?.items || []}
           suggestionsLoading={Boolean(readySources.length && suggestionsLoading)}
           settingsLoaded={!appSettingsLoading}
           selfAnalysisEnabled={selfAnalysisEnabled}
           canGenerateSuggestions={Boolean(currentProjectId && readySources.length)}
-          suggestionsError={suggestionsError ? getErrorMessage(suggestionsError) : null}
+          suggestionsFailed={Boolean(suggestionsError)}
           emptyComposer={taskComposer}
           activityLoading={standingLoading || recentRunsLoading}
           checkingStandingId={checkingStandingId}
@@ -439,6 +444,12 @@ export function ChatArea({
             onUploadFile={(file) => void uploadFile(file)}
             input={input}
             onInputChange={setInput}
+            contextKey={JSON.stringify([currentProjectId, currentConversationId])}
+            onAccepted={onAccepted}
+            disabled={!currentProjectId || isConversationLoading}
+            draftUnretained={unretained}
+            draftUnreadable={unreadable}
+            onRetryDraftRetention={retryRetention}
             analysisServices={models || []}
             selectedAnalysisServiceId={executionModelId}
             onSelectAnalysisService={handleSelectAnalysisService}

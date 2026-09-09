@@ -75,6 +75,7 @@
 
 该模块 10 个定向与双语用例、限定 ESLint 和前端类型检查通过。Chrome 1180×700 中英文验证明确检查、等待禁用、无变化反馈与按钮恢复，无页面错误或横向溢出。准备响应被拦截模拟，没有真实续跑或模型调用。
 
+- `useAnalysisModelSelection` 只拥有服务选择；输入文字由 `useComposerDraft` 按项目／会话保存，两个 InputBar 入口都交回同一草稿版本确认。服务选择从当前调查锁定身份、有效服务目录与默认设置派生；锁定服务消失时不沿用其他调查的选择。新默认仅在当前选择器乐观显示，不提前改写共享设置；保存只提交 `default_model_id`，核对返回值后只合并该字段，失败不回滚其他偏好。同步锁阻止同一选择器连续提交，禁用自动重试与重连队列。实现参考 [React 派生选择](https://react.dev/learn/you-might-not-need-an-effect)与 [TanStack 界面侧乐观更新](https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates)；这不是跨窗口的服务端并发控制。 模型选择与调用方的暂存源码检查覆盖 83 个项目模块，类型检查通过；整个桌面工作台仍未完成归并。
 - 建议接口最多提供三项，AnalysisSuggestions 使用固定桌面三列。生成／刷新由明确操作触发；刷新失败保留旧建议，成功空结果区别于失败。打开、重连或上下文改变不自动调用生成。
 - useSuggestedQuestions 同步去重并取消过期前端请求。项目、模型、语言、来源版本／状态和已接受的项目理解刷新使旧建议失效；仅来源顺序变化不失效。前端取消不证明后端模型停止或不计费，刷新不保证建议不同。
 - 建议请求复用 TanStack Mutation，明确 `retry: false` 与 `networkMode: "always"`；一次点击立即尝试，不保留断网重连后自动执行的请求。网络模式含义见 [TanStack 官方文档](https://tanstack.com/query/latest/docs/framework/react/guides/network-mode)。
