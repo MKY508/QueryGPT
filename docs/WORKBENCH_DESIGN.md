@@ -24,6 +24,7 @@
 | useResultReadingPosition / useWorkbenchPaneFocus | 会话内阅读位置与显式动作的焦点交接 |
 | WorkbenchCommands | 复用 cmdk 的操作筛选与选择，不拥有业务执行 |
 | ChatArea | 接入既有项目、提交、草稿、运行控制与数据工作区 |
+| useAnalysisSettlementRefresh / analysis-settlement-refresh | 消费运行终态，按项目刷新相关缓存并确认收尾；同一查询客户端共享在途任务，服务选择器不参与运行结束刷新 |
 | pending-task / usePendingTask | 当前标签页待办的校验、订阅与项目筛选；按暂存快照清除，页面不维护第二份待办副本 |
 | useStandingAnalyses / standing-attention | 按项目读取关注项、明确检查与续跑、互斥检查状态和业务原因翻译；页面不持有该流程的请求 |
 | MessageList / MessageListStatus / useInvestigationTimeline | 时间线结果编排、待办及会话加载反馈、测量与阅读跟随分别维护；新进展从最新消息与阅读位置派生，不另用 effect 同步标记 |
@@ -67,6 +68,8 @@
 输入交互参考 [Zulip 草稿](https://zulip.com/help/view-and-edit-your-message-drafts)与[展开输入](https://zulip.com/help/resize-the-compose-box)；没有引入独立编辑器或网络草稿服务。
 
 ## 建议、操作与运行
+
+运行结束刷新采用 [TanStack 查询前缀失效](https://github.com/TanStack/query/blob/main/docs/framework/react/guides/query-invalidation.md)。模型目录属于全局；纠正、纠正目标、调查历史、关注项和结果内容均按终态项目隔离。刷新项目详情前再核对当前项目，同一终态的在途工作跨 Strict Mode／页面重挂载复用。所有读取均完成或失败后才确认这次收尾；确认不代表所有资源读取成功，也不改变运行结果。四个刷新用例及十个服务选择用例、限定 ESLint 和类型检查通过；没有真实模型调用或新的视觉验收。
 
 关注项检查由 `useStandingAnalyses` 统一维护，复用 [TanStack Mutation](https://tanstack.com/query/latest/docs/framework/react/guides/mutations) 的状态和完成回调，禁用自动重试与重连排队。目录 GET 接受取消信号；明确点击才调用 prepare-run。同步锁阻止重复检查，每次等待后重新核对项目会话及当前调查，离开再返回同项目也不续跑旧请求；已有新活动流时不覆盖它。正在检查从 mutation 状态派生，不永久写入反馈。准备请求可能已在后端生效，前端忽略迟到结果不代表撤销。
 

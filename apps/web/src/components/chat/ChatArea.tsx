@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -20,6 +20,7 @@ import { InputBar } from "./InputBar";
 import { ChatHeader } from "./ChatHeader";
 import { DataWorkspacePanel } from "./DataWorkspacePanel";
 import { useChatAreaState } from "./useChatAreaState";
+import { useAnalysisSettlementRefresh } from "./useAnalysisSettlementRefresh";
 import { useStandingAnalyses } from "./useStandingAnalyses";
 import { usePendingTask } from "./usePendingTask";
 import { PendingTaskSaveNotice } from "./PendingTaskSaveNotice";
@@ -59,7 +60,6 @@ export function ChatArea({
   const [pane, changeWorkbenchView] = useReducer(selectWorkbenchPane, INITIAL_WORKBENCH_PANE);
   const dataPanelOpen = pane.view !== "result";
   const dataPanelView = pane.view === "result" ? pane.lastDataView : pane.view;
-  const processingSettlementsRef = useRef(new Set<string>());
   const [analysisServiceSelectorOpen, setAnalysisServiceSelectorOpen] = useState(false);
   const [pendingServiceChangeMessageIndex, setPendingServiceChangeMessageIndex] =
     useState<number | null>(null);
@@ -111,50 +111,7 @@ export function ChatArea({
   );
   const pendingUnderstandingCount = pendingKnowledgeCount;
 
-  useEffect(() => {
-    const settlement = pendingAnalysisSettlements.find(
-      (item) => !processingSettlementsRef.current.has(item.id)
-    );
-    if (!settlement) return;
-
-    processingSettlementsRef.current.add(settlement.id);
-    const refreshSettledAnalysis = async () => {
-      if (!settlement.projectId) return;
-      const refreshes: Promise<unknown>[] = [
-        queryClient.invalidateQueries({
-          queryKey: ["analysis-corrections", settlement.projectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["analysis-correction-targets", settlement.projectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["analysis-correction-target-options", settlement.projectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["analysis-runs", settlement.projectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["standing-analyses", settlement.projectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["suggested-questions", settlement.projectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["artifacts", settlement.projectId],
-        }),
-        queryClient.invalidateQueries({ queryKey: ["models"] }),
-      ];
-      if (useProjectStore.getState().currentProjectId === settlement.projectId) {
-        refreshes.unshift(useProjectStore.getState().refreshCurrent());
-      }
-      await Promise.allSettled(refreshes);
-    };
-
-    void refreshSettledAnalysis().finally(() => {
-      processingSettlementsRef.current.delete(settlement.id);
-      useChatStore.getState().acknowledgeAnalysisSettlement(settlement.id);
-    });
-  }, [pendingAnalysisSettlements, queryClient]);
+  useAnalysisSettlementRefresh(pendingAnalysisSettlements);
 
   const { data: connections } = useQuery({
     queryKey: ["connections"],
@@ -200,7 +157,7 @@ export function ChatArea({
     selectModel,
     modelSelectionSaving,
     modelSelectionError,
-  } = useChatAreaState(models, appSettings, isLoading, {
+  } = useChatAreaState(models, appSettings, {
     selectionLocked: selectorLocked,
     lockedModelId,
   });

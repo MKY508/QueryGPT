@@ -15,7 +15,6 @@ export interface ChatAreaModelSelectionOptions {
 export function useChatAreaState(
   models: ModelSummary[] | undefined,
   appSettings: AppSettings | undefined,
-  isLoading: boolean,
   options: ChatAreaModelSelectionOptions = {}
 ) {
   const t = useTranslations("chatArea");
@@ -23,19 +22,7 @@ export function useChatAreaState(
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [modelSelectionError, setModelSelectionError] = useState<string | null>(null);
   const [input, setInput] = useState("");
-  const prevIsLoadingRef = useRef(false);
   const pendingDefaultModelRef = useRef<string | null>(null);
-
-  // Refresh investigation indexes when loading completes.
-  useEffect(() => {
-    if (prevIsLoadingRef.current && !isLoading) {
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["analysis-runs"] });
-      queryClient.invalidateQueries({ queryKey: ["standing-analyses"] });
-      queryClient.invalidateQueries({ queryKey: ["artifacts"] });
-    }
-    prevIsLoadingRef.current = isLoading;
-  }, [isLoading, queryClient]);
 
   const updateDefaultModel = useMutation<
     AppSettings,

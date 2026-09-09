@@ -67,7 +67,7 @@ describe("useChatAreaState model selection", () => {
   it("uses the backend default and ignores the retired browser-sticky choice", async () => {
     localStorage.setItem("receiptbi-selected-model", "service-a");
     const { result } = renderHook(
-      () => useChatAreaState(models, settings, false),
+      () => useChatAreaState(models, settings),
       { wrapper: createWrapper() }
     );
 
@@ -80,7 +80,7 @@ describe("useChatAreaState model selection", () => {
     const noDefaultModels = models.map((model) => ({ ...model, is_default: false }));
     const noDefaultSettings = { ...settings, default_model_id: null };
     const { result } = renderHook(
-      () => useChatAreaState(noDefaultModels, noDefaultSettings, false),
+      () => useChatAreaState(noDefaultModels, noDefaultSettings),
       { wrapper: createWrapper() }
     );
 
@@ -94,7 +94,7 @@ describe("useChatAreaState model selection", () => {
       data: { data: { ...settings, default_model_id: "service-a" } },
     });
     const { result } = renderHook(
-      () => useChatAreaState(models, settings, false),
+      () => useChatAreaState(models, settings),
       { wrapper: createWrapper() }
     );
     await waitFor(() => expect(result.current.selectedModelId).toBe("service-b"));
@@ -111,7 +111,7 @@ describe("useChatAreaState model selection", () => {
   it("keeps an existing investigation on its recorded service", async () => {
     const { result } = renderHook(
       () =>
-        useChatAreaState(models, settings, false, {
+        useChatAreaState(models, settings, {
           selectionLocked: true,
           lockedModelId: "service-a",
         }),
