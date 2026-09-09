@@ -17,13 +17,14 @@ export interface ModelSettingsResourceMessages {
   deleteModelFailed: string;
 }
 
-export function useModelSettingsResource(messages: ModelSettingsResourceMessages) {
+export function useModelSettingsResource(messages: ModelSettingsResourceMessages, active = true) {
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const guardWrite = useSettingsWriteGuard();
   const { checks, checkModel, invalidateCheck } = useModelServiceChecks();
 
   const modelsQuery = useQuery({
+    enabled: active,
     queryKey: ["models"],
     queryFn: async ({ signal }) => {
       const response = await api.get("/api/v1/config/models", { signal });

@@ -1,25 +1,35 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { useMemo } from "react";
+import { Plus, RefreshCw } from "lucide-react";
 import { ModelSettingsForm } from "@/components/settings/model-settings/ModelSettingsForm";
 import { ModelSettingsList } from "@/components/settings/model-settings/ModelSettingsList";
 import { useModelSettingsResource } from "@/components/settings/hooks/useModelSettingsResource";
+import { useSettingsFormSession } from "@/components/settings/hooks/useSettingsFormSession";
 import {
   MODEL_PRESETS,
   buildModelFormData,
   initialModelFormData,
   selectModelPreset,
-  type ModelFormData,
 } from "@/lib/settings/models";
 import type { ConfiguredModel } from "@/lib/types/api";
 import { useTranslations } from "next-intl";
+import styles from "./SettingsWorkspace.module.css";
+import { Button } from "@/components/ui/button";
+import { SettingsNotice } from "./SettingsNotice";
+import { SettingsEditor } from "@/components/settings/SettingsEditor";
 
-export function ModelSettings() {
+export function ModelSettings({ active = true }: { active?: boolean }) {
   const t = useTranslations("modelSettings");
+  const tc = useTranslations("common");
+  const te = useTranslations("settingsEditor");
   const {
     models,
     isLoading,
+    loadFailed,
+    hasLoaded,
+    refreshing,
+    refresh,
     error,
     checks,
     isSubmitting,
@@ -33,45 +43,33 @@ export function ModelSettings() {
     addModelFailed: t("addModelFailed"),
     updateModelFailed: t("updateModelFailed"),
     deleteModelFailed: t("deleteModelFailed"),
+  }, active);
+  const { showForm, editingId, formData, setFormData, writeBusy, formRef, addRef, create, edit,
+    close: resetForm, submit, unavailable, dismissUnavailable, confirmation, confirming } = useSettingsFormSession({ initial: initialModelFormData, kind: "models", active,
+    busy: isSubmitting || deletePending,
+    resolveEdit: id => { const model = models.find(model => model.id === id); return model ? buildModelFormData(model) : null; },
+    onTransition: clearError,
   });
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<ModelFormData>(initialModelFormData);
   const activePreset = useMemo(
     () => MODEL_PRESETS[formData.provider] || MODEL_PRESETS.custom,
     [formData.provider]
   );
-
-  const resetForm = () => {
-    setShowForm(false);
-    setEditingId(null);
-    setFormData(initialModelFormData);
-    clearError();
-  };
+  const displayError = unavailable ?? error;
 
   const applyPreset = (presetKey: string) => {
-    setShowForm(true);
-    setFormData(current => selectModelPreset(current, presetKey));
+    setFormData((current) => selectModelPreset(current, presetKey));
   };
 
   const handleEdit = (model: ConfiguredModel) => {
-    setEditingId(model.id);
-    setFormData(buildModelFormData(model));
-    setShowForm(true);
-    clearError();
+    edit(model.id);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (writeBusy) return;
 
     try {
-      if (editingId) {
-        await updateModel(editingId, formData);
-        resetForm();
-        return;
-      }
-      await addModel(formData);
-      resetForm();
+      await submit((value, id) => id ? updateModel(id, value) : addModel(value));
     } catch {
       // Error state is already handled by the resource hook.
     }
@@ -81,64 +79,60 @@ export function ModelSettings() {
     deleteModel(id);
   };
 
+  const notice = displayError && <SettingsNotice dismissLabel={t("dismissError")} onDismiss={() => {
+    dismissUnavailable(); clearError();
+  }}>{displayError}</SettingsNotice>;
+
   return (
-    <div className="space-y-7">
-      <div className="flex items-center justify-end">
-        <button
-          onClick={() => {
-            if (showForm) {
-              resetForm();
-              return;
-            }
-            setShowForm(true);
-          }}
+    <div className={showForm ? styles.split : undefined}>
+      <div className="min-w-0 space-y-7">
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="ghost" size="icon" onClick={() => void refresh()} disabled={refreshing || writeBusy}
+          aria-label={tc("refresh")} title={tc("refresh")}>
+          <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+        </Button>
+        <Button ref={addRef}
+          disabled={writeBusy}
+          onClick={create}
           data-testid="model-add-button"
-          className="flex items-center gap-2 bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <Plus size={16} />
           {t("addService")}
-        </button>
+        </Button>
       </div>
 
-      {error && (
-        <div className="flex items-center justify-between border-l-2 border-destructive bg-destructive/10 px-4 py-3">
-          <span className="text-sm text-destructive">{error}</span>
-          <button
-            onClick={() => {
-              clearError();
-            }}
-            className="text-destructive/60 hover:text-destructive"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
+      {loadFailed && <SettingsNotice>{t(hasLoaded ? "refreshError" : "loadError")}</SettingsNotice>}
 
-      {showForm && (
-        <ModelSettingsForm
+      {!showForm && notice}
+
+      {(!loadFailed || hasLoaded) && <ModelSettingsList
+        models={models}
+        editingId={editingId}
+        isLoading={isLoading}
+        checks={checks}
+        deletePending={deletePending}
+        actionsDisabled={writeBusy}
+        onTest={testModel}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />}
+      </div>
+      {showForm && <SettingsEditor active={active} confirming={confirming} title={te(editingId ? "editModel" : "newModel")}
+        disabled={writeBusy} onClose={resetForm} notice={notice}>
+        <ModelSettingsForm embedded
+          formRef={formRef}
           editingId={editingId}
-          preserveSavedKey={Boolean(editingId && models.find(model => model.id === editingId)?.provider === formData.provider)}
+          preserveSavedKey={Boolean(editingId && models.some(model => model.id === editingId && model.provider === formData.provider))}
           formData={formData}
           activePreset={activePreset}
-          isSubmitting={isSubmitting}
+          isSubmitting={writeBusy}
           onChange={setFormData}
           onPresetSelect={applyPreset}
           onReset={resetForm}
           onSubmit={handleSubmit}
         />
-      )}
-
-      <ModelSettingsList
-        models={models}
-        isLoading={isLoading}
-        checks={checks}
-        editingId={editingId}
-        actionsDisabled={isSubmitting || deletePending}
-        deletePending={deletePending}
-        onTest={testModel}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      </SettingsEditor>}
+      {confirmation}
     </div>
   );
 }

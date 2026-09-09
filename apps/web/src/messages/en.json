@@ -1,4 +1,30 @@
 {
+  "settingsEditor": {
+    "close": "Close configuration editor",
+    "newModel": "Add analysis service",
+    "editModel": "Edit analysis service",
+    "newConnection": "Add data connection",
+    "editConnection": "Edit data connection"
+  },
+  "settingsUnsaved": {
+    "title": "Discard unsaved changes?",
+    "models": "Changes to this analysis service have not been saved.",
+    "connections": "Changes to this data connection have not been saved.",
+    "continueEditing": "Continue editing",
+    "discardClose": "Discard and close",
+    "discardReplace": "Discard and switch",
+    "unavailable": "This configuration is no longer in the list. Choose another one."
+  },
+  "settingsExit": {
+    "title": "Leave settings?",
+    "description": "You have unsaved configuration changes. Going to {destination} will discard them.",
+    "busyTitle": "Saving configuration",
+    "busyDescription": "Stay in settings until the save has finished.",
+    "stay": "Stay in settings",
+    "leave": "Discard changes and leave",
+    "project": "the project",
+    "about": "About"
+  },
   "dataView": {
     "selection": {
       "title": "Select records",
@@ -282,6 +308,9 @@
     "diagnosticsDesc": "Review investigation issues and checks."
   },
   "modelSettings": {
+    "loadError": "Analysis services could not be loaded. Please retry.",
+    "refreshError": "The service list could not be updated. Previous results are still shown.",
+    "dismissError": "Dismiss message",
     "title": "AI Model Configuration",
     "description": "Manage OpenAI-compatible, Anthropic, Ollama, and custom gateway models",
     "addModel": "Add model",
@@ -384,6 +413,10 @@
     "orcaGetKey": "Get an OrcaRouter API key (affiliate link)"
   },
   "connectionSettings": {
+    "loadError": "Database connections could not be loaded. Please retry.",
+    "refreshError": "The connection list could not be updated. Previous results are still shown.",
+    "deleteFailed": "The deletion result could not be confirmed. Refresh the list to check.",
+    "dismissError": "Dismiss message",
     "title": "Database Connections",
     "description": "Configure database connections for querying",
     "addConnection": "Add connection",

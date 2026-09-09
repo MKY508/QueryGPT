@@ -63,6 +63,83 @@ describe("PreferencesSettings locale switch", () => {
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
   });
 
+  it("keeps the interface usable when a language change fails", async () => {
+    mocks.setLocale.mockRejectedValue(new Error("offline"));
+    const queryClient = new QueryClient();
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <QueryClientProvider client={queryClient}>
+          <PreferencesSettings section="appearance" />
+        </QueryClientProvider>
+      </NextIntlClientProvider>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "中文" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(enMessages.preferences.languageChangeFailed);
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "中文" })).toBeEnabled();
+  });
+
+  it("retains other sections' choices when saving only the visible section", async () => {
+    const settings = {
+      context_rounds: 5, default_model_id: null, default_connection_id: null,
+      python_enabled: true, diagnostics_enabled: true, auto_repair_enabled: true,
+      preprocessing_enabled: true, self_analysis_enabled: true,
+    };
+    mocks.get.mockImplementation((path: string) => Promise.resolve({ data: { data: path.endsWith("capabilities")
+      ? { install_profile: "core", available_python_libraries: [], missing_optional_libraries: [] } : settings } }));
+    mocks.put.mockResolvedValue({ data: { data: { ...settings, diagnostics_enabled: false } } });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    const content = (section: "execution" | "diagnostics" | "appearance", active = true) => <NextIntlClientProvider locale="en" messages={enMessages}>
+      <QueryClientProvider client={queryClient}><PreferencesSettings section={section} active={active} /></QueryClientProvider>
+    </NextIntlClientProvider>;
+    const view = render(content("execution"));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Allow checking and preparing data/ }));
+    view.rerender(content("appearance")); expect(screen.queryByRole("button", { name: "Save settings" })).not.toBeInTheDocument();
+    view.rerender(content("diagnostics"));
+    const diagnostics = await screen.findByRole("checkbox"); fireEvent.click(diagnostics);
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+    await waitFor(() => expect(mocks.put).toHaveBeenCalledExactlyOnceWith("/api/v1/settings", { diagnostics_enabled: false }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Save settings" })).toBeDisabled());
+    view.rerender(content("execution")); expect(screen.getByRole("checkbox", { name: /Allow checking and preparing data/ })).not.toBeChecked();
+    expect(screen.queryByText("Settings saved")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save settings" })).toBeEnabled();
+    view.rerender(content("execution", false));
+    const reads = mocks.get.mock.calls.length;
+    await act(async () => { await queryClient.invalidateQueries({ queryKey: ["app-settings"] }); });
+    expect(mocks.get).toHaveBeenCalledTimes(reads);
+  });
+
+  it("preserves edited fields across a refresh and saves only those choices", async () => {
+    const settings = {
+      context_rounds: 5, default_model_id: null, default_connection_id: null,
+      python_enabled: true, diagnostics_enabled: true, auto_repair_enabled: true,
+      preprocessing_enabled: true, self_analysis_enabled: true,
+    };
+    mocks.get.mockResolvedValue({ data: { data: settings } });
+    mocks.put.mockResolvedValue({ data: { data: { ...settings, preprocessing_enabled: false } } });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <QueryClientProvider client={queryClient}>
+          <PreferencesSettings section="execution" />
+        </QueryClientProvider>
+      </NextIntlClientProvider>
+    );
+    const preprocessing = await screen.findByRole("checkbox", { name: /Allow checking and preparing data/ });
+    fireEvent.click(preprocessing);
+    act(() => queryClient.setQueryData(["app-settings"], {
+      ...settings, self_analysis_enabled: false, default_model_id: "another-model",
+    }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /Allow generating analysis suggestions/ })).not.toBeChecked());
+    expect(preprocessing).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+    await waitFor(() => expect(mocks.put).toHaveBeenCalledWith("/api/v1/settings", {
+      preprocessing_enabled: false,
+    }));
+    await screen.findByText("Settings saved");
+    expect(queryClient.getQueryData(["app-settings"])).toMatchObject({ default_model_id: "another-model", preprocessing_enabled: false });
+  });
+
   it("persists preprocessing and self-analysis permissions independently", async () => {
     const settings = {
       context_rounds: 5,

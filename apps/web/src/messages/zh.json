@@ -1,4 +1,30 @@
 {
+  "settingsEditor": {
+    "close": "关闭配置编辑",
+    "newModel": "添加分析服务",
+    "editModel": "编辑分析服务",
+    "newConnection": "添加数据连接",
+    "editConnection": "编辑数据连接"
+  },
+  "settingsUnsaved": {
+    "title": "放弃未保存的修改？",
+    "models": "当前分析服务的修改还没有保存。",
+    "connections": "当前数据连接的修改还没有保存。",
+    "continueEditing": "继续编辑",
+    "discardClose": "放弃并关闭",
+    "discardReplace": "放弃并切换",
+    "unavailable": "这项配置已不在列表中，请重新选择。"
+  },
+  "settingsExit": {
+    "title": "离开设置？",
+    "description": "还有未保存的配置更改。前往{destination}会放弃这些更改。",
+    "busyTitle": "配置正在保存",
+    "busyDescription": "保存尚未完成，暂时无法离开设置。",
+    "stay": "留在设置",
+    "leave": "放弃更改并离开",
+    "project": "项目",
+    "about": "关于页面"
+  },
   "dataView": {
     "selection": {
       "title": "选择记录",
@@ -283,6 +309,9 @@
     "diagnosticsDesc": "查看调查问题与核对记录。"
   },
   "modelSettings": {
+    "loadError": "分析服务暂时没有读取完成，请重试。",
+    "refreshError": "服务列表暂时没有更新，仍显示上次结果。",
+    "dismissError": "关闭提示",
     "title": "AI 模型配置",
     "description": "统一管理 OpenAI 兼容、Anthropic、Ollama 与自定义网关",
     "addModel": "添加模型",
@@ -385,6 +414,10 @@
     "orcaGetKey": "获取 OrcaRouter API Key（推广链接）"
   },
   "connectionSettings": {
+    "loadError": "数据库连接暂时没有读取完成，请重试。",
+    "refreshError": "连接列表暂时没有更新，仍显示上次结果。",
+    "deleteFailed": "暂时无法确认删除结果，可刷新列表查看。",
+    "dismissError": "关闭提示",
     "title": "数据库连接",
     "description": "配置要查询的数据库连接",
     "addConnection": "添加连接",

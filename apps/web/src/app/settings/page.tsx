@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import Link from "next/link";
+import { SettingsExitProvider, SettingsExitLink as Link } from "@/components/settings/SettingsExitGuard";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Info, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -51,9 +51,9 @@ function SettingsWorkspace() {
       <div ref={scroll} data-testid="settings-scroll" onScroll={event => recordScroll(event.currentTarget.scrollTop)} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <main className={styles.main}>
           <p className="mb-6 text-sm leading-6 text-muted-foreground">{t(item.description)}</p>
-          {visited.includes("models") && <section hidden={panel !== "models"} inert={panel !== "models"} data-settings-panel="models"><ModelSettings /></section>}
-          {visited.includes("connections") && <section hidden={panel !== "connections"} inert={panel !== "connections"} data-settings-panel="connections"><ConnectionSettings /></section>}
-          {visited.includes("preferences") && <section hidden={panel !== "preferences"} inert={panel !== "preferences"} data-settings-panel="preferences"><PreferencesSettings section={preference} /></section>}
+          {visited.includes("models") && <section hidden={panel !== "models"} inert={panel !== "models"} data-settings-panel="models"><ModelSettings active={panel === "models"} /></section>}
+          {visited.includes("connections") && <section hidden={panel !== "connections"} inert={panel !== "connections"} data-settings-panel="connections"><ConnectionSettings active={panel === "connections"} /></section>}
+          {visited.includes("preferences") && <section hidden={panel !== "preferences"} inert={panel !== "preferences"} data-settings-panel="preferences"><PreferencesSettings section={preference} active={panel === "preferences"} /></section>}
         </main>
       </div>
     </section>
@@ -61,5 +61,5 @@ function SettingsWorkspace() {
 }
 
 export default function SettingsPage() {
-  return <Suspense fallback={<SettingsPanelPending />}><SettingsWorkspace /></Suspense>;
+  return <Suspense fallback={<SettingsPanelPending />}><SettingsExitProvider><SettingsWorkspace /></SettingsExitProvider></Suspense>;
 }

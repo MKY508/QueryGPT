@@ -1,6 +1,6 @@
 # 设置工作区
 
-配置表单和分析服务目录分别以[表单合同](SETTINGS_FORMS.md)与[目录合同](MODEL_SERVICES.md)为准。桌面页面、栏目目录与导航会话已归并；表单启停和页面／桌面离开仍需配套交付，下文不表示已安装桌面成品已经验收。
+配置表单和分析服务目录分别以[表单合同](SETTINGS_FORMS.md)与[目录合同](MODEL_SERVICES.md)为准。桌面页面、导航、表单会话及明确页面链接的离开保护已归并；原生关闭仍需主进程和预加载配套交付，下文不表示已安装桌面成品已经验收。
 
 ## 所有权
 
@@ -11,7 +11,7 @@
 | useSettingsNavigation | URL 选择、已访问面板、共用偏好身份、每栏滚动与标题焦点 |
 | SettingsCollection | 已加载目录的显式字段搜索、筛选、数量及 12 项分页 |
 | useSettingsFormSession | 原始草稿、编辑身份、版本、关闭／替换及保存期间的同步锁 |
-| SettingsEditor | 同一表单节点在并排面板与原生模态之间呈现 |
+| SettingsEditor / SettingsNotice | 常驻桌面编辑面板与统一内联错误，不由窗口宽度切换成模态 |
 | PreferencesSettings | 执行、外观、诊断共用草稿，按栏目提交差异 |
 | SettingsExitGuard / exit-guard.ts | 聚合未保存状态，按当前版本决定明确丢弃，不保存配置 |
 | 桌面桥与主进程关闭流程 | 原生菜单导航、关闭／退出与最终卸载事件 |
@@ -41,11 +41,11 @@
 
 ## 偏好与离开
 
-- 执行、外观与诊断共享草稿及写入锁。保存只提交当前栏目允许的差异，成功只清理仍与该次提交一致的字段；其他栏目继续保留。隐藏组件暂停查询，不取消用户已发起的写入。主题／语言等即时选择不被放弃草稿回滚。
+- 执行、外观与诊断共享草稿及写入锁。保存只提交当前栏目允许的差异，回执只更新该栏目字段并保留较新的未提交缓存值；不覆盖默认模型等其他模块的选择。成功只清理仍与该次提交一致的草稿，成功／失败提示归属提交栏目。隐藏组件暂停查询，不取消用户已发起的写入。主题／语言等即时选择不被放弃草稿回滚。
 - 页面链接使用 Next Link `onNavigate` 与共享上下文，原生菜单页面导航复用同一决定；不覆盖路由内部、不插入历史哨兵、不引入导航依赖。
 - 聚合可见与隐藏的模型、连接、偏好修改。留在设置保留所有内容；放弃并离开先明确清除当前版本草稿，再跳转，而非依赖卸载。决定同时绑定请求对象和草稿版本，修改、忙碌变化、卸载或新导航都会使旧决定失效。
 - 保存中禁止放弃离开；保存完成或失败不自动跳转。已有表单放弃弹窗时，不叠第二个页面离开决定。弹窗只呈现目标和后果，不回显配置内容。
-- `beforeunload` 覆盖已挂载的隐藏草稿与未完成写入，但不持久化凭证。原生浏览器 Back／Forward 和任意其他程序化路由尚未统一保护。
+- 设置页独占 `beforeunload`，通过表单注册表覆盖隐藏草稿与未完成写入；表单不重复监听窗口事件。放弃回调完成后必须重新确认所有表单均无修改且不忙碌，不能仅凭回调已调用就批准离开。原生浏览器 Back／Forward 和任意其他程序化路由尚未统一保护。
 
 ## 桌面关闭目标与未完成交付
 
@@ -59,6 +59,6 @@
 
 导航参考 [PatternFly NavItem 源码](https://github.com/patternfly/patternfly-react/blob/main/packages/react-core/src/components/Nav/NavItem.tsx) 的真实链接与当前页标记，并参考 [VS Code 设置分组与搜索](https://code.visualstudio.com/docs/configure/settings#settings-groups)。并排编辑参考 [Drawer](https://www.patternfly.org/components/drawer/design-guidelines/)，丢弃确认参考 [Carbon dialog](https://carbondesignsystem.com/patterns/dialog-pattern/)，页面离开参考 [Next Link](https://nextjs.org/docs/app/api-reference/components/link#blocking-navigation)，桌面最终否决参考 [Electron will-prevent-unload](https://www.electronjs.org/docs/latest/api/web-contents#event-will-prevent-unload)。复用现有依赖，不复制第三方组件包。
 
-当前工作区导航检查：9 条设置页用例、限定 ESLint 与前端类型检查通过。Chrome 1180×700 中英文验证目录搜索、选择、清除焦点和历史返回；导航 248px、标题 60px、栏目 6px／正文 12px 圆角，无横向溢出、运行时错误或写入请求。模拟配置读取不证明真实保存、原生关闭和安装包可用。
+当前工作区检查：导航 9 条用例；表单会话、离开、请求生命周期、偏好与桌面桥协议共 33 条不同定向用例，限定 ESLint 与前端类型检查通过。Chrome 1180×700 中英文验证导航、隐藏草稿、继续编辑、显式放弃和页面离开；导航 248px、标题 60px、编辑区 420px，栏目 6px／正文 12px 圆角，无运行时错误或配置写入。草稿保留依据 [React 状态身份](https://react.dev/learn/preserving-and-resetting-state)；预览和模拟桥不证明真实保存、原生提示框和安装包可用。
 
 定向入口：`settings-page`、`settings-form-session`、`settings-collection`、`settings-editor`、`settings-page-exit`、`settings-desktop-close`。旧截图及逐轮测试数量不证明当前全链路完成；表单本次检查与截图见[表单合同](SETTINGS_FORMS.md)。只读预览启动方式统一见[工作台](WORKBENCH_DESIGN.md)。
