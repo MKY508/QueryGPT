@@ -16,6 +16,8 @@
 
 基础按钮、搜索、桌面导航、配置编辑面板及圆角变量已收拢。当前工作区的工作台和设置页已移除移动分支，设置的目录与 420px 编辑区固定并排；这些页面仍与之前的大批未归并改动交织，不能把局部组件提交视为全部页面完成。
 
+关于页已改为固定桌面布局：统一标题栏、产品与版本双栏、三列项目链接。版本检查的行为改动独立于视觉提交，仍在工作区中待归并。
+
 后续必须覆盖：
 
 1. 归并工作台与设置的完整页面依赖、草稿会话及离开链路。
@@ -29,3 +31,5 @@
 参考 Twenty 的 [NavigationDrawer 源码](https://github.com/twentyhq/twenty/blob/main/packages/twenty-front/src/modules/ui/navigation/navigation-drawer/components/NavigationDrawer.tsx)中导航、内容和主题变量的职责划分。只采用桌面分工，不采用其手机分支或依赖；没有复制第三方源码。
 
 定向入口为 `settings-editor`、`analysis-workbench`、`workbench-pane-focus`、`settings-page` 和现有 `SearchField` 检查。浏览器使用隔离预览，只读虚构配置，检查桌面导航折叠、设置栏目往返、编辑保留、并排边界及主题。不进行手机验收，不调用真实模型或写入配置。
+
+关于页在 Chrome 的 1200px、1440px 窗口保持三列、无页面横向溢出；当前工作区的预览：[浅色](images/zh/desktop-ui-about.png)、[深色](images/zh/desktop-ui-about-dark.png)。截图含尚未归并的版本操作，不作为真实更新服务或安装包的验证。

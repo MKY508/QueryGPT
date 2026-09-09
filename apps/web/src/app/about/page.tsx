@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { formatDesktopPlatform, readDesktopAppInfo } from "@/lib/desktop-app-info";
 import { RECEIPTBI_BRAND_ICON_SRC } from "@/lib/brand";
+import { Button } from "@/components/ui/button";
+import styles from "./page.module.css";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -53,7 +55,6 @@ export default function AboutPage() {
   const router = useRouter();
   const t = useTranslations("about");
   const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
-
   useEffect(() => {
     let active = true;
 
@@ -119,17 +120,15 @@ export default function AboutPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b border-border bg-card">
-        <div className="mx-auto flex h-[68px] max-w-5xl items-center justify-between px-5 sm:px-8">
-          <button
-            type="button"
+    <div className={styles.page}>
+      <div className={styles.surface}>
+      <header className={styles.header}>
+          <Button variant="ghost"
             onClick={() => router.push("/")}
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <ArrowLeft size={17} />
             {t("backToWorkspace")}
-          </button>
+          </Button>
           <div className="flex items-center gap-2.5">
             <Image
               src={RECEIPTBI_BRAND_ICON_SRC}
@@ -142,43 +141,45 @@ export default function AboutPage() {
             />
             <span className="text-sm font-semibold tracking-wide">ReceiptBI</span>
           </div>
-        </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-5 py-12 sm:px-8 sm:py-16">
-        <section className="grid gap-10 border-b border-border pb-10 md:grid-cols-[minmax(0,1fr)_260px] md:items-end">
-          <div>
-            <h1 className="text-5xl font-semibold tracking-[-0.055em] sm:text-6xl">ReceiptBI</h1>
+      <main className={styles.main}>
+        <section className={styles.identity}>
+          <div className={styles.product}>
+            <Image src={RECEIPTBI_BRAND_ICON_SRC} alt="" width={72} height={72} unoptimized aria-hidden="true" />
+            <h1>ReceiptBI</h1>
           </div>
 
-          <div className="border-t border-border pt-5 md:border-l md:border-t-0 md:pl-7 md:pt-0">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <div className={styles.version}>
+            <div className="text-xs font-medium text-muted-foreground">
               {t("version")}
             </div>
-            <div className="mt-3 font-mono text-sm font-semibold">{runtimeLabel}</div>
+            <div className="mt-2 text-sm font-medium tabular-nums">{runtimeLabel}</div>
             {runtimeInfo?.platform && (
-              <div className="mt-1 font-mono text-xs text-muted-foreground">
+              <div className="mt-1 text-xs text-muted-foreground">
                 {formatDesktopPlatform(runtimeInfo.platform)}
               </div>
             )}
+
           </div>
         </section>
 
-        <section className="mt-9 grid border-l border-t border-border md:grid-cols-3">
+        <section className={styles.links}>
           {links.map(({ label, description, url, icon: Icon }) => (
             <button
               key={url}
               type="button"
               onClick={() => void openFixedExternalUrl(url)}
-              className="group flex min-h-32 items-start gap-3 border-b border-r border-border bg-card px-5 py-5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+              className={styles.resource}
             >
-              <Icon size={18} className="mt-0.5 shrink-0 text-primary" />
+              <span className={styles.resourceIcon}><Icon size={18} aria-hidden="true" /></span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   {label}
                   <ExternalLink
                     size={13}
-                    className="text-muted-foreground transition-colors group-hover:text-primary"
+                    className="ml-auto shrink-0 text-muted-foreground"
+                    aria-hidden="true"
                   />
                 </span>
                 <span className="mt-2 block text-xs leading-5 text-muted-foreground">
@@ -189,6 +190,7 @@ export default function AboutPage() {
           ))}
         </section>
       </main>
+      </div>
     </div>
   );
 }
