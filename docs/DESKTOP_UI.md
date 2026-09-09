@@ -28,6 +28,8 @@
 
 文本替换编辑器与精确映射模型独立归并：样例候选和目标固定双栏，逐项编辑固定原值、目标值和删除操作同一行，动作复用共享按钮。4 个工作区用例覆盖样例转草稿、空文本、冲突处理及主编辑器预览确认；暂存模块的限定类型检查无错误。Chrome 在 1200px 验证[样例选择](images/zh/desktop-ui-text-samples.png)与[逐项编辑](images/zh/desktop-ui-text-editor.png)，没有写请求。整理主编辑器的共享底部操作栏仍在工作区，完整主编辑器及保存链路尚待归并；局部编辑器不代表后端文本替换已随本提交交付。
 
+整理变化预览与退出确认已独立归并。字段查询和选列由同一预览状态管理；字段消失或切换来源时不恢复旧选择。退出确认复用桌面按钮，保持原有模态及焦点返回合同。4 个工作区定向用例覆盖精确统计、预览切换、Escape 和应用期间保护；暂存的 15 个模块类型检查无错误。Chrome 1200px 下验证[字段对照](images/zh/desktop-ui-cleaning-impact.png)及[退出确认](images/zh/desktop-ui-cleaning-discard.png)：确认框 460px、12px 圆角、初始聚焦继续编辑，Escape 后保留草稿；虚构预览未写入真实数据。完整主编辑器与状态存储仍待归并。
+
 后续必须覆盖：
 
 1. 归并工作台与设置的完整页面依赖、草稿会话及离开链路。
@@ -41,6 +43,8 @@
 参考 Twenty 的 [NavigationDrawer 源码](https://github.com/twentyhq/twenty/blob/main/packages/twenty-front/src/modules/ui/navigation/navigation-drawer/components/NavigationDrawer.tsx)中导航、内容和主题变量的职责划分。只采用桌面分工，不采用其手机分支或依赖；没有复制第三方源码。
 
 数据来源采用 [PatternFly Drawer](https://www.patternfly.org/components/drawer/) 的 inline 主从内容分工，不采用覆盖式或断点切换，也不新增依赖。
+
+退出确认采用 [WAI-ARIA Alert Dialog](https://www.w3.org/WAI/ARIA/apg/patterns/alertdialog/) 的标题、描述和真实模态语义，普通工作面板不使用 `alertdialog`。
 
 数据目录的暂存源码检查覆盖键盘浏览、筛选期间保留详情、来源删除、语言切换和编辑 Escape。Chrome 在 1200px、1440px 验证列表始终可见、双栏布局、12px 外框且无页面横向溢出；[当前工作区预览](images/zh/desktop-ui-sources.png)使用虚构来源，不作为真实文件准备或后端写入的验证。
 

@@ -801,6 +801,26 @@ export interface VisualCleaningChange {
   changed_count: number;
 }
 
+export interface VisualCleaningColumnProfile {
+  kind: "number" | "text" | "temporal" | "boolean" | "other";
+  rows: number;
+  null_count: number;
+  blank_count: number | null;
+  zero_count: number | null;
+  non_finite_count: number | null;
+  minimum: string | number | null;
+  maximum: string | number | null;
+  sample_rows: number;
+  omitted_long_values: number;
+  top_values: { value: string | number | boolean; count: number }[];
+}
+
+export interface VisualCleaningColumnImpact {
+  column: string;
+  before: VisualCleaningColumnProfile | null;
+  after: VisualCleaningColumnProfile | null;
+}
+
 export interface VisualCleaningPreview {
   source_id: string;
   operations_hash: string;
@@ -811,6 +831,9 @@ export interface VisualCleaningPreview {
   before: VisualCleaningSnapshot;
   after: VisualCleaningSnapshot;
   changes: VisualCleaningChange[];
+  comparison_basis?: "position" | "unavailable";
+  profiles?: VisualCleaningColumnImpact[];
+  profiles_omitted?: number;
   can_apply: boolean;
 }
 
