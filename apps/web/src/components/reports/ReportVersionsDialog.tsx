@@ -11,6 +11,11 @@ import { ReportPrintView } from "./ReportPrintView";
 
 const reasons = ["baseline", "created", "copied", "saved", "page_changed", "block_changed", "refreshed", "restored", "trashed", "trash_restored"] as const;
 
+type VersionPreview =
+  | { status: "idle" }
+  | { status: "loading" | "failed"; version: number }
+  | { status: "ready"; document: ReportDocument };
+
 interface ReportVersionsProps {
   projectId: string; reportId: string; currentVersion: number; copy: ReportSerializationCopy;
   onRestore: (version: number) => Promise<void>; onReload: () => Promise<void>; onClose: () => void;
@@ -30,15 +35,18 @@ function ReportVersionsSession({ projectId, reportId, currentVersion, copy, onRe
   const listController = useRef<AbortController | null>(null);
   const previewController = useRef<AbortController | null>(null);
   const [directory, setDirectory] = useState<ReportVersionPage | null>(null);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [preview, setPreview] = useState<ReportDocument | null>(null);
+  const [review, setReview] = useState<VersionPreview>({ status: "idle" });
+  const preview = review.status === "ready" ? review.document : null;
+  const selected = review.status === "ready" ? review.document.version : review.status === "idle" ? null : review.version;
+  const previewLoading = review.status === "loading";
   const [loading, setLoading] = useState(true);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<"readFailed" | "previewFailed" | "conflict" | "uncertain" | null>(null);
+  const [error, setError] = useState<"readFailed" | "conflict" | "uncertain" | null>(null);
+  const displayError = error ?? (review.status === "failed" ? "previewFailed" : null);
 
   useEffect(() => {
     active.current = true;
+    const previous = document.activeElement;
     const element = dialog.current;
     element?.showModal();
     const controller = new AbortController();
@@ -50,7 +58,10 @@ function ReportVersionsSession({ projectId, reportId, currentVersion, copy, onRe
       }
     }, () => { if (active.current && !controller.signal.aborted) setError("readFailed"); })
       .finally(() => { if (active.current && !controller.signal.aborted) setLoading(false); });
-    return () => { active.current = false; controller.abort(); listController.current?.abort(); previewController.current?.abort(); element?.close(); };
+    return () => {
+      active.current = false; controller.abort(); listController.current?.abort(); previewController.current?.abort(); element?.close();
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
+    };
   }, [projectId, reportId, currentVersion]);
 
   const choose = async (version: number) => {
@@ -58,12 +69,11 @@ function ReportVersionsSession({ projectId, reportId, currentVersion, copy, onRe
     previewController.current?.abort();
     const controller = new AbortController();
     previewController.current = controller;
-    setSelected(version); setPreview(null); setPreviewLoading(true); setError(null);
+    setReview({ status: "loading", version }); setError(null);
     try {
       const saved = await getReportVersion(projectId, reportId, version, copy, controller.signal);
-      if (active.current && !controller.signal.aborted) setPreview(saved);
-    } catch { if (active.current && !controller.signal.aborted) setError("previewFailed"); }
-    finally { if (active.current && !controller.signal.aborted) setPreviewLoading(false); }
+      if (active.current && !controller.signal.aborted) setReview({ status: "ready", document: saved });
+    } catch { if (active.current && !controller.signal.aborted) setReview({ status: "failed", version }); }
   };
   const more = async () => {
     if (listing.current || writing.current || !directory?.next_before || error === "conflict" || error === "uncertain") return;
@@ -94,9 +104,9 @@ function ReportVersionsSession({ projectId, reportId, currentVersion, copy, onRe
     finally { writing.current = false; if (active.current) setBusy(false); }
   };
   const needsReload = error === "conflict" || error === "uncertain" || (error === "readFailed" && !directory);
-  return <TaskDialog dialogRef={dialog} writingRef={writing} activeRef={active} busy={busy} title={t("title")} closeLabel={t("close")} onClose={onClose}>
-    <div className="grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)]">
-      <nav aria-label={t("versions")} className="overflow-y-auto border-r border-border p-3">
+  return <TaskDialog dialogRef={dialog} writingRef={writing} activeRef={active} busy={busy} autoFocusClose={false} title={t("title")} closeLabel={t("close")} onClose={onClose}>
+    <div className="grid min-h-0 flex-1 grid-cols-[320px_minmax(0,1fr)]">
+      <nav aria-label={t("versions")} className="overflow-y-auto border-r border-border p-4">
         {directory?.items.map((item) => <Button variant="ghost" size="md" type="button" key={item.version} aria-pressed={selected === item.version} disabled={busy || needsReload}
           onClick={() => void choose(item.version)} className="mb-1 block w-full p-3 text-left text-xs aria-pressed:bg-muted disabled:opacity-50 h-auto shrink-0">
           <span className="block font-semibold">{t("version", { version: item.version })}{item.version === currentVersion ? ` · ${t("current")}` : ""}</span>
@@ -112,8 +122,8 @@ function ReportVersionsSession({ projectId, reportId, currentVersion, copy, onRe
           : <p className="mt-8 text-center text-xs text-muted-foreground">{t("choose")}</p>}
       </section>
     </div>
-    <footer className="space-y-3 border-t border-border px-5 py-4">
-      {error && <p role="alert" className="text-xs text-destructive">{t(error)}</p>}
+    <footer className="shrink-0 space-y-3 border-t border-border px-5 py-4">
+      {displayError && <p role="alert" className="text-xs text-destructive">{t(displayError)}</p>}
       <div className="flex items-center justify-between gap-4">
         <p className="text-xs leading-5 text-muted-foreground">{t("scope")}</p>
         {needsReload ? <Button variant="primary" size="md" type="button" disabled={busy} onClick={() => void reload()} className="shrink-0 px-4 py-2 text-xs">{t("reload")}</Button>

@@ -34,6 +34,29 @@ afterEach(() => {
 });
 
 describe("saved report version review", () => {
+  it("retries a failed selection without retaining a restorable preview and restores opener focus", async () => {
+    vi.spyOn(versions, "listReportVersions").mockResolvedValue({ report_id: "report", current_version: 3, items: [item(2), item(1)], next_before: null });
+    const preview = vi.spyOn(versions, "getReportVersion").mockResolvedValueOnce({ ...document, version: 2 })
+      .mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(document);
+    render(<button>Version history</button>);
+    const opener = screen.getByRole("button", { name: "Version history" }); opener.focus();
+    const view = mount();
+    fireEvent.click(await screen.findByRole("button", { name: /第 2 版/ }));
+    const restore = screen.getByRole("button", { name: messages.reportVersions.restore });
+    await waitFor(() => expect(restore).toBeEnabled());
+    const first = screen.getByRole("button", { name: /第 1 版/ });
+    fireEvent.click(first);
+    await screen.findByText(messages.reportVersions.previewFailed);
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("历史报告")).not.toBeInTheDocument(); expect(restore).toBeDisabled();
+    fireEvent.click(first); await screen.findByText("历史报告");
+    expect(preview).toHaveBeenCalledTimes(3); expect(restore).toBeEnabled();
+    restore.focus(); fireEvent.keyDown(restore, { key: "Tab" });
+    const close = screen.getByRole("button", { name: messages.reportVersions.close }); expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: "Tab", shiftKey: true }); expect(restore).toHaveFocus();
+    view.unmount(); expect(opener).toHaveFocus();
+  });
+
   it("previews explicitly and keeps an uncertain restore reload-only after failed reconciliation", async () => {
     vi.spyOn(versions, "listReportVersions").mockResolvedValue({ report_id: "report", current_version: 3, items: [item(3), item(1)], next_before: null });
     const preview = vi.spyOn(versions, "getReportVersion").mockResolvedValue(document);
