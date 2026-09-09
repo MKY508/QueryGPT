@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { getReportVersion, listReportVersions, type ReportVersionPage } from "@/lib/report-versions";
 import { ReportConflictError, type ReportDocument, type ReportSerializationCopy } from "@/lib/reports";
 import { ReportPrintView } from "./ReportPrintView";
+import { ReportLibraryLayout } from "./ReportLibraryLayout";
 
 const reasons = ["baseline", "created", "copied", "saved", "page_changed", "block_changed", "refreshed", "restored", "trashed", "trash_restored"] as const;
 
@@ -105,8 +106,7 @@ function ReportVersionsSession({ projectId, reportId, currentVersion, copy, onRe
   };
   const needsReload = error === "conflict" || error === "uncertain" || (error === "readFailed" && !directory);
   return <TaskDialog dialogRef={dialog} writingRef={writing} activeRef={active} busy={busy} autoFocusClose={false} title={t("title")} closeLabel={t("close")} onClose={onClose}>
-    <div className="grid min-h-0 flex-1 grid-cols-[320px_minmax(0,1fr)]">
-      <nav aria-label={t("versions")} className="overflow-y-auto border-r border-border p-4">
+    <ReportLibraryLayout directoryLabel={t("versions")} directory={<>
         {directory?.items.map((item) => <Button variant="ghost" size="md" type="button" key={item.version} aria-pressed={selected === item.version} disabled={busy || needsReload}
           onClick={() => void choose(item.version)} className="mb-1 block w-full p-3 text-left text-xs aria-pressed:bg-muted disabled:opacity-50 h-auto shrink-0">
           <span className="block font-semibold">{t("version", { version: item.version })}{item.version === currentVersion ? ` · ${t("current")}` : ""}</span>
@@ -116,12 +116,12 @@ function ReportVersionsSession({ projectId, reportId, currentVersion, copy, onRe
         {loading && <Loader2 aria-label={t("loading")} size={18} className="mx-auto my-4 animate-spin" />}
         {directory?.next_before && <Button variant="ghost" size="md" type="button" disabled={loading || busy || needsReload} onClick={() => void more()} className="p-3 text-xs font-medium">{t("more")}</Button>}
         {directory && !directory.items.length && <p className="p-3 text-xs leading-5 text-muted-foreground">{t("empty")}</p>}
-      </nav>
-      <section aria-label={t("preview")} className="min-w-0 overflow-auto bg-muted/20 p-4">
+      </>}>
+      <section aria-label={t("preview")} className="min-h-0 min-w-0 flex-1 overflow-auto p-4">
         {previewLoading ? <Loader2 size={18} className="mx-auto my-8 animate-spin" /> : preview ? <ReportPrintView report={preview} filterValues={{}} preview />
           : <p className="mt-8 text-center text-xs text-muted-foreground">{t("choose")}</p>}
       </section>
-    </div>
+    </ReportLibraryLayout>
     <footer className="shrink-0 space-y-3 border-t border-border px-5 py-4">
       {displayError && <p role="alert" className="text-xs text-destructive">{t(displayError)}</p>}
       <div className="flex items-center justify-between gap-4">
