@@ -22,6 +22,7 @@
 | useResultReadingPosition / useWorkbenchPaneFocus | 会话内阅读位置与显式动作的焦点交接 |
 | WorkbenchCommands | 复用 cmdk 的操作筛选与选择，不拥有业务执行 |
 | ChatArea | 接入既有项目、提交、草稿、运行控制与数据工作区 |
+| MessageList / MessageListStatus / useInvestigationTimeline | 时间线结果编排、待办及会话加载反馈、测量与阅读跟随分别维护；新进展从最新消息与阅读位置派生，不另用 effect 同步标记 |
 | hasModalDialog | 区分常驻面板和真正模态；不以所有 open dialog 阻断快捷键 |
 
 ## 记录、阅读与搜索
@@ -67,6 +68,7 @@
 - 当前运行控制条在阅读旧结果或数据／理解页仍保留停止入口。按当前活动流匹配并在提交前重新核对，等待真实终态；成功先到不改写为已停止。控制消失时只恢复它原来持有的焦点。
 - InvestigationActivity 展示完整问题、当前业务状态和可展开的最近动态。最多 12 条已知阶段，相邻等价阶段合并，不保存模型自由文本／参数／推理；节点表示收到过动态，不表示阶段已成功。
 - 已收到结果但尚未收到流终态时显示整理／保存等待，不提前宣称报告已经保存。活动列表只属于当前前端会话，不是完整持久运行日志。
+- 待办页仅保留原始问题、当前服务状态及继续／修改动作；收到问题不显示“已理解”或预造后续流程。加载与失败反馈不拥有请求，只有明确重试才交回调用方。
 
 命令面板参考 [VS Code](https://code.visualstudio.com/docs/getstarted/userinterface#_command-palette)；运行呈现参考 [Streamlit status](https://docs.streamlit.io/develop/api-reference/status/st.status)，不预造固定流程、百分比或预计耗时。
 

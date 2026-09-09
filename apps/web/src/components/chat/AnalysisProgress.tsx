@@ -43,7 +43,7 @@ export function AnalysisProgress({
   return (
     <section
       aria-label={t("currentProgressAria")}
-      className="w-full max-w-[920px] border-y border-border bg-card px-5 py-5 sm:px-6"
+      className="w-full max-w-[920px] rounded-xl border border-border bg-card p-6"
     >
       <div
         aria-atomic="true"
