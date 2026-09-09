@@ -2796,5 +2796,20 @@
     "loadDescription": "The entire form will be replaced by the version just read. Your unsaved input will be discarded. You can then edit it; loading does not save it.",
     "keep": "Keep my input",
     "confirmLoad": "Discard input and load"
+  },
+  "reportWriting": {
+    "title": "Focus writing",
+    "openFor": "Edit text: {title}",
+    "back": "Back to report",
+    "viewMode": "Writing view",
+    "write": "Write",
+    "compare": "Compare",
+    "preview": "Preview",
+    "writingArea": "Text editor",
+    "previewArea": "In the report",
+    "heading": "Content title",
+    "body": "Body text",
+    "headingPlaceholder": "Add a title",
+    "bodyPlaceholder": "Write the conclusions and context for this section…"
   }
 }

@@ -2796,5 +2796,20 @@
     "loadDescription": "整个表单将替换为刚刚读取的版本，当前未保存输入会被放弃。载入后可继续编辑，不会立即保存。",
     "keep": "保留我的输入",
     "confirmLoad": "放弃输入并载入"
+  },
+  "reportWriting": {
+    "title": "专注写作",
+    "openFor": "专注编辑：{title}",
+    "back": "返回报告",
+    "viewMode": "写作视图",
+    "write": "写作",
+    "compare": "对照",
+    "preview": "预览",
+    "writingArea": "正文编辑区",
+    "previewArea": "报告中的样式",
+    "heading": "内容标题",
+    "body": "正文",
+    "headingPlaceholder": "添加标题",
+    "bodyPlaceholder": "写下这部分的结论与说明…"
   }
 }
