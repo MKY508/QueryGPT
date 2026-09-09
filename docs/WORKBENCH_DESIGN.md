@@ -22,6 +22,7 @@
 | useResultReadingPosition / useWorkbenchPaneFocus | 会话内阅读位置与显式动作的焦点交接 |
 | WorkbenchCommands | 复用 cmdk 的操作筛选与选择，不拥有业务执行 |
 | ChatArea | 接入既有项目、提交、草稿、运行控制与数据工作区 |
+| useStandingAnalyses / standing-attention | 按项目读取关注项、明确检查与续跑、互斥检查状态和业务原因翻译；页面不持有该流程的请求 |
 | MessageList / MessageListStatus / useInvestigationTimeline | 时间线结果编排、待办及会话加载反馈、测量与阅读跟随分别维护；新进展从最新消息与阅读位置派生，不另用 effect 同步标记 |
 | ChatEmptyState / AnalysisSuggestions / WorkspaceActivitySummary | 空白页组合提问、建议与项目活动；建议只交回问题，活动保留全部已加载关注项，检查中的条目禁止重复点击 |
 | hasModalDialog | 区分常驻面板和真正模态；不以所有 open dialog 阻断快捷键 |
@@ -63,6 +64,10 @@
 输入交互参考 [Zulip 草稿](https://zulip.com/help/view-and-edit-your-message-drafts)与[展开输入](https://zulip.com/help/resize-the-compose-box)；没有引入独立编辑器或网络草稿服务。
 
 ## 建议、操作与运行
+
+关注项检查由 `useStandingAnalyses` 统一维护，复用 [TanStack Mutation](https://tanstack.com/query/latest/docs/framework/react/guides/mutations) 的状态和完成回调，禁用自动重试与重连排队。目录 GET 接受取消信号；明确点击才调用 prepare-run。同步锁阻止重复检查，每次等待后重新核对项目会话及当前调查，离开再返回同项目也不续跑旧请求；已有新活动流时不覆盖它。正在检查从 mutation 状态派生，不永久写入反馈。准备请求可能已在后端生效，前端忽略迟到结果不代表撤销。
+
+该模块 10 个定向与双语用例、限定 ESLint 和前端类型检查通过。Chrome 1180×700 中英文验证明确检查、等待禁用、无变化反馈与按钮恢复，无页面错误或横向溢出。准备响应被拦截模拟，没有真实续跑或模型调用。
 
 - 建议接口最多提供三项，AnalysisSuggestions 使用固定桌面三列。生成／刷新由明确操作触发；刷新失败保留旧建议，成功空结果区别于失败。打开、重连或上下文改变不自动调用生成。
 - useSuggestedQuestions 同步去重并取消过期前端请求。项目、模型、语言、来源版本／状态和已接受的项目理解刷新使旧建议失效；仅来源顺序变化不失效。前端取消不证明后端模型停止或不计费，刷新不保证建议不同。

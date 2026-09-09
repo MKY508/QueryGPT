@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
-import { NextIntlClientProvider, useLocale, useTranslations } from "next-intl";
+import { NextIntlClientProvider, useTranslations } from "next-intl";
 import { describe, expect, it } from "vitest";
-import { standingAttentionFeedback } from "@/components/chat/ChatArea";
+import { standingAttentionFeedback } from "@/components/chat/standing-attention";
 import type { StandingPrepareResponse } from "@/lib/types/api";
 import enMessages from "@/messages/en.json";
 import zhMessages from "@/messages/zh.json";
@@ -15,8 +15,7 @@ function Feedback({
   >;
 }) {
   const t = useTranslations("chatArea");
-  const locale = useLocale();
-  return <p>{standingAttentionFeedback(prepared, t, locale)}</p>;
+  return <p>{standingAttentionFeedback(prepared, t)}</p>;
 }
 
 function renderFeedback(

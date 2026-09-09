@@ -10,11 +10,8 @@ import type {
   AppSettings,
   ConnectionSummary,
   ModelSummary,
-  StandingAnalysis,
-  StandingPrepareResponse,
   SuggestedQuestionsResponse,
 } from "@/lib/types/api";
-import { getErrorMessage, UserFacingError } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
 import {
   migratePendingTaskStorage,
@@ -30,6 +27,7 @@ import { InputBar } from "./InputBar";
 import { ChatHeader } from "./ChatHeader";
 import { DataWorkspacePanel } from "./DataWorkspacePanel";
 import { useChatAreaState } from "./useChatAreaState";
+import { useStandingAnalyses } from "./useStandingAnalyses";
 
 interface ChatAreaProps {
   sidebarOpen: boolean;
@@ -90,99 +88,6 @@ interface RunPromptOptions {
   correctionId?: string;
 }
 
-type StandingAttentionMessageKey =
-  | "standingNeedsAttention"
-  | "standingReasonPlaybookUnavailable"
-  | "standingReasonPlaybookChanged"
-  | "standingReasonPlaybookSourcesUnbound"
-  | "standingReasonSourcePendingConfirmation"
-  | "standingReasonSourceNotUnique"
-  | "standingReasonSourceChangedSinceBaseline"
-  | "standingReasonSourceNotReady"
-  | "standingReasonSourceWorkingCopyMissing"
-  | "standingReasonSourceSchemaChanged"
-  | "standingReasonSourceVersionInvalid"
-  | "standingReasonSourceRecipeChanged"
-  | "standingReasonSemanticMissing"
-  | "standingReasonSemanticInactive"
-  | "standingReasonSemanticChanged"
-  | "standingReasonRelationshipUnavailable"
-  | "standingReasonRelationshipChanged"
-  | "standingReasonProjectInputUnavailable"
-  | "standingReasonRunMissing"
-  | "standingReasonResultRejected"
-  | "standingReasonExecutionFailed";
-
-type StandingAttentionTranslator = (
-  key: StandingAttentionMessageKey,
-  values?: Record<string, string>,
-) => string;
-
-export function standingAttentionFeedback(
-  prepared: Pick<
-    StandingPrepareResponse,
-    "attention_reason" | "attention_reason_code" | "attention_reason_params"
-  >,
-  t: StandingAttentionTranslator,
-  _locale: string,
-): string {
-  const fallbackReason = t("standingNeedsAttention");
-  const params = prepared.attention_reason_params || {};
-  const sourceValues = params.source ? { source: params.source } : null;
-  switch (prepared.attention_reason_code) {
-    case "standing_playbook_unavailable":
-      return t("standingReasonPlaybookUnavailable");
-    case "standing_playbook_changed":
-      return t("standingReasonPlaybookChanged");
-    case "standing_playbook_sources_unbound":
-      return t("standingReasonPlaybookSourcesUnbound");
-    case "standing_source_pending_confirmation":
-      return sourceValues
-        ? t("standingReasonSourcePendingConfirmation", sourceValues)
-        : fallbackReason;
-    case "standing_source_not_unique":
-      return sourceValues ? t("standingReasonSourceNotUnique", sourceValues) : fallbackReason;
-    case "standing_source_changed_since_baseline":
-      return sourceValues
-        ? t("standingReasonSourceChangedSinceBaseline", sourceValues)
-        : fallbackReason;
-    case "standing_source_not_ready":
-      return sourceValues ? t("standingReasonSourceNotReady", sourceValues) : fallbackReason;
-    case "standing_source_working_copy_missing":
-      return sourceValues
-        ? t("standingReasonSourceWorkingCopyMissing", sourceValues)
-        : fallbackReason;
-    case "standing_source_schema_changed":
-      return sourceValues ? t("standingReasonSourceSchemaChanged", sourceValues) : fallbackReason;
-    case "standing_source_version_invalid":
-      return sourceValues ? t("standingReasonSourceVersionInvalid", sourceValues) : fallbackReason;
-    case "standing_source_recipe_changed_since_baseline":
-      return sourceValues
-        ? t("standingReasonSourceRecipeChanged", sourceValues)
-        : fallbackReason;
-    case "standing_semantic_definition_missing":
-      return t("standingReasonSemanticMissing");
-    case "standing_semantic_definition_inactive":
-      return t("standingReasonSemanticInactive");
-    case "standing_semantic_definition_changed_since_baseline":
-      return t("standingReasonSemanticChanged");
-    case "standing_relationship_definition_unavailable":
-      return t("standingReasonRelationshipUnavailable");
-    case "standing_relationship_definition_changed":
-      return t("standingReasonRelationshipChanged");
-    case "standing_project_input_unavailable":
-      return t("standingReasonProjectInputUnavailable");
-    case "standing_in_flight_run_missing":
-      return t("standingReasonRunMissing");
-    case "standing_result_rejected":
-      return t("standingReasonResultRejected");
-    case "standing_execution_failed":
-      return t("standingReasonExecutionFailed");
-    default:
-      return fallbackReason;
-  }
-}
-
 export function ChatArea({
   sidebarOpen: _sidebarOpen,
   onToggleSidebar,
@@ -203,8 +108,6 @@ export function ChatArea({
   );
   const processingSettlementsRef = useRef(new Set<string>());
   const [pendingTask, setPendingTask] = useState<PendingTask | null>(null);
-  const [checkingStandingId, setCheckingStandingId] = useState<string | null>(null);
-  const [standingFeedback, setStandingFeedback] = useState<Record<string, string>>({});
   const [analysisServiceSelectorOpen, setAnalysisServiceSelectorOpen] = useState(false);
   const [pendingServiceChangeMessageIndex, setPendingServiceChangeMessageIndex] =
     useState<number | null>(null);
@@ -233,13 +136,11 @@ export function ChatArea({
     currentConversationMeta,
     lastModelId,
     sendMessage,
-    resumePreparedRun,
     confirmBusinessDefinition,
     stopGeneration,
     retryMessage,
     retryMessageWithModel,
     rerunMessage,
-    setCurrentConversation,
     loadConversation,
     pendingAnalysisSettlements,
   } = useChatStore();
@@ -335,21 +236,6 @@ export function ChatArea({
     },
   });
 
-  const {
-    data: standingAnalyses = [],
-    isLoading: standingLoading,
-    refetch: refetchStanding,
-  } = useQuery<StandingAnalysis[]>({
-    queryKey: ["standing-analyses", currentProjectId],
-    queryFn: async () => {
-      const response = await api.get(
-        `/api/v1/projects/${currentProjectId}/standing-analyses`
-      );
-      return response.data.data as StandingAnalysis[];
-    },
-    enabled: Boolean(currentProjectId),
-  });
-
   const recordedMessageModelId = [...messages]
     .reverse()
     .find((message) => message.executionContext?.model_id)?.executionContext?.model_id;
@@ -438,6 +324,9 @@ export function ChatArea({
   }, [currentProjectId]);
 
   const effectiveContextRounds = appSettings?.context_rounds || 5;
+  const { standingAnalyses, standingLoading, checkingStandingId, standingFeedback, checkStanding } = useStandingAnalyses({
+    projectId: currentProjectId, modelId: selectedModelId, modelReady, contextRounds: effectiveContextRounds,
+  });
 
   const clearPendingTask = () => {
     sessionStorage.removeItem(PENDING_TASK_STORAGE_KEY);
@@ -547,112 +436,6 @@ export function ChatArea({
   ) => {
     await confirmBusinessDefinition(analysisRunId, key, selectedOption, locale);
     await refreshCurrent();
-  };
-
-  const handleCheckStanding = async (standing: StandingAnalysis) => {
-    if (!currentProjectId || checkingStandingId) return;
-    const originProjectId = currentProjectId;
-    if (!modelReady || !selectedModelId) {
-      setStandingFeedback((current) => ({
-        ...current,
-        [standing.id]: tArea("modelNotReady"),
-      }));
-      router.push("/settings");
-      return;
-    }
-    if (isLoading) {
-      setStandingFeedback((current) => ({
-        ...current,
-        [standing.id]: tArea("waitForRun"),
-      }));
-      return;
-    }
-
-    setCheckingStandingId(standing.id);
-    setStandingFeedback((current) => ({ ...current, [standing.id]: tArea("checkingData") }));
-    try {
-      const response = await api.post(
-        `/api/v1/projects/${originProjectId}/standing-analyses/${standing.id}/prepare-run`,
-        { trigger: "manual", force: false }
-      );
-      const prepared = response.data.data as StandingPrepareResponse;
-      if (useProjectStore.getState().currentProjectId !== originProjectId) {
-        return;
-      }
-      await refetchStanding();
-
-      if (prepared.outcome === "no_change") {
-        setStandingFeedback((current) => ({
-          ...current,
-          [standing.id]: tArea("noChanges"),
-        }));
-        return;
-      }
-      if (prepared.outcome === "paused") {
-        setStandingFeedback((current) => ({
-          ...current,
-          [standing.id]: tArea("standingPaused"),
-        }));
-        return;
-      }
-      if (prepared.outcome === "already_completed") {
-        setStandingFeedback((current) => ({
-          ...current,
-          [standing.id]: tArea("standingCompleted"),
-        }));
-        return;
-      }
-      if (prepared.outcome === "already_running") {
-        const runsResponse = await api.get(
-          `/api/v1/projects/${originProjectId}/analysis-runs`
-        );
-        if (useProjectStore.getState().currentProjectId !== originProjectId) {
-          return;
-        }
-        const claimedRun = (runsResponse.data.data as AnalysisRunSummary[]).find(
-          (run) => run.id === prepared.run_id
-        );
-        if (claimedRun?.stage !== "prepared") {
-          if (prepared.conversation_id) {
-            setCurrentConversation(prepared.conversation_id);
-          }
-          setStandingFeedback((current) => ({
-            ...current,
-            [standing.id]: tArea("standingInvestigating"),
-          }));
-          return;
-        }
-      }
-      if (prepared.outcome === "needs_attention") {
-        setStandingFeedback((current) => ({
-          ...current,
-          [standing.id]: standingAttentionFeedback(prepared, tArea, locale),
-        }));
-        return;
-      }
-      if (!prepared.run_id || !prepared.conversation_id) {
-        throw new UserFacingError(tArea("standingResumeMissing"));
-      }
-      await resumePreparedRun(
-        {
-          query: standing.query,
-          projectId: originProjectId,
-          runId: prepared.run_id,
-          conversationId: prepared.conversation_id,
-        },
-        selectedModelId,
-        effectiveContextRounds,
-        locale
-      );
-    } catch (error) {
-      setStandingFeedback((current) => ({
-        ...current,
-        [standing.id]: getErrorMessage(error),
-      }));
-    } finally {
-      setCheckingStandingId(null);
-      void refetchStanding();
-    }
   };
 
   const showDockComposer = messages.length > 0 && !pendingTaskVisible;
@@ -776,7 +559,7 @@ export function ChatArea({
           onRetryConversation={() => {
             if (currentConversationId) void loadConversation(currentConversationId);
           }}
-          onCheckStanding={(standing) => void handleCheckStanding(standing)}
+          onCheckStanding={checkStanding}
           onConfirm={handleConfirmation}
           onContinuePending={() => void handleContinuePendingTask()}
           onEditPending={handleEditPendingTask}
