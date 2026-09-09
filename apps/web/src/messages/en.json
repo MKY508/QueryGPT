@@ -1627,7 +1627,11 @@
     "closeEditorAria": "Close cleaning editor",
     "selectColumnAria": "Select a column to clean",
     "removeStepAria": "Remove cleaning step: {step}",
-    "previewAria": "Cleaning change preview"
+    "previewAria": "Cleaning change preview",
+    "sampleNoMatchingColumns": "No matching columns",
+    "columnSearchMore": "More columns available. Refine your search.",
+    "clearColumnSearch": "Clear column search",
+    "columnSearchCurrent": "Current selection"
   },
   "investigationPicker": {
     "smartDrawerAria": "Smart investigation report composer",

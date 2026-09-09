@@ -1628,7 +1628,11 @@
     "closeEditorAria": "关闭数据整理编辑器",
     "selectColumnAria": "选择要整理的列",
     "removeStepAria": "移除整理步骤：{step}",
-    "previewAria": "数据整理变化预览"
+    "previewAria": "数据整理变化预览",
+    "sampleNoMatchingColumns": "没有匹配的字段",
+    "columnSearchMore": "还有其他字段，可继续搜索",
+    "clearColumnSearch": "清空字段搜索",
+    "columnSearchCurrent": "当前选择"
   },
   "investigationPicker": {
     "smartDrawerAria": "智能整理调查报告",
