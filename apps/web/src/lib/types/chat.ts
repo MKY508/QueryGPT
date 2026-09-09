@@ -6,7 +6,7 @@ import type {
   ExecutionContextSummary,
   Visualization,
 } from "@/lib/types/api";
-
+import type { AnalysisActivityStep } from "@/lib/analysis-activity";
 import type { AnalysisState } from "@/lib/types/analysis-state";
 
 export interface ChatMessage {
@@ -17,6 +17,7 @@ export interface ChatMessage {
   isLoading?: boolean;
   status?: string;
   thinkingStage?: string;
+  activitySteps?: AnalysisActivityStep[];
   sql?: string;
   pythonCode?: string;
   visualization?: Visualization;
