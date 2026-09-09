@@ -14,7 +14,7 @@ import type { ConfiguredConnection } from "@/lib/types/api";
 import { useTranslations } from "next-intl";
 import styles from "./SettingsWorkspace.module.css";
 import { Button } from "@/components/ui/button";
-import { SettingsNotice } from "./SettingsNotice";
+import { InlineNotice } from "@/components/ui/InlineNotice";
 import { SettingsEditor } from "@/components/settings/SettingsEditor";
 
 export function ConnectionSettings({ active = true }: { active?: boolean }) {
@@ -68,9 +68,9 @@ export function ConnectionSettings({ active = true }: { active?: boolean }) {
     deleteConnection(id);
   };
 
-  const notice = (unavailable || error) && <SettingsNotice dismissLabel={t("dismissError")} onDismiss={() => {
+  const notice = (unavailable || error) && <InlineNotice dismissLabel={t("dismissError")} onDismiss={() => {
     dismissUnavailable(); clearError();
-  }}>{unavailable ?? (error ? t(error) : null)}</SettingsNotice>;
+  }}>{unavailable ?? (error ? t(error) : null)}</InlineNotice>;
 
   return (
     <div className={showForm ? styles.split : undefined}>
@@ -90,7 +90,7 @@ export function ConnectionSettings({ active = true }: { active?: boolean }) {
         </Button>
       </div>
 
-      {loadFailed && <SettingsNotice>{t(hasLoaded ? "refreshError" : "loadError")}</SettingsNotice>}
+      {loadFailed && <InlineNotice>{t(hasLoaded ? "refreshError" : "loadError")}</InlineNotice>}
       {!showForm && notice}
 
       {(!loadFailed || hasLoaded) && <ConnectionSettingsList connections={connections} isLoading={isLoading}

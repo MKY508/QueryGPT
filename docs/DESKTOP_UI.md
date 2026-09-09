@@ -4,6 +4,8 @@
 
 ## 统一规则
 
+任务内反馈统一使用 `InlineNotice`：设置表单错误、报告错误及历史恢复提示共享面板与动作布局，不额外弹出通知或自动消失。操作继续使用 Button，保存／重载判断由业务模块拥有。参考 [Carbon 任务内通知](https://carbondesignsystem.com/components/notification/usage/#inline)，不引入依赖。11 条定向用例与类型检查通过；中英文 Chrome 1180×700 模拟保存冲突后确认“继续编辑”保留草稿，面板 12px／按钮 6px，无横向溢出。保存请求被拦截返回 409，没有真实写入。
+
 报表模式与保存：`ReportEditingControls` 复用共享 Button，阅读／编辑保持文字及稳定的 `aria-pressed` 名称，按 [WAI 按钮模式](https://www.w3.org/WAI/ARIA/apg/patterns/button/)支持原生键盘激活。重复选择当前模式不再次发出动作；模式切换不保存文档，显式保存仍由工作区处理。中英文 Chrome 1180×700 验证焦点、未保存标题保留及 6px 圆角，无横向溢出或服务写入；组件和工作区的 4 条定向用例通过，真实持久化仍未验收。
 
 - 设计最小宽度 1180px，导航 248px，标题栏 60px。桌面窗口内可以调整内容宽度，不因窗口变窄切换到手机菜单或全屏编辑器。

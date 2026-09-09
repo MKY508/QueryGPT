@@ -11,7 +11,7 @@
 | useSettingsNavigation | URL 选择、已访问面板、共用偏好身份、每栏滚动与标题焦点 |
 | SettingsCollection | 已加载目录的显式字段搜索、筛选、数量及 12 项分页 |
 | useSettingsFormSession | 原始草稿、编辑身份、版本、关闭／替换及保存期间的同步锁 |
-| SettingsEditor / SettingsNotice | 常驻桌面编辑面板与统一内联错误，不由窗口宽度切换成模态 |
+| SettingsEditor / InlineNotice | 常驻桌面编辑面板与全站共享内联错误，不由窗口宽度切换成模态 |
 | PreferencesSettings | 执行、外观、诊断共用草稿，按栏目提交差异 |
 | SettingsExitGuard / exit-guard.ts | 聚合未保存状态，按当前版本决定明确丢弃，不保存配置 |
 | 桌面桥与主进程关闭流程 | 原生菜单导航、关闭／退出与最终卸载事件 |

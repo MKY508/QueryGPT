@@ -16,7 +16,7 @@ import type { ConfiguredModel } from "@/lib/types/api";
 import { useTranslations } from "next-intl";
 import styles from "./SettingsWorkspace.module.css";
 import { Button } from "@/components/ui/button";
-import { SettingsNotice } from "./SettingsNotice";
+import { InlineNotice } from "@/components/ui/InlineNotice";
 import { SettingsEditor } from "@/components/settings/SettingsEditor";
 
 export function ModelSettings({ active = true }: { active?: boolean }) {
@@ -79,9 +79,9 @@ export function ModelSettings({ active = true }: { active?: boolean }) {
     deleteModel(id);
   };
 
-  const notice = displayError && <SettingsNotice dismissLabel={t("dismissError")} onDismiss={() => {
+  const notice = displayError && <InlineNotice dismissLabel={t("dismissError")} onDismiss={() => {
     dismissUnavailable(); clearError();
-  }}>{displayError}</SettingsNotice>;
+  }}>{displayError}</InlineNotice>;
 
   return (
     <div className={showForm ? styles.split : undefined}>
@@ -101,7 +101,7 @@ export function ModelSettings({ active = true }: { active?: boolean }) {
         </Button>
       </div>
 
-      {loadFailed && <SettingsNotice>{t(hasLoaded ? "refreshError" : "loadError")}</SettingsNotice>}
+      {loadFailed && <InlineNotice>{t(hasLoaded ? "refreshError" : "loadError")}</InlineNotice>}
 
       {!showForm && notice}
 

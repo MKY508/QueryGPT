@@ -1,5 +1,9 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
+import { InlineNotice } from "@/components/ui/InlineNotice";
+
 import { ReportEditingControls } from "./ReportEditingControls";
 
 import Link from "next/link";
@@ -1148,10 +1152,10 @@ function ReportWorkspaceSession({ projectId, reportId, initialRunId }: ReportWor
         saveState === "conflict" ||
         exportError ||
         refreshError) && (
-        <div role="alert" className="flex shrink-0 items-center justify-between gap-4 border-b border-destructive/25 bg-destructive/5 px-5 py-2.5 text-xs text-destructive">
-          <span>{saveError || exportError || refreshError}</span>
-          {saveState === "conflict" && <button type="button" onClick={() => void load()} className="font-semibold hover:underline">{t("reload")}</button>}
-        </div>
+        <InlineNotice className="mx-5 my-3 shrink-0" actions={saveState === "conflict" &&
+          <Button variant="outline" size="sm" onClick={() => void load()}>{t("reload")}</Button>}>
+          {saveError || exportError || refreshError}
+        </InlineNotice>
       )}
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
