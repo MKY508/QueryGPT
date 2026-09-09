@@ -1,5 +1,7 @@
 "use client";
 
+import { inspectProject, inspectProjectDirectory, PROJECT_NAME_LIMIT, ProjectOperationBusy } from "@/lib/project-directory";
+
 import { create } from "zustand";
 import { runtimeMessage } from "@/i18n/runtime";
 import { api } from "@/lib/api/client";
@@ -28,6 +30,9 @@ import type {
 } from "@/lib/types/api";
 
 let refreshGeneration = 0;
+let projectDirectoryGeneration = 0, projectNavigationGeneration = 0;
+let creatingProject = false;
+const renamingProjects = new Set<string>();
 const cleaningApplications = new Set<string>();
 
 interface ProjectBootstrapDefaults {
@@ -82,7 +87,8 @@ interface ProjectState {
   } | null;
   error: string | null;
   bootstrap: (defaults: ProjectBootstrapDefaults) => Promise<void>;
-  createProject: (name: string) => Promise<Project>;
+  reloadProjects: (signal?: AbortSignal) => Promise<void>;
+  createProject: (name: string, options?: { activate?: boolean }) => Promise<Project>;
   renameProject: (id: string, name: string) => Promise<Project>;
   selectProject: (id: string) => Promise<void>;
   refreshCurrent: () => Promise<void>;
@@ -278,6 +284,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const currentProjectId =
         projects.find((project) => project.id === saved)?.id || projects[0].id;
       localStorage.setItem(PROJECT_STORAGE_KEY, currentProjectId);
+      projectDirectoryGeneration++;
       set({ projects, currentProjectId });
       await get().refreshCurrent();
     } catch (error) {
@@ -287,27 +294,47 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  createProject: async (name) => {
-    const response = await api.post("/api/v1/projects", { name });
-    const project = response.data.data as Project;
-    set((state) => ({ projects: [project, ...state.projects] }));
-    await get().selectProject(project.id);
-    return project;
+  reloadProjects: async (signal) => {
+    const generation = ++projectDirectoryGeneration;
+    const response = await api.get("/api/v1/projects", { signal });
+    const projects = inspectProjectDirectory(response.data.data);
+    if (!signal?.aborted && generation === projectDirectoryGeneration) set({ projects });
+  },
+
+  createProject: async (name, options) => {
+    const normalized = name.trim();
+    if (!normalized || [...normalized].length > PROJECT_NAME_LIMIT) throw new Error("Invalid project name");
+    if (creatingProject) throw new ProjectOperationBusy();
+    creatingProject = true; projectDirectoryGeneration++;
+    const origin = get().currentProjectId, navigation = projectNavigationGeneration;
+    try {
+      const response = await api.post("/api/v1/projects", { name: normalized });
+      const project = inspectProject(response.data.data, { name: normalized });
+      if (get().projects.some(item => item.id === project.id)) throw new Error("Creation returned an existing project");
+      projectDirectoryGeneration++;
+      set((state) => ({ projects: [project, ...state.projects] }));
+      if (options?.activate !== false && get().currentProjectId === origin && navigation === projectNavigationGeneration) await get().selectProject(project.id);
+      return project;
+    } finally { creatingProject = false; }
   },
 
   renameProject: async (id, name) => {
-    const response = await api.patch(`/api/v1/projects/${id}`, {
-      name: name.trim(),
-    });
-    const project = response.data.data as Project;
-    set((state) => ({
-      projects: state.projects.map((item) => (item.id === id ? project : item)),
-    }));
-    return project;
+    const normalized = name.trim();
+    if (!normalized || [...normalized].length > PROJECT_NAME_LIMIT) throw new Error("Invalid project name");
+    if (renamingProjects.has(id)) throw new ProjectOperationBusy();
+    renamingProjects.add(id); projectDirectoryGeneration++;
+    try {
+      const response = await api.patch(`/api/v1/projects/${id}`, { name: normalized });
+      const project = inspectProject(response.data.data, { id, name: normalized });
+      projectDirectoryGeneration++;
+      set((state) => ({ projects: state.projects.map((item) => (item.id === id ? project : item)) }));
+      return project;
+    } finally { renamingProjects.delete(id); }
   },
 
   selectProject: async (id) => {
-    localStorage.setItem(PROJECT_STORAGE_KEY, id);
+    projectNavigationGeneration++;
+    try { localStorage.setItem(PROJECT_STORAGE_KEY, id); } catch { /* session-only choice */ }
     set({
       currentProjectId: id,
       sources: [],
