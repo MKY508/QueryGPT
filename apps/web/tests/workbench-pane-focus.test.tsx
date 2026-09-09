@@ -1,8 +1,9 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useReducer } from "react";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextIntlClientProvider } from "next-intl";
-import { AnalysisWorkbench, type WorkbenchView } from "@/components/chat/AnalysisWorkbench";
+import { AnalysisWorkbench } from "@/components/chat/AnalysisWorkbench";
+import { INITIAL_WORKBENCH_PANE, selectWorkbenchPane } from "@/lib/workbench-pane";
 import type { ChatMessage } from "@/lib/types/chat";
 import zh from "@/messages/zh.json";
 import { mockSemanticDialogs, mockSemanticWidth } from "./semantic-dialog-mock";
@@ -13,11 +14,13 @@ const messages: ChatMessage[] = [
 ];
 const submit = vi.fn(), history = vi.fn();
 function Harness({ items = messages, request = 0 }: { items?: ChatMessage[]; request?: number }) {
-  const [view, setView] = useState<WorkbenchView>("result");
+  const [pane, setView] = useReducer(selectWorkbenchPane, INITIAL_WORKBENCH_PANE);
+  const { view } = pane;
+  const dataView = view === "result" ? pane.lastDataView : view;
   return <NextIntlClientProvider locale="zh" messages={zh}>
     <AnalysisWorkbench messages={items} view={view} onViewChange={setView} onNewAnalysis={submit} onOpenHistory={history}
       focusComposerRequest={request} composer={<textarea aria-label="Draft" defaultValue="Keep my question" />}
-      emptyContent={<p>No result</p>} dataContent={view !== "result" ? <p>Sources</p> : null}
+      emptyContent={<p>No result</p>} dataContent={<div hidden={view === "result"}><input aria-label={`Data ${dataView}`} /></div>}
       renderResult={(message) => <><h1>{message.content}</h1><input aria-label={`Note ${message.id}`} /></>} />
   </NextIntlClientProvider>;
 }
@@ -40,6 +43,22 @@ beforeEach(() => { restoreDialogs = mockSemanticDialogs(); });
 afterEach(() => { cleanup(); restoreDialogs(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 
 describe("workbench pane focus", () => {
+  it("retains the hidden data view and its local input when returning to results", () => {
+    layout(); render(<Harness />);
+    const tabs = screen.getByRole("tablist");
+    click(within(tabs).getByRole("tab", { name: zh.workbench.understanding }));
+    const field = screen.getByLabelText("Data understanding");
+    fireEvent.change(field, { target: { value: "Keep this selection" } });
+    const resultTab = within(tabs).getByRole("tab", { name: zh.workbench.result });
+    click(resultTab);
+    expect(resultTab).toHaveFocus(); expect(field).not.toBeVisible();
+    expect(screen.getByLabelText("Data understanding")).toBe(field);
+    click(within(tabs).getByRole("tab", { name: zh.workbench.understanding }));
+    expect(screen.getByLabelText("Data understanding")).toBe(field);
+    expect(field).toBeVisible(); expect(field).toHaveValue("Keep this selection");
+    expect(submit).not.toHaveBeenCalled();
+  });
+
   it("retains the result and draft while desktop navigation is collapsed", () => {
     layout(); render(<Harness />);
     const draft = screen.getByLabelText("Draft");

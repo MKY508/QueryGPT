@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
@@ -28,6 +28,8 @@ import { ChatHeader } from "./ChatHeader";
 import { DataWorkspacePanel } from "./DataWorkspacePanel";
 import { useChatAreaState } from "./useChatAreaState";
 import { useStandingAnalyses } from "./useStandingAnalyses";
+import { INITIAL_WORKBENCH_PANE, selectWorkbenchPane } from "@/lib/workbench-pane";
+import { Button } from "@/components/ui/button";
 
 interface ChatAreaProps {
   sidebarOpen: boolean;
@@ -102,10 +104,9 @@ export function ChatArea({
   const tArea = useTranslations("chatArea");
   const tProjectDefaults = useTranslations("projectDefaults");
   const queryClient = useQueryClient();
-  const [dataPanelOpen, setDataPanelOpen] = useState(false);
-  const [dataPanelView, setDataPanelView] = useState<"sources" | "understanding">(
-    "sources"
-  );
+  const [pane, changeWorkbenchView] = useReducer(selectWorkbenchPane, INITIAL_WORKBENCH_PANE);
+  const dataPanelOpen = pane.view !== "result";
+  const dataPanelView = pane.view === "result" ? pane.lastDataView : pane.view;
   const processingSettlementsRef = useRef(new Set<string>());
   const [pendingTask, setPendingTask] = useState<PendingTask | null>(null);
   const [analysisServiceSelectorOpen, setAnalysisServiceSelectorOpen] = useState(false);
@@ -115,16 +116,8 @@ export function ChatArea({
   useEffect(() => {
     router.prefetch("/settings");
   }, [router]);
-  const closeDataPanel = () => {
-    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    setDataPanelOpen(false);
-  };
-  const openDataPanel = useCallback((view: "sources" | "understanding") => {
-    setDataPanelView(view);
-    setDataPanelOpen(true);
-  }, []);
+  const closeDataPanel = () => changeWorkbenchView("result");
+  const openDataPanel = changeWorkbenchView;
   const {
     messages,
     isLoading,
@@ -505,7 +498,7 @@ export function ChatArea({
                   : tArea("localWorkspaceHint")}
               </div>
             </div>
-            <button
+            <Button variant="outline" size="sm"
               type="button"
               onClick={() =>
                 void bootstrap({
@@ -513,10 +506,10 @@ export function ChatArea({
                   description: tProjectDefaults("initialDescription"),
                 })
               }
-              className="ml-auto shrink-0 border border-warning/40 bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-warning/10"
+              className="ml-auto border-warning/40 hover:bg-warning/10"
             >
               {tArea("reconnect")}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -613,7 +606,7 @@ export function ChatArea({
         }}
         connections={connections}
         view={dataPanelView}
-        onViewChange={setDataPanelView}
+        onViewChange={changeWorkbenchView}
       />
     </div>
   );

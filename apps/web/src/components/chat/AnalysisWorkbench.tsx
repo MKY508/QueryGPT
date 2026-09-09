@@ -16,7 +16,7 @@ import { useWorkbenchPaneFocus } from "./useWorkbenchPaneFocus";
 import { InvestigationList } from "./InvestigationList";
 import { EMPTY_RESULT_NAVIGATION, resultNavigationTarget, visitResult } from "@/lib/result-navigation";
 
-export type WorkbenchView = "result" | "sources" | "understanding";
+import type { WorkbenchView } from "@/lib/workbench-pane";
 
 interface AnalysisWorkbenchProps {
   messages: ChatMessage[];

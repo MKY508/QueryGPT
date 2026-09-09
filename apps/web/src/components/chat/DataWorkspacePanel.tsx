@@ -1,5 +1,7 @@
 "use client";
 
+import type { DataWorkspaceView } from "@/lib/workbench-pane";
+
 import { useId, useRef, useState } from "react";
 import { useDataWorkspacePresentation } from "./useDataWorkspacePresentation";
 import { Button } from "@/components/ui/button";
@@ -43,8 +45,8 @@ interface DataWorkspacePanelProps {
   settingsLoaded?: boolean;
   onOpenPreprocessingSettings?: () => void;
   connections?: ConnectionSummary[];
-  view?: "sources" | "understanding";
-  onViewChange?: (view: "sources" | "understanding") => void;
+  view?: DataWorkspaceView;
+  onViewChange?: (view: DataWorkspaceView) => void;
 }
 
 function inferredColumnNames(schema: Record<string, unknown> | undefined): string[] {
@@ -175,9 +177,9 @@ function ProjectDataWorkspace({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [localView, setLocalView] = useState<"sources" | "understanding">("sources");
+  const [localView, setLocalView] = useState<DataWorkspaceView>("sources");
   const activeView = view || localView;
-  const changeView = (nextView: "sources" | "understanding") => {
+  const changeView = (nextView: DataWorkspaceView) => {
     if (view === undefined) setLocalView(nextView);
     onViewChange?.(nextView);
   };
