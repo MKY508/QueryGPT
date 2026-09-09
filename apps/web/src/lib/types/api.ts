@@ -680,6 +680,8 @@ export interface PreflightIssue {
   severity: "info" | "warning" | "critical";
   automatic: boolean;
   count?: number | null;
+  presentation_code?: string;
+  presentation_facts?: Record<string, string>;
 }
 
 export interface PreflightAmbiguity {

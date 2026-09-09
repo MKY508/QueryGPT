@@ -22,7 +22,7 @@
 | 关于 | 统一标题栏、产品与版本双栏、三列项目链接 | 工作区里的版本检查行为 |
 | 项目理解 | 320px 详情区；工作区已改为 200px 目录与单一表格 | 页面历史、选择及保存恢复的整体归并 |
 | 数据来源 | 280px 目录、来源版本解析、字段与样例预览 | 上传、文件准备、来源替换及工作区完整行为 |
-| 数据工作区外框 | 60px 标题栏、共享页签；嵌入模式或 900px 桌面侧面板 | 外框提交不包含其余工作区新功能 |
+| 数据工作区 | 60px 标题栏、共享页签与按钮、12px 内容卡片；嵌入模式或 900px 桌面侧面板。界面状态按项目重建，数据说明独立维护 | 来源操作、上传队列和项目存储仍需整体归并 |
 | 文件准备窗口 | Excel 与 CSV 复用 PreparationDialog、共享按钮及样例表；1120px 窗口、224px 工作表目录 | 来源入口、项目存储和真实文件准备联调 |
 | 来源更新与方法重用 | 复用文件准备窗口和完整样例查看器；移除另一套截断样例表，保留两期数据标签与明确确认 | 工作区入口、项目存储及真实更新链路的整体归并 |
 | 数据窗口 | 表格与 360px 记录详情并排；筛选、排序、列选择、精确值与导出 | 报告和聊天入口的整体归并 |
@@ -34,6 +34,7 @@
 - 来源预览只使用当前来源保留的快照，不从独立列样例拼造记录；字段名和精确值不改写。
 - 整理前后行号是各自样例位置，不假设同一记录。字段消失或切换来源时不恢复旧选列。
 - 整理的迟到预览不能恢复已关闭会话；应用期间不能重复提交。项目存储只归并整理请求归属，其他项目操作仍待整理。
+- `DataWorkspacePanel` 只在项目身份变化时重建内部工作区；同项目收起保留栏目，项目往返不复用旧界面状态。数据说明、字段摘要、问题文案与时间格式统一在 `useDataWorkspacePresentation`，不混入页面操作处理。
 - 退出确认初始聚焦继续编辑，Escape 返回草稿；确认框固定 460px，普通工作面板不冒充模态。
 
 ## 验证证据
@@ -43,7 +44,7 @@
 | 范围 | 已检查内容 | 视觉证据 |
 | --- | --- | --- |
 | 工作台、设置 | 导航折叠、栏目往返、编辑保留、并排边界、主题；入口为 settings-editor、analysis-workbench、workbench-pane-focus、settings-page | 仍需完整页面验收 |
-| 数据工作区外框 | 暂存源码 3 个定向用例及类型检查通过；Chrome 1200px 验证 60px 标题栏、字段搜索与放大样例，无脚本错误或写请求 | 与下行字段搜索共用预览 |
+| 数据工作区 | 外框、字段搜索与放大样例已验证；本次暂存源码 3 个用例覆盖项目往返、同项目收起及中英文数据说明，限定类型检查与 ESLint 通过。Chrome 1200px：6px 按钮、12px 卡片、60px 标题栏，无横向溢出、脚本错误或写请求 | [数据工作区](images/zh/desktop-ui-data-workspace.png) |
 | 文件准备 | 暂存源码 4 个用例覆盖只读预览、迟到响应、明确提交与未确认结果；类型检查、限定 ESLint 通过。Chrome 1200px 验证两种窗口的 12px 圆角、60px 标题栏及 Escape，未写真实数据 | [CSV](images/zh/desktop-ui-csv-import.png)、[Excel](images/zh/desktop-ui-workbook.png) |
 | 来源更新与方法重用 | 暂存源码 4 个用例覆盖迟到预览、单次确认、未确认写入、版本锁定和后部字段完整值；限定类型检查与 ESLint 通过。Chrome 1200px 验证两种窗口、完整值及分层 Escape；使用虚构来源与整理方法，未执行应用 | [更新数据](images/zh/desktop-ui-source-replacement.png)、[重新整理](images/zh/desktop-ui-recipe-replay.png) |
 | 数据目录与预览 | 1200/1440px 下列表可见、12px 外框、无页面横向溢出；筛选、来源切换、字段定位、页签键盘、样例失效 | [目录](images/zh/desktop-ui-sources.png)、[字段搜索](images/zh/desktop-ui-source-fields.png) |
@@ -64,4 +65,5 @@
 - [Twenty NavigationDrawer 源码](https://github.com/twentyhq/twenty/blob/main/packages/twenty-front/src/modules/ui/navigation/navigation-drawer/components/NavigationDrawer.tsx)：导航、内容和主题变量的职责划分。只采用桌面分工，没有复制源码或新增其依赖。
 - [PatternFly inline Drawer](https://www.patternfly.org/components/drawer/)：主从内容并排，不采用手机断点或覆盖式切换。
 - [PatternFly Modal](https://www.patternfly.org/components/modal/design-guidelines/)：明确任务采用标题、内容与动作分区；文件准备、来源更新及方法重用复用一个桌面框架。
+- [React 状态归属](https://react.dev/learn/preserving-and-resetting-state)：项目身份作为工作区 key，直接重建该项目的局部状态，不为每个反馈和弹窗单独追加项目切换补丁。
 - [WAI-ARIA Alert Dialog](https://www.w3.org/WAI/ARIA/apg/patterns/alertdialog/)：真实模态、标题、描述与确认操作。页签规则见上文。

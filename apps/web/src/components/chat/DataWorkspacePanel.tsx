@@ -1,9 +1,10 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { useDataWorkspacePresentation } from "./useDataWorkspacePresentation";
 import { Button } from "@/components/ui/button";
 import { TabList } from "@/components/ui/TabList";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -25,7 +26,6 @@ import {
 } from "lucide-react";
 import type {
   ConnectionSummary,
-  PreflightIssue,
   PreflightReport,
   ProjectDataSource,
   SemanticEntry,
@@ -59,30 +59,6 @@ function inferredColumnNames(schema: Record<string, unknown> | undefined): strin
     .filter(Boolean);
 }
 
-const FIELD_WORD_KEYS = [
-  "unit",
-  "price",
-  "cost",
-  "total",
-  "amount",
-  "revenue",
-  "sales",
-  "order",
-  "id",
-  "date",
-  "time",
-  "store",
-  "shop",
-  "channel",
-  "category",
-  "product",
-  "quantity",
-  "qty",
-  "discount",
-  "refund",
-  "profit",
-];
-
 function isBusinessFacingKnowledge(entry: SemanticEntry): boolean {
   if (entry.entry_type === "verified_query") return false;
   if (
@@ -101,7 +77,12 @@ export function getPendingUnderstandingCount(knowledge: SemanticEntry[]): number
   return visibleKnowledge.filter((entry) => entry.state === "candidate").length;
 }
 
-export function DataWorkspacePanel({
+export function DataWorkspacePanel(props: DataWorkspacePanelProps) {
+  const projectId = useProjectStore(state => state.currentProjectId);
+  return <ProjectDataWorkspace key={projectId ?? "no-project"} {...props} />;
+}
+
+function ProjectDataWorkspace({
   embedded = false,
   open,
   onClose,
@@ -112,13 +93,9 @@ export function DataWorkspacePanel({
   view,
   onViewChange,
 }: DataWorkspacePanelProps) {
+  const { locale, businessIssueTitle, businessPreflightSummary, dedupeBusinessIssues, businessColumnSummary, knowledgeKindLabel, knowledgeDisplayValue, revisionTime } = useDataWorkspacePresentation();
   const tabsId = useId();
-  const locale = useLocale();
   const t = useTranslations("dataWorkspace");
-  const fieldWordsRaw = t("fieldWords").split(",").map((s) => s.trim());
-  const FIELD_WORDS: Record<string, string> = Object.fromEntries(
-    FIELD_WORD_KEYS.map((key, i) => [key, fieldWordsRaw[i] || key]),
-  );
 
   const sourceStatus = (status: string) => {
     if (status === "ready") return { label: t("statusReady"), tone: "text-success bg-success/[0.06]" };
@@ -128,300 +105,6 @@ export function DataWorkspacePanel({
     if (status === "error") return { label: t("statusNeedsAttention"), tone: "text-destructive bg-destructive/[0.06]" };
     if (status === "attached") return { label: t("statusAwaitingPreparation"), tone: "text-muted-foreground bg-muted" };
     return { label: t("statusSanitizing"), tone: "text-muted-foreground bg-muted" };
-  };
-
-  const businessFieldLabel = (value: string): string | null => {
-    const normalized = value.trim().replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
-    const parts = normalized.split(/[_\s.-]+/).filter(Boolean);
-    if (!parts.length || !parts.every((part) => FIELD_WORDS[part])) return null;
-    return parts.map((part) => FIELD_WORDS[part]).join("");
-  };
-
-  const businessIssueTitle = (issue: PreflightIssue): string => {
-    const fieldMatch = issue.title.match(/^([^“”]+?)\s*中有\s*(\d+)\s*个(.+)$/);
-    const duplicateKeyMatch = issue.title.match(/^(.+?)\s+有\s+(\d+)\s+条重复出现$/);
-    const rawField = fieldMatch?.[1] || duplicateKeyMatch?.[1];
-    const field = rawField
-      ? businessFieldLabel(rawField) || rawField.trim().slice(0, 80)
-      : null;
-    const countValue =
-      typeof issue.count === "number" && Number.isFinite(issue.count)
-        ? issue.count
-        : Number(fieldMatch?.[2] || duplicateKeyMatch?.[2] || 0);
-    const count = Math.max(0, countValue).toLocaleString(locale);
-
-    switch (issue.code) {
-      case "possible_outliers":
-        return field
-          ? t("issueOutliersField", { field, count })
-          : t("issueOutliers", { count });
-      case "invalid_currency_values":
-        return field
-          ? t("issueAmountsField", { field, count })
-          : t("issueAmounts", { count });
-      case "invalid_date_values":
-        return field
-          ? t("issueDatesField", { field, count })
-          : t("issueDates", { count });
-      case "duplicate_business_keys":
-        return field
-          ? t("issueDuplicates", { label: field, count })
-          : t("issueDuplicateKeys", { count });
-      case "header_offset":
-        return t("issueHeaderOffset", {
-          row: (Math.max(0, countValue) + 1).toLocaleString(locale),
-        });
-      case "empty_regions":
-        return t("issueEmptyRegions");
-      case "summary_rows":
-        return t("issueSummaryRows", { count });
-      case "duplicate_rows":
-      case "drop_exact_duplicates":
-        return t("issueDuplicateRows", { count });
-      case "missing_values":
-        return t("issueMissingValues", { count });
-      case "recipe_replay_drift":
-      case "recipe_input_changed":
-        return t("issueRecipeChanged", { count });
-      case "recipe_replayed":
-        return t("issueRecipeReplayed", { count });
-      case "imported_recipe_candidate":
-        return t("issueImportedRecipe");
-      case "schema_drift":
-      case "replacement_pending":
-        return t("issueSchemaChanged");
-      case "replacement_accepted":
-        return t("issueReplacementAccepted");
-      case "sanitation_reverted":
-        return t("issueSanitationReverted");
-      case "confirmed_knowledge_reused":
-        return t("issueKnowledgeReused");
-      case "database_table_budget_reached":
-      case "database_catalog_column_budget_reached":
-      case "database_table_column_budget_reached":
-      case "database_column_budget_reached":
-        return t("issueDatabaseScopeLimited");
-      case "database_sample_byte_budget_reached":
-      case "database_preflight_time_budget_reached":
-      case "database_preflight_byte_budget_reached":
-        return t("issueDatabaseSampleLimited");
-      case "database_tables_partially_unavailable":
-      case "no_profileable_columns":
-        return t("issueDatabasePartial");
-      case "database_catalog_unavailable":
-      case "database_preflight_failed":
-      case "preflight_failed":
-        return t("issuePreparationFailed");
-      default:
-        if (issue.severity === "critical") return t("issueUnknownFailed");
-        return issue.automatic
-          ? t("issueUnknownPrepared")
-          : t("issueUnknownReview");
-    }
-  };
-
-  const businessPreflightSummary = (
-    report: PreflightReport | undefined,
-    source: ProjectDataSource,
-  ): string => {
-    const asRecord = (value: unknown): Record<string, unknown> =>
-      value && typeof value === "object" && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : {};
-    const asCount = (value: unknown): number | null =>
-      typeof value === "number" && Number.isFinite(value) && value >= 0
-        ? value
-        : null;
-    const format = (value: number) => value.toLocaleString(locale);
-    const snapshot = asRecord(report?.source_snapshot);
-    const sourcePreanalysis = asRecord(source.profile_data.preanalysis);
-    const preanalysis = asRecord(snapshot.preanalysis);
-    const effectivePreanalysis = Object.keys(preanalysis).length
-      ? preanalysis
-      : sourcePreanalysis;
-    const summaryCode = String(
-      snapshot.summary_code ?? effectivePreanalysis.summary_code ?? "",
-    );
-    const summaryFacts = asRecord(
-      snapshot.summary_facts ?? effectivePreanalysis.summary_facts,
-    );
-    const shape = asRecord(effectivePreanalysis.shape);
-    const legacySummary = String(
-      report?.summary ?? source.profile_data.summary ?? "",
-    ).trim();
-    const legacySummaryMatchesLocale =
-      !summaryCode &&
-      legacySummary.length > 0 &&
-      (locale.startsWith("zh")
-        ? /[\u3400-\u9fff]/u.test(legacySummary)
-        : !/[\u3400-\u9fff]/u.test(legacySummary));
-
-    if (source.kind === "connection") {
-      const tables = asCount(summaryFacts.profiled_tables ?? shape.profiled_tables);
-      const columns = asCount(summaryFacts.profiled_columns ?? shape.columns);
-      const relationIndex = asRecord(
-        source.profile_data.relation_index ?? sourcePreanalysis.relation_index,
-      );
-      const indexedRelations = Array.isArray(relationIndex.relations)
-        ? relationIndex.relations
-        : [];
-      const catalogTables =
-        asCount(relationIndex.relations_total) ??
-        asCount(relationIndex.relations_total_at_least) ??
-        asCount(relationIndex.relations_loaded) ??
-        (indexedRelations.length ? indexedRelations.length : null);
-      const catalogComplete =
-        relationIndex.complete !== false && relationIndex.truncated !== true;
-      const profileStatus = String(
-        summaryFacts.status ??
-          snapshot.profile_status ??
-          source.profile_data.profile_status ??
-          report?.status ??
-          source.status,
-      );
-      if (profileStatus === "error" || source.status === "error") {
-        return t("preflightDatabaseFailed");
-      }
-      if (
-        catalogTables !== null &&
-        tables !== null &&
-        catalogTables !== tables
-      ) {
-        return t(
-          catalogComplete
-            ? "preflightDatabaseCatalogReady"
-            : "preflightDatabaseCatalogPartial",
-          {
-            tables: format(catalogTables),
-            checked: format(tables),
-          },
-        );
-      }
-      if (tables !== null && columns !== null) {
-        const parts = [
-          t("preflightDatabaseReady", {
-            tables: format(tables),
-            columns: format(columns),
-          }),
-        ];
-        if (summaryFacts.partial === true || profileStatus === "partial") {
-          parts.push(t("preflightDatabasePartial"));
-        }
-        return parts.join(" · ");
-      }
-      if (legacySummaryMatchesLocale) return legacySummary;
-      return t("preflightDatabasePrepared");
-    }
-
-    if (source.status === "error" || report?.status === "error") {
-      return t("preflightFileFailed");
-    }
-    const rows = asCount(summaryFacts.rows ?? snapshot.ready_rows ?? shape.rows);
-    const columns = asCount(
-      summaryFacts.columns ?? snapshot.ready_columns ?? shape.columns,
-    );
-    if (rows === null || columns === null) {
-      if (legacySummaryMatchesLocale) return legacySummary;
-      return source.status === "attached"
-        ? t("sourceAwaitingPreparation")
-        : t("preflightFilePrepared");
-    }
-    const parts = [
-      t("preflightFileReady", {
-        rows: format(rows),
-        columns: format(columns),
-      }),
-    ];
-    const automaticCount =
-      asCount(summaryFacts.automatic_issue_count) ??
-      report?.issues.filter((issue) => issue.automatic).length ??
-      0;
-    const ambiguityCount =
-      asCount(summaryFacts.ambiguity_count) ?? report?.ambiguities.length ?? 0;
-    if (automaticCount > 0) {
-      parts.push(t("preflightAutomaticHandled", { count: format(automaticCount) }));
-    }
-    if (ambiguityCount > 0) {
-      parts.push(t("preflightDefinitionsPending", { count: format(ambiguityCount) }));
-    }
-    const recipeSteps = asCount(summaryFacts.recipe_step_count) ?? 0;
-    const recipeDrift = asCount(summaryFacts.recipe_drift_count) ?? 0;
-    if (recipeDrift > 0) {
-      parts.push(t("preflightRecipeChanged"));
-    } else if (recipeSteps > 0) {
-      parts.push(t("preflightRecipeChecked"));
-    }
-    return parts.join(" · ");
-  };
-
-  const dedupeBusinessIssues = (issues: PreflightIssue[]): PreflightIssue[] => {
-    const unique = new Map<string, PreflightIssue>();
-    for (const issue of issues) {
-      const label = businessIssueTitle(issue);
-      const previous = unique.get(label);
-      if (!previous || (previous.automatic && !issue.automatic)) {
-        unique.set(label, issue);
-      }
-    }
-    return Array.from(unique.values());
-  };
-
-  const businessColumnSummary = (values: unknown): string | null => {
-    if (!Array.isArray(values) || !values.length) return null;
-    const known = Array.from(
-      new Set(
-        values
-          .map((value) => businessFieldLabel(String(value)))
-          .filter((value): value is string => Boolean(value))
-      )
-    );
-    const hiddenCount = values.length - known.length;
-    const knownLabel = new Intl.ListFormat(locale, {
-      style: "short",
-      type: "conjunction",
-    }).format(known);
-    return hiddenCount > 0
-      ? t("columnSummaryWithHidden", {
-          known: knownLabel,
-          hidden: t("hiddenItems", { count: hiddenCount }),
-        })
-      : knownLabel;
-  };
-
-  const knowledgeKindLabel = (kind: SemanticEntry["entry_type"]): string => {
-    if (kind === "metric") return t("knowledgeMetric");
-    if (kind === "dimension") return t("knowledgeGranularity");
-    if (kind === "relationship") return t("knowledgeRelation");
-    if (kind === "cleaning_rule") return t("knowledgeMethod");
-    if (kind === "verified_query") return t("knowledgeVerified");
-    return t("knowledgeDefinition");
-  };
-
-  const knowledgeDisplayValue = (entry: SemanticEntry): string => {
-    if (entry.entry_type === "relationship" && entry.state === "candidate") {
-      return t("relationPreviewHint");
-    }
-    return entry.value.replace(/\b[a-zA-Z][a-zA-Z0-9_.-]*\b/g, (token) => {
-      const lastPart = token.split(".").at(-1) || token;
-      const businessLabel = businessFieldLabel(lastPart);
-      if (businessLabel) return businessLabel;
-      return token.includes("_") || token.includes(".") || /[a-z][A-Z]/.test(token)
-        ? t("relatedFields")
-        : token;
-    });
-  };
-
-  const revisionTime = (value: string): string => {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return t("timeUnconfirmed");
-    return new Intl.DateTimeFormat(locale, {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(date);
   };
 
   const UnderstandingMap = ({
@@ -435,18 +118,18 @@ export function DataWorkspacePanel({
   }) => {
     if (!sources.length) {
       return (
-        <button
+        <Button variant="outline" size="sm"
           type="button"
-          className="flex min-h-40 w-full items-center justify-center border border-dashed border-border bg-background/70 px-6 text-center text-xs leading-5 text-muted-foreground"
+          className="flex min-h-40 w-full items-center justify-center border border-dashed border-border bg-background/70 px-6 text-center text-xs leading-5 text-muted-foreground h-auto min-h-7 whitespace-normal"
         >
           {t("emptyUnderstandingHint")}
-        </button>
+        </Button>
       );
     }
 
     return (
       <div
-        className="border border-border bg-background/70 p-3"
+        className="border border-border bg-background/70 p-3 rounded-xl"
         aria-label={t("understandingMapAria")}
       >
         <div className="grid grid-cols-2 gap-2">
@@ -454,7 +137,7 @@ export function DataWorkspacePanel({
             <div
               key={source.id}
               data-source-overview-node={source.id}
-              className="min-w-0 border border-primary/20 bg-card px-3.5 py-3"
+              className="min-w-0 border border-primary/20 bg-card px-3.5 py-3 rounded-xl"
             >
               <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground">
                 {source.kind === "connection" ? (
@@ -474,7 +157,7 @@ export function DataWorkspacePanel({
 
         <div
           data-understanding-summary
-          className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-success/30 bg-success/[0.05] px-4 py-3"
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-success/30 bg-success/[0.05] px-4 py-3 rounded-xl"
         >
           <div className="flex items-center gap-2 text-xs font-semibold text-success">
             <BookOpenText size={14} />
@@ -713,7 +396,7 @@ export function DataWorkspacePanel({
             className="hidden"
             onChange={(event) => acceptFile(event.target.files?.[0])}
           />
-          <button
+          <Button variant="outline" size="sm"
             type="button"
             disabled={!currentProjectId || isUploading}
             onClick={() => inputRef.current?.click()}
@@ -727,7 +410,7 @@ export function DataWorkspacePanel({
               setDragging(false);
               acceptFile(event.dataTransfer.files?.[0]);
             }}
-            className={cn(
+            className={cn("h-auto min-h-7 whitespace-normal",
               "flex w-full flex-col items-center border border-dashed px-5 py-7 text-center transition-colors",
               dragging
                 ? "border-primary bg-primary/5"
@@ -745,10 +428,10 @@ export function DataWorkspacePanel({
             <span className="mt-1 text-xs text-muted-foreground">
               {t("uploadFormats")}
             </span>
-          </button>
+          </Button>
 
           {error && (
-            <div className="flex gap-2 border border-destructive/30 bg-destructive/[0.06] px-3 py-3 text-xs leading-5 text-destructive">
+            <div className="flex gap-2 border border-destructive/30 bg-destructive/[0.06] px-3 py-3 text-xs leading-5 text-destructive rounded-xl">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
               {error}
             </div>
@@ -793,7 +476,7 @@ export function DataWorkspacePanel({
                   return (
                     <div
                       key={template.id}
-                      className="border border-border bg-background px-3 py-3"
+                      className="border border-border bg-background px-3 py-3 rounded-xl"
                     >
                       <div className="flex items-start gap-3">
                         <History size={17} className="mt-0.5 shrink-0 text-primary" />
@@ -820,7 +503,7 @@ export function DataWorkspacePanel({
                                     [template.id]: event.target.value,
                                   }))
                                 }
-                                className="mt-1.5 w-full border border-border bg-card px-2.5 py-2 text-sm text-foreground outline-none focus:border-primary"
+                                className="mt-1.5 w-full border border-border bg-card px-2.5 py-2 text-sm text-foreground outline-none focus:border-primary rounded-md"
                               >
                                 {compatibleSources.map((source) => (
                                   <option key={source.id} value={source.id}>
@@ -831,13 +514,13 @@ export function DataWorkspacePanel({
                             </label>
                           )}
                           {!visiblePreview && (
-                            <button
+                            <Button variant="ghost" size="sm"
                               type="button"
                               disabled={busy || !selectedSourceId}
                               onClick={() =>
                                 void performTemplatePreview(template.id, selectedSourceId)
                               }
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 text-xs text-primary h-auto min-h-7 whitespace-normal"
                             >
                               {busy && recipeTemplateAction?.kind === "preview" ? (
                                 <Loader2 size={13} className="animate-spin" />
@@ -845,11 +528,11 @@ export function DataWorkspacePanel({
                                 <RefreshCw size={13} />
                               )}
                               {t("recipePreviewButton")}
-                            </button>
+                            </Button>
                           )}
 
                           {visiblePreview && (
-                            <div className="border border-success/30 bg-success/[0.05] px-3 py-3">
+                            <div className="border border-success/30 bg-success/[0.05] px-3 py-3 rounded-xl">
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <div className="text-[11px] text-muted-foreground">{t("recipePreviewBefore")}</div>
@@ -904,11 +587,11 @@ export function DataWorkspacePanel({
                               </p>
                               <div className="mt-3 flex flex-wrap gap-3">
                                 {visiblePreview.can_apply && (
-                                  <button
+                                  <Button variant="primary" size="sm"
                                     type="button"
                                     disabled={busy}
                                     onClick={() => void performTemplateBind(template.id)}
-                                    className="inline-flex items-center gap-1.5 bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs h-auto min-h-7 whitespace-normal"
                                   >
                                     {busy && recipeTemplateAction?.kind === "bind" ? (
                                       <Loader2 size={13} className="animate-spin" />
@@ -916,18 +599,18 @@ export function DataWorkspacePanel({
                                       <Check size={13} />
                                     )}
 {t("recipeApply")}
-                                    </button>
+                                    </Button>
                                 )}
-                                <button
+                                <Button variant="ghost" size="sm"
                                   type="button"
                                   disabled={busy}
                                   onClick={() =>
                                     void performTemplatePreview(template.id, selectedSourceId)
                                   }
-                                  className="text-xs font-semibold text-muted-foreground hover:text-primary disabled:opacity-50"
+                                  className="text-xs text-muted-foreground hover:text-primary h-auto min-h-7 whitespace-normal"
                                 >
                                   {t("recipeRecheck")}
-                                </button>
+                                </Button>
                               </div>
                             </div>
                           )}
@@ -998,7 +681,7 @@ export function DataWorkspacePanel({
                   ? dedupeBusinessIssues(report.issues)
                   : [];
                 return (
-                  <div key={source.id} className="border border-border bg-background px-3 py-3">
+                  <div key={source.id} className="border border-border bg-background px-3 py-3 rounded-xl">
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 text-primary">
                         {source.kind === "file" ? (
@@ -1022,20 +705,20 @@ export function DataWorkspacePanel({
 
                     {source.kind === "file" && source.status !== "attached" && (
                       <div className="mt-3 border-t border-border pt-3">
-                        <button
+                        <Button variant="ghost" size="sm"
                           type="button"
                           onClick={() => setCleaningSourceId(source.id)}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                          className="inline-flex items-center gap-1.5 text-xs text-primary h-auto min-h-7 whitespace-normal"
                         >
                           <FileSpreadsheet size={13} />
                           {t("sourceCleanButton")}
-                        </button>
+                        </Button>
                       </div>
                     )}
 
                     {source.status === "attached" && (
                       <div className="mt-3 border-t border-border pt-3">
-                        <button
+                        <Button variant="ghost" size="sm"
                           type="button"
                           disabled={busy || !settingsLoaded || !preprocessingEnabled}
                           onClick={() =>
@@ -1045,7 +728,7 @@ export function DataWorkspacePanel({
                               t("sourcePrepared")
                             )
                           }
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 text-xs text-primary h-auto min-h-7 whitespace-normal"
                         >
                           {busy && sourceAction?.kind === "profile" ? (
                             <Loader2 size={13} className="animate-spin" />
@@ -1055,7 +738,7 @@ export function DataWorkspacePanel({
                           {!settingsLoaded
                             ? t("preprocessingLoading")
                             : t("sourcePrepareButton")}
-                        </button>
+                        </Button>
                         {settingsLoaded && !preprocessingEnabled && (
                           <div className="mt-2 border-l-2 border-warning/50 bg-warning/[0.06] px-3 py-2 text-xs leading-5 text-muted-foreground">
                             <p>{t("preprocessingDisabled")}</p>
@@ -1067,12 +750,12 @@ export function DataWorkspacePanel({
                     {needsAction && (
                       <div className="mt-3 border-t border-border pt-3">
                         {isPendingReplacement && (
-                          <div className="mb-3 border border-warning/30 bg-warning/[0.06] px-3 py-3 text-xs leading-5 text-warning">
+                          <div className="mb-3 border border-warning/30 bg-warning/[0.06] px-3 py-3 text-xs leading-5 text-warning rounded-xl">
                             <p>
                               {t("sourceNotInUse")}
                             </p>
                             <div className="mt-2 flex flex-wrap gap-2">
-                              <button
+                              <Button variant="primary" size="sm"
                                 type="button"
                                 disabled={busy}
                                 onClick={() =>
@@ -1082,7 +765,7 @@ export function DataWorkspacePanel({
                                     t("sourceAcceptConfirm")
                                   )
                                 }
-                                className="inline-flex items-center gap-1.5 bg-primary px-3 py-2 font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 h-auto min-h-7 whitespace-normal"
                               >
                                 {busy && sourceAction?.kind === "accept_replacement" ? (
                                   <Loader2 size={13} className="animate-spin" />
@@ -1090,8 +773,8 @@ export function DataWorkspacePanel({
                                   <Check size={13} />
                                 )}
                                 {t("sourceAcceptButton")}
-                              </button>
-                              <button
+                              </Button>
+                              <Button variant="outline" size="sm"
                                 type="button"
                                 disabled={busy}
                                 onClick={() =>
@@ -1101,7 +784,7 @@ export function DataWorkspacePanel({
                                     t("sourceRejectConfirm")
                                   )
                                 }
-                                className="inline-flex items-center gap-1.5 border border-warning/40 bg-background px-3 py-2 font-semibold text-foreground hover:border-primary hover:text-primary disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 border border-warning/40 bg-background px-3 py-2 text-foreground hover:border-primary hover:text-primary h-auto min-h-7 whitespace-normal"
                               >
                                 {busy && sourceAction?.kind === "keep_trusted" ? (
                                   <Loader2 size={13} className="animate-spin" />
@@ -1109,26 +792,26 @@ export function DataWorkspacePanel({
                                   <RotateCcw size={13} />
                                 )}
                                 {t("sourceRejectButton")}
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         )}
                         <div className="flex flex-wrap gap-x-3 gap-y-2 text-xs">
-                          <button
+                          <Button variant="ghost" size="sm"
                             type="button"
                             aria-expanded={detailsOpen}
                             onClick={() =>
                               setExpandedSourceId(detailsOpen ? null : source.id)
                             }
-                            className="inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary"
+                            className="inline-flex items-center gap-1 text-foreground hover:text-primary h-auto min-h-7 whitespace-normal"
                           >
                             <ChevronDown
                               size={13}
                               className={cn("transition-transform", detailsOpen && "rotate-180")}
                             />
                             {t("sourceReviewChanges")}
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="ghost" size="sm"
                             type="button"
                             disabled={busy}
                             title={t("sourceReviewOnly")}
@@ -1139,7 +822,7 @@ export function DataWorkspacePanel({
                                 t("sourceRetryHint")
                               )
                             }
-                            className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary disabled:opacity-50"
+                            className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary h-auto min-h-7 whitespace-normal"
                           >
                             {busy && sourceAction?.kind === "reorganize" ? (
                               <Loader2 size={12} className="animate-spin" />
@@ -1147,25 +830,25 @@ export function DataWorkspacePanel({
                               <RefreshCw size={12} />
                             )}
                             {t("sourceRetryButton")}
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="ghost" size="sm"
                             type="button"
                             disabled={busy}
                             onClick={() => setRemovingSourceId(source.id)}
-                            className="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive disabled:opacity-50"
+                            className="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive h-auto min-h-7 whitespace-normal"
                           >
                             <Trash2 size={12} />
                             {t("sourceRemoveButton")}
-                          </button>
+                          </Button>
                         </div>
 
                         {removing && (
-                          <div className="mt-3 border border-destructive/30 bg-destructive/[0.06] px-3 py-3 text-xs leading-5 text-destructive">
+                          <div className="mt-3 border border-destructive/30 bg-destructive/[0.06] px-3 py-3 text-xs leading-5 text-destructive rounded-xl">
                             <p>
                               {t("sourceRemoveHint")}
                             </p>
                             <div className="mt-2 flex gap-3">
-                              <button
+                              <Button variant="ghost" size="sm"
                                 type="button"
                                 disabled={busy}
                                 onClick={() =>
@@ -1178,21 +861,21 @@ export function DataWorkspacePanel({
                                     t("sourceRemoved")
                                   )
                                 }
-                                className="inline-flex items-center gap-1 font-semibold text-destructive hover:underline disabled:opacity-50"
+                                className="inline-flex items-center gap-1 text-destructive h-auto min-h-7 whitespace-normal"
                               >
                                 {busy && sourceAction?.kind === "remove" && (
                                   <Loader2 size={12} className="animate-spin" />
                                 )}
                                 {t("sourceRemoveConfirm")}
-                              </button>
-                              <button
+                              </Button>
+                              <Button variant="ghost" size="sm"
                                 type="button"
                                 disabled={busy}
                                 onClick={() => setRemovingSourceId(null)}
-                                className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                className="text-muted-foreground hover:text-foreground h-auto min-h-7 whitespace-normal"
                               >
                                 {t("sourceRemoveCancel")}
-                              </button>
+                              </Button>
                             </div>
                           </div>
                         )}
@@ -1278,11 +961,11 @@ export function DataWorkspacePanel({
                     {recipe && (
                       <div className="mt-3 border-t border-border pt-3">
                         <div className="flex items-center justify-between gap-3">
-                          <button
+                          <Button variant="ghost" size="sm"
                             type="button"
                             aria-expanded={recipeHistoryOpen}
                             onClick={() => toggleRecipeHistory(recipe.id)}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground hover:text-primary"
+                            className="inline-flex items-center gap-1.5 text-xs text-foreground hover:text-primary h-auto min-h-7 whitespace-normal"
                           >
                             <History size={12} />
                             {t("recipeHistoryTitle")}
@@ -1294,8 +977,8 @@ export function DataWorkspacePanel({
                                 recipeHistoryOpen && "rotate-180"
                               )}
                             />
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="ghost" size="sm"
                             type="button"
                             disabled={busy}
                             onClick={() =>
@@ -1305,7 +988,7 @@ export function DataWorkspacePanel({
                                 t("recipeReapplied")
                               )
                             }
-                            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary disabled:opacity-50"
+                            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary h-auto min-h-7 whitespace-normal"
                           >
                             {busy && sourceAction?.kind === "reorganize" ? (
                               <Loader2 size={12} className="animate-spin" />
@@ -1313,7 +996,7 @@ export function DataWorkspacePanel({
                               <RefreshCw size={12} />
                             )}
                             {t("recipeReapplyButton")}
-                          </button>
+                          </Button>
                         </div>
 
                         {recipeHistoryOpen && (
@@ -1331,20 +1014,20 @@ export function DataWorkspacePanel({
                               recipeRevisionErrorByRecipe[recipe.id] && (
                                 <div
                                   role="alert"
-                                  className="border border-destructive/30 bg-destructive/[0.06] px-3 py-2 text-xs leading-5 text-destructive"
+                                  className="border border-destructive/30 bg-destructive/[0.06] px-3 py-2 text-xs leading-5 text-destructive rounded-xl"
                                 >
                                   <p>{recipeRevisionErrorByRecipe[recipe.id]}</p>
-                                  <button
+                                  <Button variant="ghost" size="sm"
                                     type="button"
                                     onClick={() =>
                                       void loadRecipeRevisions(recipe.id).catch(
                                         () => undefined
                                       )
                                     }
-                                    className="mt-1 font-semibold hover:underline"
+                                    className="mt-1 h-auto min-h-7 whitespace-normal"
                                   >
                                     {t("recipeHistoryRetry")}
-                                  </button>
+                                  </Button>
                                 </div>
                               )}
                             {!recipeRevisionLoadingByRecipe[recipe.id] &&
@@ -1394,7 +1077,7 @@ export function DataWorkspacePanel({
                                           {summary}
                                         </p>
                                         {!current && !pending && (
-                                          <button
+                                          <Button variant="ghost" size="sm"
                                             type="button"
                                             disabled={Boolean(restoring)}
                                             aria-label={t("restoreRecipeAria", {
@@ -1406,18 +1089,18 @@ export function DataWorkspacePanel({
                                                 revisionId: revision.id,
                                               })
                                             }
-                                            className="mt-1 text-[11px] font-semibold text-primary hover:underline disabled:opacity-50"
+                                            className="mt-1 text-[11px] text-primary h-auto min-h-7 whitespace-normal"
                                           >
                                             {t("recipeRestoreButton")}
-                                          </button>
+                                          </Button>
                                         )}
                                         {pending && (
-                                          <div className="mt-2 border border-warning/30 bg-warning/[0.06] px-2.5 py-2 text-[11px] leading-5 text-warning">
+                                          <div className="mt-2 border border-warning/30 bg-warning/[0.06] px-2.5 py-2 text-[11px] leading-5 text-warning rounded-xl">
                                             <p>
                                               {t("recipeRestoreHint")}
                                             </p>
                                             <div className="mt-1.5 flex gap-3">
-                                              <button
+                                              <Button variant="ghost" size="sm"
                                                 type="button"
                                                 disabled={Boolean(restoring)}
                                                 onClick={() =>
@@ -1426,22 +1109,22 @@ export function DataWorkspacePanel({
                                                     revision.id
                                                   )
                                                 }
-                                                className="font-semibold text-primary hover:underline disabled:opacity-50"
+                                                className="text-primary h-auto min-h-7 whitespace-normal"
                                               >
                                                 {restoring === revision.id
                                                   ? t("recipeRestoring")
                                                   : t("recipeRestoreConfirm")}
-                                              </button>
-                                              <button
+                                              </Button>
+                                              <Button variant="ghost" size="sm"
                                                 type="button"
                                                 disabled={Boolean(restoring)}
                                                 onClick={() =>
                                                   setPendingRecipeRestore(null)
                                                 }
-                                                className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                                className="text-muted-foreground hover:text-foreground h-auto min-h-7 whitespace-normal"
                                               >
                                                 {t("recipeRestoreCancel")}
-                                              </button>
+                                              </Button>
                                             </div>
                                           </div>
                                         )}
@@ -1453,7 +1136,7 @@ export function DataWorkspacePanel({
                             {recipeHistoryFeedback?.recipeId === recipe.id && (
                               <div
                                 role="status"
-                                className="mt-3 border border-success/30 bg-success/[0.06] px-3 py-2 text-xs leading-5 text-success"
+                                className="mt-3 border border-success/30 bg-success/[0.06] px-3 py-2 text-xs leading-5 text-success rounded-xl"
                               >
                                 {recipeHistoryFeedback.message}
                               </div>
@@ -1466,7 +1149,7 @@ export function DataWorkspacePanel({
                 );
               })}
               {!sources.length && (
-                <div className="border border-border px-4 py-5 text-center text-xs leading-5 text-muted-foreground">
+                <div className="border border-border px-4 py-5 text-center text-xs leading-5 text-muted-foreground rounded-xl">
                   {t("emptyData")}
                 </div>
               )}
@@ -1480,11 +1163,11 @@ export function DataWorkspacePanel({
                 {connections
                   .filter((connection) => !attachedConnections.has(connection.id))
                   .map((connection) => (
-                    <button
+                    <Button variant="outline" size="sm"
                       key={connection.id}
                       disabled={isUploading}
                       onClick={() => void attachConnection(connection.id, connection.name)}
-                      className="flex w-full items-center gap-3 border border-border bg-background px-3 py-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:opacity-50"
+                      className="flex w-full items-center gap-3 border border-border bg-background px-3 py-3 text-left transition-colors hover:border-primary/50 hover:bg-primary/5 h-auto min-h-7 whitespace-normal"
                     >
                       <Database size={17} className="text-primary" />
                       <div className="min-w-0 flex-1">
@@ -1496,26 +1179,26 @@ export function DataWorkspacePanel({
                         </div>
                       </div>
                       <Plus size={16} className="text-muted-foreground" />
-                    </button>
+                    </Button>
                   ))}
               </div>
             </section>
           )}
 
           {!connections?.length && (
-            <section className="border border-border bg-background px-4 py-4">
+            <section className="border border-border bg-background px-4 py-4 rounded-xl">
               <h3 className="text-sm font-semibold text-foreground">{t("connectDbPrompt")}</h3>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 {t("connectDbHint")}
               </p>
-              <button
+              <Button variant="primary" size="sm"
                 type="button"
                 onClick={onConfigureConnection}
-                className="mt-3 inline-flex items-center gap-2 bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+                className="mt-3 inline-flex items-center gap-2 px-3 py-2 text-xs h-auto min-h-7 whitespace-normal"
               >
                 <Plus size={14} />
                 {t("connectDbButton")}
-              </button>
+              </Button>
             </section>
           )}
             </>
