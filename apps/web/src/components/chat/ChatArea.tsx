@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { CircleAlert } from "lucide-react";
@@ -10,7 +10,6 @@ import type {
   AppSettings,
   ConnectionSummary,
   ModelSummary,
-  SuggestedQuestionsResponse,
 } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
 import { useChatStore } from "@/lib/stores/chat";
@@ -20,6 +19,7 @@ import { InputBar } from "./InputBar";
 import { ChatHeader } from "./ChatHeader";
 import { DataWorkspacePanel } from "./DataWorkspacePanel";
 import { useComposerDraft } from "./useComposerDraft";
+import { useSuggestedQuestions } from "./useSuggestedQuestions";
 import { useAnalysisModelSelection } from "./useAnalysisModelSelection";
 import { useAnalysisSettlementRefresh } from "./useAnalysisSettlementRefresh";
 import { useStandingAnalyses } from "./useStandingAnalyses";
@@ -95,6 +95,7 @@ export function ChatArea({
     currentProjectId,
     sources,
     pendingKnowledgeCount,
+    suggestedQuestionsRevisionByProject,
     isUploading,
     error: projectError,
     bootstrap,
@@ -175,36 +176,11 @@ export function ChatArea({
     await retryPromise;
   };
 
-  const sourceSuggestionKey = readySources
-    .map((source) => `${source.id}:${source.updated_at}`)
-    .join("|");
-  const {
-    data: suggestedQuestions,
-    error: suggestionsError,
-    isPending: suggestionsLoading,
-    mutate: generateSuggestions,
-    reset: resetSuggestions,
-  } = useMutation<SuggestedQuestionsResponse>({
-    mutationFn: async () => {
-      if (!currentProjectId) throw new Error(tArea("noAnalyzableProject"));
-      const response = await api.post(
-        `/api/v1/projects/${currentProjectId}/suggested-questions`,
-        { model_id: selectedModelId || null, locale: locale === "en" ? "en" : "zh" },
-        { timeout: 20_000 }
-      );
-      return response.data.data as SuggestedQuestionsResponse;
-    },
-  });
-
-  useEffect(() => {
-    resetSuggestions();
-  }, [currentProjectId, locale, resetSuggestions, selectedModelId, sourceSuggestionKey]);
-
   const selfAnalysisEnabled = appSettings?.self_analysis_enabled === true;
-  const handleGenerateSuggestions = () => {
-    if (!selfAnalysisEnabled || !currentProjectId || !readySources.length) return;
-    generateSuggestions();
-  };
+  const canGenerateSuggestions = !appSettingsLoading && selfAnalysisEnabled && Boolean(currentProjectId && readySources.length);
+  const suggestions = useSuggestedQuestions({ projectId: currentProjectId, modelId: selectedModelId || null, locale,
+    sources: readySources, contextRevision: currentProjectId ? suggestedQuestionsRevisionByProject[currentProjectId] || 0 : 0,
+    enabled: canGenerateSuggestions });
 
   const effectiveContextRounds = appSettings?.context_rounds || 5;
   const { standingAnalyses, standingLoading, checkingStandingId, standingFeedback, checkStanding } = useStandingAnalyses({
@@ -393,12 +369,13 @@ export function ChatArea({
           project={currentProject}
           sources={sources}
           standingAnalyses={standingAnalyses}
-          suggestedQuestions={suggestedQuestions?.items || []}
-          suggestionsLoading={Boolean(readySources.length && suggestionsLoading)}
+          suggestedQuestions={suggestions.items}
+          suggestionsGenerated={suggestions.generated}
+          suggestionsLoading={suggestions.loading}
           settingsLoaded={!appSettingsLoading}
           selfAnalysisEnabled={selfAnalysisEnabled}
-          canGenerateSuggestions={Boolean(currentProjectId && readySources.length)}
-          suggestionsFailed={Boolean(suggestionsError)}
+          canGenerateSuggestions={canGenerateSuggestions}
+          suggestionsFailed={suggestions.failed}
           emptyComposer={taskComposer}
           activityLoading={standingLoading || recentRunsLoading}
           checkingStandingId={checkingStandingId}
@@ -411,7 +388,7 @@ export function ChatArea({
           onManageAnalysisServices={handleManageAnalysisServices}
           onOpenSettings={() => router.push("/settings")}
           onOpenProcessingSettings={() => router.push("/settings?tab=execution")}
-          onGenerateSuggestions={handleGenerateSuggestions}
+          onGenerateSuggestions={() => void suggestions.generate()}
           onOpenData={() => openDataPanel("sources")}
           onOpenUnderstanding={() => openDataPanel("understanding")}
           onUsePrompt={setInput}

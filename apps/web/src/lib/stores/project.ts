@@ -392,7 +392,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       ) {
         return;
       }
-      set({
+      set((state) => ({
         sources: sourcesResponse.data.data as ProjectDataSource[],
         preflightReports: reportsResponse.data.data as PreflightReport[],
         recipes:
@@ -405,8 +405,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         knowledgeTotal: knowledgePreview.summary.active_total,
         pendingKnowledgeCount: knowledgePreview.summary.pending_total,
         relationshipKnowledgeCount: knowledgePreview.summary.relationship_total,
+        // Semantic workspace writes also refresh here without using the store's
+        // individual knowledge actions. Retire the old suggestion snapshot;
+        // this revision never triggers generation by itself.
+        suggestedQuestionsRevisionByProject: {
+          ...state.suggestedQuestionsRevisionByProject,
+          [projectId]: (state.suggestedQuestionsRevisionByProject[projectId] || 0) + 1,
+        },
         error: null,
-      });
+      }));
     } catch (error) {
       if (
         get().currentProjectId === projectId &&

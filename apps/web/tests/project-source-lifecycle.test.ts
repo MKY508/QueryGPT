@@ -75,6 +75,24 @@ describe("project source lifecycle actions", () => {
     mockWorkspaceRefresh();
   });
 
+  it("retires suggestions only after a current project refresh is accepted", async () => {
+    useProjectStore.setState({ suggestedQuestionsRevisionByProject: { "project-1": 7, "project-2": 3 } });
+    await useProjectStore.getState().refreshCurrent();
+    expect(useProjectStore.getState().suggestedQuestionsRevisionByProject).toEqual({ "project-1": 8, "project-2": 3 });
+    let finish!: (value: unknown) => void;
+    mocks.get.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const staleRefresh = useProjectStore.getState().refreshCurrent();
+    useProjectStore.setState({ currentProjectId: "project-2" });
+    finish({ data: { data: [] } });
+    await staleRefresh;
+    expect(useProjectStore.getState().suggestedQuestionsRevisionByProject).toEqual({ "project-1": 8, "project-2": 3 });
+    useProjectStore.setState({ currentProjectId: "project-1" });
+    mocks.get.mockRejectedValueOnce(new Error("refresh unavailable"));
+    await useProjectStore.getState().refreshCurrent();
+    expect(useProjectStore.getState().suggestedQuestionsRevisionByProject["project-1"]).toBe(8);
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
   it("never starts preflight while adding a file or connection", async () => {
     await useProjectStore
       .getState()
