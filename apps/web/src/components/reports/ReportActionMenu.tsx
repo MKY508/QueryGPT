@@ -1,6 +1,8 @@
 "use client";
 
 import { useId, useLayoutEffect, useRef, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export interface ReportMenuAction {
   id: string;
@@ -12,8 +14,10 @@ export interface ReportMenuAction {
 }
 
 /** Toolbar overflow following the APG menu-button keyboard and focus pattern. */
-export function ReportActionMenu({ label, icon, actions, open, onOpenChange }: {
+export function ReportActionMenu({ label, text, disabled = false, icon, actions, open, onOpenChange }: {
   label: string;
+  text?: string;
+  disabled?: boolean;
   icon: ReactNode;
   actions: ReportMenuAction[];
   open: boolean;
@@ -53,17 +57,19 @@ export function ReportActionMenu({ label, icon, actions, open, onOpenChange }: {
   return <div ref={root} className="relative" onBlur={(event) => {
     if (!event.currentTarget.contains(event.relatedTarget)) onOpenChange(false);
   }}>
-    <button ref={trigger} type="button" aria-label={label} title={label}
+    <Button ref={trigger} variant="ghost" size={text ? "md" : "icon"} disabled={disabled} aria-label={label} title={label}
       aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined}
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
+      className="text-xs"
       onClick={() => { focusLast.current = false; onOpenChange(!open); }}
       onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
         if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
         event.preventDefault(); focusLast.current = event.key === "ArrowUp"; onOpenChange(true);
-      }}>{icon}</button>
+      }}>{icon}{text && <><span>{text}</span><ChevronDown size={12} /></>}</Button>
     {open && <div ref={menu} id={id} role="menu" aria-label={label} tabIndex={-1}
       className="absolute top-11 z-40 w-56 rounded-lg border border-border bg-popover p-1.5 shadow-lg"
       onKeyDown={(event) => {
+        if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
         const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)')];
         const index = items.indexOf(document.activeElement as HTMLButtonElement);
         if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
