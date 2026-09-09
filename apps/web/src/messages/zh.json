@@ -632,7 +632,8 @@
     "saveProjectNameAria": "保存项目名称",
     "cancelRenameAria": "取消重命名",
     "renameProjectAria": "重命名项目：{name}",
-    "settingsAria": "打开设置"
+    "settingsAria": "打开设置",
+    "switchProject": "切换项目：{name}"
   },
   "inputBar": {
     "dropHint": "松开以加入当前项目",

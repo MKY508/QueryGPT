@@ -631,7 +631,8 @@
     "saveProjectNameAria": "Save project name",
     "cancelRenameAria": "Cancel renaming",
     "renameProjectAria": "Rename project: {name}",
-    "settingsAria": "Open settings"
+    "settingsAria": "Open settings",
+    "switchProject": "Switch project: {name}"
   },
   "inputBar": {
     "dropHint": "Release to add files to the project",

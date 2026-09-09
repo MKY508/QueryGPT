@@ -1,42 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Sidebar } from "@/components/chat/Sidebar";
+import { AnalysisHistoryDialog } from "@/components/chat/AnalysisHistoryDialog";
 import { ChatArea } from "@/components/chat/ChatArea";
-import { api } from "@/lib/api/client";
+import { ProjectSwitcherDialog } from "@/components/projects/ProjectSwitcherDialog";
 import {
   normalizeConversationId,
   storedConversationIdForProject,
   useChatStore,
 } from "@/lib/stores/chat";
 import { useProjectStore } from "@/lib/stores/project";
-import type { AnalysisRunSummary } from "@/lib/types/api";
 
 export default function Home() {
   const router = useRouter();
-  const tSidebar = useTranslations("sidebar");
   const tProjectDefaults = useTranslations("projectDefaults");
   const initialProjectName = tProjectDefaults("initialName");
   const initialProjectDescription = tProjectDefaults("initialDescription");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dialog, setDialog] = useState<"history" | "projects" | null>(null);
+  const closeDialog = (owner: "history" | "projects") => setDialog(current => current === owner ? null : current);
   const [selectedReport, setSelectedReport] = useState<{
+    projectId: string | null;
     conversationId: string;
-    analysisRunId: string;
+    analysisRunId: string | null;
   } | null>(null);
   const [focusAnalysisRunId, setFocusAnalysisRunId] = useState<string | null>(null);
   const attemptedRestoreRef = useRef<string | null>(null);
-  const [returnConversationId, setReturnConversationId] = useState<string | null>(
-    () => {
-      if (typeof window === "undefined") return null;
-      return normalizeConversationId(
-        new URLSearchParams(window.location.search).get("conversation")
-      );
-    }
-  );
-  const { bootstrap, currentProjectId } = useProjectStore();
+  const returnConversation = useRef<string | null | undefined>(undefined);
+  if (returnConversation.current === undefined) {
+    returnConversation.current = typeof window === "undefined" ? null : normalizeConversationId(
+      new URLSearchParams(window.location.search).get("conversation")
+    );
+  }
+  const { bootstrap, currentProjectId, projects } = useProjectStore();
   const {
     messages,
     currentConversationId,
@@ -44,56 +41,45 @@ export default function Home() {
     activeStreamId,
     setCurrentConversation,
   } = useChatStore();
-
-  const { data: reportRuns = [], isLoading: reportsLoading } =
-    useQuery<AnalysisRunSummary[]>({
-      queryKey: ["analysis-runs", currentProjectId],
-      queryFn: async () => {
-        const response = await api.get(
-          `/api/v1/projects/${currentProjectId}/analysis-runs`
-        );
-        return response.data.data as AnalysisRunSummary[];
-      },
-      enabled: Boolean(currentProjectId),
-    });
+  const selectionContext = useRef({ projectId: currentProjectId, conversationId: currentConversationId });
+  useLayoutEffect(() => {
+    selectionContext.current = { projectId: currentProjectId, conversationId: currentConversationId };
+  }, [currentProjectId, currentConversationId]);
 
   const handleOpenReport = useCallback(
     (conversationId: string, analysisRunId: string) => {
       if (isLoading || activeStreamId) return;
-      setSelectedReport({ conversationId, analysisRunId });
+      setSelectedReport({ projectId: currentProjectId, conversationId, analysisRunId });
       setFocusAnalysisRunId(analysisRunId);
       setCurrentConversation(conversationId, currentProjectId);
     },
     [activeStreamId, currentProjectId, isLoading, setCurrentConversation]
   );
 
+  const handleVisibleReportChange = useCallback((analysisRunId: string | null) => {
+    if (!currentConversationId || selectionContext.current.projectId !== currentProjectId || selectionContext.current.conversationId !== currentConversationId) return;
+    setSelectedReport((current) => current?.projectId === currentProjectId && current.conversationId === currentConversationId && current.analysisRunId === analysisRunId
+      ? current : { projectId: currentProjectId, conversationId: currentConversationId, analysisRunId });
+  }, [currentProjectId, currentConversationId]);
+
   const latestMessageRunId = [...messages]
     .reverse()
     .find((message) => message.analysisRunId)?.analysisRunId;
   const currentAnalysisRunId =
-    (selectedReport?.conversationId === currentConversationId
+    focusAnalysisRunId || (selectedReport?.projectId === currentProjectId && selectedReport.conversationId === currentConversationId
       ? selectedReport.analysisRunId
-      : null) ||
-    latestMessageRunId ||
-    reportRuns.find((run) => run.conversation_id === currentConversationId)?.id ||
-    null;
+      : latestMessageRunId || null);
 
   useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 768px)");
-    const syncSidebar = (event: MediaQueryList | MediaQueryListEvent) => {
-      setSidebarOpen(event.matches);
-    };
-    syncSidebar(desktop);
-    desktop.addEventListener("change", syncSidebar);
     void bootstrap({
       name: initialProjectName,
       description: initialProjectDescription,
     });
-    return () => desktop.removeEventListener("change", syncSidebar);
   }, [bootstrap, initialProjectDescription, initialProjectName]);
 
   useEffect(() => {
     if (!currentProjectId || isLoading || activeStreamId) return;
+    const returnConversationId = returnConversation.current;
     const restoreKey = `${currentProjectId}:${returnConversationId || "stored"}`;
     if (returnConversationId) {
       if (attemptedRestoreRef.current !== restoreKey) {
@@ -103,7 +89,7 @@ export default function Home() {
         }
       }
       router.replace("/", { scroll: false });
-      setReturnConversationId(null);
+      returnConversation.current = null;
       return;
     }
     if (currentConversationId) return;
@@ -117,50 +103,42 @@ export default function Home() {
     currentConversationId,
     currentProjectId,
     isLoading,
-    returnConversationId,
     router,
     setCurrentConversation,
   ]);
 
-  useEffect(() => {
-    if (
-      !currentConversationId ||
-      (selectedReport && selectedReport.conversationId !== currentConversationId)
-    ) {
-      setSelectedReport(null);
-      setFocusAnalysisRunId(null);
-    }
-  }, [currentConversationId, selectedReport]);
+  if (selectedReport && (selectedReport.projectId !== currentProjectId || selectedReport.conversationId !== currentConversationId)) {
+    setSelectedReport(null);
+    setFocusAnalysisRunId(null);
+  }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        reportRuns={reportRuns}
-        reportsLoading={reportsLoading}
-        reportSwitchDisabled={isLoading || Boolean(activeStreamId)}
-        currentConversationId={currentConversationId}
+    <div className="workspace-shell flex h-screen overflow-hidden bg-background">
+      <AnalysisHistoryDialog
+        open={dialog === "history"}
+        onClose={() => closeDialog("history")}
+        projectId={currentProjectId}
+        projectName={projects.find(project => project.id === currentProjectId)?.name || ""}
+        disabled={isLoading || Boolean(activeStreamId)}
         currentAnalysisRunId={currentAnalysisRunId}
         onOpenReport={handleOpenReport}
+        onNewAnalysis={() => {
+          const chat = useChatStore.getState();
+          if (chat.isLoading || chat.activeStreamId) return;
+          chat.clearConversation({ forget: true, projectId: currentProjectId });
+          closeDialog("history");
+        }}
       />
-      {sidebarOpen && (
-        <button
-          type="button"
-          aria-label={tSidebar("closeNav")}
-          onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 z-30 bg-slate-950/25 md:hidden"
-        />
-      )}
       <ChatArea
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        recentRuns={reportRuns}
-        recentRunsLoading={reportsLoading}
+        onOpenHistory={() => setDialog("history")}
+        onOpenProjects={() => setDialog("projects")}
         onOpenReport={handleOpenReport}
         focusAnalysisRunId={focusAnalysisRunId}
         onReportFocused={() => setFocusAnalysisRunId(null)}
+        onVisibleReportChange={handleVisibleReportChange}
       />
+      {dialog === "projects" && <ProjectSwitcherDialog disabled={isLoading || Boolean(activeStreamId)}
+        onClose={() => closeDialog("projects")} onSwitched={() => closeDialog("projects")} />}
     </div>
   );
 }

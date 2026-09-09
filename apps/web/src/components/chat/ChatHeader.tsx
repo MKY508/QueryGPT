@@ -1,220 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Check, Database, History, Loader2, Pencil, Settings2, X } from "lucide-react";
-import Link from "next/link";
+import { BookOpenText, ChevronDown, Database } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { getUserFacingErrorMessage, type Project } from "@/lib/types/api";
+import type { Project } from "@/lib/types/api";
+import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 interface ChatHeaderProps {
-  onToggleSidebar: () => void;
   onToggleData: () => void;
   onOpenUnderstanding?: () => void;
   project?: Project;
   readySources: number;
   totalSources: number;
   pendingUnderstandingCount?: number;
-  onRenameProject?: (name: string) => Promise<void>;
+  onOpenProjects?: () => void;
+  workspaceActions?: ReactNode;
 }
-
-function renameErrorMessage(error: unknown, fallback: string): string {
-  return getUserFacingErrorMessage(error, fallback);
-}
-
 export function ChatHeader({
-  onToggleSidebar,
   onToggleData,
   onOpenUnderstanding,
   project,
   readySources,
   totalSources,
   pendingUnderstandingCount = 0,
-  onRenameProject,
+  onOpenProjects,
+  workspaceActions,
 }: ChatHeaderProps) {
   const t = useTranslations("chatHeader");
+  const tw = useTranslations("workbench");
   const dataReady = readySources > 0;
   const hasPendingUnderstanding = pendingUnderstandingCount > 0;
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [isSavingName, setIsSavingName] = useState(false);
-  const [draftName, setDraftName] = useState(project?.name || "");
-  const [renameError, setRenameError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setDraftName(project?.name || "");
-    setIsEditingName(false);
-    setIsSavingName(false);
-    setRenameError(null);
-  }, [project?.id, project?.name]);
-
-  const beginRename = () => {
-    if (!project || !onRenameProject) return;
-    setDraftName(project.name);
-    setRenameError(null);
-    setIsEditingName(true);
-  };
-
-  const cancelRename = () => {
-    if (isSavingName) return;
-    setDraftName(project?.name || "");
-    setRenameError(null);
-    setIsEditingName(false);
-  };
-
-  const saveRename = async () => {
-    if (!project || !onRenameProject || isSavingName) return;
-    const normalizedName = draftName.trim();
-    if (!normalizedName) {
-      setRenameError(t("projectNameEmpty"));
-      return;
-    }
-    if (normalizedName === project.name) {
-      setDraftName(project.name);
-      setRenameError(null);
-      setIsEditingName(false);
-      return;
-    }
-
-    setIsSavingName(true);
-    setRenameError(null);
-    try {
-      await onRenameProject(normalizedName);
-      setDraftName(normalizedName);
-      setIsEditingName(false);
-    } catch (error) {
-      setRenameError(renameErrorMessage(error, t("projectNameSaveFailed")));
-    } finally {
-      setIsSavingName(false);
-    }
-  };
-
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur-md">
-      <div className="flex h-14 items-center justify-between px-3 sm:h-[68px] sm:px-5">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"
-            aria-label={t("openProjectNavigationAria")}
-          >
-            <History size={20} />
-          </button>
-          <div className="hidden h-8 w-px bg-border sm:block md:hidden" />
+    <header className="flex min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="min-w-0">
-            {isEditingName ? (
-              <div className="flex min-w-0 items-center gap-1">
-                <input
-                  autoFocus
-                  aria-label={t("projectNameAria")}
-                  value={draftName}
-                  maxLength={120}
-                  disabled={isSavingName}
-                  onChange={(event) => {
-                    setDraftName(event.target.value);
-                    setRenameError(null);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void saveRename();
-                    }
-                    if (event.key === "Escape") {
-                      event.preventDefault();
-                      cancelRename();
-                    }
-                  }}
-                  className="h-7 min-w-0 max-w-[320px] border border-primary/40 bg-background px-2 text-sm font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
-                />
-                <button
-                  type="button"
-                  onClick={() => void saveRename()}
-                  disabled={isSavingName}
-                  className="p-1 text-primary hover:bg-primary/10 disabled:opacity-50"
-                  aria-label={t("saveProjectNameAria")}
-                >
-                  {isSavingName ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Check size={14} />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelRename}
-                  disabled={isSavingName}
-                  className="p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
-                  aria-label={t("cancelRenameAria")}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : project && onRenameProject ? (
-              <button
-                type="button"
-                onClick={beginRename}
-                className="group flex max-w-full items-center gap-1.5 text-left text-[13px] font-semibold text-foreground"
-                aria-label={t("renameProjectAria", { name: project.name })}
-              >
-                <span className="truncate">{project.name}</span>
-                <Pencil
-                  size={12}
-                  className="shrink-0 text-muted-foreground opacity-70 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                />
-              </button>
-            ) : project ? (
-              <div className="truncate text-sm font-semibold text-foreground">
-                {project.name}
-              </div>
-            ) : null}
-            {renameError ? (
-              <div role="alert" className="mt-0.5 text-[11px] text-destructive">
-                {renameError}
-              </div>
-            ) : dataReady ? (
-              <div className="mt-0.5 hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
-                <span className="h-1.5 w-1.5 bg-success" />
+            {project && onOpenProjects ? <Button variant="ghost" size="sm" onClick={onOpenProjects} aria-haspopup="dialog"
+              aria-label={t("switchProject", { name: project.name })} className="max-w-full justify-start text-left text-[13px] font-semibold text-foreground">
+              <span className="truncate">{project.name}</span><ChevronDown size={13} className="shrink-0 text-muted-foreground" />
+            </Button> : project ? <div className="truncate text-sm font-semibold">{project.name}</div> : <span className="text-sm font-medium">ReceiptBI</span>}
+            {dataReady ? (
+              <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-success" />
                 {t("readySources", { count: readySources })}
               </div>
             ) : null}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={
-              hasPendingUnderstanding
-                ? onOpenUnderstanding || onToggleData
-                : onToggleData
-            }
-            aria-label={
-              hasPendingUnderstanding
-                ? `${t("data")}，${t("pendingReview", { count: pendingUnderstandingCount })}`
-                : `${t("data")}${totalSources > 0 ? ` ${totalSources}` : ""}`
-            }
-            className="inline-flex items-center gap-2 border border-border bg-card px-2.5 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/50 hover:bg-primary/[0.04] sm:px-3"
-          >
+        <div className="flex shrink-0 items-center gap-2">
+          {hasPendingUnderstanding && onOpenUnderstanding && <Button variant="ghost" onClick={onOpenUnderstanding}
+            aria-label={`${tw("understanding")} · ${t("pendingReview", { count: pendingUnderstandingCount })}`}>
+            <BookOpenText size={16} className="text-warning" />
+            <span>{t("pendingReview", {count: pendingUnderstandingCount})}</span>
+          </Button>}
+          <Button variant="outline" onClick={onToggleData}
+            aria-label={`${t("data")}${totalSources > 0 ? ` ${totalSources}` : ""}`}>
             <Database size={16} className="text-primary" />
             <span>{t("data")}</span>
-            {(hasPendingUnderstanding || totalSources > 0) && (
-              <span
-                className={
-                  hasPendingUnderstanding
-                    ? "bg-warning/10 px-1.5 py-0.5 text-[11px] text-warning"
-                    : "bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary"
-                }
-              >
-                {hasPendingUnderstanding
-                  ? t("pendingReview", { count: pendingUnderstandingCount })
-                  : totalSources}
-              </span>
-            )}
-          </button>
-          <Link
-            href="/settings"
-            className="p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
-            aria-label={t("settingsAria")}
-          >
-            <Settings2 size={18} />
-          </Link>
+            {totalSources > 0 && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary">{totalSources}</span>}
+          </Button>
+          {workspaceActions}
         </div>
       </div>
     </header>
