@@ -10,14 +10,16 @@ export interface ReportMenuAction {
   icon: ReactNode;
   disabled?: boolean;
   title?: string;
+  destructive?: boolean;
   onSelect: () => void;
 }
 
 /** Toolbar overflow following the APG menu-button keyboard and focus pattern. */
-export function ReportActionMenu({ label, text, disabled = false, icon, actions, open, onOpenChange }: {
+export function ReportActionMenu({ label, text, disabled = false, align = "start", icon, actions, open, onOpenChange }: {
   label: string;
   text?: string;
   disabled?: boolean;
+  align?: "start" | "end";
   icon: ReactNode;
   actions: ReportMenuAction[];
   open: boolean;
@@ -37,8 +39,12 @@ export function ReportActionMenu({ label, text, disabled = false, icon, actions,
     if (!popup || !anchor) return;
     const position = () => {
       const bounds = anchor.getBoundingClientRect();
-      const left = Math.max(8, Math.min(bounds.left, window.innerWidth - popup.offsetWidth - 8));
+      const preferredLeft = align === "end" ? bounds.right - popup.offsetWidth : bounds.left;
+      const left = Math.max(8, Math.min(preferredLeft, window.innerWidth - popup.offsetWidth - 8));
       popup.style.left = `${left - bounds.left}px`;
+      const below = bounds.bottom + 8;
+      const top = below + popup.offsetHeight <= window.innerHeight - 8 ? below : Math.max(8, bounds.top - popup.offsetHeight - 8);
+      popup.style.top = `${top - bounds.top}px`;
     };
     position();
     const items = popup.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)');
@@ -52,7 +58,7 @@ export function ReportActionMenu({ label, text, disabled = false, icon, actions,
       document.removeEventListener("pointerdown", dismiss);
       window.removeEventListener("resize", position);
     };
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, align]);
 
   return <div ref={root} className="relative" onBlur={(event) => {
     if (!event.currentTarget.contains(event.relatedTarget)) onOpenChange(false);
@@ -86,7 +92,7 @@ export function ReportActionMenu({ label, text, disabled = false, icon, actions,
       }}>
       {actions.map((action) => <button key={action.id} type="button" role="menuitem" tabIndex={-1}
         disabled={action.disabled} title={action.title}
-        className="flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-xs font-medium text-foreground hover:bg-muted focus-visible:bg-muted disabled:opacity-40"
+        className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-xs font-medium hover:bg-muted focus-visible:bg-muted disabled:opacity-40 ${action.destructive ? "text-destructive" : "text-foreground"}`}
         onClick={() => { close(); action.onSelect(); }}>{action.icon}{action.label}</button>)}
     </div>}
   </div>;

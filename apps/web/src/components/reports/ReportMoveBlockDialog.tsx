@@ -38,7 +38,7 @@ function ReportMoveSession({ report, blockId, disabled, onMove, onClose }: Repor
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
     };
   }, []);
-  return <TaskDialog dialogRef={dialog} writingRef={{ current: false }} busy={false} size="compact" title={t("title")} name={`${block?.title || t("untitled")} · ${source?.title || ""}`} closeLabel={t("close")} onClose={onClose}>
+  return <TaskDialog dialogRef={dialog} writingRef={{ current: false }} busy={false} autoFocusClose={false} size="compact" title={t("title")} name={`${block?.title || t("untitled")} · ${source?.title || ""}`} closeLabel={t("close")} onClose={onClose}>
     <SearchField inputRef={search} label={t("search")} clearLabel={t("clearSearch")} className="mx-5 my-4 shrink-0"
         value={query} onChange={setQuery}
         onKeyDown={(event) => { if (event.key === "ArrowDown" && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {

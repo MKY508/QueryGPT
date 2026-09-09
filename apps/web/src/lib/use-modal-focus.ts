@@ -16,8 +16,7 @@ function available(element: HTMLElement): boolean {
   if (!element.isConnected || element.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
   const visibility = window.getComputedStyle(element).visibility;
   if (visibility === "hidden" || visibility === "collapse") return false;
-  // Responsive master/detail panes stay mounted to retain their place. A
-  // hidden ancestor must not become an initial or wraparound focus target.
+  // Hidden mounted panels must not become initial or wraparound focus targets.
   for (let parent: HTMLElement | null = element; parent; parent = parent.parentElement) {
     if (window.getComputedStyle(parent).display === "none") return false;
   }
@@ -25,8 +24,15 @@ function available(element: HTMLElement): boolean {
 }
 
 export function focusableElements(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    .filter((element) => element.getAttribute("tabindex") !== "-1" && available(element));
+  // Traverse in document order, as in Radix FocusScope. Dynamic insertions must
+  // retain their place between controls of different element types.
+  const elements: HTMLElement[] = [];
+  const walker = container.ownerDocument.createTreeWalker(container, NodeFilter.SHOW_ELEMENT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node instanceof HTMLElement && node.matches(FOCUSABLE_SELECTOR)
+      && node.getAttribute("tabindex") !== "-1" && available(node)) elements.push(node);
+  }
+  return elements;
 }
 
 /** Shared by native task frames and overlays that listen at the window boundary. */
