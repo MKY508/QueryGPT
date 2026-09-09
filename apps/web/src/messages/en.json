@@ -2508,5 +2508,16 @@
     "saveHint": "Save after applying. Your pre-merge edits will be retained as a draft.",
     "apply": "Apply and continue editing",
     "applying": "Retaining draft"
+  },
+  "reportFind": {
+    "title": "Find in report",
+    "close": "Close search",
+    "placeholder": "Search titles, text or metrics…",
+    "clear": "Clear search",
+    "count": "{count, plural, one {# matching location} other {# matching locations}}",
+    "noMatches": "No matching content",
+    "untitled": "Untitled content",
+    "openResult": "Go to page {page}: {title}",
+    "showMore": "Show more · {shown} of {total} shown"
   }
 }

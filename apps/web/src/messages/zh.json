@@ -2508,5 +2508,16 @@
     "saveHint": "应用后仍需保存。合并前的修改会保留为草稿。",
     "apply": "应用并继续编辑",
     "applying": "正在保留草稿"
+  },
+  "reportFind": {
+    "title": "查找报告内容",
+    "close": "关闭查找",
+    "placeholder": "搜索标题、正文或指标…",
+    "clear": "清除查找",
+    "count": "{count} 个匹配位置",
+    "noMatches": "没有找到匹配的内容",
+    "untitled": "未命名内容",
+    "openResult": "前往第 {page} 页：{title}",
+    "showMore": "显示更多 · 已显示 {shown} / {total}"
   }
 }
