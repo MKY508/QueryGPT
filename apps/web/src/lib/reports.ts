@@ -26,6 +26,7 @@ export interface ReportBlock {
   source_kind: ReportBlockSource;
   analysis_run_id?: string | null;
   artifact_id?: string | null;
+  copy_source_block_id?: string;
   source_ref?: Record<string, unknown>;
   source_available?: boolean;
   content: Record<string, unknown>;
