@@ -21,7 +21,7 @@ const wrapper = (english = false, disabled = false) => <NextIntlClientProvider l
   <ProjectSwitcherDialog onClose={close} onSwitched={switched} disabled={disabled} />
 </NextIntlClientProvider>;
 const nameInput = () => screen.getByRole("textbox", { name: copy.name });
-const launchCreate = async () => { await waitFor(() => expect(screen.getByRole("button", { name: copy.refresh })).toBeEnabled()); fireEvent.click(screen.getByRole("button", { name: copy.new, exact: true })); };
+const launchCreate = async () => { await waitFor(() => expect(screen.getByRole("button", { name: copy.refresh })).toBeEnabled()); fireEvent.click(screen.getByRole("button", { name: copy.new })); };
 beforeEach(() => {
   restoreDialogs = mockSemanticDialogs(); close.mockReset(); switched.mockReset();
   projects = Array.from({ length: 42 }, (_, index) => project(String(index + 1)));

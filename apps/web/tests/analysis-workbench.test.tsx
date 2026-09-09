@@ -86,7 +86,7 @@ describe("analysis workbench", () => {
     fireEvent.compositionEnd(search); fireEvent.keyDown(search, { key: "Escape" });
     expect(search).toHaveValue(""); expect(search).toHaveFocus();
     fireEvent.change(search, { target: { value: "无匹配" } });
-    fireEvent.click(screen.getByRole("button", { name: "清除搜索", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "清除搜索" }));
     expect(search).toHaveValue(""); expect(search).toHaveFocus();
     expect(within(screen.getByRole("region", { name: zh.workbench.result })).getByRole("heading", { level: 1 })).toHaveTextContent("八月结论");
     expect(screen.getByRole("button", { name: /七月利润/ })).toBeInTheDocument();

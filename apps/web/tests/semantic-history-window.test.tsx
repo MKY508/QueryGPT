@@ -38,7 +38,7 @@ const view = (restored = vi.fn(), close = vi.fn(), id = current.id) => <NextIntl
 </NextIntlClientProvider>;
 async function chooseAndConfirm() {
   fireEvent.click(await screen.findByRole("button", { name: /^版本 2 / }));
-  fireEvent.click(screen.getByRole("button", { name: zh.semanticHistory.restore, exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: zh.semanticHistory.restore }));
 }
 it("compares alongside the directory and restores only after explicit head-bound confirmation", async () => {
   const post = vi.spyOn(api, "post").mockResolvedValue(response({ ...current, active_revision_id: "new-head", revision_number: 4 }));
@@ -48,7 +48,7 @@ it("compares alongside the directory and restores only after explicit head-bound
   expect(post).not.toHaveBeenCalled();
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   expect(screen.queryByRole("heading", { name: "恢复版本 2？" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: zh.semanticHistory.restore, exact: true })).toHaveFocus();
+  expect(screen.getByRole("button", { name: zh.semanticHistory.restore })).toHaveFocus();
   await chooseAndConfirm();
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: zh.semanticHistory.confirmRestore })); });
   expect(post).toHaveBeenCalledExactlyOnceWith("/api/v1/projects/history-project/knowledge/definition/revisions/revision-2/restore", { expected_active_revision_id: "revision-3" });
@@ -64,5 +64,5 @@ it("does not deliver an old restoration into a newly selected definition session
   await screen.findByRole("button", { name: /^版本 3 / });
   await act(async () => { complete(response({ ...current, active_revision_id: "new-head", revision_number: 4 })); });
   expect(restored).not.toHaveBeenCalled(); expect(close).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: zh.semanticHistory.restore, exact: true })).toBeDisabled();
+  expect(screen.getByRole("button", { name: zh.semanticHistory.restore })).toBeDisabled();
 });

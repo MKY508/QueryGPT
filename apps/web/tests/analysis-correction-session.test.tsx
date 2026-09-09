@@ -28,7 +28,7 @@ describe('correction draft ownership',()=>{
   fireEvent.change(input,{target:{value:'正在编辑：扣除退款再计算'}});
   await act(async()=>{client.setQueryData(['analysis-corrections','project'],[{...saved,text:'已更新的收入定义',updated_at:'2026-09-02'}]);});
   expect(input).toHaveValue('正在编辑：扣除退款再计算');
-  fireEvent.click(screen.getByRole('button',{name:'取消',exact:true}));
+  fireEvent.click(screen.getByRole('button',{name:'取消'}));
   expect(screen.getByText('已更新的收入定义')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'修改'}));
   expect(screen.getByLabelText('正确的理解是什么？')).toHaveValue('已更新的收入定义');

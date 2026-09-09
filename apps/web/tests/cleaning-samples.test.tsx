@@ -39,7 +39,7 @@ describe("cleaning sample review", () => {
     render(view(before));
     const table = screen.getByRole("table", { name: "数据样本" });
     for (const value of ["缺失值", "空文本", "仅空白字符", "0", "false", "9007199254740993.01"]) {
-      expect(within(table).getByRole("cell", { name: value === "仅空白字符" ? "仅空白字符 展开" : value, exact: true })).toBeInTheDocument();
+      expect(within(table).getByRole("cell", { name: value === "仅空白字符" ? "仅空白字符 展开" : value })).toBeInTheDocument();
     }
     const label = screen.getByRole("checkbox", { name: "显示空白字符" });
     fireEvent.click(label);

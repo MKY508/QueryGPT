@@ -30,7 +30,7 @@ function layout() {
   });
   return viewport;
 }
-const button = (name: string) => screen.getByRole("button", { name, exact: true });
+const button = (name: string) => screen.getByRole("button", { name });
 const entry = (letter: string) => screen.getByRole("button", { name: new RegExp(`Question ${letter}`) });
 const result = () => screen.getByRole("region", { name: zh.workbench.result });
 const click = (node: HTMLElement) => { node.focus(); fireEvent.click(node); };

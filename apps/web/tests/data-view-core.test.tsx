@@ -103,10 +103,10 @@ describe("data view", () => {
     expect(search).toHaveAccessibleDescription(`没有与“${query}”匹配的字段`);
     expect(screen.getByRole("status")).toHaveTextContent("0 / 2 个字段");
     expect(document.querySelector("aside script")).toBeNull();
-    expect(screen.getByRole("button", { name: "复制记录", exact: true })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "复制记录" })).toBeEnabled();
     rerender(details([]));
     expect(search).toHaveAccessibleDescription("当前没有显示的字段");
-    expect(screen.getByRole("button", { name: "复制记录", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "复制记录" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "清除字段搜索" }));
     expect(search).toHaveFocus();
     expect(search).toHaveAccessibleDescription("当前没有显示的字段");
@@ -148,7 +148,7 @@ describe("data view", () => {
     const rows = [{ name: "West", amount: 3 }, { name: "East", amount: 1 }, { name: "North", amount: 2 }];
     render(intl(<Viewer snapshot={{ title: "Orders", rows, sort: { column: "amount", direction: "asc" } }} />));
     const initialCalls = model.mock.calls.length;
-    fireEvent.click(screen.getByRole("button", { name: "选择记录", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "选择记录" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "选择第 1 条记录" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "选择第 2 条记录" }));
     const search = screen.getByRole("searchbox", { name: "搜索表格" });
@@ -157,7 +157,7 @@ describe("data view", () => {
     fireEvent.click(screen.getByRole("button", { name: /导出所选/ }));
     expect(download.mock.calls.at(-1)?.[0]).toEqual([rows[1], rows[2]]);
     fireEvent.change(search, { target: { value: "" } });
-    fireEvent.click(screen.getByRole("button", { name: "amount", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "amount" }));
     expect(model).toHaveBeenCalledTimes(initialCalls + 1);
     fireEvent.click(screen.getByRole("button", { name: /导出所选/ }));
     expect(download.mock.calls.at(-1)?.[0]).toEqual([rows[2], rows[1]]);
@@ -184,16 +184,16 @@ describe("data view", () => {
     const add = () => fireEvent.click(screen.getByRole("button", { name: "添加筛选" }));
     const value = () => screen.getByLabelText("值", { exact: true });
     add(); fireEvent.change(value(), { target: { value: "East" } });
-    fireEvent.click(screen.getByRole("button", { name: "应用", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "应用" }));
     add(); fireEvent.change(value(), { target: { value: "unfinished" } });
     for (const name of ["修改筛选：name 包含 East", "移除筛选：name 包含 East", "清除筛选"]) {
-      const action = screen.getByRole("button", { name, exact: true });
+      const action = screen.getByRole("button", { name });
       expect(action).toHaveAttribute("aria-disabled", "true");
       fireEvent.click(action);
       expect(value()).toHaveValue("unfinished");
       expect(screen.getByRole("status")).toHaveTextContent("1 / 2 行");
     }
-    fireEvent.click(screen.getByRole("button", { name: "取消", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
     const edit = screen.getByRole("button", { name: "修改筛选：name 包含 East" });
     expect(edit).toHaveAttribute("aria-disabled", "false");
     fireEvent.click(edit);
@@ -201,7 +201,7 @@ describe("data view", () => {
     fireEvent.change(value(), { target: { value: "West" } });
     // Re-selecting the same chip must not restore its old saved value either.
     fireEvent.click(edit); expect(value()).toHaveValue("West");
-    fireEvent.click(screen.getByRole("button", { name: "应用", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "应用" }));
     expect(screen.getByRole("cell", { name: "West" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "移除筛选：name 包含 West" }));
     expect(screen.getByRole("status")).toHaveTextContent("2 / 2 行");
@@ -212,8 +212,8 @@ describe("data view", () => {
     const download = vi.spyOn(csv, "downloadCsv").mockImplementation(() => {});
     const rows = [{ name: "West", amount: 3 }, { name: "East", amount: 1 }];
     render(intl(<Viewer snapshot={{ title: "Orders", rows }} />));
-    fireEvent.click(screen.getByRole("button", { name: "amount", exact: true }));
-    fireEvent.click(screen.getByRole("button", { name: "选择记录", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "amount" }));
+    fireEvent.click(screen.getByRole("button", { name: "选择记录" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "选择第 2 条记录" }));
     fireEvent.click(screen.getByRole("button", { name: "只看已选" }));
     const search = screen.getByRole("searchbox", { name: "搜索表格" });
@@ -234,7 +234,7 @@ describe("data view", () => {
     render(intl(<Viewer snapshot={{ title: "Orders", rows: [{ name: "East" }] }} />));
     fireEvent.click(screen.getByRole("button", { name: "添加筛选" }));
     fireEvent.change(screen.getByLabelText("值", { exact: true }), { target: { value: "West" } });
-    fireEvent.click(screen.getByRole("button", { name: "应用", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "应用" }));
     expect(screen.getByText("没有匹配的记录")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "添加筛选" }));
     fireEvent.change(screen.getByLabelText("值", { exact: true }), { target: { value: "Draft" } });
@@ -242,9 +242,9 @@ describe("data view", () => {
     expect(restore).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(restore);
     expect(screen.getByLabelText("值", { exact: true })).toHaveValue("Draft");
-    fireEvent.click(screen.getByRole("button", { name: "取消", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
     fireEvent.click(restore);
-    expect(screen.getByRole("cell", { name: "East", exact: true })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "East" })).toBeInTheDocument();
     expect(screen.queryByText("没有匹配的记录")).not.toBeInTheDocument();
   });
 
@@ -259,19 +259,19 @@ describe("data view", () => {
     const writeText = vi.fn().mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; })).mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     render(intl(<Viewer snapshot={{ title: "Orders", rows: [{ name: "East" }, { name: "West" }] }} />));
-    fireEvent.click(screen.getByRole("button", { name: "选择记录", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "选择记录" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "选择第 2 条记录" }));
     fireEvent.click(screen.getByRole("button", { name: "查看第 1 条记录" }));
     fireEvent.click(screen.getByRole("button", { name: "复制name的值" }));
     fireEvent.click(screen.getByRole("button", { name: messages.dataView.backToTable }));
     fireEvent.click(screen.getByRole("button", { name: "查看第 2 条记录" }));
-    expect(screen.getByRole("button", { name: "复制记录", exact: true })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "复制记录" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "复制所选 1 条" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "复制所选 1 条" }));
     expect(writeText).toHaveBeenCalledExactlyOnceWith("East");
     await act(async () => { finish(); });
     expect(screen.queryByText("已复制", { exact: true })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "复制记录", exact: true })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "复制记录" })).toBeEnabled();
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "复制所选 1 条" })); });
     expect(writeText).toHaveBeenLastCalledWith("name\r\nWest");
   });
@@ -329,7 +329,7 @@ describe("data view", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "条件组合" }), { target: { value: "all" } });
     fireEvent.click(screen.getByRole("button", { name: "导出当前结果 CSV" }));
     expect(download.mock.lastCall?.[0]).toEqual(rows.slice(0, 2));
-    fireEvent.click(screen.getByRole("button", { name: "取消", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
     fireEvent.click(screen.getByRole("button", { name: "用amount的值筛选" }));
     expect(screen.getByRole("combobox", { name: "条件组合" })).toHaveValue("any");
     fireEvent.change(screen.getByRole("combobox", { name: "条件组合" }), { target: { value: "all" } });
@@ -378,9 +378,9 @@ describe("data view", () => {
     const download = vi.spyOn(csv, "downloadCsv").mockImplementation(() => {});
     render(intl(<Viewer snapshot={{ title: "Orders", rows }} />));
     fireEvent.click(screen.getByRole("button", { name: "查看第 1 条记录" }));
-    fireEvent.click(screen.getByRole("button", { name: "group", exact: true }));
-    fireEvent.click(screen.getByRole("button", { name: "amount", exact: true }), { shiftKey: true });
-    fireEvent.click(screen.getByRole("button", { name: "amount", exact: true }), { shiftKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "group" }));
+    fireEvent.click(screen.getByRole("button", { name: "amount" }), { shiftKey: true });
+    fireEvent.click(screen.getByRole("button", { name: "amount" }), { shiftKey: true });
     expect(screen.getByRole("columnheader", { name: "group" })).toHaveAttribute("aria-sort", "ascending");
     expect(screen.getByRole("columnheader", { name: "amount" })).not.toHaveAttribute("aria-sort");
     expect(within(screen.getByRole("complementary")).getByText("3 / 3")).toBeInTheDocument();
@@ -446,7 +446,7 @@ describe("data view", () => {
   it("starts a clean view on snapshot replacement without a stale close event dismissing the new dialog", async () => {
     const rows = Array.from({ length: 60 }, (_, index) => ({ name: `old-${index}`, amount: index }));
     const view = render(intl(<StrictMode><Viewer snapshot={{ title: "Old", rows }} /></StrictMode>));
-    fireEvent.click(screen.getByRole("button", { name: "amount", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "amount" }));
     fireEvent.change(screen.getByRole("combobox", { name: "每页行数" }), { target: { value: "25" } });
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索表格" }), { target: { value: "old" } });
     const chooser = screen.getByText("显示列 2/2").closest("details")!;
@@ -552,7 +552,7 @@ describe("data view", () => {
     expect(screen.getByRole("status")).toHaveTextContent("2 / 5 行");
     fireEvent.click(screen.getByRole("button", { name: "修改筛选：note 无数据" }));
     fireEvent.change(screen.getByLabelText("条件", { exact: true }), { target: { value: "is_empty_text" } });
-    fireEvent.click(screen.getByRole("button", { name: "取消", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(screen.getByRole("status")).toHaveTextContent("2 / 5 行");
     fireEvent.click(screen.getByRole("button", { name: "修改筛选：note 无数据" }));
     fireEvent.change(screen.getByLabelText("条件", { exact: true }), { target: { value: "is_empty_text" } });
@@ -598,7 +598,7 @@ describe("data view", () => {
     fireEvent.click(within(details).getByRole("button", { name: "上一条记录" }));
     expect(within(details).getByRole("button", { name: "上一条记录" })).toHaveAttribute("aria-disabled", "true");
     expect(within(details).getByText("order-52")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "下一页", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
     expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查看第 26 条记录" })).toBeInTheDocument();
     expect(rows[0]).toEqual({ name: "order-1", amount: "52" });

@@ -25,11 +25,11 @@ function Harness({ items = messages, scope = "conversation-one", focus, loading 
       renderResult={(message) => <><h1>{message.content}</h1><input aria-label={`note-${message.id}`} /></>} />
   </NextIntlClientProvider>;
 }
-const button = (name: string) => screen.getByRole("button", { name, exact: true });
+const button = (name: string) => screen.getByRole("button", { name });
 const back = () => button("上一个查看的结果"), forward = () => button("下一个查看的结果");
 const choose = (letter: string) => fireEvent.click(screen.getByRole("button", { name: new RegExp(`Question ${letter}`) }));
 const title = (value: string) => {
-  const canvas = screen.queryByRole("region", {name: zh.workbench.result, exact: true}) || screen.getByRole("region", {name: en.workbench.result, exact: true});
+  const canvas = screen.queryByRole("region", {name: zh.workbench.result}) || screen.getByRole("region", {name: en.workbench.result});
   expect(within(canvas).getByRole("heading", {level: 1})).toHaveTextContent(value);
 };
 const observers: { notify: () => void; disconnect: ReturnType<typeof vi.fn> }[] = [];
@@ -126,7 +126,7 @@ describe("result reading navigation", () => {
     view.rerender(<Harness items={messages} />);
     fireEvent.click(back()); title("Third");
     choose("C"); // Explicitly resume following before leaving the result tab.
-    fireEvent.click(screen.getByRole("tab", { name: "数据", exact: true }));
+    fireEvent.click(screen.getByRole("tab", { name: "数据" }));
     view.rerender(<Harness items={[...messages, fourth]} />);
     const fifth: ChatMessage = { id: "e", role: "assistant", content: "Fifth", analysisRunId: "run-e" };
     view.rerender(<Harness items={[...messages, fourth, fifth]} />);
@@ -145,7 +145,7 @@ describe("result reading navigation", () => {
       fireEvent.scroll(canvas, { target: { scrollTop: 300, scrollLeft: 3 } });
       fireEvent.click(back()); expect(canvas.scrollTop).toBe(850); expect(canvas.scrollLeft).toBe(12);
       fireEvent.click(forward()); expect(canvas.scrollTop).toBe(300);
-      fireEvent.click(screen.getByRole("tab", { name: "数据", exact: true }));
+      fireEvent.click(screen.getByRole("tab", { name: "数据" }));
       fireEvent.scroll(canvas, { target: { scrollTop: 0 } });
       fireEvent.click(screen.getByRole("tab", { name: "分析结果" })); expect(canvas.scrollTop).toBe(300);
       // Mobile/CSS hiding is observed independently of the selected result key.

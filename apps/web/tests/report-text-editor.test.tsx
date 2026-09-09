@@ -24,10 +24,10 @@ describe("focused report writing", () => {
     </NextIntlClientProvider>;
     const view = render(writer(initial));
     const dialog = screen.getByRole("dialog");
-    fireEvent.click(screen.getByRole("button", { name: "Compare", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Compare" }));
     view.rerender(writer({ ...initial, id: "another", title: "Another block" }));
     expect(screen.getByRole("dialog")).toBe(dialog);
-    expect(screen.getByRole("button", { name: "Compare", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Compare" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("textbox", { name: "Content title" })).toHaveValue("Another block");
     expect(screen.getByRole("textbox", { name: "Body text" })).toHaveFocus();
     window.addEventListener("keydown", keyboard);
@@ -70,7 +70,7 @@ describe("focused report writing", () => {
     }
     const { rerender } = render(<Writer />);
     const switchTo = (name: string) => {
-      const button = screen.getByRole("button", { name, exact: true });
+      const button = screen.getByRole("button", { name });
       button.focus(); fireEvent.click(button);
     };
     const body = screen.getByRole("textbox", { name: "Body text" }) as HTMLTextAreaElement;
@@ -98,7 +98,7 @@ describe("focused report writing", () => {
     expect(changedHeading).toHaveValue("Changed title");
     expect(changedHeading.selectionStart).toBe(changedHeading.selectionEnd);
     switchTo("Preview"); rerender(<Writer disabled />); switchTo("Write");
-    expect(screen.getByRole("button", { name: "Write", exact: true })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Write" })).toHaveFocus();
     expect(changes).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled();
   });
 
@@ -146,19 +146,19 @@ describe("focused report writing", () => {
     fireEvent.change(body, { target: { value: raw } });
     expect(changes).toHaveBeenLastCalledWith({ content: { ...initial.content, text: raw } });
     fireEvent.change(within(dialog).getByRole("textbox", { name: "Content title" }), { target: { value: "Revised title" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Compare", exact: true }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Compare" }));
     const preview = within(dialog).getByRole("region", { name: "In the report" });
     expect(preview).toHaveTextContent("Revised title"); expect(preview).toHaveTextContent("Existing evidence"); expect(preview).toHaveTextContent("Kept supporting detail");
     expect(preview.querySelector("article p.whitespace-pre-wrap")?.textContent).toBe(raw);
     expect(preview.querySelector("script")).toBeNull();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Preview", exact: true }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Preview" }));
     expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Write", exact: true }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Write" }));
     expect(within(dialog).getByRole("textbox", { name: "Body text" })).toHaveValue(raw);
     expect(changes).toHaveBeenCalledTimes(2);
     rerender(<Harness disabled />);
     expect(within(dialog).getByRole("textbox", { name: "Body text" })).toBeDisabled();
-    expect(within(dialog).getByRole("button", { name: "Save", exact: true })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
     fireEvent.keyDown(dialog, { key: "Escape", isComposing: true }); expect(dialog).toBeInTheDocument();
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(); expect(opener).toHaveFocus();
