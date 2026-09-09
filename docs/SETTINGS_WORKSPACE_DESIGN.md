@@ -1,12 +1,14 @@
 # 设置工作区
 
-配置表单和分析服务目录已分别收拢为[表单合同](SETTINGS_FORMS.md)与[目录合同](MODEL_SERVICES.md)。栏目会话、侧栏接线及页面／桌面离开在当前工作区已有实现，仍需作为完整链路归并和验证；下文规定它们的目标行为，不表示已安装桌面成品已经交付。
+配置表单和分析服务目录分别以[表单合同](SETTINGS_FORMS.md)与[目录合同](MODEL_SERVICES.md)为准。桌面页面、栏目目录与导航会话已归并；表单启停和页面／桌面离开仍需配套交付，下文不表示已安装桌面成品已经验收。
 
 ## 所有权
 
 | 模块 | 职责 |
 |---|---|
-| SettingsDirectory / navigation.ts | 五个栏目、搜索、真实链接与地址同步 |
+| navigation.ts | 唯一栏目目录：身份、翻译键、页面归属、偏好分区与地址解析 |
+| SettingsDirectory | 目录呈现、输入法确认后的搜索、真实链接 |
+| useSettingsNavigation | URL 选择、已访问面板、共用偏好身份、每栏滚动与标题焦点 |
 | SettingsCollection | 已加载目录的显式字段搜索、筛选、数量及 12 项分页 |
 | useSettingsFormSession | 原始草稿、编辑身份、版本、关闭／替换及保存期间的同步锁 |
 | SettingsEditor | 同一表单节点在并排面板与原生模态之间呈现 |
@@ -21,7 +23,7 @@
 ## 栏目与目录
 
 - 桌面固定目录。搜索只匹配现有栏目及描述，支持 NFKC、多词、中英文；不搜配置字段、不改变当前栏目、不调用接口。清除后保留搜索焦点。
-- URL 决定栏目。链接更新 `tab`，保留无关参数及普通点击时的片段；重复当前栏目不加历史，连续操作以即时地址为准，修饰键保留浏览器行为。已有别名归一化；退役、未知或对象原型名称不建立面板。
+- URL 决定栏目。链接更新 `tab`，保留无关参数及普通点击时的片段；重复当前栏目不加历史，连续操作以即时地址为准，修饰键保留浏览器行为。只接受目录中的五个身份；旧别名、退役及未知名称统一落到分析服务，不维护兼容映射。
 - 按首次访问挂载模型、连接及共用偏好组件；离开栏目后以 `hidden`、`inert` 保留草稿。代码预热不触发配置查询。每栏保留本页滚动位置，明确切换与历史切换交接到可见标题。
 - 连接列表搜索名称、类型、主机与数据库名，不序列化完整配置；按数据库类型筛选。名称是编辑按钮，当前编辑项高亮，默认项用文字标记，检查和删除只操作对应项。
 - 搜索／筛选返回第一页；列表缩短后页码收敛，后来增长不跳回旧末页。翻页交接数量提示，清除交接搜索框。操作目录、检查或编辑会解除旧的删除确认。
@@ -55,6 +57,8 @@
 
 ## 依据与检查入口
 
-导航参考 [PatternFly Navigation](https://www.patternfly.org/components/navigation/design-guidelines/)，并排编辑参考 [Drawer](https://www.patternfly.org/components/drawer/design-guidelines/)，丢弃确认参考 [Carbon dialog](https://carbondesignsystem.com/patterns/dialog-pattern/)，页面离开参考 [Next Link](https://nextjs.org/docs/app/api-reference/components/link#blocking-navigation)，桌面最终否决参考 [Electron will-prevent-unload](https://www.electronjs.org/docs/latest/api/web-contents#event-will-prevent-unload)。使用现有依赖和原生对话框，不复制第三方组件包。
+导航参考 [PatternFly NavItem 源码](https://github.com/patternfly/patternfly-react/blob/main/packages/react-core/src/components/Nav/NavItem.tsx) 的真实链接与当前页标记，并参考 [VS Code 设置分组与搜索](https://code.visualstudio.com/docs/configure/settings#settings-groups)。并排编辑参考 [Drawer](https://www.patternfly.org/components/drawer/design-guidelines/)，丢弃确认参考 [Carbon dialog](https://carbondesignsystem.com/patterns/dialog-pattern/)，页面离开参考 [Next Link](https://nextjs.org/docs/app/api-reference/components/link#blocking-navigation)，桌面最终否决参考 [Electron will-prevent-unload](https://www.electronjs.org/docs/latest/api/web-contents#event-will-prevent-unload)。复用现有依赖，不复制第三方组件包。
+
+当前工作区导航检查：9 条设置页用例、限定 ESLint 与前端类型检查通过。Chrome 1180×700 中英文验证目录搜索、选择、清除焦点和历史返回；导航 248px、标题 60px、栏目 6px／正文 12px 圆角，无横向溢出、运行时错误或写入请求。模拟配置读取不证明真实保存、原生关闭和安装包可用。
 
 定向入口：`settings-page`、`settings-form-session`、`settings-collection`、`settings-editor`、`settings-page-exit`、`settings-desktop-close`。旧截图及逐轮测试数量不证明当前全链路完成；表单本次检查与截图见[表单合同](SETTINGS_FORMS.md)。只读预览启动方式统一见[工作台](WORKBENCH_DESIGN.md)。

@@ -258,6 +258,10 @@
     "nextPage": "下一页"
   },
   "settings": {
+    "searchSections": "查找设置栏目",
+    "clearSectionSearch": "清除栏目搜索",
+    "directory": "设置目录",
+    "noMatchingSections": "没有匹配的设置栏目",
     "title": "设置",
     "models": "AI 模型",
     "connections": "数据库连接",

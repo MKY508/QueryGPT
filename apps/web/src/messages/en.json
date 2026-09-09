@@ -257,6 +257,10 @@
     "nextPage": "Next"
   },
   "settings": {
+    "searchSections": "Find a settings section",
+    "clearSectionSearch": "Clear section search",
+    "directory": "Settings directory",
+    "noMatchingSections": "No matching settings sections",
     "title": "Settings",
     "models": "AI Models",
     "connections": "Database Connections",
