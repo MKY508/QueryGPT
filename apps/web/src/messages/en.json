@@ -1386,7 +1386,9 @@
       "structuredJson": "Structured JSON",
       "extendedDefinition": "Extended definition",
       "jsonPlaceholder": "For example: a JSON object with version and kind fields",
-      "governanceHint": "Confirmed and locked mean that you accept this definition; anything that affects calculations still requires execution validation."
+      "governanceHint": "Confirmed and locked mean that you accept this definition; anything that affects calculations still requires execution validation.",
+      "saving": "Saving…",
+      "unsaved": "Unsaved changes"
     },
     "bulk": {
       "selected": "{count, plural, one {# item selected} other {# items selected}}",

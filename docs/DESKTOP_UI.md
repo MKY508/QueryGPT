@@ -38,6 +38,7 @@
 | 模型与连接目录 | 共用 SettingsResourceCard 的标题、状态、反馈与操作分区；移除模型 480px 和连接 sm 布局分支，12px 卡片、6px 控件。检查与二次删除复用 Button；删除确认遇到搜索或筛选即取消 | 连接列表已在工作区入口接入；完整连接资源、表单与设置离开链路仍待整体归并 |
 | 关于 | 统一标题栏、产品与版本双栏、三列项目链接 | 工作区里的版本检查行为 |
 | 项目理解 | 320px 详情区；工作区已改为 200px 目录与单一表格 | 页面历史、选择及保存恢复的整体归并 |
+| 定义编辑窗口 | SemanticDefinitionEditor 分离窗口与表单动作，固定底栏；字段样式从设置页提取为 FieldControl，共用 6px 圆角、焦点与禁用状态 | 暂存源码 3 个用例、10 模块限定类型检查与 ESLint 通过；工作区 3 个用例覆盖草稿／输入法／保存锁／冲突载入，项目理解依赖类型检查通过。Chrome 1180px 中英文验证 1120px／60px／12px／6px、加长正文滚动时底栏固定、取消保留与放弃后焦点返回，无服务请求。[中文](images/zh/desktop-ui-definition-editor.png)、[英文](images/zh/desktop-ui-definition-editor-en.png)。完整字段内容和主页面接线仍在工作区 |
 | 整理项目理解 | 原生 TaskDialog 与按项目隔离会话，目录转换独立模块；移除全部手机断点，共享动作与双列选择 | 暂存源码 4 个定向用例、17 模块限定类型检查及 ESLint 通过。Chrome 中英文 1180px 验证 1120px／60px／12px／6px、原生模态与 Escape 返回焦点，无溢出或页面错误；仅拦截目录刷新 POST，没有生成或启动整理。[中文](images/zh/desktop-ui-governance.png)、[英文](images/zh/desktop-ui-governance-en.png)。真实整理仍未验证 |
 | 定义保存核对 | 按目标身份隔离读取与确认；固定双栏、12px 卡片和共享按钮。合同见 [项目理解](UNDERSTANDING_DETAIL_DESIGN.md#保存冲突与结果核对) | 暂存源码 4 个会话／双语用例、17 模块限定类型检查及 ESLint 通过；工作区 2 个定向用例覆盖冲突载入与移除／取消。隔离 Chrome 1180px 中英文无溢出、页面错误或写请求，取消载入不改草稿；[中文](images/zh/desktop-ui-definition-recovery.png)、[英文](images/zh/desktop-ui-definition-recovery-en.png)。全页面与真实服务未验收 |
 | 项目理解批量选择 | 1120px TaskDialog，条目与 320px 操作区固定并排；移除手机页签、单独的全屏窗口和重复键盘圈闭。选择状态独立于接口结果校验，保留选中版本及 100 条上限 | 工作区入口已接入；批量接口校验、结果归并与完整项目理解页面尚未整体归并 |

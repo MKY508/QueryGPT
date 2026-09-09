@@ -69,32 +69,7 @@
   font-weight: 500;
 }
 
-.control {
-  width: 100%;
-  min-width: 0;
-  min-height: 2.25rem;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-control, 6px);
-  padding: 0.625rem 0.75rem;
-  outline: none;
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-size: 0.875rem;
-  transition: border-color 120ms, box-shadow 120ms;
-}
-
-.control:focus {
-  border-color: hsl(var(--primary));
-  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15);
-}
-
-.control[aria-invalid="true"] {
-  border-color: hsl(var(--destructive));
-}
-
-.control[aria-invalid="true"]:focus {
-  box-shadow: 0 0 0 2px hsl(var(--destructive) / 0.15);
-}
+.control { composes: control from "../ui/FieldControl.module.css"; }
 
 .hint {
   margin-top: 0.375rem;
@@ -177,7 +152,7 @@
 .cancel:hover, .header button:hover { background: hsl(var(--muted)); }
 .submit { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-weight: 500; }
 .submit:hover { background: hsl(var(--primary) / 0.9); }
-.form button:disabled, .control:disabled { opacity: 0.5; cursor: default; }
+.form button:disabled { opacity: 0.5; cursor: default; }
 
 .form button:focus-visible, .disclosure > summary:focus-visible, .checkbox input:focus-visible {
   outline: 2px solid hsl(var(--primary));
@@ -186,8 +161,4 @@
 
 @container settings-form (min-width: 36rem) {
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .control { transition: none; }
 }

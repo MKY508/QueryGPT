@@ -1387,7 +1387,9 @@
       "structuredJson": "结构化 JSON",
       "extendedDefinition": "扩展定义",
       "jsonPlaceholder": "例如：包含 version 和 kind 字段的 JSON 对象",
-      "governanceHint": "已确认和已锁定表示你认可这条定义；会影响计算的内容仍需通过执行验证。"
+      "governanceHint": "已确认和已锁定表示你认可这条定义；会影响计算的内容仍需通过执行验证。",
+      "saving": "正在保存…",
+      "unsaved": "有未保存的修改"
     },
     "bulk": {
       "selected": "已选 {count} 条",
