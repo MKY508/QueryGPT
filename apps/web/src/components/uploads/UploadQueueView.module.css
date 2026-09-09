@@ -1,0 +1,40 @@
+.progress {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 3px;
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
+}
+
+.progress::-webkit-progress-bar {
+  border-radius: 3px;
+  background: hsl(var(--muted));
+}
+
+.progress::-webkit-progress-value {
+  border-radius: 3px;
+  background: hsl(var(--primary));
+}
+
+.progress::-moz-progress-bar {
+  border-radius: 3px;
+  background: hsl(var(--primary));
+}
+
+.progress:indeterminate {
+  animation: pending 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes pending {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress:indeterminate { animation: none; }
+}
