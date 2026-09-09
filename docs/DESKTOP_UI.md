@@ -23,6 +23,7 @@
 | 项目理解 | 320px 详情区；工作区已改为 200px 目录与单一表格 | 页面历史、选择及保存恢复的整体归并 |
 | 数据来源 | 280px 目录、来源版本解析、字段与样例预览 | 上传、文件准备、来源替换及工作区完整行为 |
 | 数据工作区外框 | 60px 标题栏、共享页签；嵌入模式或 900px 桌面侧面板 | 外框提交不包含其余工作区新功能 |
+| 文件准备窗口 | Excel 与 CSV 复用 PreparationDialog、共享按钮及样例表；1120px 窗口、224px 工作表目录 | 来源入口、项目存储和真实文件准备联调 |
 | 数据窗口 | 表格与 360px 记录详情并排；筛选、排序、列选择、精确值与导出 | 报告和聊天入口的整体归并 |
 | 整理编辑器 | 320px 操作目录、草稿历史、步骤选择、规则解析、预览与确认；样例和文本替换固定双栏 | 真实文件处理、后端文本替换及安装包联调 |
 
@@ -42,6 +43,7 @@
 | --- | --- | --- |
 | 工作台、设置 | 导航折叠、栏目往返、编辑保留、并排边界、主题；入口为 settings-editor、analysis-workbench、workbench-pane-focus、settings-page | 仍需完整页面验收 |
 | 数据工作区外框 | 暂存源码 3 个定向用例及类型检查通过；Chrome 1200px 验证 60px 标题栏、字段搜索与放大样例，无脚本错误或写请求 | 与下行字段搜索共用预览 |
+| 文件准备 | 暂存源码 4 个用例覆盖只读预览、迟到响应、明确提交与未确认结果；类型检查、限定 ESLint 通过。Chrome 1200px 验证两种窗口的 12px 圆角、60px 标题栏及 Escape，未写真实数据 | [CSV](images/zh/desktop-ui-csv-import.png)、[Excel](images/zh/desktop-ui-workbook.png) |
 | 数据目录与预览 | 1200/1440px 下列表可见、12px 外框、无页面横向溢出；筛选、来源切换、字段定位、页签键盘、样例失效 | [目录](images/zh/desktop-ui-sources.png)、[字段搜索](images/zh/desktop-ui-source-fields.png) |
 | 数据窗口 | 8 个定向核心用例；限定类型检查；1200/1440px 下详情并排，1200px 菜单 8px、无溢出 | [列菜单](images/zh/desktop-ui-data-columns.png)、[筛选](images/zh/desktop-ui-data-filters.png) |
 | 整理 | 9 个主流程定向用例及子组件检查；限定类型检查；1200px 下编辑、预览、返回、退出确认和草稿保留 | [编辑器](images/zh/desktop-ui-cleaning-editor.png)、[样例](images/zh/desktop-ui-cleaning-samples.png)、[字段对照](images/zh/desktop-ui-cleaning-impact.png)、[确认](images/zh/desktop-ui-cleaning-discard.png) |
