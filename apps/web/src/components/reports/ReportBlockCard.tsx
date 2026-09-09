@@ -837,7 +837,7 @@ export function ReportBlockCard({
         onSelect();
       }}
       className={cn(
-        "group relative flex min-h-0 flex-col border bg-card px-5 pb-5 pt-4 text-card-foreground transition-colors",
+        "group relative flex min-h-0 flex-col rounded-xl border bg-card px-5 pb-5 pt-4 text-card-foreground transition-colors",
         editing ? "h-full" : "h-auto",
         block.block_type === "metric" &&
           (editing

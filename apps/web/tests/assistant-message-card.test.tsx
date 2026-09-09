@@ -1,13 +1,15 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   act,
+  cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
 } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mockSemanticDialogs } from "./semantic-dialog-mock";
 import type { ChatMessage } from "@/lib/types/chat";
 import type { AnalysisCorrection, SemanticEntry } from "@/lib/types/api";
 import { AssistantMessageCard } from "@/components/chat/AssistantMessageCard";
@@ -121,6 +123,9 @@ function renderCard(
 }
 
 describe("AssistantMessageCard", () => {
+  let restoreDialogs: () => void;
+  beforeEach(() => { restoreDialogs = mockSemanticDialogs(); });
+  afterEach(() => { cleanup(); restoreDialogs(); });
   beforeEach(() => {
     vi.mocked(api.get).mockReset();
     vi.mocked(api.post).mockReset();
