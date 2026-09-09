@@ -794,7 +794,8 @@ export type VisualCleaningOperation =
 export interface VisualCleaningSnapshot {
   rows: number;
   columns: number;
-  sample: DataRow[];
+  // Arrow previews preserve structured cells as well as exact scalar values.
+  sample: Record<string, unknown>[];
 }
 
 export interface VisualCleaningChange {

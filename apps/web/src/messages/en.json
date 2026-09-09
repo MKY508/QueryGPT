@@ -2154,5 +2154,39 @@
     "encryptionRequired": "Choose an encryption option to use the certificate paths.",
     "invalidJson": "Enter valid JSON.",
     "objectRequired": "Enter a JSON object."
+  },
+  "sourcePreview": {
+    "expandSample": "Expand sample",
+    "sampleNotice": "Contains only {count} sample rows.",
+    "title": "Data preview",
+    "sample": "Sample",
+    "fields": "Fields",
+    "sampleTitle": "Sample data",
+    "totalRows": "{count} data rows",
+    "name": "Field",
+    "type": "Type",
+    "missing": "Missing",
+    "searchFields": "Search field names",
+    "clearSearch": "Clear field search",
+    "fieldCount": "Showing {shown} of {total} fields",
+    "moreFields": "Show {count} more fields",
+    "viewField": "View field sample: {name}",
+    "unnamedField": "Unnamed field",
+    "noMatchingFields": "No matching fields",
+    "noFields": "No field information available",
+    "noSample": "No sample data available",
+    "emptyData": "This data has no records",
+    "changedSample": "The file has changed. These are earlier samples.",
+    "previousSample": "Showing the last available samples.",
+    "reviewSample": "The cleaning result still needs review.",
+    "limitedFields": "Previewing the first {count} fields.",
+    "limitedRows": "Showing the first {count} sample rows.",
+    "kind": {
+      "number": "Number",
+      "text": "Text",
+      "date": "Date and time",
+      "boolean": "Yes / No",
+      "other": "Other"
+    }
   }
 }

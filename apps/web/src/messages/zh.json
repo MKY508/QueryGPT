@@ -2154,5 +2154,39 @@
     "encryptionRequired": "已填写证书路径，请选择一种加密方式。",
     "invalidJson": "请输入有效的 JSON。",
     "objectRequired": "请填写 JSON 对象。"
+  },
+  "sourcePreview": {
+    "expandSample": "放大样例",
+    "sampleNotice": "仅包含 {count} 行样例。",
+    "title": "数据预览",
+    "sample": "样例",
+    "fields": "字段",
+    "sampleTitle": "数据样例",
+    "totalRows": "{count} 行数据",
+    "name": "字段",
+    "type": "类型",
+    "missing": "空值",
+    "searchFields": "搜索字段名称",
+    "clearSearch": "清除字段搜索",
+    "fieldCount": "显示 {shown} / {total} 个字段",
+    "moreFields": "再显示 {count} 个字段",
+    "viewField": "查看字段样例：{name}",
+    "unnamedField": "未命名字段",
+    "noMatchingFields": "没有符合条件的字段",
+    "noFields": "暂无字段信息",
+    "noSample": "暂无数据样例",
+    "emptyData": "这份数据没有记录",
+    "changedSample": "文件已变化，这里是先前的样例。",
+    "previousSample": "显示上次保留的样例。",
+    "reviewSample": "整理结果仍需核对。",
+    "limitedFields": "字段较多，预览前 {count} 个字段。",
+    "limitedRows": "显示前 {count} 行样例。",
+    "kind": {
+      "number": "数值",
+      "text": "文本",
+      "date": "日期与时间",
+      "boolean": "是／否",
+      "other": "其他"
+    }
   }
 }

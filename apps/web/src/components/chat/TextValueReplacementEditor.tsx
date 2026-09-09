@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { TabList } from "@/components/ui/TabList";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -97,19 +98,9 @@ export function TextValueReplacementEditor({ column, columnLabel = column, initi
     <section className="mt-4 rounded-lg border border-border bg-background p-3" aria-label={t("replacementEditorTitle", { column: columnLabel })}>
       <h4 ref={headingRef} tabIndex={-1} className="break-words text-sm font-semibold outline-none">{t("replacementEditorTitle", { column: columnLabel })}</h4>
       <p className="mt-1 text-xs text-muted-foreground">{t("replacementScope")}</p>
-      {samples.length > 0 && <div role="tablist" aria-label={t("replacementInputMode")} className="mt-4 flex border-b border-border">
-        {(["sample", "manual"] as const).map((tab, index, tabs) => <button key={tab} type="button" role="tab" id={`${id}-${tab}`}
-          aria-controls={`${id}-panel`} aria-selected={mode === tab} tabIndex={mode === tab ? 0 : -1} disabled={disabled}
-          onClick={() => { setFocusRow(null); setMode(tab); setError(null); }} onKeyDown={event => {
-            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
-            const next = event.key === "ArrowRight" ? (index + 1) % 2 : event.key === "ArrowLeft" ? (index + 1) % 2 : event.key === "Home" ? 0 : event.key === "End" ? 1 : null;
-            if (next === null) return;
-            event.preventDefault(); setFocusRow(null); setMode(tabs[next]); setError(null);
-            event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
-          }} className={`min-h-10 border-b-2 px-3 text-xs font-semibold disabled:opacity-40 ${mode === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>
-          {t(tab === "sample" ? "replacementSampleMode" : "replacementManualMode")}
-        </button>)}
-      </div>}
+      {samples.length > 0 && <TabList id={id} label={t("replacementInputMode")} value={mode} disabled={disabled} className="mt-4"
+        onChange={(tab: "sample" | "manual") => { setFocusRow(null); setMode(tab); setError(null); }}
+        items={[{ value: "sample", label: t("replacementSampleMode") }, { value: "manual", label: t("replacementManualMode") }]} />}
       <div id={`${id}-panel`} role={samples.length ? "tabpanel" : undefined} aria-labelledby={samples.length ? `${id}-${mode}` : undefined}>
       {mode === "sample" ? <TextReplacementSamplePicker values={samples} selected={selected} target={target} emptyTarget={emptyTarget} used={used} disabled={disabled}
         onSelect={value => { setSelected(current => current.includes(value) ? current.filter(item => item !== value) : [...current, value]); setError(null); }}
