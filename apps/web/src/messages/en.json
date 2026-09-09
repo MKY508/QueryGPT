@@ -1066,6 +1066,10 @@
     },
     "details": {
       "aria": "Project understanding details",
+      "browse": "Browse definitions on this page",
+      "position": "On this page: {current} / {total}",
+      "previous": "Previous definition",
+      "next": "Next definition",
       "close": "Close project understanding details",
       "left": "Left",
       "right": "Right",

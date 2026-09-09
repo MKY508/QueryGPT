@@ -1066,6 +1066,10 @@
     },
     "details": {
       "aria": "项目理解详情",
+      "browse": "浏览本页项目理解",
+      "position": "本页 {current} / {total}",
+      "previous": "上一条项目理解",
+      "next": "下一条项目理解",
       "close": "关闭项目理解详情",
       "left": "左侧",
       "right": "右侧",
