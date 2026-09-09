@@ -84,6 +84,7 @@ interface CleaningSamplesProps {
   before: VisualCleaningSnapshot;
   after?: VisualCleaningSnapshot;
   title?: string;
+  comparisonLabels?: readonly [string, string];
   preferredColumns?: string[];
   columnNames?: readonly string[];
   columnOrder?: readonly string[];
@@ -91,7 +92,7 @@ interface CleaningSamplesProps {
 }
 
 /** Both sides browse the same field window, never an assumed record identity. */
-export function CleaningSamples({ before, after, title, preferredColumns = [], columnNames = NO_COLUMN_NAMES, columnOrder = NO_COLUMN_NAMES, onCleanColumn }: CleaningSamplesProps) {
+export function CleaningSamples({ before, after, title, comparisonLabels, preferredColumns = [], columnNames = NO_COLUMN_NAMES, columnOrder = NO_COLUMN_NAMES, onCleanColumn }: CleaningSamplesProps) {
   const t = useTranslations("visualCleaning");
   const locale = useLocale();
   const fieldSelect = useRef<HTMLSelectElement>(null);
@@ -117,7 +118,7 @@ export function CleaningSamples({ before, after, title, preferredColumns = [], c
   const start = page * COLUMNS_PER_PAGE;
   const visibleColumns = columns.slice(start, start + COLUMNS_PER_PAGE);
   const snapshots = after ? [before, after] : [before];
-  const titles = after ? [t("beforeLabel"), t("afterLabel")] : [title ?? t("sourceSample")];
+  const titles = after ? comparisonLabels ?? [t("beforeLabel"), t("afterLabel")] : [title ?? t("sourceSample")];
   const selection = session.expanded;
   const expandedRow = selection && visibleColumns.includes(selection.column)
     ? snapshots[selection.side]?.sample[selection.row] : undefined;
