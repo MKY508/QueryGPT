@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReactElement } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SemanticGovernanceDialog } from "@/components/semantic/SemanticGovernanceDialog";
 import { api } from "@/lib/api/client";
 import type {
@@ -112,9 +112,22 @@ function inventoryJob(
 }
 
 describe("SemanticGovernanceDialog", () => {
+  const nativeMethods = ["showModal", "close"] as const;
+  let nativeDescriptors: (PropertyDescriptor | undefined)[];
+  beforeEach(() => {
+    nativeDescriptors = nativeMethods.map(name => Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, name));
+    for (const name of nativeMethods) Object.defineProperty(HTMLDialogElement.prototype, name, {
+      configurable: true, value: function (this: HTMLDialogElement) { this.open = name === "showModal"; },
+    });
+  });
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    nativeMethods.forEach((name, index) => {
+      const descriptor = nativeDescriptors[index];
+      if (descriptor) Object.defineProperty(HTMLDialogElement.prototype, name, descriptor);
+      else Reflect.deleteProperty(HTMLDialogElement.prototype, name);
+    });
   });
 
   it("waits for an explicit click and keeps database organization separate from files", async () => {
@@ -278,7 +291,7 @@ describe("SemanticGovernanceDialog", () => {
   });
 
   it("shows a business error when starting table organization returns HTTP 404", async () => {
-    const post = vi.spyOn(api, "post").mockImplementation(async (url) => {
+    vi.spyOn(api, "post").mockImplementation(async (url) => {
       if (url.endsWith("/sources/db-ready/relation-index")) {
         return {
           data: {
@@ -570,5 +583,26 @@ describe("SemanticGovernanceDialog", () => {
     await waitFor(() => expect(firstSource).toHaveFocus());
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks duplicate submission and closing, then ignores a response from a previous project", async () => {
+    let finish!: (value: unknown) => void;
+    const post = vi.spyOn(api, "post").mockImplementation(() => new Promise(resolve => { finish = resolve; }) as ReturnType<typeof api.post>);
+    const onClose = vi.fn(), onGenerated = vi.fn();
+    const sources = [source("file-ready", "订单.csv", "file", "ready")];
+    const view = render(<SemanticGovernanceDialog open projectId="project-1" sources={sources} onClose={onClose} onGenerated={onGenerated} />);
+    fireEvent.click(screen.getByLabelText("选择数据来源 订单.csv"));
+    const form = screen.getByRole("button", { name: "开始整理" }).closest("form")!;
+    act(() => { fireEvent.submit(form); fireEvent.submit(form); });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    view.rerender(<NextIntlClientProvider locale="zh" messages={zhMessages}><SemanticGovernanceDialog open projectId="project-2" sources={sources} onClose={onClose} onGenerated={onGenerated} /></NextIntlClientProvider>);
+    expect(screen.getByLabelText("选择数据来源 订单.csv")).not.toBeChecked();
+    await act(async () => finish({ data: { data: { batch_id: "old", generated_by: "ai", items: [] } } }));
+    expect(onGenerated).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "取消" })).toBeEnabled();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, FileSpreadsheet, Loader2, Sparkles, X } from "lucide-react";
+import { Database, FileSpreadsheet, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { api } from "@/lib/api/client";
@@ -8,9 +8,7 @@ import { useModalFocus } from "@/lib/use-modal-focus";
 import { normalizeSemanticInventoryJob } from "@/components/semantic/semantic-inventory";
 import {
   UserFacingError,
-  type DataSourceRelationIndex,
   type ProjectDataSource,
-  type RelationIndexRefreshResult,
   type SemanticInventoryDepth,
   type SemanticInventoryJob,
   type SemanticInventoryJobRequest,
@@ -18,6 +16,10 @@ import {
   type SemanticRecommendationResult,
   type SemanticRecommendationScope,
 } from "@/lib/types/api";
+
+import { Button } from "@/components/ui/button";
+import { TaskDialog } from "@/components/ui/TaskDialog";
+import { sourceBusinessName, sourceTableOptions, parseRelationIndexRefresh, withRelationIndex } from "./semantic-governance-sources";
 
 type Translate = (key: string, values?: Record<string, string | number>) => string;
 
@@ -35,206 +37,11 @@ interface SemanticGovernanceDialogProps {
 
 type DatabaseMode = "all" | "selected";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+export function SemanticGovernanceDialog(props: SemanticGovernanceDialogProps) {
+  return props.open ? <GovernanceSession key={props.projectId} {...props} /> : null;
 }
 
-function nonEmptyString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-interface SourceTableOption {
-  name: string;
-  businessName: string;
-  summary: string | null;
-}
-
-function qualifiedRelationName(record: Record<string, unknown>): string | null {
-  const name = nonEmptyString(record.name);
-  if (!name) return null;
-  const schema = nonEmptyString(record.schema);
-  return schema ? `${schema}.${name}` : name;
-}
-
-function relationIdentity(record: Record<string, unknown>): string | null {
-  const name = nonEmptyString(record.name);
-  if (!name) return null;
-  return `${nonEmptyString(record.schema) || ""}\u0000${name}`;
-}
-
-function relationIndexForSource(source: ProjectDataSource): Record<string, unknown> {
-  const preanalysis = isRecord(source.profile_data.preanalysis)
-    ? source.profile_data.preanalysis
-    : {};
-  return isRecord(source.profile_data.relation_index)
-    ? source.profile_data.relation_index
-    : isRecord(preanalysis.relation_index)
-      ? preanalysis.relation_index
-      : {};
-}
-
-function mergedTableRecords(source: ProjectDataSource): Record<string, unknown>[] {
-  const relationIndex = relationIndexForSource(source);
-  const profiledTables = Array.isArray(source.profile_data.tables)
-    ? source.profile_data.tables.filter(isRecord)
-    : [];
-  const indexedRelations = Array.isArray(relationIndex.relations)
-    ? relationIndex.relations.filter(isRecord)
-    : [];
-  if (!indexedRelations.length) return profiledTables;
-
-  const profilesByIdentity = new Map(
-    profiledTables.flatMap((table) => {
-      const identity = relationIdentity(table);
-      return identity ? [[identity, table] as const] : [];
-    })
-  );
-  const profilesByName = new Map<string, Record<string, unknown>[]>();
-  for (const table of profiledTables) {
-    const name = nonEmptyString(table.name);
-    if (!name) continue;
-    profilesByName.set(name, [...(profilesByName.get(name) || []), table]);
-  }
-  const indexedNameCounts = new Map<string, number>();
-  for (const relation of indexedRelations) {
-    const name = nonEmptyString(relation.name);
-    if (name) indexedNameCounts.set(name, (indexedNameCounts.get(name) || 0) + 1);
-  }
-
-  const matchedProfiles = new Set<Record<string, unknown>>();
-  const mergedRelations = indexedRelations.map((relation) => {
-    const identity = relationIdentity(relation);
-    const name = nonEmptyString(relation.name);
-    const sameNamedProfiles = name ? profilesByName.get(name) || [] : [];
-    const profile =
-      (identity ? profilesByIdentity.get(identity) : undefined) ||
-      (name && indexedNameCounts.get(name) === 1 && sameNamedProfiles.length === 1
-        ? sameNamedProfiles[0]
-        : undefined);
-    if (profile) matchedProfiles.add(profile);
-    return profile ? { ...profile, ...relation } : relation;
-  });
-
-  if (relationIndex.complete !== false) return mergedRelations;
-  return [
-    ...mergedRelations,
-    ...profiledTables.filter((table) => !matchedProfiles.has(table)),
-  ];
-}
-
-function sourceBusinessName(source: ProjectDataSource): string {
-  const presentation = isRecord(source.profile_data.presentation)
-    ? source.profile_data.presentation
-    : {};
-  return (
-    nonEmptyString(source.profile_data.business_name) ||
-    nonEmptyString(source.profile_data.display_name) ||
-    nonEmptyString(presentation.business_name) ||
-    source.name
-  );
-}
-
-function tableDisplayName(value: string, locale: string): string {
-  const relationName = value.split(".").at(-1) || value;
-  if (locale === "en") {
-    return relationName
-      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-      .split(/[^a-zA-Z0-9\u3400-\u9fff]+/)
-      .filter(Boolean)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ");
-  }
-  const tokens = relationName
-    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-    .split(/[^a-zA-Z0-9\u3400-\u9fff]+/)
-    .filter(Boolean);
-  const year = tokens.find((token) => /^(?:19|20)\d{2}$/.test(token));
-  const ignored = new Set(["d", "dim", "f", "fact", "info", "new", "tbl", "table", "v", "view"]);
-  const labels: Record<string, string> = {
-    center: "中心",
-    cust: "客户",
-    customer: "客户",
-    customers: "客户",
-    dict: "字典",
-    order: "订单",
-    orders: "订单",
-    prd: "商品",
-    product: "商品",
-    products: "商品",
-    refund: "退款",
-    refunds: "退款",
-    region: "地区",
-    sales: "销售",
-    sku: "商品",
-    store: "门店",
-    stores: "门店",
-  };
-  const rendered = tokens
-    .filter((token) => token !== year && !ignored.has(token.toLowerCase()))
-    .map((token) => {
-      if (/[\u3400-\u9fff]/u.test(token)) return token;
-      return labels[token.toLowerCase()] || token.toUpperCase();
-    })
-    .join("");
-  if (year && rendered) return `${year} 年${rendered}资料`;
-  return rendered ? `${rendered}资料` : "数据表";
-}
-
-function sourceTableOptions(source: ProjectDataSource, locale: string): SourceTableOption[] {
-  if (source.kind !== "connection") return [];
-  const seen = new Set<string>();
-  return mergedTableRecords(source).flatMap((table) => {
-    const name = qualifiedRelationName(table);
-    if (!name || seen.has(name)) return [];
-    seen.add(name);
-    const documentedName =
-      nonEmptyString(table.business_name) ||
-      nonEmptyString(table.display_name) ||
-      nonEmptyString(table.comment);
-    return [
-      {
-        name,
-        businessName: documentedName || tableDisplayName(name, locale),
-        summary:
-          nonEmptyString(table.description) ||
-          nonEmptyString(table.business_topic) ||
-          (documentedName === nonEmptyString(table.comment)
-            ? null
-            : nonEmptyString(table.comment)),
-      },
-    ];
-  });
-}
-
-function parseRelationIndexRefresh(value: unknown): RelationIndexRefreshResult | null {
-  if (!isRecord(value) || typeof value.source_id !== "string") return null;
-  if (!isRecord(value.relation_index) || !Array.isArray(value.relation_index.relations)) {
-    return null;
-  }
-  return value as unknown as RelationIndexRefreshResult;
-}
-
-function withRelationIndex(
-  source: ProjectDataSource,
-  relationIndex: DataSourceRelationIndex
-): ProjectDataSource {
-  const profile = source.profile_data;
-  const preanalysis = isRecord(profile.preanalysis) ? profile.preanalysis : {};
-  return {
-    ...source,
-    profile_data: {
-      ...profile,
-      relation_index: relationIndex,
-      preanalysis: {
-        ...preanalysis,
-        relation_index: relationIndex,
-      },
-    },
-  };
-}
-
-export function SemanticGovernanceDialog({
-  open,
+function GovernanceSession({
   projectId,
   sources,
   modelId,
@@ -264,33 +71,23 @@ export function SemanticGovernanceDialog({
   const [catalogRefreshBySource, setCatalogRefreshBySource] = useState<
     Record<string, "loading" | "ready" | "failed">
   >({});
-  const dialogRef = useRef<HTMLElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const writingRef = useRef(false);
+  const activeRef = useRef(true);
   const firstSourceRef = useRef<HTMLInputElement>(null);
   const sourcesRef = useRef(sources);
   const onCatalogRefreshedRef = useRef(onCatalogRefreshed);
-
-  useEffect(() => {
-    sourcesRef.current = sources;
-    if (!open) setDialogSources(sources);
-  }, [open, sources]);
 
   useEffect(() => {
     onCatalogRefreshedRef.current = onCatalogRefreshed;
   }, [onCatalogRefreshed]);
 
   useEffect(() => {
-    if (!open) return;
     const initialSources = sourcesRef.current;
     const connections = initialSources.filter(
       (source) => source.kind === "connection" && source.status === "ready"
     );
     let active = true;
-    setDialogSources(initialSources);
-    setSelectedSourceIds(new Set());
-    setSelectedTables({});
-    setDatabaseModeBySource({});
-    setDepthBySource({});
-    setError(null);
     setCatalogRefreshBySource(
       Object.fromEntries(connections.map((source) => [source.id, "loading" as const]))
     );
@@ -320,14 +117,24 @@ export function SemanticGovernanceDialog({
     return () => {
       active = false;
     };
-  }, [open, projectId]);
+  }, [projectId]);
 
   useModalFocus({
-    active: open,
+    active: true,
     containerRef: dialogRef,
-    onClose,
+    onClose: () => { if (!writingRef.current) onClose(); },
     initialFocusRef: firstSourceRef,
   });
+
+  useEffect(() => {
+    activeRef.current = true;
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    return () => {
+      activeRef.current = false;
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
 
   const selectedSources = readySources.filter((source) => selectedSourceIds.has(source.id));
   const connectionWithoutTable = selectedSources.some(
@@ -337,8 +144,6 @@ export function SemanticGovernanceDialog({
       !(selectedTables[source.id] || []).length
   );
   const canSubmit = selectedSources.length > 0 && !connectionWithoutTable && !submitting;
-
-  if (!open) return null;
 
   const toggleSource = (source: ProjectDataSource) => {
     const removing = selectedSourceIds.has(source.id);
@@ -402,6 +207,7 @@ export function SemanticGovernanceDialog({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (writingRef.current) return;
     if (!canSubmit) {
       setError(
         selectedSources.length === 0
@@ -415,6 +221,7 @@ export function SemanticGovernanceDialog({
       (source) => source.kind === "connection"
     );
     const fileSources = selectedSources.filter((source) => source.kind === "file");
+    writingRef.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -459,6 +266,7 @@ export function SemanticGovernanceDialog({
         Promise.allSettled(databaseRequests),
         fileRequest ? Promise.allSettled([fileRequest]) : Promise.resolve([]),
       ]);
+      if (!activeRef.current) return;
       const startedJobs = databaseResults.flatMap((result) =>
         result.status === "fulfilled" ? [result.value] : []
       );
@@ -496,40 +304,18 @@ export function SemanticGovernanceDialog({
       }
       onClose();
     } catch {
-      setError(t("errors.startFailed"));
+      if (activeRef.current) setError(t("errors.startFailed"));
     } finally {
-      setSubmitting(false);
+      writingRef.current = false;
+      if (activeRef.current) setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 p-4">
-      <section
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="semantic-governance-title"
-        tabIndex={-1}
-        className="flex max-h-[min(760px,calc(100dvh-2rem))] w-full max-w-2xl flex-col overflow-hidden bg-background shadow-2xl"
-      >
-        <div className="flex shrink-0 items-start justify-between border-b border-border px-5 py-5 sm:px-6">
-          <div className="min-w-0 pr-4">
-            <h2 id="semantic-governance-title" className="text-xl font-semibold">
-              {t("title")}
-            </h2>
-          </div>
-          <button
-            type="button"
-            aria-label={t("close")}
-            onClick={onClose}
-            className="p-2 text-muted-foreground hover:text-foreground"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
+    <TaskDialog dialogRef={dialogRef} writingRef={writingRef} activeRef={activeRef} busy={submitting}
+      title={t("title")} closeLabel={t("close")} onClose={onClose} autoFocusClose={false}>
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             <div className="flex items-center justify-between gap-4">
               <h3 className="text-sm font-semibold">{t("scopeTitle")}</h3>
               <span className="shrink-0 text-xs text-muted-foreground">
@@ -598,8 +384,8 @@ export function SemanticGovernanceDialog({
                             <legend className="text-xs font-medium text-muted-foreground">
                               {t("databaseScope")}
                             </legend>
-                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                              <label className="flex cursor-pointer items-start gap-2 border border-border px-3 py-3">
+                            <div className="mt-2 grid gap-2 grid-cols-2">
+                              <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border px-3 py-3">
                                 <input
                                   type="radio"
                                   name={`database-mode-${source.id}`}
@@ -618,7 +404,7 @@ export function SemanticGovernanceDialog({
                                   </span>
                                 </span>
                               </label>
-                              <label className="flex cursor-pointer items-start gap-2 border border-border px-3 py-3">
+                              <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border px-3 py-3">
                                 <input
                                   type="radio"
                                   name={`database-mode-${source.id}`}
@@ -678,24 +464,24 @@ export function SemanticGovernanceDialog({
                                 <legend className="flex w-full items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
                                   <span>{t("chooseTables")}</span>
                                   {tables.length ? (
-                                    <button
+                                    <Button
                                       type="button"
                                       disabled={submitting}
                                       onClick={() => selectAllTables(source)}
-                                      className="text-primary hover:underline disabled:opacity-40"
+                                      variant="ghost" size="sm"
                                     >
                                       {selectedForSource.length === tables.length
                                         ? t("clearTables")
                                         : t("selectAllTables")}
-                                    </button>
+                                    </Button>
                                   ) : null}
                                 </legend>
                                 {tables.length ? (
-                                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                  <div className="mt-3 grid gap-2 grid-cols-2">
                                     {tables.map((table) => (
                                       <label
                                         key={table.name}
-                                        className="flex min-w-0 cursor-pointer items-center gap-2 border border-border px-3 py-2 text-sm"
+                                        className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm"
                                       >
                                         <input
                                           type="checkbox"
@@ -743,7 +529,7 @@ export function SemanticGovernanceDialog({
                 })}
               </div>
             ) : (
-              <div className="mt-4 border border-border px-4 py-8 text-center text-sm text-muted-foreground">
+              <div className="mt-4 rounded-xl border border-border px-4 py-8 text-center text-sm text-muted-foreground">
                 {t("noReadySources")}
               </div>
             )}
@@ -755,25 +541,24 @@ export function SemanticGovernanceDialog({
             )}
           </div>
 
-          <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6">
-            <button
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+            <Button
               type="button"
               onClick={onClose}
-              className="h-10 px-4 text-sm text-muted-foreground hover:text-foreground"
+              variant="ghost"
+              disabled={submitting}
             >
               {t("cancel")}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={!canSubmit}
-              className="inline-flex h-10 items-center justify-center gap-2 bg-primary px-5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-45"
             >
               {submitting ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
               {submitting ? t("starting") : t("start")}
-            </button>
+            </Button>
           </div>
         </form>
-      </section>
-    </div>
+    </TaskDialog>
   );
 }

@@ -2,6 +2,15 @@
 
 桌面布局与尚未归并的范围见 [桌面界面合同](DESKTOP_UI.md)。本文件只维护已归并模块的交互约束。
 
+## 整理项目理解
+
+窗口结构参考 [PatternFly 任务模态](https://www.patternfly.org/components/modal/design-guidelines/)，复用 TaskDialog 的原生模态、键盘边界、1120px 宽度与 60px 标题栏。选择方式及表清单固定桌面双列，控件复用 Button。
+
+- SemanticGovernanceDialog 只在打开时创建按项目隔离的会话；重开／换项目清除选择与请求结果。提交使用同步锁，期间关闭、取消、Escape 和重复提交均不可用；旧项目迟到响应不触发新项目回调。不能撤回服务端已收到的任务。
+- semantic-governance-sources 独立维护业务名称、目录与已分析表的合并。同名跨 schema 的表仍按完整身份区分；此次提取不改变既有目录合并规则。
+- 打开窗口仍沿用已有 relation-index 刷新，目录失败保留当前可用表；该刷新不是模型整理。文件与数据库整理只由明确开始触发；部分成功后只保留失败来源，避免重复启动已成功部分。
+- 会话读取打开时的来源快照，目录刷新在本窗口合并；不是持续来源同步、跨窗口任务锁或持久化队列。真实模型调用和数据库整理尚未联调。
+
 ## 保存冲突与结果核对
 
 交互参考 [VS Code 冲突选择](https://code.visualstudio.com/docs/configure/settings-sync#conflicts)、[React 身份隔离会话](https://react.dev/learn/preserving-and-resetting-state#resetting-state-with-a-key)及 [PatternFly 内容卡片](https://www.patternfly.org/components/card/design-guidelines/)，沿用现有依赖，不自动覆盖或合并。
