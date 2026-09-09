@@ -1,6 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { TabList } from "@/components/ui/TabList";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import {
@@ -33,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { VisualCleaningEditor } from "./VisualCleaningEditor";
 
 interface DataWorkspacePanelProps {
+  embedded?: boolean;
   open: boolean;
   onClose: () => void;
   onConfigureConnection: () => void;
@@ -99,6 +102,7 @@ export function getPendingUnderstandingCount(knowledge: SemanticEntry[]): number
 }
 
 export function DataWorkspacePanel({
+  embedded = false,
   open,
   onClose,
   onConfigureConnection,
@@ -108,6 +112,7 @@ export function DataWorkspacePanel({
   view,
   onViewChange,
 }: DataWorkspacePanelProps) {
+  const tabsId = useId();
   const locale = useLocale();
   const t = useTranslations("dataWorkspace");
   const fieldWordsRaw = t("fieldWords").split(",").map((s) => s.trim());
@@ -444,7 +449,7 @@ export function DataWorkspacePanel({
         className="border border-border bg-background/70 p-3"
         aria-label={t("understandingMapAria")}
       >
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2">
           {sources.map((source) => (
             <div
               key={source.id}
@@ -667,65 +672,38 @@ export function DataWorkspacePanel({
     <>
     <aside
       className={cn(
-        "fixed inset-0 z-40 h-full w-full overflow-hidden border-l border-border bg-card shadow-2xl transition-transform duration-200 md:inset-y-0 md:left-auto md:right-0 md:w-[540px] md:max-w-[calc(100vw-2rem)]",
-        open ? "translate-x-0" : "pointer-events-none translate-x-full border-l-0"
+        embedded
+          ? "workbench-data-panel relative min-h-0 flex-1 overflow-hidden bg-card"
+          : "fixed inset-y-0 right-0 z-40 h-full w-[900px] overflow-hidden border-l border-border bg-card shadow-2xl transition-transform duration-200",
+        embedded ? (!open && "hidden") : open ? "translate-x-0" : "pointer-events-none translate-x-full border-l-0"
       )}
       aria-hidden={!open}
       inert={!open}
     >
       <div className="flex h-full w-full min-w-0 flex-col">
-        <div className="flex items-start justify-between px-5 py-5">
+        <div className="flex h-[60px] shrink-0 items-center justify-between border-b border-border px-5">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
               {activeView === "sources" ? t("panelTitleSources") : t("panelTitleUnderstanding")}
             </h2>
           </div>
-          <button
+          <Button variant="ghost" size="icon"
             onClick={onClose}
-            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label={t("closeWorkspaceAria")}
           >
             <X size={18} />
-          </button>
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 border-y border-border px-5" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeView === "sources"}
-            onClick={() => changeView("sources")}
-            className={cn(
-              "border-b-2 px-1 py-3 text-sm font-medium transition-colors",
-              activeView === "sources"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("dataSourcesTab")}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeView === "understanding"}
-            onClick={() => changeView("understanding")}
-            className={cn(
-              "border-b-2 px-1 py-3 text-sm font-medium transition-colors",
-              activeView === "understanding"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {t("understandingTab")}
-            {pendingKnowledgeCount > 0 && (
-              <span className="ml-1.5 bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning">
-                {pendingKnowledgeCount}
-              </span>
-            )}
-          </button>
-        </div>
+        {!embedded && <TabList id={tabsId} label={t("panelTitleSources")} value={activeView} onChange={changeView}
+          className="px-5" items={[
+            { value: "sources", label: t("dataSourcesTab") },
+            { value: "understanding", label: <>{t("understandingTab")}{pendingKnowledgeCount > 0 &&
+              <span className="ml-1.5 rounded-md bg-warning/15 px-1.5 py-0.5 text-[10px] text-warning">{pendingKnowledgeCount}</span>}</> },
+          ]} />}
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+        <div id={tabsId + "-panel"} role={embedded ? undefined : "tabpanel"}
+          aria-labelledby={embedded ? undefined : tabsId + "-" + activeView} className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
           {activeView === "sources" ? (
             <>
           <input

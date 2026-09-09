@@ -151,7 +151,7 @@ describe("DataWorkspacePanel project understanding", () => {
   });
 
 
-  it("uses one fixed overlay drawer width on desktop and full width on mobile", () => {
+  it("keeps a fixed desktop workspace while switching keyboard-accessible views", () => {
     const { container } = render(
       <NextIntlClientProvider locale="zh" messages={messages}>
         <DataWorkspacePanel
@@ -164,15 +164,19 @@ describe("DataWorkspacePanel project understanding", () => {
     );
 
     const panel = container.querySelector("aside");
-    expect(panel).toHaveClass("fixed", "inset-0", "w-full", "md:w-[540px]");
-    expect(panel).not.toHaveClass("md:relative", "md:w-[370px]", "md:w-[640px]");
+    expect(panel).toHaveClass("fixed", "inset-y-0", "right-0", "w-[900px]");
     expect(screen.queryByText("当前上下文")).not.toBeInTheDocument();
     expect(screen.queryByText("随时加入或替换；原件不会被修改。")).not.toBeInTheDocument();
     expect(screen.getByText("暂无数据")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: /项目理解/ }));
-    expect(panel).toHaveClass("md:w-[540px]");
-    expect(panel).not.toHaveClass("md:w-[640px]");
+    const sources = screen.getByRole("tab", { name: /数据来源/ });
+    const understanding = screen.getByRole("tab", { name: /项目理解/ });
+    sources.focus();
+    fireEvent.keyDown(sources, { key: "ArrowRight" });
+    expect(understanding).toHaveFocus();
+    expect(understanding).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", understanding.id);
+    expect(panel).toHaveClass("w-[900px]");
   });
 
   it("shows every source without inventing relationship connectors", () => {
