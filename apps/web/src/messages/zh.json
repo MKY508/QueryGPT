@@ -2772,5 +2772,27 @@
   },
   "businessConfirmation": {
     "confirmed": "已确认"
+  },
+  "semanticSaveRecovery": {
+    "title": "核对保存结果",
+    "conflict": "已保存的定义可能有变化。你的输入仍在，请先读取当前内容。",
+    "uncertain": "尚未确认保存结果。你的输入仍在，请先查看已保存内容。",
+    "read": "查看已保存内容",
+    "refresh": "重新读取",
+    "reading": "正在读取…",
+    "readFailed": "暂时无法读取，请稍后再试。",
+    "notFound": "暂未找到这条定义。可以再次读取，或返回编辑后重试保存。",
+    "inactive": "这条定义已被移除，不能直接载入编辑。",
+    "review": "请比较业务说明。载入会替换整个表单，不会自动保存或合并修改。",
+    "saved": "当前已保存",
+    "draft": "我的输入",
+    "unnamed": "尚未命名",
+    "noDescription": "没有可显示的业务说明。",
+    "load": "载入已保存版本",
+    "retry": "返回编辑后重试",
+    "loadTitle": "载入已保存的定义？",
+    "loadDescription": "整个表单将替换为刚刚读取的版本，当前未保存输入会被放弃。载入后可继续编辑，不会立即保存。",
+    "keep": "保留我的输入",
+    "confirmLoad": "放弃输入并载入"
   }
 }

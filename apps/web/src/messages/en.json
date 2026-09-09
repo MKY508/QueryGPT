@@ -2772,5 +2772,27 @@
   },
   "businessConfirmation": {
     "confirmed": "Confirmed"
+  },
+  "semanticSaveRecovery": {
+    "title": "Check the saved definition",
+    "conflict": "The saved definition may have changed. Your input is still here; read the current content first.",
+    "uncertain": "Saving has not been confirmed. Your input is still here; check the saved content first.",
+    "read": "View saved content",
+    "refresh": "Read again",
+    "reading": "Reading…",
+    "readFailed": "The definition could not be read. Please try again later.",
+    "notFound": "This definition was not found yet. Read again, or return to editing before retrying the save.",
+    "inactive": "This definition has been removed and cannot be loaded for editing.",
+    "review": "Compare the business descriptions. Loading replaces the entire form; it does not save or merge changes.",
+    "saved": "Currently saved",
+    "draft": "My input",
+    "unnamed": "Not named yet",
+    "noDescription": "No business description is available.",
+    "load": "Load saved version",
+    "retry": "Return to editing to retry",
+    "loadTitle": "Load the saved definition?",
+    "loadDescription": "The entire form will be replaced by the version just read. Your unsaved input will be discarded. You can then edit it; loading does not save it.",
+    "keep": "Keep my input",
+    "confirmLoad": "Discard input and load"
   }
 }
