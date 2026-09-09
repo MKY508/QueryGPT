@@ -40,19 +40,43 @@ export class ModelJsonMapError extends Error {
 export type ModelPreset = Pick<
   ModelFormData,
   "provider" | "api_format" | "base_url" | "api_key_optional"
->;
+> & { model_id?: string; addressRequired?: boolean };
 
 export const MODEL_PRESETS: Record<string, ModelPreset> = {
+  orcarouter: {
+    provider: "orcarouter",
+    api_format: "openai_compatible",
+    base_url: "https://api.orcarouter.ai/v1",
+    model_id: "orcarouter/auto",
+    api_key_optional: false,
+  },
   openai: {
     provider: "openai",
     api_format: "openai_compatible",
-    base_url: "",
+    base_url: "https://api.openai.com/v1",
+    model_id: "gpt-4o",
     api_key_optional: false,
   },
   deepseek: {
     provider: "deepseek",
     api_format: "openai_compatible",
     base_url: "https://api.deepseek.com",
+    model_id: "deepseek-chat",
+    api_key_optional: false,
+  },
+  groq: {
+    provider: "groq",
+    api_format: "openai_compatible",
+    base_url: "https://api.groq.com/openai/v1",
+    model_id: "openai/gpt-oss-120b",
+    api_key_optional: false,
+  },
+  qwen: {
+    provider: "qwen",
+    api_format: "openai_compatible",
+    base_url: "",
+    model_id: "qwen-plus",
+    addressRequired: true,
     api_key_optional: false,
   },
   anthropic: {
@@ -71,9 +95,29 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     provider: "custom",
     api_format: "openai_compatible",
     base_url: "",
+    addressRequired: true,
     api_key_optional: false,
   },
 };
+
+export function selectModelPreset(current: ModelFormData, key: string): ModelFormData {
+  const preset = MODEL_PRESETS[key] ?? MODEL_PRESETS.custom;
+  if (current.provider === preset.provider) return current;
+  return {
+    ...current,
+    provider: preset.provider,
+    model_id: preset.model_id ?? "",
+    base_url: preset.base_url,
+    api_format: preset.api_format,
+    api_key_optional: preset.api_key_optional,
+    api_key: "",
+    headersText: "{}",
+    queryParamsText: "{}",
+  };
+}
+
+// Account attribution is established by OrcaRouter at signup, not by API headers.
+export const ORCAROUTER_REFERRAL_URL = "https://www.orcarouter.ai/ref/ref_86d1b2f35d6800d5f85b";
 
 export const initialModelFormData: ModelFormData = {
   name: "",

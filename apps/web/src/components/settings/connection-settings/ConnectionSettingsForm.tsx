@@ -1,14 +1,19 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, type FormEvent, type RefObject } from "react";
 import {
   CONNECTION_DRIVERS,
   type ConnectionFormData,
 } from "@/lib/settings/connections";
 import { useTranslations } from "next-intl";
+import { validateConnectionSettings } from "@/lib/settings/validation";
+import { useSettingsValidation } from "@/components/settings/hooks/useSettingsValidation";
+import { SettingsDisclosure, SettingsForm } from "../SettingsForm";
+import styles from "../SettingsForm.module.css";
 
 interface ConnectionSettingsFormProps {
+  embedded?: boolean;
+  formRef?: RefObject<HTMLFormElement | null>;
   editingId: string | null;
   formData: ConnectionFormData;
   isSubmitting: boolean;
@@ -19,6 +24,8 @@ interface ConnectionSettingsFormProps {
 }
 
 export function ConnectionSettingsForm({
+  embedded = false,
+  formRef,
   editingId,
   formData,
   isSubmitting,
@@ -29,6 +36,9 @@ export function ConnectionSettingsForm({
 }: ConnectionSettingsFormProps) {
   const t = useTranslations("connectionSettings");
   const tc = useTranslations("common");
+  const tv = useTranslations("settingsValidation");
+  const errors = Object.fromEntries(Object.entries(validateConnectionSettings(formData)).map(([field, issue]) => [field, tv(issue)]));
+  const validation = useSettingsValidation({ scope: editingId, errors, busy: isSubmitting });
   const hasAdvancedOptions =
     formData.extra_options.sslmode !== "prefer" ||
     Boolean(
@@ -37,41 +47,46 @@ export function ConnectionSettingsForm({
         formData.extra_options.sslcert ||
         formData.extra_options.sslkey
     );
-  const [advancedOpen, setAdvancedOpen] = useState(hasAdvancedOptions);
-
-  useEffect(() => {
-    if (hasAdvancedOptions) setAdvancedOpen(true);
-  }, [editingId, hasAdvancedOptions]);
+  const [advanced, setAdvanced] = useState({ editingId, hasOptions: hasAdvancedOptions, open: hasAdvancedOptions });
+  if (advanced.editingId !== editingId || advanced.hasOptions !== hasAdvancedOptions) {
+    setAdvanced({ editingId, hasOptions: hasAdvancedOptions, open: hasAdvancedOptions || advanced.open });
+  }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      data-testid="connection-form"
-      className="mb-7 border-y border-border bg-card px-4 py-5 sm:px-5"
+    <SettingsForm
+      embedded={embedded}
+      formRef={formRef}
+      title={editingId ? t("editConnection") : t("addConnection")}
+      closeLabel={tc("close")}
+      submitLabel={editingId ? t("update") : tc("save")}
+      busy={isSubmitting}
+      testId="connection"
+      feedback={validation.summary}
+      onCancel={onReset}
+      onSubmit={event => validation.submit(event, onSubmit)}
     >
-      <h3 className="text-sm font-medium text-foreground mb-4">
-        {editingId ? t("editConnection") : t("addConnection")}
-      </h3>
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className={styles.grid}>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">{t("connectionName")}</label>
-          <input
+          <label htmlFor={validation.id("name")} className={styles.label}>{t("connectionName")}</label>
+          <input {...validation.field("name")}
             type="text"
             value={formData.name}
             onChange={(event) => onChange({ ...formData, name: event.target.value })}
             data-testid="connection-name-input"
-            className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            data-settings-primary-field=""
+            className={styles.control}
             placeholder={t("connectionNamePlaceholder")}
             required
           />
+          {validation.error("name")}
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">{t("databaseType")}</label>
-          <select
+          <label htmlFor={validation.id("driver")} className={styles.label}>{t("databaseType")}</label>
+          <select {...validation.field("driver")}
             value={formData.driver}
             onChange={(event) => onDriverChange(event.target.value)}
             data-testid="connection-driver-select"
-            className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            className={styles.control}
           >
             {CONNECTION_DRIVERS.map((driver) => (
               <option key={driver.value} value={driver.value}>
@@ -83,94 +98,98 @@ export function ConnectionSettingsForm({
         {formData.driver !== "sqlite" && (
           <>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">{t("hostAddress")}</label>
-              <input
+              <label htmlFor={validation.id("host")} className={styles.label}>{t("hostAddress")}</label>
+              <input {...validation.field("host")}
                 type="text"
                 value={formData.host}
                 onChange={(event) => onChange({ ...formData, host: event.target.value })}
                 data-testid="connection-host-input"
-                className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                className={styles.control}
                 placeholder="localhost"
                 required
               />
+              {validation.error("host")}
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">{t("port")}</label>
-              <input
+              <label htmlFor={validation.id("port")} className={styles.label}>{t("port")}</label>
+              <input {...validation.field("port")}
                 type="number"
-                value={formData.port}
+                value={Number.isFinite(formData.port) ? formData.port : ""}
+                min={1}
+                max={65535}
+                step={1}
                 onChange={(event) =>
-                  onChange({ ...formData, port: parseInt(event.target.value, 10) })
+                  onChange({ ...formData, port: event.target.valueAsNumber })
                 }
                 data-testid="connection-port-input"
-                className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                className={styles.control}
                 required
               />
+              {validation.error("port")}
             </div>
           </>
         )}
-        <div className={formData.driver === "sqlite" ? "md:col-span-2" : ""}>
-          <label className="block text-sm font-medium text-foreground mb-1">
+        <div className={formData.driver === "sqlite" ? styles.fullWidth : undefined}>
+          <label htmlFor={validation.id("database")} className={styles.label}>
             {formData.driver === "sqlite" ? t("databaseFilePath") : t("databaseName")}
           </label>
-          <input
+          <input {...validation.field("database")}
             type="text"
             value={formData.database}
             onChange={(event) => onChange({ ...formData, database: event.target.value })}
             data-testid="connection-database-input"
-            className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+            className={styles.control}
             placeholder={formData.driver === "sqlite" ? "/path/to/database.db" : "mydb"}
             required
           />
+          {validation.error("database")}
         </div>
         {formData.driver !== "sqlite" && (
           <>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">{t("username")}</label>
-              <input
+              <label htmlFor={validation.id("username")} className={styles.label}>{t("username")}</label>
+              <input {...validation.field("username")}
                 type="text"
                 value={formData.username}
                 onChange={(event) => onChange({ ...formData, username: event.target.value })}
                 data-testid="connection-username-input"
-                className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                className={styles.control}
                 placeholder="root"
                 required
               />
+              {validation.error("username")}
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
+              <label htmlFor={validation.id("password")} className={styles.label}>
                 {t("password")}
                 {editingId && (
                   <span className="text-muted-foreground font-normal ml-2">{t("passwordHint")}</span>
                 )}
               </label>
-              <input
+              <input {...validation.field("password")}
                 type="password"
                 value={formData.password}
                 onChange={(event) => onChange({ ...formData, password: event.target.value })}
                 data-testid="connection-password-input"
-                className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                className={styles.control}
                 placeholder={editingId ? t("passwordPlaceholder") : "••••••••"}
               />
             </div>
           </>
         )}
         {formData.driver !== "sqlite" && (
-          <details
-            className="md:col-span-2 border-y border-border py-3"
-            open={advancedOpen}
-            onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+          <SettingsDisclosure
+            title={t("security.title")}
+            open={advanced.open}
+            onToggle={(event) => { const open = event.currentTarget.open; setAdvanced(current => current.open === open ? current : { ...current, open }); }}
             data-testid="connection-security-options"
           >
-            <summary className="cursor-pointer select-none text-sm font-medium text-foreground">
-              {t("security.title")}
-            </summary>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className={styles.grid}>
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">
+                <label htmlFor={validation.id("sslmode")} className={styles.label}>
                   {t("security.encryption")}
                 </label>
-                <select
+                <select {...validation.field("sslmode")}
                   value={formData.extra_options.sslmode}
                   onChange={(event) => {
                     const sslmode =
@@ -187,7 +206,7 @@ export function ConnectionSettingsForm({
                     });
                   }}
                   data-testid="connection-sslmode-select"
-                  className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                  className={styles.control}
                 >
                   <option value="prefer">{t("security.sslMode.prefer")}</option>
                   <option value="require">{t("security.sslMode.require")}</option>
@@ -195,13 +214,14 @@ export function ConnectionSettingsForm({
                   <option value="verify-full">{t("security.sslMode.verifyFull")}</option>
                   <option value="disable">{t("security.sslMode.disable")}</option>
                 </select>
+                {validation.error("sslmode")}
               </div>
               {formData.driver === "postgresql" && (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-foreground">
+                  <label htmlFor={validation.id("schema")} className={styles.label}>
                     {t("security.schema")}
                   </label>
-                  <input
+                  <input {...validation.field("schema")}
                     type="text"
                     value={formData.extra_options.schema}
                     onChange={(event) =>
@@ -214,18 +234,19 @@ export function ConnectionSettingsForm({
                       })
                     }
                     data-testid="connection-schema-input"
-                    className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                    className={styles.control}
                     placeholder="public"
                   />
+                  {validation.error("schema")}
                 </div>
               )}
               {formData.extra_options.sslmode !== "disable" && (
                 <>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-foreground">
+                    <label htmlFor={validation.id("sslrootcert")} className={styles.label}>
                       {t("security.caCertificatePath")}
                     </label>
-                    <input
+                    <input {...validation.field("sslrootcert")}
                       type="text"
                       value={formData.extra_options.sslrootcert}
                       onChange={(event) =>
@@ -238,15 +259,16 @@ export function ConnectionSettingsForm({
                         })
                       }
                       data-testid="connection-ca-path-input"
-                      className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                      className={styles.control}
                       placeholder="/path/to/ca.pem"
                     />
+                    {validation.error("sslrootcert")}
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-foreground">
+                    <label htmlFor={validation.id("sslcert")} className={styles.label}>
                       {t("security.clientCertificatePath")}
                     </label>
-                    <input
+                    <input {...validation.field("sslcert")}
                       type="text"
                       value={formData.extra_options.sslcert}
                       onChange={(event) =>
@@ -259,15 +281,16 @@ export function ConnectionSettingsForm({
                         })
                       }
                       data-testid="connection-client-cert-input"
-                      className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                      className={styles.control}
                       placeholder="/path/to/client.pem"
                     />
+                    {validation.error("sslcert")}
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-foreground">
+                    <label htmlFor={validation.id("sslkey")} className={styles.label}>
                       {t("security.clientKeyPath")}
                     </label>
-                    <input
+                    <input {...validation.field("sslkey")}
                       type="text"
                       value={formData.extra_options.sslkey}
                       onChange={(event) =>
@@ -280,18 +303,19 @@ export function ConnectionSettingsForm({
                         })
                       }
                       data-testid="connection-client-key-input"
-                      className="w-full border border-border bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+                      className={styles.control}
                       placeholder="/path/to/client.key"
                     />
+                    {validation.error("sslkey")}
                   </div>
                 </>
               )}
             </div>
-          </details>
+          </SettingsDisclosure>
         )}
-        <div className="md:col-span-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
+        <div className={styles.fullWidth}>
+          <label htmlFor={validation.id("is_default")} className={styles.checkbox}>
+            <input {...validation.field("is_default")}
               type="checkbox"
               checked={formData.is_default}
               onChange={(event) => onChange({ ...formData, is_default: event.target.checked })}
@@ -302,24 +326,6 @@ export function ConnectionSettingsForm({
           </label>
         </div>
       </div>
-      <div className="flex justify-end gap-2 mt-4">
-        <button
-          type="button"
-          onClick={onReset}
-          className="px-4 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
-        >
-          {tc("cancel")}
-        </button>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          data-testid="connection-submit-button"
-          className="flex items-center gap-2 bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-          {editingId ? t("update") : tc("save")}
-        </button>
-      </div>
-    </form>
+    </SettingsForm>
   );
 }

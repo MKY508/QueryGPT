@@ -138,7 +138,6 @@
     "descOllama": "Local models, API Key optional",
     "descOpenai": "OpenAI-compatible interface",
     "editModel": "Edit model",
-    "currentFormat": "Current API format",
     "name": "Name",
     "providerTag": "Provider tag",
     "modelId": "Model ID",
@@ -186,17 +185,16 @@
     "addService": "Add service",
     "form": {
       "chooseService": "Choose a service",
-      "chooseServiceHint": "Start with a common service. Choose Custom Gateway when its address or protocol differs.",
+      "changeService": "Change",
       "serviceName": "Display name",
       "serviceNameHint": "e.g. Everyday analysis service",
       "model": "Model to use",
       "serviceAddress": "Service address",
-      "serviceAddressHint": "Leave blank for an official endpoint; enter the full endpoint for a compatible service.",
+      "serviceAddressHint": "Use the address supplied by your service. Preset endpoints can be changed.",
+      "qwenAddressHint": "Use your Model Studio workspace endpoint, in the same region as your key.",
       "accessKey": "Access key",
       "defaultService": "Use as the default analysis service",
       "compatibility": "Advanced connection options",
-      "compatibilityHint": "Adjust these only when the service needs a special protocol or request options.",
-      "serviceType": "Service type",
       "protocol": "Interface protocol",
       "protocolOpenaiCompatible": "OpenAI compatible",
       "protocolAnthropicNative": "Anthropic native",
@@ -210,7 +208,11 @@
     "loadingServices": "Loading analysis services",
     "checkingService": "Checking the model’s analysis capabilities…",
     "connectionDetails": "Connection details",
-    "connectionDetailsFor": "Connection details for {name}"
+    "connectionDetailsFor": "Connection details for {name}",
+    "providerCloud": "Cloud service",
+    "providerGateway": "Model gateway",
+    "providerLocal": "On this computer",
+    "orcaGetKey": "Get an OrcaRouter API key (affiliate link)"
   },
   "connectionSettings": {
     "title": "Database Connections",
@@ -1821,5 +1823,22 @@
     "range": "{start}–{end} of {total}",
     "previous": "Previous configurations",
     "next": "Next configurations"
+  },
+  "settingsValidation": {
+    "summary": "{count, plural, one {# field needs attention} other {# fields need attention}}",
+    "required": "Fill in this field.",
+    "nameTooLong": "Use a name of 100 characters or fewer.",
+    "port": "Enter a whole number from 1 to 65535.",
+    "serviceUrl": "Enter a complete http:// or https:// service address.",
+    "urlCredentials": "Remove the username or password from the address.",
+    "urlFragment": "Remove the part after # from the address.",
+    "schema": "Start with a letter or underscore. Use only letters, numbers and underscores, up to 63 characters.",
+    "certificatePath": "Enter a file path, not the contents of a certificate or private key.",
+    "pathTooLong": "Use a file path of 4096 characters or fewer.",
+    "caRequired": "Enter the CA certificate path to verify the server certificate.",
+    "certificatePair": "Enter both the client certificate and private key paths.",
+    "encryptionRequired": "Choose an encryption option to use the certificate paths.",
+    "invalidJson": "Enter valid JSON.",
+    "objectRequired": "Enter a JSON object."
   }
 }
