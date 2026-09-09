@@ -2048,6 +2048,7 @@
     "fallbackTitle": "调查报告"
   },
   "reportWorkspace": {
+    "reportMode": "报告模式",
     "pageNavigation": "报告分页",
     "pagePosition": "第 {current} / {total} 页",
     "selectPage": "选择报告页面",

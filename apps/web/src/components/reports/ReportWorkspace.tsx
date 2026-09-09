@@ -1,5 +1,7 @@
 "use client";
 
+import { ReportEditingControls } from "./ReportEditingControls";
+
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -10,18 +12,15 @@ import {
   ChevronRight,
   CircleAlert,
   Download,
-  Eye,
   FileText,
   FileSpreadsheet,
   LayoutDashboard,
   Loader2,
   PanelLeftClose,
   PanelRightClose,
-  PencilLine,
   Plus,
   Printer,
   RefreshCw,
-  Save,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -1136,23 +1135,12 @@ function ReportWorkspaceSession({ projectId, reportId, initialRunId }: ReportWor
             )}
           </div>
 
-          <div className="flex h-9 items-center border border-border bg-background p-0.5">
-            <button type="button" aria-pressed={!editing} aria-label={t("readReport")} onClick={() => { setEditing(false); setAddMenuOpen(false); }} className={cn("inline-flex h-7 items-center gap-1.5 px-2.5 text-[11px] font-medium", !editing ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              <Eye size={13} />
-              <span className="hidden sm:inline">{t("read")}</span>
-            </button>
-            <button type="button" aria-pressed={editing} aria-label={t("editReport")} onClick={() => { setEditing(true); clearSelections(); }} className={cn("inline-flex h-7 items-center gap-1.5 px-2.5 text-[11px] font-medium", editing ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
-              <PencilLine size={13} />
-              <span className="hidden sm:inline">{t("edit")}</span>
-            </button>
-          </div>
-
-          {editing && (
-            <button type="button" onClick={() => void save()} disabled={!dirty || saveState === "saving" || reportMutationDisabled} aria-label={saveState === "saving" ? t("saving") : t("save")} className="inline-flex h-9 min-w-9 items-center justify-center gap-2 bg-primary px-2 text-xs font-semibold text-primary-foreground disabled:opacity-45 sm:min-w-20 sm:px-3">
-              {saveState === "saving" ? <Loader2 size={14} className="animate-spin" /> : saveState === "saved" ? <Check size={14} /> : <Save size={14} />}
-              <span className="hidden sm:inline">{saveState === "saving" ? t("saving") : saveState === "saved" ? t("saved") : t("save")}</span>
-            </button>
-          )}
+          <ReportEditingControls editing={editing} onModeChange={next => {
+            setEditing(next); setAddMenuOpen(false);
+            if (next) clearSelections();
+          }} canSave={dirty && saveState !== "conflict" && !reportMutationDisabled}
+            status={saveState === "saving" ? "saving" : saveState === "saved" ? "saved" : "ready"}
+            onSave={() => void save()} />
         </div>
       </header>
 

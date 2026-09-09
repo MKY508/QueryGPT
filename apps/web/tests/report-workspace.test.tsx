@@ -210,7 +210,7 @@ describe("ReportWorkspace", () => {
 
     const title = screen.getByLabelText("区块标题");
     fireEvent.change(title, { target: { value: "本月收入" } });
-    expect(screen.getByText("本月收入")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "本月收入", level: 3 })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(updateReport).toHaveBeenCalledTimes(1));

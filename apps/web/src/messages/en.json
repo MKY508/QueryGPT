@@ -2048,6 +2048,7 @@
     "fallbackTitle": "Investigation report"
   },
   "reportWorkspace": {
+    "reportMode": "Report mode",
     "pageNavigation": "Report pages",
     "pagePosition": "Page {current} / {total}",
     "selectPage": "Select report page",
