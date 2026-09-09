@@ -24,7 +24,8 @@
 | 工作台与设置 | 导航和配置编辑面板；工作区已有 248px 目录与 420px 编辑区 | 完整页面依赖、草稿会话及离开链路 |
 | 工作台命令与输入 | 现有 cmdk 搜索与选择复用原生 640px 桌面窗口，60px 标题、12px 外框、6px 选项；触发按钮与快捷键常驻。输入区保留文件、数据来源文字，删除手机文案与缩排分支 | 命令已在工作区入口接入；工作台导航与任务提交仍需整体归并 |
 | 问题编辑与重用 | InputBar 按项目／会话重建局部状态，独立草稿存储保留原文和修订。展开窗口直接编辑同一草稿，返回恢复选区；1120px 编辑、760px 双栏对照共用 TaskDialog。追加／替换只对仍匹配的草稿生效，不触发发送；删除重复键盘循环和手机样式 | 工作台级草稿接入、关闭保护和真实发送回执仍需整体归并，不能把编辑验证当成消息投递验证 |
-| 分析结果阅读 | AnalysisReportHighlights 独立承担指标、发现和建议，不读取服务或保存纠错。指标桌面三列、建议双列；原文和完整提示交给已有入口。结果卡片移除手机断点及装饰侧线，按钮统一共享控件，内容面板 12px；工作区旧指标覆盖样式已移除 | 纠错编辑、确认请求和保存动作仍需独立归并；卡片中两处既有 effect 状态同步待处理，完整工作台页面仍待验收 |
+| 分析结果阅读 | AnalysisReportHighlights 独立承担指标、发现和建议，不读取服务或保存纠错。指标桌面三列、建议双列；原文和完整提示交给已有入口。结果卡片移除手机断点及装饰侧线，按钮统一共享控件，内容面板 12px；工作区旧指标覆盖样式已移除 | 纠错编辑、确认请求和保存动作仍需独立归并，完整工作台页面仍待验收 |
+| 结果卡片状态 | 以项目／报告身份重建卡片会话，操作、错误和子窗口不沿用上一报告。已保存纠错状态从查询派生；正在编辑的内容只由用户动作修改，不用 effect 同步服务端文本。卸载使旧纠错写入回调失效，但保留对应项目的查询缓存更新 | 纠错编辑器组件拆分与完整读写联调 |
 | 分析历史 | 查询与分页独立于窗口，预览合同独立校验。TaskDialog 固定 1120px、列表 420px、详情并排；搜索和全部操作复用共享控件，移除手机全屏、隐藏栏和断点焦点逻辑。先预览再明确打开，跨页失败保留原预览并阻止打开 | 工作台入口与后端历史接口仍在工作区，未纳入本模块提交；真实服务及完整打开链路待联调 |
 | 外观偏好 | AppearancePreferences 接回原偏好入口；语言即时切换和失败重试独立维护。主题固定双栏、原生单选、12px 预览卡，配色直接引用应用变量；保存与重试复用 Button | 设置工作区完整导航、持久草稿及原生离开链路仍待整体归并 |
 | 模型与连接目录 | 共用 SettingsResourceCard 的标题、状态、反馈与操作分区；移除模型 480px 和连接 sm 布局分支，12px 卡片、6px 控件。检查与二次删除复用 Button；删除确认遇到搜索或筛选即取消 | 连接列表已在工作区入口接入；完整连接资源、表单与设置离开链路仍待整体归并 |
@@ -81,7 +82,8 @@
 
 | 范围 | 已检查内容 | 视觉证据 |
 | --- | --- | --- |
-| 分析结果阅读 | 待提交源码 3 个用例覆盖指标原值、纯文本发现、空态、双语和完整建议交接，限定类型检查通过。工作区额外 4 个用例覆盖服务切换、表格、图表与纠错保存；ESLint 无错误，2 条既有状态同步警告。隔离 Chrome 1180px 验证四项指标按三列换行、建议双列、12px／6px 圆角及无溢出；建议只交回完整问题，无服务写入 | [中文浅色](images/zh/desktop-ui-result-reading.png)、[英文深色](images/zh/desktop-ui-result-reading-en-dark.png) |
+| 结果卡片状态 | 7 个定向用例覆盖旧保存／删除、报告切换、可重用纠错、刷新保留草稿及记录消失；待提交源码独立复核 2 个新增用例和限定类型检查。ESLint 无错误或警告。仅状态逻辑改变，未重复视觉检查、全量构建或真实写入 | 复用结果阅读截图，行为证据为隔离测试 |
+| 分析结果阅读 | 待提交源码 3 个用例覆盖指标原值、纯文本发现、空态、双语和完整建议交接，限定类型检查通过。工作区额外 4 个用例覆盖服务切换、表格、图表与纠错保存。隔离 Chrome 1180px 验证四项指标按三列换行、建议双列、12px／6px 圆角及无溢出；建议只交回完整问题，无服务写入 | [中文浅色](images/zh/desktop-ui-result-reading.png)、[英文深色](images/zh/desktop-ui-result-reading-en-dark.png) |
 | 问题编辑与重用 | 待提交源码 10 个用例覆盖原文／选区、IME、Tab、文件拖放、项目及语言切换、追加与替换；另验证旧项目迟到失败不污染新输入会话。限定类型检查及 ESLint 通过。隔离 Chrome 中英文 1180px 验证 1120px 编辑、760px 并排对照、60px 标题、12px 外框／正文卡片；取消不改草稿、追加保留原文、返回保留选区，无发送、上传或页面错误 | [编辑问题](images/zh/desktop-ui-question-editor.png)、[英文对照](images/zh/desktop-ui-prompt-insertion-en.png) |
 | 分析历史与窗口焦点 | 16 个既有历史用例通过；共享窗口补充 2 个键盘用例，待提交源码定向复核 6 个用例及限定类型检查、ESLint。隔离 Chrome 中英文 1180px 检查 1120px 窗口、420px 列表、60px 标题和 12px／6px 圆角；双栏无溢出、Tab 循环、两级 Escape 返回焦点、仅明确打开时触发导航。使用虚构只读数据，未写服务或测试真实导航 | [中文](images/zh/desktop-ui-analysis-history.png)、[英文](images/zh/desktop-ui-analysis-history-en.png) |
 | 原生窗口约束 | 从暂存 main.ts 提取构造尺寸，隔离 Electron 隐藏窗口验证默认 1280×800、最小 1180×600；另用工作区恢复逻辑验证 900px 历史宽度提升至 1180px。未启动应用后端或构建安装包 | 原生 API 返回尺寸，未修改用户窗口记录 |
@@ -126,6 +128,6 @@
 - [PatternFly inline Drawer](https://www.patternfly.org/components/drawer/)：主从内容并排，不采用手机断点或覆盖式切换。
 - [PatternFly Modal](https://www.patternfly.org/components/modal/design-guidelines/)：明确任务采用标题、内容与动作分区；文件准备、来源更新及方法重用复用一个桌面框架。
 - [PatternFly Multiple file upload](https://www.patternfly.org/components/file-upload/multiple-file-upload/)：上传入口、逐文件状态和传输处理分开组合；只采用分工，未引入依赖或复制源码。
-- [React 状态归属](https://react.dev/learn/preserving-and-resetting-state)：项目身份作为工作区 key，直接重建该项目的局部状态，不为每个反馈和弹窗单独追加项目切换补丁。
+- [React 状态归属](https://react.dev/learn/you-might-not-need-an-effect#resetting-all-state-when-a-prop-changes)：项目／报告身份作为会话 key；已保存展示从查询派生，编辑草稿只在明确用户动作中加载，不用 effect 在两者之间复制状态。
 - [Electron 窗口尺寸参数](https://www.electronjs.org/docs/latest/api/structures/base-window-options)：窗口宽度与最小宽度分别设置，保存尺寸不能覆盖当前桌面布局下限。
 - [WAI-ARIA Alert Dialog](https://www.w3.org/WAI/ARIA/apg/patterns/alertdialog/)：真实模态、标题、描述与确认操作。页签规则见上文。

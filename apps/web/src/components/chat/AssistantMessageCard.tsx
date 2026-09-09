@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -276,7 +276,13 @@ function CorrectionApplicationReceipt({
   );
 }
 
-export function AssistantMessageCard({
+export function AssistantMessageCard(props: AssistantMessageCardProps) {
+  const { message, index } = props;
+  const identity = JSON.stringify([message.projectId ?? null, message.analysisRunId || message.id || index]);
+  return <AssistantMessageSession key={identity} {...props} />;
+}
+
+function AssistantMessageSession({
   message,
   index,
   onRetry,
@@ -318,13 +324,16 @@ export function AssistantMessageCard({
   );
   const [correctionSelection, setCorrectionSelection] =
     useState<AnalysisCorrectionSelection | null>(null);
-  const [correctionReusable, setCorrectionReusable] = useState(false);
-  const [correctionState, setCorrectionState] =
-    useState<CorrectionState>("idle");
+  const [draftReusable, setCorrectionReusable] = useState(false);
+  const [correctionMutationState, setCorrectionState] =
+    useState<Exclude<CorrectionState, "saved">>("idle");
   const [correctionError, setCorrectionError] = useState<string | null>(null);
   const correctionIdentityRef = useRef("");
   const correctionIdentity = `${message.projectId || ""}:${message.analysisRunId || ""}`;
-  correctionIdentityRef.current = correctionIdentity;
+  useLayoutEffect(() => {
+    correctionIdentityRef.current = correctionIdentity;
+    return () => { correctionIdentityRef.current = ""; };
+  }, [correctionIdentity]);
   const report = message.report;
   const localizedPreflightConfirmation = (() => {
     const confirmation = report?.confirmation;
@@ -499,6 +508,10 @@ export function AssistantMessageCard({
   const persistedCorrection = projectCorrections.find(
     (item) => item.analysis_run_id === message.analysisRunId,
   );
+  // Saved presentation follows the query; an open editor owns its draft.
+  const correctionState: CorrectionState = correctionMutationState !== "idle" ? correctionMutationState
+    : !correctionOpen && persistedCorrection ? "saved" : "idle";
+  const correctionReusable = !correctionOpen && persistedCorrection ? persistedCorrection.scope === "project" : draftReusable;
   const selectedCorrectionTarget = correctionTargets.find(
     (target) => target.target_ref === correctionTargetRef,
   );
@@ -590,31 +603,6 @@ export function AssistantMessageCard({
     (projectCorrectionInactive ? "blocked" : "definition_only");
   const correctionExecutionVerified = correctionExecutionState === "verified";
   const correctionExecutionBlocked = correctionExecutionState === "blocked";
-
-  useEffect(() => {
-    setSavedArtifactsOpen(false);
-    setCorrectionOpen(false);
-    setCorrectionText("");
-    setCorrectionKind("business_rule");
-    setCorrectionTargetRef(null);
-    setCorrectionSelection(null);
-    setCorrectionReusable(false);
-    setCorrectionState("idle");
-    setCorrectionError(null);
-  }, [message.analysisRunId, message.projectId]);
-
-  useEffect(() => {
-    if (correctionState === "saving" || correctionState === "deleting") return;
-    if (!persistedCorrection) return;
-    setCorrectionText(
-      linkedProjectKnowledge?.value || persistedCorrection.text,
-    );
-    setCorrectionKind(persistedCorrection.correction_type);
-    setCorrectionTargetRef(persistedCorrection.target_ref || null);
-    setCorrectionSelection(persistedCorrection.selection || null);
-    setCorrectionReusable(persistedCorrection.scope === "project");
-    setCorrectionState("saved");
-  }, [linkedProjectKnowledge?.value, persistedCorrection, correctionState]);
 
   const savedFiles = artifacts.filter(
     (artifact) => typeof artifact.payload.relative_path === "string",
@@ -827,7 +815,7 @@ export function AssistantMessageCard({
       setCorrectionTargetRef(savedCorrection.target_ref || correctionTargetRef);
       setCorrectionSelection(savedCorrection.selection || null);
       setCorrectionReusable(savedCorrection.scope === "project");
-      setCorrectionState("saved");
+      setCorrectionState("idle");
       setCorrectionOpen(false);
 
       if (savedCorrection.scope === "project") {
@@ -895,7 +883,7 @@ export function AssistantMessageCard({
       setCorrectionState("idle");
     } catch (error) {
       if (correctionIdentityRef.current !== requestIdentity) return;
-      setCorrectionState("saved");
+      setCorrectionState("idle");
       setCorrectionError(getErrorMessage(error));
     }
   };
