@@ -15,6 +15,8 @@ import {
   RENDERER_CHUNK_FAILURE_CHANNEL,
 } from './frontend-reliability.js';
 
+const DESKTOP_MIN_WIDTH = 1180;
+
 const bootstrapLogger: Logger = {
   info: (message, ...args) => console.info(message, ...args),
   warn: (message, ...args) => console.warn(message, ...args),
@@ -173,7 +175,7 @@ async function createWindow(): Promise<BrowserWindow> {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 900,
+    minWidth: DESKTOP_MIN_WIDTH,
     minHeight: 600,
     title: 'ReceiptBI',
     icon: app.isPackaged ? undefined : developmentIconPath,

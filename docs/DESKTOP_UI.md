@@ -5,6 +5,7 @@
 ## 统一规则
 
 - 设计最小宽度 1180px，导航 248px，标题栏 60px。桌面窗口内可以调整内容宽度，不因窗口变窄切换到手机菜单或全屏编辑器。
+- Electron 主窗口最小尺寸为 1180×600；窗口恢复逻辑不得重新打开窄于 1180px 的工作区。安装包及其他平台的窗口行为仍需最终验收。
 - 工作台和设置使用同一层次：低对比导航背景、独立的正文面板、单一强调色。浅色与深色都由主题变量决定，设置页不再固定深蓝侧栏。
 - 几何值只在 `desktop-tokens.css` 定义：控件 6px、菜单 8px、内容面板 12px。Tailwind 的圆角名称映射到这些语义；胶囊只用于标记，不作为所有按钮的默认形状。
 - 普通导航是 `aside`，配置编辑是命名 `section`，不是 dialog。明确折叠导航保留 DOM、草稿和查询，并在必要时返回触发按钮；不锁住整个工作区的 Tab。
@@ -46,6 +47,7 @@
 
 | 范围 | 已检查内容 | 视觉证据 |
 | --- | --- | --- |
+| 原生窗口约束 | 从暂存 main.ts 提取构造尺寸，隔离 Electron 隐藏窗口验证默认 1280×800、最小 1180×600；另用工作区恢复逻辑验证 900px 历史宽度提升至 1180px。未启动应用后端或构建安装包 | 原生 API 返回尺寸，未修改用户窗口记录 |
 | 工作台、设置 | 导航折叠、栏目往返、编辑保留、并排边界、主题；入口为 settings-editor、analysis-workbench、workbench-pane-focus、settings-page | 仍需完整页面验收 |
 | 数据工作区 | 外框、字段搜索与放大样例已验证；本次暂存源码 3 个用例覆盖项目往返、同项目收起及中英文数据说明，限定类型检查与 ESLint 通过。Chrome 1200px：6px 按钮、12px 卡片、60px 标题栏，无横向溢出、脚本错误或写请求 | [数据工作区](images/zh/desktop-ui-data-workspace.png) |
 | 文件准备 | 暂存源码 4 个用例覆盖只读预览、迟到响应、明确提交与未确认结果；类型检查、限定 ESLint 通过。Chrome 1200px 验证两种窗口的 12px 圆角、60px 标题栏及 Escape，未写真实数据 | [CSV](images/zh/desktop-ui-csv-import.png)、[Excel](images/zh/desktop-ui-workbook.png) |
@@ -63,7 +65,7 @@
 1. 归并上述待完成模块，不以独立控件提交代替完整页面。
 2. 覆盖报告阅读与编辑、历史和项目页面，统一标题栏、工具栏、字段、菜单、空态和错误态。
 3. 复核全部弹窗、表格的圆角、间距、密度和键盘行为，清除剩余手机样式。
-4. 核对桌面窗口约束、全站导航和真实安装包；所有要求都有对应证据后才能认定全站完成。
+4. 原生最小宽度已做隔离验证；继续核对窗口恢复的整体归并、全站导航和真实安装包，不能用构造参数检查代替产品运行验收。
 
 ## 参考
 
@@ -72,4 +74,5 @@
 - [PatternFly Modal](https://www.patternfly.org/components/modal/design-guidelines/)：明确任务采用标题、内容与动作分区；文件准备、来源更新及方法重用复用一个桌面框架。
 - [PatternFly Multiple file upload](https://www.patternfly.org/components/file-upload/multiple-file-upload/)：上传入口、逐文件状态和传输处理分开组合；只采用分工，未引入依赖或复制源码。
 - [React 状态归属](https://react.dev/learn/preserving-and-resetting-state)：项目身份作为工作区 key，直接重建该项目的局部状态，不为每个反馈和弹窗单独追加项目切换补丁。
+- [Electron 窗口尺寸参数](https://www.electronjs.org/docs/latest/api/structures/base-window-options)：窗口宽度与最小宽度分别设置，保存尺寸不能覆盖当前桌面布局下限。
 - [WAI-ARIA Alert Dialog](https://www.w3.org/WAI/ARIA/apg/patterns/alertdialog/)：真实模态、标题、描述与确认操作。页签规则见上文。
