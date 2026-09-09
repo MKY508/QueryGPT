@@ -370,3 +370,18 @@
     -webkit-print-color-adjust: exact;
   }
 }
+
+.report-recovery-preview {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  min-width: 640px;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.report-recovery-preview .report-print-page {
+  min-height: 0;
+  border-bottom: 1px solid hsl(var(--border));
+}

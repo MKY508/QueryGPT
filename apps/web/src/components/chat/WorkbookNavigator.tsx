@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { PreparationDialog } from "./PreparationDialog";
+import { TaskDialog } from "@/components/ui/TaskDialog";
 import { Loader2 } from "lucide-react";
 import { readWorkbook, type WorkbookPreview, type WorkbookSelection } from "@/lib/workbook";
 import { PreparationPreviewTable } from "./PreparationPreviewTable";
@@ -97,7 +97,7 @@ export function WorkbookNavigator({ projectId, sourceId, name, canPrepare, previ
     catch { /* Preserve the unconfirmed state until a successful source read. */ }
     finally { writing.current = false; if (active.current) setBusy(false); }
   };
-  return <PreparationDialog dialogRef={dialog} writingRef={writing} busy={busy} title={t("title")} name={name} closeLabel={t("close")} onClose={onClose}>
+  return <TaskDialog dialogRef={dialog} writingRef={writing} busy={busy} title={t("title")} name={name} closeLabel={t("close")} onClose={onClose}>
       <div className="flex min-h-0 flex-1">
         <aside className="w-56 shrink-0 overflow-auto border-r border-border p-3" aria-label={t("sheets")}>
           <p className="mb-2 px-2 text-xs font-semibold text-muted-foreground">{t("sheets")}</p>
@@ -144,5 +144,5 @@ export function WorkbookNavigator({ projectId, sourceId, name, canPrepare, previ
           : writeError === "failed" ? <Button variant="outline" size="md" type="button" disabled={busy} onClick={() => choose(sheet)}>{t("previewAgain")}</Button>
           : <Button variant="primary" size="md" type="button" disabled={busy || !canPrepare || !sheet || preview?.selected_sheet !== sheet || failed || headerStale} onClick={() => void prepare()}>{busy && <Loader2 size={14} className="animate-spin" />}{t(previewOnly ? "previewOnlyAction" : "prepare")}</Button>}
       </footer>
-  </PreparationDialog>;
+  </TaskDialog>;
 }

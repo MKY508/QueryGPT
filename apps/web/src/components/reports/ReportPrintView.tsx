@@ -22,10 +22,12 @@ const noop = () => undefined;
 export function ReportPrintView({
   report,
   filterValues,
+  preview = false,
   selections = [],
 }: {
   report: ReportDocument;
   filterValues: Record<string, string>;
+  preview?: boolean;
   selections?: ReportSelection[];
 }) {
   const t = useTranslations("reportInteractions");
@@ -36,9 +38,9 @@ export function ReportPrintView({
 
   return (
     <section
-      className="report-print-view"
+      className={preview ? "report-print-view report-recovery-preview" : "report-print-view"}
       data-testid="report-print-view"
-      aria-hidden="true"
+      aria-hidden={preview ? undefined : true}
     >
       {pages.map((page, pageIndex) => {
         const reading = readReportPage(page, { filters: filterValues, selections }, connected);

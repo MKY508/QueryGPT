@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { PreparationDialog } from "./PreparationDialog";
+import { TaskDialog } from "@/components/ui/TaskDialog";
 import { Loader2 } from "lucide-react";
 import { CSV_DELIMITERS, CSV_ENCODINGS, readCsv, sameCsvInput, type CsvDelimiter, type CsvEncoding, type CsvPreview, type CsvSelection } from "@/lib/csv-import";
 import { PreparationPreviewTable } from "./PreparationPreviewTable";
@@ -100,7 +100,7 @@ export function CsvNavigator({ projectId, sourceId, name, canPrepare, previewOnl
     catch { /* Keep uncertain state after a failed read; never repeat the write. */ }
     finally { writing.current = false; if (active.current) setBusy(false); }
   };
-  return <PreparationDialog dialogRef={dialog} writingRef={writing} busy={busy} title={t("title")} name={name} closeLabel={t("close")} onClose={onClose}>
+  return <TaskDialog dialogRef={dialog} writingRef={writing} busy={busy} title={t("title")} name={name} closeLabel={t("close")} onClose={onClose}>
       <div className="flex flex-wrap items-center gap-5 border-b border-border px-5 py-3 text-xs">
         <label className="flex items-center gap-2">{t("delimiter")}<select value={delimiter} disabled={busy} onChange={(event) => { if (!writing.current) { setDelimiter(event.target.value as CsvDelimiter); reload(1); } }} className="rounded-md border border-border bg-background px-2 py-1">
           <option value=",">{t("comma")}</option><option value=";">{t("semicolon")}</option><option value={"\t"}>{t("tab")}</option><option value="|">{t("pipe")}</option>
@@ -130,5 +130,5 @@ export function CsvNavigator({ projectId, sourceId, name, canPrepare, previewOnl
           : writeError === "failed" ? <Button variant="outline" size="md" type="button" disabled={busy} onClick={() => reload()}>{common("previewAgain")}</Button>
             : <Button variant="primary" size="md" type="button" disabled={busy || !canPrepare || !preview || failed || stale} onClick={() => void prepare()}>{busy && <Loader2 size={14} className="animate-spin" />}{previewOnly ? common("previewOnlyAction") : t("prepare")}</Button>}
       </footer>
-  </PreparationDialog>;
+  </TaskDialog>;
 }

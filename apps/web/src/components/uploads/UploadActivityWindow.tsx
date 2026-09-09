@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { PreparationDialog } from "@/components/chat/PreparationDialog";
+import { TaskDialog } from "@/components/ui/TaskDialog";
 
 /** Dismissal closes the reader, not the project-owned transfers. */
 export function UploadActivityWindow({ projectName, onClose, children }: {
@@ -18,8 +18,8 @@ export function UploadActivityWindow({ projectName, onClose, children }: {
     element?.showModal();
     return () => element?.close();
   }, []);
-  return <PreparationDialog dialogRef={dialog} writingRef={writing} busy={false}
+  return <TaskDialog dialogRef={dialog} writingRef={writing} busy={false}
     title={t("title")} name={projectName} closeLabel={t("close")} onClose={onClose}>
     <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
-  </PreparationDialog>;
+  </TaskDialog>;
 }

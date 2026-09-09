@@ -2402,5 +2402,36 @@
     "checkList": "Refresh and check projects",
     "created": "Created “{name}”.",
     "renamed": "Renamed to “{name}”."
+  },
+  "reportVersions": {
+    "title": "Version history",
+    "close": "Close",
+    "versions": "Saved versions",
+    "preview": "Version preview",
+    "version": "Version {version}",
+    "current": "Current",
+    "loading": "Loading history…",
+    "more": "Earlier versions",
+    "empty": "No recorded versions yet.",
+    "choose": "Select a version to preview",
+    "scope": "Restoring keeps the current version in history. It does not change sources or recalculate data.",
+    "restore": "Restore this version",
+    "reload": "Reload report",
+    "readFailed": "Version history could not be loaded.",
+    "previewFailed": "This version could not be opened. Select it again to retry.",
+    "conflict": "The report or historical version has changed. Reload before continuing.",
+    "uncertain": "The restore result is not yet confirmed. Reload the report first.",
+    "reasons": {
+      "baseline": "Existing version",
+      "created": "Created",
+      "copied": "Created a copy",
+      "saved": "Saved",
+      "page_changed": "Page edited",
+      "block_changed": "Content edited",
+      "refreshed": "Data refreshed",
+      "restored": "Version restored",
+      "trashed": "Moved to trash",
+      "trash_restored": "Restored from trash"
+    }
   }
 }

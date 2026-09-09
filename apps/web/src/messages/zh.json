@@ -2402,5 +2402,36 @@
     "checkList": "刷新并核对项目列表",
     "created": "已创建「{name}」。",
     "renamed": "名称已更新为「{name}」。"
+  },
+  "reportVersions": {
+    "title": "版本历史",
+    "close": "关闭",
+    "versions": "已保存版本",
+    "preview": "版本预览",
+    "version": "第 {version} 版",
+    "current": "当前",
+    "loading": "正在读取历史…",
+    "more": "更早版本",
+    "empty": "尚无已记录的历史版本。",
+    "choose": "选择一个版本查看内容",
+    "scope": "恢复会保留当前版本，不更改数据源或重新计算数据。",
+    "restore": "恢复此版本",
+    "reload": "重新载入报表",
+    "readFailed": "暂时无法读取版本历史。",
+    "previewFailed": "暂时无法打开这个版本，请重新选择。",
+    "conflict": "报表或历史版本已变化，请重新载入后查看。",
+    "uncertain": "尚未确认恢复结果，请先重新载入报表。",
+    "reasons": {
+      "baseline": "原有版本",
+      "created": "创建",
+      "copied": "创建副本",
+      "saved": "保存",
+      "page_changed": "修改页面",
+      "block_changed": "修改内容",
+      "refreshed": "刷新数据",
+      "restored": "恢复版本",
+      "trashed": "移入回收站",
+      "trash_restored": "从回收站恢复"
+    }
   }
 }

@@ -198,7 +198,7 @@ function serializePage(page: ReportPage, copy: ReportSerializationCopy) {
   };
 }
 
-function normalizeDocument(
+export function normalizeDocument(
   document: ReportDocument,
   copy: ReportSerializationCopy
 ): ReportDocument {

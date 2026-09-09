@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { PreparationDialog } from "./PreparationDialog";
+import { TaskDialog } from "@/components/ui/TaskDialog";
 import { Loader2 } from "lucide-react";
 import { previewRecipeReplay, type RecipeReplayPreview, type RecipeReplayRequest } from "@/lib/recipe-replay";
 import { getErrorHttpStatus } from "@/lib/types/api";
@@ -75,7 +75,7 @@ export function RecipeReplayDialog({ projectId, sourceId, name, recipeId, revisi
   };
 
   return (
-    <PreparationDialog dialogRef={dialog} writingRef={writing} busy={busy} name={name} title={t("title")} closeLabel={t("close")} onClose={onClose}>
+    <TaskDialog dialogRef={dialog} writingRef={writing} busy={busy} name={name} title={t("title")} closeLabel={t("close")} onClose={onClose}>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
         {!preview && !error && <p role="status" className="flex items-center gap-2 text-sm"><Loader2 size={15} className="animate-spin" />{t("loading")}</p>}
         {error && <p role="alert" className="text-sm text-destructive">{t(error)}</p>}
@@ -100,6 +100,6 @@ export function RecipeReplayDialog({ projectId, sourceId, name, recipeId, revisi
           : error ? <Button variant="outline" type="button" disabled={busy} onClick={() => { setPreview(null); setError(null); setAttempt((value) => value + 1); }}>{t("retry")}</Button>
             : <Button variant="primary" type="button" disabled={busy || !canApply || !preview?.can_apply} onClick={() => void apply()}>{busy && <Loader2 size={14} className="animate-spin" />}{t(revisionId ? "restoreApply" : "apply")}</Button>}
       </footer>
-    </PreparationDialog>
+    </TaskDialog>
   );
 }

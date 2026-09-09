@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { PreparationDialog } from "./PreparationDialog";
+import { TaskDialog } from "@/components/ui/TaskDialog";
 import { Loader2 } from "lucide-react";
 import { getErrorHttpStatus, type ProjectDataSource } from "@/lib/types/api";
 import { previewSourceReplacement, type ReplacementPreview, type ReplacementRequest, type ReplacementSelection } from "@/lib/source-replacement";
@@ -83,7 +83,7 @@ export function SourceReplacementDialog({ projectId, source, candidates, canAppl
     finally { writing.current = false; if (active.current) setBusy(false); }
   };
   return <>
-    <PreparationDialog dialogRef={dialog} writingRef={writing} busy={busy} blockCancel={readerOpen} name={source.name} title={t("title")} closeLabel={t("close")} onClose={onClose}>
+    <TaskDialog dialogRef={dialog} writingRef={writing} busy={busy} blockCancel={readerOpen} name={source.name} title={t("title")} closeLabel={t("close")} onClose={onClose}>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
         <p className="text-sm text-muted-foreground">{t("description")}</p>
         {candidates.length === 0 ? <p className="text-sm">{t("noCandidates")}</p> : <div className="flex flex-wrap items-end gap-3">
@@ -109,7 +109,7 @@ export function SourceReplacementDialog({ projectId, source, candidates, canAppl
         {error === "uncertain" ? <Button variant="outline" type="button" disabled={busy} onClick={() => void refresh()}>{t("refresh")}</Button>
           : <Button variant="primary" type="button" disabled={busy || pending || !canApply || !preview?.can_apply || !!error || !candidate || preview.candidate_source_id !== candidate.id} onClick={() => void apply()}>{busy && <Loader2 size={14} className="animate-spin" />}{t("apply")}</Button>}
       </footer>
-    </PreparationDialog>
+    </TaskDialog>
     {readerOpen && candidate && <Navigator key={`${projectId}:${candidate.id}`} projectId={projectId} sourceId={candidate.id} name={candidate.name} canPrepare={!busy} previewOnly onPrepare={async (reader: ReplacementSelection) => { await loadPreview(reader); }} onRefreshSource={onRefresh} onClose={() => setReaderOpen(false)} />}
   </>;
 }
