@@ -778,6 +778,11 @@ export interface SanitationTemplatePreview {
   can_apply: boolean;
 }
 
+export interface TextValueReplacement {
+  from_value: string;
+  to_value: string;
+}
+
 export type VisualCleaningOperation =
   | { operation: "trim_text"; column: string }
   | { operation: "fill_missing"; column: string; value: 0 }
