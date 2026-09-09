@@ -39,9 +39,7 @@
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-surface);
   text-align: left;
-  transition: background-color 120ms;
 }
 .resource:hover { background: hsl(var(--muted) / 0.5); }
-.resource:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
 .resourceIcon { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--radius-menu); background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
 @media (prefers-reduced-motion: reduce) { .resource { transition: none; } }

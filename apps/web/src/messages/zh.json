@@ -513,7 +513,14 @@
     "licenseDescription": "查看本项目的开源许可证。",
     "issues": "问题与建议",
     "issuesDescription": "报告问题或提出改进建议。",
-    "backToWorkspace": "返回工作台"
+    "backToWorkspace": "返回工作台",
+    "checkUpdates": "检查更新",
+    "checkingUpdates": "正在检查…",
+    "downloadDesktop": "下载桌面版",
+    "downloadUpdate": "下载 v{version}",
+    "upToDate": "当前已是最新版本",
+    "updateCheckFailed": "暂时无法检查更新，请稍后重试。",
+    "viewReleases": "查看发布版本"
   },
   "errors": {
     "somethingWrong": "出错了",

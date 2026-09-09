@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -10,23 +9,18 @@ import {
   Github,
   MessageCircleQuestion,
   Scale,
+  RefreshCw,
 } from "lucide-react";
-import { formatDesktopPlatform, readDesktopAppInfo } from "@/lib/desktop-app-info";
+import { formatDesktopPlatform } from "@/lib/desktop-app-info";
 import { RECEIPTBI_BRAND_ICON_SRC } from "@/lib/brand";
+import { RELEASES_URL } from "@/lib/releases";
 import { Button } from "@/components/ui/button";
+import { useAboutRuntime } from "./useAboutRuntime";
 import styles from "./page.module.css";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const REPOSITORY_URL = "https://github.com/MoonMao42/ReceiptBI";
 const LICENSE_URL = `${REPOSITORY_URL}/blob/main/LICENSE`;
 const ISSUES_URL = `${REPOSITORY_URL}/issues`;
-
-interface RuntimeInfo {
-  version: string;
-  isPackaged: boolean;
-  platform?: string;
-}
 
 function formatDisplayVersion(version: string) {
   return version.replace(/^(\d+\.\d+)\.0$/, "$1");
@@ -54,50 +48,11 @@ async function openFixedExternalUrl(url: string) {
 export default function AboutPage() {
   const router = useRouter();
   const t = useTranslations("about");
-  const [runtimeInfo, setRuntimeInfo] = useState<RuntimeInfo | null>(null);
-  useEffect(() => {
-    let active = true;
-
-    const loadRuntimeInfo = async () => {
-      try {
-        const desktopInfo = await readDesktopAppInfo();
-        if (desktopInfo) {
-          if (active) {
-            setRuntimeInfo({
-              version: desktopInfo.version,
-              isPackaged: desktopInfo.isPackaged,
-              platform: desktopInfo.platform,
-            });
-          }
-          return;
-        }
-      } catch {
-        // Fall back to the local service when an older desktop bridge is still starting.
-      }
-
-      try {
-        const response = await fetch(`${API_URL}/health`, {
-          headers: { Accept: "application/json" },
-        });
-        if (!response.ok) return;
-        const payload = (await response.json()) as { version?: string };
-        if (active && payload.version) {
-          setRuntimeInfo({ version: payload.version, isPackaged: false });
-        }
-      } catch {
-        // Basic product links remain available while the local service starts.
-      }
-    };
-
-    void loadRuntimeInfo();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { runtimeInfo, updateState, checkUpdates } = useAboutRuntime();
 
   const runtimeLabel = runtimeInfo
     ? `${runtimeInfo.isPackaged ? t("desktop") : t("preview")} · v${formatDisplayVersion(runtimeInfo.version)}`
-    : t("preview");
+    : "—";
   const links = [
     {
       label: "GitHub",
@@ -160,17 +115,48 @@ export default function AboutPage() {
                 {formatDesktopPlatform(runtimeInfo.platform)}
               </div>
             )}
-
+            <div className="mt-4 space-y-2">
+              {runtimeInfo?.isPackaged ? (
+                <Button variant="outline" size="sm"
+                  onClick={() => void checkUpdates()}
+                  disabled={updateState.status === "checking"}
+                >
+                  <RefreshCw size={14} className={updateState.status === "checking" ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" />
+                  {t(updateState.status === "checking" ? "checkingUpdates" : "checkUpdates")}
+                </Button>
+              ) : runtimeInfo ? (
+                <Button variant="outline" size="sm" onClick={() => void openFixedExternalUrl(RELEASES_URL)}>
+                  {t("downloadDesktop")}
+                </Button>
+              ) : null}
+              <div role="status" aria-live="polite" className="text-xs leading-5 text-muted-foreground">
+                {updateState.status === "done" && (
+                  updateState.release.available ? (
+                    <Button variant="ghost" size="sm" onClick={() => void openFixedExternalUrl(updateState.release.url)}>
+                      {t("downloadUpdate", { version: updateState.release.version })}
+                    </Button>
+                  ) : t("upToDate")
+                )}
+                {updateState.status === "error" && (
+                  <>
+                    <p>{t("updateCheckFailed")}</p>
+                    <Button variant="ghost" size="sm" onClick={() => void openFixedExternalUrl(RELEASES_URL)}>
+                      {t("viewReleases")}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </section>
 
         <section className={styles.links}>
           {links.map(({ label, description, url, icon: Icon }) => (
-            <button
+            <Button variant="outline" size="md"
               key={url}
               type="button"
               onClick={() => void openFixedExternalUrl(url)}
-              className={styles.resource}
+              className={`${styles.resource} h-auto w-full`}
             >
               <span className={styles.resourceIcon}><Icon size={18} aria-hidden="true" /></span>
               <span className="min-w-0 flex-1">
@@ -186,7 +172,7 @@ export default function AboutPage() {
                   {description}
                 </span>
               </span>
-            </button>
+            </Button>
           ))}
         </section>
       </main>

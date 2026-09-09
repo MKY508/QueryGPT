@@ -512,7 +512,14 @@
     "licenseDescription": "Read the open-source license for this project.",
     "issues": "Issues",
     "issuesDescription": "Report a problem or suggest an improvement.",
-    "backToWorkspace": "Back to workspace"
+    "backToWorkspace": "Back to workspace",
+    "checkUpdates": "Check for updates",
+    "checkingUpdates": "Checking…",
+    "downloadDesktop": "Download desktop app",
+    "downloadUpdate": "Download v{version}",
+    "upToDate": "You're up to date",
+    "updateCheckFailed": "Couldn't check for updates. Try again later.",
+    "viewReleases": "View releases"
   },
   "errors": {
     "somethingWrong": "Something went wrong",
