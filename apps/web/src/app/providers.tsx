@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { createWorkspaceQueryClient } from "@/lib/api/query-client";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { ComposerDraftGuard } from "@/components/providers/ComposerDraftGuard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -12,6 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        <ComposerDraftGuard />
         <ThemeProvider>{children}</ThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>
