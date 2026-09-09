@@ -1,4 +1,29 @@
 {
+  "sourceDirectory": {
+    "listLabel": "Data directory",
+    "openSource": "View data: {name}",
+    "sourceDetails": "Data details: {name}",
+    "backToList": "Back to directory",
+    "previousSource": "Previous source",
+    "nextSource": "Next source",
+    "position": "{position} / {count}",
+    "outsideFilter": "This source is outside the current filter",
+    "locateSource": "Show in directory",
+    "currentVersion": "Current version",
+    "openCurrentVersion": "View current version: {name}",
+    "backToVersion": "Back to previous version",
+    "search": "Search file or connection names",
+    "clearSearch": "Clear data name search",
+    "filterLabel": "Filter data by status",
+    "all": "All",
+    "attention": "To review",
+    "ready": "Ready",
+    "history": "Previous",
+    "showing": "Showing {shown} of {total}",
+    "showMore": "Show {count} more",
+    "noMatches": "No matching data",
+    "reset": "Show all data"
+  },
   "metadata": {
     "title": "ReceiptBI - Personal Data Analyst",
     "description": "Turn files and databases into cleaned, investigated, traceable business reports."
@@ -1233,6 +1258,8 @@
     }
   },
   "dataWorkspace": {
+    "statusHistorical": "Previous version",
+    "statusPreparationReview": "Review needed",
     "statusReady": "Ready to analyze",
     "statusNeedsReview": "Has definitions to confirm",
     "statusNeedsAttention": "Needs attention",

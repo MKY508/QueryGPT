@@ -1,4 +1,29 @@
 {
+  "sourceDirectory": {
+    "listLabel": "数据目录",
+    "openSource": "查看数据：{name}",
+    "sourceDetails": "数据详情：{name}",
+    "backToList": "返回目录",
+    "previousSource": "上一项数据",
+    "nextSource": "下一项数据",
+    "position": "{position} / {count}",
+    "outsideFilter": "此文件不在当前筛选结果中",
+    "locateSource": "在目录中定位",
+    "currentVersion": "当前版本",
+    "openCurrentVersion": "查看当前版本：{name}",
+    "backToVersion": "返回刚才的历史版本",
+    "search": "搜索文件或连接名称",
+    "clearSearch": "清除数据名称搜索",
+    "filterLabel": "按数据状态筛选",
+    "all": "全部",
+    "attention": "待处理",
+    "ready": "已就绪",
+    "history": "历史版本",
+    "showing": "显示 {shown} / {total} 项",
+    "showMore": "再显示 {count} 项",
+    "noMatches": "没有符合条件的数据",
+    "reset": "查看全部数据"
+  },
   "metadata": {
     "title": "ReceiptBI - 私人数据分析员",
     "description": "从文件和数据库开始，自主整理、调查并生成可追溯的业务报告"
@@ -1233,6 +1258,8 @@
     }
   },
   "dataWorkspace": {
+    "statusHistorical": "历史版本",
+    "statusPreparationReview": "需要核对",
     "statusReady": "可以分析",
     "statusNeedsReview": "有口径待确认",
     "statusNeedsAttention": "需要处理",

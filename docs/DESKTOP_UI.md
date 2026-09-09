@@ -20,6 +20,8 @@
 
 项目理解的当前工作区已收敛为 200px 范围目录、单一表格和 320px 详情区；删除重复手机卡片、来源下拉和详情宽度监听。共享搜索、按钮与页面外框已接入。详情组件独立提交；完整页面仍与历史、选择和保存恢复的既有改动交织，待继续归并。
 
+数据来源目录已改为固定 280px 列表与详情并排，删除隐藏列表的容器断点和尺寸监听。样式由 `SourceDirectory.module.css` 单独维护，搜索与状态筛选复用共享控件；来源版本往返和实际准备操作保持原有语义。目录及其状态、版本解析独立归并，外围数据工作区仍待整体整理。
+
 后续必须覆盖：
 
 1. 归并工作台与设置的完整页面依赖、草稿会话及离开链路。
@@ -31,6 +33,10 @@
 ## 参考与验证
 
 参考 Twenty 的 [NavigationDrawer 源码](https://github.com/twentyhq/twenty/blob/main/packages/twenty-front/src/modules/ui/navigation/navigation-drawer/components/NavigationDrawer.tsx)中导航、内容和主题变量的职责划分。只采用桌面分工，不采用其手机分支或依赖；没有复制第三方源码。
+
+数据来源采用 [PatternFly Drawer](https://www.patternfly.org/components/drawer/) 的 inline 主从内容分工，不采用覆盖式或断点切换，也不新增依赖。
+
+数据目录的暂存源码检查覆盖键盘浏览、筛选期间保留详情、来源删除、语言切换和编辑 Escape。Chrome 在 1200px、1440px 验证列表始终可见、双栏布局、12px 外框且无页面横向溢出；[当前工作区预览](images/zh/desktop-ui-sources.png)使用虚构来源，不作为真实文件准备或后端写入的验证。
 
 定向入口为 `settings-editor`、`analysis-workbench`、`workbench-pane-focus`、`settings-page` 和现有 `SearchField` 检查。浏览器使用隔离预览，只读虚构配置，检查桌面导航折叠、设置栏目往返、编辑保留、并排边界及主题。不进行手机验收，不调用真实模型或写入配置。
 
