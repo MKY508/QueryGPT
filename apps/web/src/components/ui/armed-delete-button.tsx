@@ -2,6 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "./button";
 
 interface ArmedDeleteButtonProps {
   armed: boolean;
@@ -22,7 +23,8 @@ export function ArmedDeleteButton({
   className,
 }: ArmedDeleteButtonProps) {
   return (
-    <button
+    <Button
+      variant="ghost"
       type="button"
       onClick={(event) => {
         event.stopPropagation();
@@ -32,7 +34,7 @@ export function ArmedDeleteButton({
       aria-label={armed ? confirmLabel : deleteLabel}
       title={armed ? confirmLabel : deleteLabel}
       className={cn(
-        "transition-colors disabled:opacity-50",
+        "min-w-9",
         armed
           ? "border border-destructive/50 bg-destructive/10 px-2 py-1 text-[11px] font-semibold text-destructive"
           : "p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
@@ -40,6 +42,6 @@ export function ArmedDeleteButton({
       )}
     >
       {armed ? confirmLabel : <Trash2 size={16} />}
-    </button>
+    </Button>
   );
 }

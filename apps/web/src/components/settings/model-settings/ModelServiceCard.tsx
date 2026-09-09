@@ -6,7 +6,8 @@ import type { ConfiguredModel } from "@/lib/types/api";
 import { getModelServiceState, getModelTestResultMessage, type ModelServiceCheck } from "@/lib/settings/model-service";
 import { ArmedDeleteButton } from "@/components/ui/armed-delete-button";
 import { ModelProviderMark, ModelProviderName } from "./ModelProviderIdentity";
-import styles from "./ModelServiceCard.module.css";
+import { Button } from "@/components/ui/button";
+import styles from "../SettingsResourceCard.module.css";
 
 const STATES = {
   available: { label: "statusAvailable", hint: "statusAvailableHint", Icon: CheckCircle, tone: "text-primary bg-primary/10" },
@@ -75,14 +76,14 @@ export function ModelServiceCard({ model, check, disabled, editing, deleteArmed,
         {!check && checkedAt && <p className="mt-1">{t("lastCheckedAt", { time: checkedAt })}</p>}
       </div>
       <div className={styles.actions}>
-        <button type="button" onClick={onTest} disabled={checking || disabled}
+        <Button type="button" variant="outline" onClick={onTest} disabled={checking || disabled}
           data-testid={`model-test-${model.id}`} aria-label={t("checkService", { name: model.name })}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border/70 bg-background px-3 text-xs font-medium outline-none hover:border-primary/40 hover:bg-primary/5 hover:text-primary focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50">
+          className="text-xs">
           <RefreshCw size={14} aria-hidden="true" className={checking ? "animate-spin" : ""} />
           {checking ? t("checking") : t("check")}
-        </button>
+        </Button>
         <ArmedDeleteButton armed={deleteArmed} onRequest={onDelete} confirmLabel={tc("confirmDelete")}
-          deleteLabel={tl("deleteItem", { name: model.name })} disabled={disabled} className="min-h-11 min-w-11 rounded-lg" />
+          deleteLabel={tl("deleteItem", { name: model.name })} disabled={disabled} />
       </div>
     </div>
     <details className={styles.details} onToggle={onInspect} data-testid={`model-details-${model.id}`}>
