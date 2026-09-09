@@ -13,14 +13,7 @@ import type {
   SuggestedQuestionsResponse,
 } from "@/lib/types/api";
 import { api } from "@/lib/api/client";
-import {
-  migratePendingTaskStorage,
-  PENDING_TASK_STORAGE_KEY,
-} from "@/lib/storage/legacy";
-import {
-  useChatStore,
-  type SemanticValidationSelection,
-} from "@/lib/stores/chat";
+import { useChatStore } from "@/lib/stores/chat";
 import { useProjectStore } from "@/lib/stores/project";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
@@ -28,6 +21,9 @@ import { ChatHeader } from "./ChatHeader";
 import { DataWorkspacePanel } from "./DataWorkspacePanel";
 import { useChatAreaState } from "./useChatAreaState";
 import { useStandingAnalyses } from "./useStandingAnalyses";
+import { usePendingTask } from "./usePendingTask";
+import type { PendingTask } from "@/lib/pending-task";
+import { submitWithAnalysisReceipt } from "@/lib/chat-submission";
 import { INITIAL_WORKBENCH_PANE, selectWorkbenchPane } from "@/lib/workbench-pane";
 import { Button } from "@/components/ui/button";
 
@@ -39,51 +35,6 @@ interface ChatAreaProps {
   onOpenReport: (conversationId: string, analysisRunId: string) => void;
   focusAnalysisRunId?: string | null;
   onReportFocused?: () => void;
-}
-
-interface PendingTask {
-  query: string;
-  projectId: string | null;
-  validationSelection?: SemanticValidationSelection[];
-}
-
-function parsePendingTask(value: unknown): PendingTask | null {
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Record<string, unknown>;
-  if (typeof candidate.query !== "string" || !candidate.query.trim()) return null;
-  if (candidate.projectId !== null && typeof candidate.projectId !== "string") return null;
-
-  let validationSelection: SemanticValidationSelection[] | undefined;
-  if (candidate.validationSelection !== undefined) {
-    if (
-      !Array.isArray(candidate.validationSelection) ||
-      candidate.validationSelection.length > 100
-    ) {
-      return null;
-    }
-    validationSelection = [];
-    for (const item of candidate.validationSelection) {
-      if (!item || typeof item !== "object") return null;
-      const selection = item as Record<string, unknown>;
-      if (
-        typeof selection.entry_id !== "string" ||
-        !selection.entry_id ||
-        typeof selection.expected_active_revision_id !== "string" ||
-        !selection.expected_active_revision_id
-      ) {
-        return null;
-      }
-      validationSelection.push({
-        entry_id: selection.entry_id,
-        expected_active_revision_id: selection.expected_active_revision_id,
-      });
-    }
-  }
-  return {
-    query: candidate.query,
-    projectId: candidate.projectId as string | null,
-    ...(validationSelection ? { validationSelection } : {}),
-  };
 }
 
 interface RunPromptOptions {
@@ -108,7 +59,6 @@ export function ChatArea({
   const dataPanelOpen = pane.view !== "result";
   const dataPanelView = pane.view === "result" ? pane.lastDataView : pane.view;
   const processingSettlementsRef = useRef(new Set<string>());
-  const [pendingTask, setPendingTask] = useState<PendingTask | null>(null);
   const [analysisServiceSelectorOpen, setAnalysisServiceSelectorOpen] = useState(false);
   const [pendingServiceChangeMessageIndex, setPendingServiceChangeMessageIndex] =
     useState<number | null>(null);
@@ -138,10 +88,6 @@ export function ChatArea({
     pendingAnalysisSettlements,
   } = useChatStore();
 
-  // A parked task belongs to the "new investigation" workspace. Once a
-  // conversation is open, sidebar navigation must win over the pending card.
-  const pendingTaskVisible = Boolean(pendingTask) && !currentConversationId;
-
   const {
     projects,
     currentProjectId,
@@ -154,6 +100,10 @@ export function ChatArea({
     uploadFile,
     refreshCurrent,
   } = useProjectStore();
+  const parkedTask = usePendingTask(currentProjectId);
+  const pendingTask = parkedTask.task;
+  const pendingTaskVisible = Boolean(pendingTask) && !currentConversationId && !isLoading && !activeStreamId;
+  const clearPendingTask = parkedTask.clear;
   const currentProject = projects.find((project) => project.id === currentProjectId);
   const readySources = sources.filter((source) =>
     ["ready", "needs_confirmation"].includes(source.status)
@@ -298,33 +248,10 @@ export function ChatArea({
     generateSuggestions();
   };
 
-  useEffect(() => {
-    if (!currentProjectId) return;
-    const stored = migratePendingTaskStorage(sessionStorage);
-    if (!stored) {
-      setPendingTask(null);
-      return;
-    }
-    try {
-      const parsed = parsePendingTask(JSON.parse(stored));
-      setPendingTask(
-        parsed?.projectId === currentProjectId ? parsed : null
-      );
-    } catch {
-      sessionStorage.removeItem(PENDING_TASK_STORAGE_KEY);
-      setPendingTask(null);
-    }
-  }, [currentProjectId]);
-
   const effectiveContextRounds = appSettings?.context_rounds || 5;
   const { standingAnalyses, standingLoading, checkingStandingId, standingFeedback, checkStanding } = useStandingAnalyses({
     projectId: currentProjectId, modelId: selectedModelId, modelReady, contextRounds: effectiveContextRounds,
   });
-
-  const clearPendingTask = () => {
-    sessionStorage.removeItem(PENDING_TASK_STORAGE_KEY);
-    setPendingTask(null);
-  };
 
   const handleInputSubmit = async (query: string, options?: RunPromptOptions) => {
     if (pendingServiceChangeMessageIndex !== null) {
@@ -335,8 +262,7 @@ export function ChatArea({
       setAnalysisServiceSelectorOpen(true);
       return false;
     }
-    if (pendingTaskVisible) clearPendingTask();
-    await sendMessage(
+    const accepted = await submitWithAnalysisReceipt(() => sendMessage(
       query,
       null,
       executionModelId,
@@ -347,46 +273,24 @@ export function ChatArea({
       null,
       null,
       options?.correctionId
-    );
-    return true;
+    ), useChatStore.getState);
+    if (accepted && pendingTaskVisible) clearPendingTask();
+    return accepted;
   };
 
   const handleContinuePendingTask = async () => {
-    if (!pendingTask || !modelReady || !executionModelId) return;
-    const task = pendingTask;
-    // Hide the prompt while it runs, but keep the durable copy until the
-    // backend has returned a run identity. Provider/configuration failures can
-    // happen before a server checkpoint exists, so clearing storage first
-    // would silently turn a later retry into an unscoped investigation.
-    setPendingTask(null);
+    const chat = useChatStore.getState();
+    if (!pendingTask || !parkedTask.isCurrent() || !modelReady || !executionModelId ||
+        chat.isLoading || chat.activeStreamId || chat.currentConversationId || chat.isConversationLoading ||
+        useProjectStore.getState().currentProjectId !== pendingTask.projectId) return;
     try {
-      await sendMessage(
-        task.query,
-        null,
-        executionModelId,
-        effectiveContextRounds,
-        locale,
-        task.projectId,
-        null,
-        null,
-        null,
-        null,
-        task.validationSelection
-      );
+      const accepted = await submitWithAnalysisReceipt(() => sendMessage(
+        pendingTask.query, null, executionModelId, effectiveContextRounds, locale,
+        pendingTask.projectId, null, null, null, null, pendingTask.validationSelection,
+      ), useChatStore.getState);
+      if (accepted) clearPendingTask();
     } catch {
-      setPendingTask(task);
-      return;
-    }
-    const acceptedMessage = [...useChatStore.getState().messages]
-      .reverse()
-      .find(
-        (message) =>
-          message.role === "assistant" && message.originalQuery === task.query
-      );
-    if (acceptedMessage?.analysisRunId) {
-      clearPendingTask();
-    } else {
-      setPendingTask(task);
+      // The retained snapshot remains available until this submission has a receipt.
     }
   };
 
@@ -417,7 +321,7 @@ export function ChatArea({
           ? { validationSelection: failedMessage.semanticValidationSelection }
           : {}),
       };
-      sessionStorage.setItem(PENDING_TASK_STORAGE_KEY, JSON.stringify(task));
+      parkedTask.write(task);
     }
     router.push("/settings?tab=models");
   };

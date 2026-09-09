@@ -24,6 +24,7 @@
 | useResultReadingPosition / useWorkbenchPaneFocus | 会话内阅读位置与显式动作的焦点交接 |
 | WorkbenchCommands | 复用 cmdk 的操作筛选与选择，不拥有业务执行 |
 | ChatArea | 接入既有项目、提交、草稿、运行控制与数据工作区 |
+| pending-task / usePendingTask | 当前标签页待办的校验、订阅与项目筛选；按暂存快照清除，页面不维护第二份待办副本 |
 | useStandingAnalyses / standing-attention | 按项目读取关注项、明确检查与续跑、互斥检查状态和业务原因翻译；页面不持有该流程的请求 |
 | MessageList / MessageListStatus / useInvestigationTimeline | 时间线结果编排、待办及会话加载反馈、测量与阅读跟随分别维护；新进展从最新消息与阅读位置派生，不另用 effect 同步标记 |
 | ChatEmptyState / AnalysisSuggestions / WorkspaceActivitySummary | 空白页组合提问、建议与项目活动；建议只交回问题，活动保留全部已加载关注项，检查中的条目禁止重复点击 |
@@ -79,7 +80,9 @@
 - 当前运行控制条在阅读旧结果或数据／理解页仍保留停止入口。按当前活动流匹配并在提交前重新核对，等待真实终态；成功先到不改写为已停止。控制消失时只恢复它原来持有的焦点。
 - InvestigationActivity 展示完整问题、当前业务状态和可展开的最近动态。最多 12 条已知阶段，相邻等价阶段合并，不保存模型自由文本／参数／推理；节点表示收到过动态，不表示阶段已成功。
 - 已收到结果但尚未收到流终态时显示整理／保存等待，不提前宣称报告已经保存。活动列表只属于当前前端会话，不是完整持久运行日志。
-- 待办页仅保留原始问题、当前服务状态及继续／修改动作；收到问题不显示“已理解”或预造后续流程。加载与失败反馈不拥有请求，只有明确重试才交回调用方。
+- 待办页仅保留原始问题、当前服务状态及继续／修改动作；收到问题不显示“已理解”或预造后续流程。`pending-task` 集中读写当前标签页的暂存槽，项目筛选直接从快照派生；每次写入有独立身份，清除须匹配原快照。继续与普通提问共用本次 stream 的运行回执，不以历史中相同问题文字代替接收证明；失败或未接收不清除，新待办不受旧回执影响。问题转入输入框继续复用现有草稿冲突选择。结构参考 [Zulip 独立草稿模型](https://github.com/zulip/zulip/blob/main/web/src/drafts.ts)，没有新增网络草稿或跨重启承诺。
+
+待办的五个定向用例及三个既有回执用例、限定 ESLint 和类型检查通过。Chrome 1180×700 中英文核对离开后恢复原文、编辑回填与焦点交接、12px 卡片；无写请求、页面错误或横向溢出。真实配置保存、模型续跑和存储不可用时的完整提示仍未由这些检查证明。
 
 命令面板参考 [VS Code](https://code.visualstudio.com/docs/getstarted/userinterface#_command-palette)；运行呈现参考 [Streamlit status](https://docs.streamlit.io/develop/api-reference/status/st.status)，不预造固定流程、百分比或预计耗时。
 
