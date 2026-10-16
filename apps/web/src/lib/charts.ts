@@ -1,3 +1,5 @@
+import { chartNumber, isNumericCell } from "@/lib/numeric-values";
+
 export const CHART_TYPES = [
   "bar",
   "horizontal_bar",
@@ -28,8 +30,8 @@ export type ChartStack = "none" | "normal" | "percent";
 
 export const RECEIPTBI_CHART_PALETTES = {
   receiptbi: [
-    "#16836b",
-    "#173f37",
+    "#397660",
+    "#8ba99b",
     "#d68a2e",
     "#39749b",
     "#9a6048",
@@ -213,7 +215,7 @@ function hasField(rows: ChartDataPoint[], field: string): boolean {
 function hasNumericValue(rows: ChartDataPoint[], field: string): boolean {
   return rows.some((row) => {
     const value = row[field];
-    return typeof value === "number" && Number.isFinite(value);
+    return isNumericCell(value) && chartNumber(value) !== null;
   });
 }
 

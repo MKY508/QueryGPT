@@ -50,7 +50,7 @@ describe("configuration field validation", () => {
   it("keeps integer ports and TLS/schema rules scoped to the selected database type", () => {
     for (const port of [NaN, Infinity, 0, -1, 3306.5, 65536]) expect(validateConnectionSettings({ ...validConnection, port })).toEqual({ port: "port" });
     for (const port of [1, 5432, 65535]) expect(validateConnectionSettings({ ...validConnection, port })).toEqual({});
-    const options = { ...validConnection.extra_options, sslmode: "verify-full", schema: "bad-name", sslcert: "/cert/client.pem" };
+    const options = { ...validConnection.extra_options, sslmode: "verify-full" as const, schema: "bad-name", sslcert: "/cert/client.pem" };
     expect(validateConnectionSettings({ ...validConnection, driver: "postgresql", extra_options: options })).toEqual({ schema: "schema", sslrootcert: "caRequired", sslkey: "certificatePair" });
     expect(validateConnectionSettings({ ...validConnection, extra_options: { ...options, sslmode: "disable" } })).toEqual({ sslmode: "encryptionRequired" });
     expect(validateConnectionSettings({ ...validConnection, extra_options: { ...validConnection.extra_options, sslrootcert: "-----BEGIN CERTIFICATE-----" } })).toEqual({ sslrootcert: "certificatePath" });

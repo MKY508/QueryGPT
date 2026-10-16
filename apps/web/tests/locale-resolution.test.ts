@@ -6,7 +6,7 @@ import {
   localeFromAcceptLanguage,
   resolveLocale,
 } from "@/i18n/config";
-import { middleware } from "@/middleware";
+import { proxy } from "@/proxy";
 
 describe("locale resolution", () => {
   it("uses Chinese as the product default", () => {
@@ -31,8 +31,8 @@ describe("locale resolution", () => {
     expect(resolveLocale("fr", "zh-Hans-CN,zh;q=0.9")).toBe("zh");
   });
 
-  it("persists the same browser-derived locale from middleware", () => {
-    const response = middleware(
+  it("persists the same browser-derived locale from the request proxy", () => {
+    const response = proxy(
       new NextRequest("http://localhost/", {
         headers: { "accept-language": "en-GB,en;q=0.9,zh;q=0.5" },
       })
@@ -42,7 +42,7 @@ describe("locale resolution", () => {
   });
 
   it("does not replace an explicit locale cookie", () => {
-    const response = middleware(
+    const response = proxy(
       new NextRequest("http://localhost/", {
         headers: {
           "accept-language": "zh-CN,zh;q=0.9",

@@ -94,9 +94,14 @@ jobs:
         with:
           python-version: '3.13'
 
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: '0.8.11'
+          enable-cache: true
+
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
 
       - name: Install web dependencies
         run: cd apps/web && npm ci
@@ -106,18 +111,6 @@ jobs:
 
       - name: Test release data policy
         run: cd apps/desktop && npm run test:packaging-policy
-
-      # API venv for the build script's requirements fallback
-      - name: Setup API venv
-        shell: bash
-        run: |
-          cd apps/api
-          python -m venv .venv
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            .venv/Scripts/pip install -e "."
-          else
-            .venv/bin/pip install -e "."
-          fi
 
       - name: Build backend
         run: cd apps/desktop && npx tsx scripts/build-pyinstaller.ts
@@ -154,7 +147,7 @@ jobs:
         shell: bash
 
       - name: Compile TypeScript
-        run: cd apps/desktop && npx tsc -p tsconfig.electron.json
+        run: cd apps/desktop && npm run compile:electron
 
       - name: Check macOS signing credentials
         id: mac-signing

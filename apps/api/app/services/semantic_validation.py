@@ -14,7 +14,9 @@ import threading
 from collections import Counter
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -40,16 +42,19 @@ from app.models.workspace import (
 )
 from app.services.checkpoint_contract import stable_payload_hash
 from app.services.database import create_database_manager
+from app.services.file_query import UnsupportedParquetPrecisionError, materialize_parquet
 from app.services.metric_formula import metric_formula_columns
 from app.services.result_filters import (
     stable_field_binding_candidates,
     stable_schema_signature,
 )
+from app.services.result_values import fetch_result_rows, json_result_value
 from app.services.semantic_revisions import (
     SemanticRevisionConflictError,
     append_semantic_revision,
     semantic_entry_snapshot,
 )
+from app.services.source_activation import is_current_source
 
 VALIDATION_TIMEOUT_SECONDS = 5.0
 _LEASE_SECONDS = 30
@@ -1171,9 +1176,7 @@ async def _project_sources(
         )
     )
     return [
-        (source, connection)
-        for source, connection in result.all()
-        if (source.profile_data or {}).get("is_current") is not False
+        (source, connection) for source, connection in result.all() if is_current_source(source)
     ]
 
 
@@ -1231,40 +1234,75 @@ def _file_quote(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
-def _duckdb_relation(path: str) -> str:
-    escaped = path.replace("'", "''")
-    return f"read_parquet('{escaped}')"
-
-
-def _run_duckdb_query(sql: str, timeout_seconds: float) -> dict[str, Any]:
+def _run_duckdb_query(
+    sql: str,
+    timeout_seconds: float,
+    sources: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
     import duckdb
 
-    connection = duckdb.connect(database=":memory:")
-    timer = threading.Timer(timeout_seconds, connection.interrupt)
-    timer.daemon = True
-    timer.start()
-    try:
-        cursor = connection.execute(sql)
-        row = cursor.fetchone()
-        if row is None:
-            return {}
-        return {column[0]: _json_value(value) for column, value in zip(cursor.description, row)}
-    finally:
-        timer.cancel()
-        connection.close()
+    with TemporaryDirectory(prefix="receiptbi-validation-") as scratch:
+        connection = duckdb.connect(
+            database=":memory:",
+            config={
+                "memory_limit": "256MB",
+                "threads": "2",
+                "temp_directory": scratch,
+                "max_temp_directory_size": "2GB",
+                "autoinstall_known_extensions": "false",
+                "autoload_known_extensions": "false",
+            },
+        )
+        timed_out = threading.Event()
+
+        def interrupt():
+            timed_out.set()
+            connection.interrupt()
+
+        def check_budget():
+            if timed_out.is_set():
+                raise _BlockedValidation(
+                    "semantic_validation_timeout", "文件验证超时，未将候选标为已验证。"
+                )
+
+        timer = threading.Timer(timeout_seconds, interrupt)
+        timer.daemon = True
+        timer.start()
+        try:
+            for name, path in (sources or {}).items():
+                check_budget()
+                materialize_parquet(connection, path, name, require_lossless=True)
+            check_budget()
+            connection.execute("SET enable_external_access = false")
+            rows, _truncated = fetch_result_rows(connection.execute(sql), 1)
+            check_budget()
+            return rows[0] if rows else {}
+        except duckdb.InterruptException:
+            check_budget()
+            raise
+        except UnsupportedParquetPrecisionError as exc:
+            raise _BlockedValidation(
+                "semantic_file_precision_unsupported",
+                str(exc),
+                facts={"columns": exc.columns},
+            ) from exc
+        finally:
+            timer.cancel()
+            timer.join()
+            connection.close()
 
 
 def _json_value(value: Any) -> Any:
-    if value is None or isinstance(value, (str, int, bool)):
-        return value
-    if isinstance(value, float):
-        return round(value, 8)
-    if hasattr(value, "isoformat"):
-        return value.isoformat()
+    return json_result_value(value)
+
+
+def _finite_metric_value(value: Any) -> bool:
+    if isinstance(value, bool) or value is None:
+        return False
     try:
-        return float(value)
-    except (TypeError, ValueError):
-        return str(value)
+        return Decimal(str(value)).is_finite()
+    except InvalidOperation:
+        return False
 
 
 async def _execute_source_query(
@@ -1279,8 +1317,13 @@ async def _execute_source_query(
                 "semantic_working_copy_unavailable",
                 "可信数据副本当前不可用，未执行验证。",
             )
-        sql = sql_builder(_file_quote, _duckdb_relation(source.working_uri))
-        return await asyncio.to_thread(_run_duckdb_query, sql, VALIDATION_TIMEOUT_SECONDS)
+        sql = sql_builder(_file_quote, _file_quote("validation_source"))
+        return await asyncio.to_thread(
+            _run_duckdb_query,
+            sql,
+            VALIDATION_TIMEOUT_SECONDS,
+            {"validation_source": source.working_uri},
+        )
     if connection is None:
         raise _BlockedValidation(
             "semantic_connection_unavailable",
@@ -1369,6 +1412,10 @@ async def _validate_aggregate_metric(
             "metric_probe_has_no_values",
             "指标字段在完整探测中没有可汇总数值。",
             facts=stats,
+        )
+    if not _finite_metric_value(stats["aggregate_value"]):
+        raise _BlockedValidation(
+            "metric_probe_nonfinite", "指标汇总包含非有限数值，未通过验证。", facts=stats
         )
     return {"check": "aggregate_metric_probe", "operation": operation, **stats}
 
@@ -1466,6 +1513,12 @@ async def _validate_derived_metric(
     if int(stats.get("total_rows") or 0) <= 0 or int(stats.get("computed_rows") or 0) <= 0:
         raise _BlockedValidation(
             "derived_metric_has_no_values", "派生指标没有可执行的完整数据行。", facts=stats
+        )
+    if not _finite_metric_value(stats.get("aggregate_value")):
+        raise _BlockedValidation(
+            "derived_metric_probe_nonfinite",
+            "派生指标汇总包含非有限数值，未通过验证。",
+            facts=stats,
         )
     return {"check": "derived_metric_probe", "aggregate": aggregate, **stats}
 
@@ -1631,12 +1684,20 @@ async def _validate_relationship(
             )
         sql = _relationship_stats_sql(
             quote=_file_quote,
-            left_relation=_duckdb_relation(left_source.working_uri),
-            right_relation=_duckdb_relation(right_source.working_uri),
+            left_relation=_file_quote("validation_left"),
+            right_relation=_file_quote("validation_right"),
             left_column=str(left_endpoint["column"]),
             right_column=str(right_endpoint["column"]),
         )
-        stats = await asyncio.to_thread(_run_duckdb_query, sql, VALIDATION_TIMEOUT_SECONDS)
+        stats = await asyncio.to_thread(
+            _run_duckdb_query,
+            sql,
+            VALIDATION_TIMEOUT_SECONDS,
+            {
+                "validation_left": left_source.working_uri,
+                "validation_right": right_source.working_uri,
+            },
+        )
     elif (
         left_source.kind == right_source.kind == "connection"
         and left_source.connection_id is not None

@@ -41,9 +41,16 @@ def test_resolve_openai_compatible_provider_defaults():
 def test_orcarouter_uses_own_endpoint_and_preserves_gateway_model_id():
     from app.models.config import ModelCreate
 
-    model = ModelCreate(name="OrcaRouter", provider="orcarouter", model_id="orcarouter/auto", api_key="test-orca-key")
+    model = ModelCreate(
+        name="OrcaRouter",
+        provider="orcarouter",
+        model_id="orcarouter/auto",
+        api_key="test-orca-key",
+    )
     resolved, extra = resolve_model_runtime(
-        model, fallback_model="gpt-4o", fallback_api_key="unrelated-key",
+        model,
+        fallback_model="gpt-4o",
+        fallback_api_key="unrelated-key",
         fallback_base_url="https://unrelated.invalid/v1",
     )
     assert resolved.source_provider == "orcarouter"

@@ -139,12 +139,6 @@
 .workbench-result-page .analysis-report-title { font-family: "Iowan Old Style", "Songti SC", "Noto Serif CJK SC", Georgia, serif; font-weight: 500; margin-top: 16px; font-size: clamp(26px, 2.8vw, 42px); line-height: 1.3; letter-spacing: -.04em; }
 .workbench-welcome-title { font-family: "Iowan Old Style", "Songti SC", "Noto Serif CJK SC", Georgia, serif; }
 .workbench-result-page .prose { font-size: 17px; line-height: 1.85; }
-.workbench-result-page .analysis-report-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 40px 0 32px; border: 0; border-radius: 0; background: transparent; gap: 24px 0; }
-.workbench-result-page .analysis-report-metrics > div { border: 0; border-right: 1px solid hsl(var(--border)); padding: 0 24px; }
-.workbench-result-page .analysis-report-metrics > div:first-child { padding-left: 0; }
-.workbench-result-page .analysis-report-metrics > div:last-child { border-right: 0; }
-.workbench-result-page .analysis-report-metrics .text-2xl { color: hsl(var(--primary)); font-size: clamp(30px, 3.6vw, 54px); line-height: 1.45; margin: 8px 0; }
-.workbench-result-page .analysis-report-metrics .text-xs { font-size: 14px; }
 .workbench-result-page figure { padding: 0; }
 .workbench-result-page figure > [role="img"] { height: 280px; }
 .receiptbi-chart .recharts-cartesian-axis-tick-value,
@@ -171,6 +165,8 @@
   .workspace-shell *, .workspace-shell *::after { transition-duration: 0ms !important; scroll-behavior: auto !important; }
 }
 
+/* Source browsing follows the pane's width, not the whole window. */
+
 .report-editor-shell { min-width: var(--desktop-min-width); }
 
 .report-editor-icon {
@@ -180,7 +176,6 @@
 .report-editor-icon:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
 .report-editor-icon:disabled { opacity: .35; cursor: not-allowed; }
 .report-editor-shell :is(button, a, input, select, textarea):focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
-.report-editor-shell > header { padding: 12px 20px; gap: 10px; }
 .report-editor-shell > header button, .report-editor-shell > header a { border-radius: var(--radius-control); }
 .report-editor-shell > header > div:last-child > div:has(> button[aria-pressed]) { border-radius: var(--radius-control); background: hsl(var(--muted)); border-color: transparent; }
 .report-editor-shell [aria-label] > select, .report-editor-shell nav button { border-radius: var(--radius-control); }
@@ -192,14 +187,7 @@
 .report-editor-shell .report-layout-block > article { border-radius: var(--radius-surface); }
 .report-editor-shell .report-layout-block > article[aria-pressed="true"] { box-shadow: 0 0 0 2px hsl(var(--primary) / .12); }
 .report-editor-shell .report-layout-block[data-block-type="metric"] > article { border-top-width: 1px; }
-.report-inspector :is(input, select, textarea) { border-radius: var(--radius-control); }
 .report-inspector fieldset { scrollbar-gutter: stable; }
-@media (min-width: 1280px) {
-  .report-editor-shell > header { flex-wrap: nowrap; }
-  .report-editor-shell > header > div:first-child { width: auto; flex: 1 1 auto; }
-  .report-editor-shell > header > div:last-child { width: auto; flex-wrap: nowrap; border: 0; padding-top: 0; }
-  .report-editor-shell > header input { width: min(24vw, 320px); }
-}
 .report-canvas {
   container-name: report-canvas;
   container-type: inline-size;
@@ -214,6 +202,20 @@
 .report-layout-block {
   grid-column: 1 / -1;
   min-width: 0;
+}
+
+/* The editor keeps a useful grid with both side panels open. Below that,
+   chart cards need an explicit height because auto-flow rows have no height. */
+@container report-canvas (min-width: 720px) and (max-width: 899px) {
+  .report-editor-shell .report-layout-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+  .report-editor-shell .report-layout-block { grid-column: var(--report-column-span); }
+  .report-editor-shell .report-layout-grid[data-editing="true"] { grid-auto-rows: 56px; }
+  .report-editor-shell .report-layout-grid[data-editing="true"] .report-layout-block {
+    grid-column: var(--report-column); grid-row: var(--report-row);
+  }
+}
+@container report-canvas (max-width: 719px) {
+  .report-editor-shell .report-layout-grid[data-editing="true"] .report-layout-block[data-block-type="chart"] { min-height: 320px; }
 }
 
 /* Keep the 12-column report grid only while three KPI cards remain readable. */
@@ -262,6 +264,44 @@
   min-height: 720px;
   padding: 32px;
   background: hsl(var(--background));
+}
+
+/* A layout-ready, non-interactive capture surface, outside the visible canvas. */
+.report-image-view {
+  visibility: visible;
+}
+
+.report-recovery-preview {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 100%;
+  min-width: 640px;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.report-recovery-preview .report-print-page {
+  min-height: 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.report-image-view .overflow-auto {
+  overflow: visible;
+}
+
+.report-image-view th,
+.report-image-view td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.report-image-view thead {
+  position: static;
+}
+
+.report-image-view button {
+  display: none;
 }
 
 .report-print-header {
@@ -327,6 +367,9 @@
 }
 
 @media print {
+  .report-image-view {
+    display: none !important;
+  }
   @page {
     size: A4 landscape;
     margin: 10mm;
@@ -400,19 +443,4 @@
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-}
-
-.report-recovery-preview {
-  position: relative;
-  left: auto;
-  top: auto;
-  width: 100%;
-  min-width: 640px;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.report-recovery-preview .report-print-page {
-  min-height: 0;
-  border-bottom: 1px solid hsl(var(--border));
 }

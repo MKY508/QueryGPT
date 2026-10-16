@@ -1054,7 +1054,9 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
     monkeypatch.setattr(
         analyst_runtime,
         "model_session",
-        lambda _config, **_kwargs: nullcontext(FunctionModel(lambda _messages, _info: ModelResponse(parts=[]))),
+        lambda _config, **_kwargs: nullcontext(
+            FunctionModel(lambda _messages, _info: ModelResponse(parts=[]))
+        ),
     )
     monkeypatch.setattr(
         recovery,
@@ -1068,7 +1070,12 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=project_context,
-        resume_state=RestoredCheckpoint(manifest=deepcopy(manifest), dataframes=deepcopy(dataframes), python_output=[], python_images=[]),
+        resume_state=RestoredCheckpoint(
+            manifest=deepcopy(manifest),
+            dataframes=deepcopy(dataframes),
+            python_output=[],
+            python_images=[],
+        ),
     )
     restore_session_checkpoint(runtime.deps, runtime.resume_state)
     assert runtime.deps.dataframes["net_revenue_by_store"] == aggregate_rows
@@ -1079,7 +1086,12 @@ async def test_metric_formula_checkpoint_replay_rejects_semantic_hash_drift(
     drifted_runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=project_context,
-        resume_state=RestoredCheckpoint(manifest=deepcopy(manifest), dataframes=deepcopy(dataframes), python_output=[], python_images=[]),
+        resume_state=RestoredCheckpoint(
+            manifest=deepcopy(manifest),
+            dataframes=deepcopy(dataframes),
+            python_output=[],
+            python_images=[],
+        ),
     )
     with pytest.raises(CheckpointDriftError, match="语义定义已经变化"):
         restore_session_checkpoint(drifted_runtime.deps, drifted_runtime.resume_state)
@@ -1159,12 +1171,16 @@ async def test_checkpoint_replay_filters_legacy_unscoped_relationship_proposals(
     monkeypatch.setattr(
         analyst_runtime,
         "model_session",
-        lambda _config, **_kwargs: nullcontext(FunctionModel(lambda _messages, _info: ModelResponse(parts=[]))),
+        lambda _config, **_kwargs: nullcontext(
+            FunctionModel(lambda _messages, _info: ModelResponse(parts=[]))
+        ),
     )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="旧关系证据恢复"),
-        resume_state=RestoredCheckpoint(manifest=manifest, dataframes={'orders': rows}, python_output=[], python_images=[]),
+        resume_state=RestoredCheckpoint(
+            manifest=manifest, dataframes={"orders": rows}, python_output=[], python_images=[]
+        ),
     )
 
     restore_session_checkpoint(runtime.deps, runtime.resume_state)

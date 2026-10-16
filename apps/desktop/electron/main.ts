@@ -1,8 +1,19 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
 import path from 'node:path';
 import os from 'node:os';
+import windowStateKeeper from 'electron-window-state';
 import { ProcessManager } from './process-manager.js';
 import { registerIpcHandlers } from './ipc-handlers.js';
+import { createStartupPages, type StartupPages } from './startup-pages.js';
+import { createStartupRecoveryHandler, openStartupFolder, retryStartup } from './startup-recovery.js';
+import { STARTUP_ACTION_CHANNEL } from './startup-protocol.js';
+import { configureDesktopWindow, isTrustedDesktopSender } from './desktop-security.js';
+import { installDesktopCloseGuard } from './desktop-close.js';
+import { installDesktopMenu } from './menu.js';
+import {
+  DESKTOP_NAVIGATE_CHANNEL, DESKTOP_NAVIGATION_READY_CHANNEL, desktopLocale,
+  type DesktopLocale, type DesktopPage,
+} from './desktop-navigation.js';
 import { setupLogger, type Logger } from './logger.js';
 import {
   LegacyDataMigrationRequiredError,
@@ -33,129 +44,25 @@ let frontendChunkRecovery: ChunkLoadRecoveryGate | null = null;
 let startupFailureHandled = false;
 let quitCleanupStarted = false;
 let quitCleanupFinished = false;
+let openingWindow: Promise<void> | null = null;
+let pendingNavigation: DesktopPage | null = null;
+let rendererNavigationReady = false;
+let menuLocale: DesktopLocale = 'zh';
+const closeGuards = new WeakMap<BrowserWindow, ReturnType<typeof installDesktopCloseGuard>>();
 
 const developmentIconPath = path.join(__dirname, '../resources/icon/icon.png');
 
-function brandMarkHtml(iconDataUrl: string | null): string {
-  if (!iconDataUrl) return '';
-  return `<img class="mark" src="${iconDataUrl}" alt="" aria-hidden="true">`;
+const windowPages = new WeakMap<BrowserWindow, Record<DesktopLocale, StartupPages>>();
+
+function startupPage(win: BrowserWindow, kind: keyof StartupPages): string {
+  const pages = windowPages.get(win);
+  if (!pages) throw new Error('Startup pages are not initialized');
+  return pages[menuLocale][kind];
 }
 
-function loadingHtml(iconDataUrl: string | null): string {
-  const brandMark = brandMarkHtml(iconDataUrl);
-  return `data:text/html;charset=utf-8,${encodeURIComponent(`<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>ReceiptBI</title><style>
-  :root {
-    color-scheme:light dark;
-    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
-    --background:hsl(60 14% 98%);
-    --foreground:hsl(160 35% 14%);
-    --muted-foreground:hsl(160 12% 42%);
-    --border:hsl(150 12% 88%);
-    --primary:hsl(158 42% 26%);
-    --primary-foreground:hsl(60 14% 98%);
-    --pulse:hsla(158 42% 26% / .28);
-  }
-  @media (prefers-color-scheme:dark) {
-    :root {
-      --background:hsl(160 20% 8%);
-      --foreground:hsl(150 15% 92%);
-      --muted-foreground:hsl(150 10% 58%);
-      --border:hsl(160 12% 20%);
-      --primary:hsl(158 38% 42%);
-      --primary-foreground:hsl(160 20% 8%);
-      --pulse:hsla(158 38% 42% / .38);
-    }
-  }
-  * { box-sizing:border-box; }
-  body { margin:0; min-height:100vh; background:var(--background); color:var(--foreground); }
-  .shell { min-height:100vh; display:grid; grid-template-rows:auto 1fr; padding:42px 52px; overflow:hidden; }
-  .brand { display:flex; align-items:center; gap:13px; color:var(--muted-foreground); font-size:13px; font-weight:700; letter-spacing:.08em; }
-  .mark { width:34px; height:34px; display:block; object-fit:contain; }
-  .status { align-self:center; display:grid; grid-template-columns:4px minmax(0,640px); gap:34px; margin-left:8vw; }
-  .rail { position:relative; min-height:206px; background:var(--border); overflow:hidden; }
-  .rail::after { content:""; position:absolute; inset:0 0 auto; height:72px; background:var(--primary); animation:scan 1.8s cubic-bezier(.65,0,.35,1) infinite alternate; }
-  .eyebrow { margin:3px 0 22px; color:var(--primary); font-size:12px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; }
-  h1 { max-width:620px; margin:0; font-size:clamp(34px,5vw,58px); line-height:1.1; letter-spacing:-.035em; }
-  .copy { max-width:520px; margin:24px 0 0; color:var(--muted-foreground); font-size:16px; line-height:1.8; }
-  .pulse { width:7px; height:7px; margin-top:30px; background:var(--primary); border-radius:50%; box-shadow:0 0 0 0 var(--pulse); animation:pulse 1.6s ease-out infinite; }
-  @keyframes scan { from { transform:translateY(-30px); } to { transform:translateY(164px); } }
-  @keyframes pulse { 70% { box-shadow:0 0 0 9px transparent; } 100% { box-shadow:0 0 0 0 transparent; } }
-  @media (max-width:720px) { .shell { padding:32px; } .status { margin-left:0; gap:24px; } }
-  @media (prefers-reduced-motion:reduce) { .rail::after,.pulse { animation:none; } .rail::after { top:34%; } }
-</style></head><body>
-<main class="shell">
-  <header class="brand">${brandMark}<span>RECEIPTBI</span></header>
-  <section class="status" role="status" aria-live="polite">
-    <div class="rail" aria-hidden="true"></div>
-    <div>
-      <p class="eyebrow">本地分析工作台</p>
-      <h1>正在打开 ReceiptBI</h1>
-      <p class="copy">稍候片刻，应用会自动显示。</p>
-      <div class="pulse" aria-hidden="true"></div>
-    </div>
-  </section>
-</main>
-</body></html>`)}`;
-}
-
-function errorHtml(
-  iconDataUrl: string | null,
-  reason: 'startup' | 'frontend-assets' = 'startup'
-): string {
-  const brandMark = brandMarkHtml(iconDataUrl);
-  const copy =
-    reason === 'frontend-assets'
-      ? '界面资源加载失败。请关闭 ReceiptBI 后重新打开。'
-      : '这次没有正常打开。请关闭后重新试一次，你的项目不会因此发生变化。';
-  return `data:text/html;charset=utf-8,${encodeURIComponent(`<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>ReceiptBI 无法启动</title><style>
-  :root {
-    color-scheme:light dark;
-    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
-    --background:hsl(60 14% 98%);
-    --foreground:hsl(160 35% 14%);
-    --muted-foreground:hsl(160 12% 42%);
-    --border:hsl(150 12% 88%);
-    --primary:hsl(158 42% 26%);
-    --primary-foreground:hsl(60 14% 98%);
-    --warning:hsl(34 62% 40%);
-  }
-  @media (prefers-color-scheme:dark) {
-    :root {
-      --background:hsl(160 20% 8%);
-      --foreground:hsl(150 15% 92%);
-      --muted-foreground:hsl(150 10% 58%);
-      --border:hsl(160 12% 20%);
-      --primary:hsl(158 38% 42%);
-      --primary-foreground:hsl(160 20% 8%);
-      --warning:hsl(38 78% 66%);
-    }
-  }
-  * { box-sizing:border-box; }
-  body { margin:0; min-height:100vh; background:var(--background); color:var(--foreground); }
-  .shell { min-height:100vh; display:grid; grid-template-rows:auto 1fr; padding:42px 52px; }
-  .brand { display:flex; align-items:center; gap:13px; color:var(--muted-foreground); font-size:13px; font-weight:700; letter-spacing:.08em; }
-  .mark { width:34px; height:34px; display:block; object-fit:contain; }
-  .content { align-self:center; width:min(720px,92vw); margin-left:8vw; border-left:4px solid var(--warning); padding:4px 0 4px 34px; }
-  .eyebrow { margin:0 0 18px; color:var(--warning); font-size:12px; font-weight:800; letter-spacing:.16em; }
-  h1 { margin:0; font-size:clamp(34px,5vw,54px); line-height:1.1; letter-spacing:-.035em; }
-  .copy { max-width:590px; margin:22px 0 0; color:var(--muted-foreground); font-size:16px; line-height:1.75; }
-  button { margin-top:28px; min-height:42px; padding:0 20px; border:1px solid var(--primary); background:var(--primary); color:var(--primary-foreground); font:inherit; font-weight:800; cursor:pointer; }
-  button:hover { filter:brightness(1.08); }
-  button:focus-visible { outline:3px solid var(--warning); outline-offset:3px; }
-  @media (max-width:720px) { .shell { padding:32px; } .content { margin-left:0; padding-left:24px; } }
-</style></head><body>
-<main class="shell">
-  <header class="brand">${brandMark}<span>RECEIPTBI</span></header>
-  <section class="content">
-    <p class="eyebrow">启动需要处理</p>
-    <h1>ReceiptBI 暂时无法启动</h1>
-    <p class="copy">${copy}</p>
-    <button type="button" onclick="window.electronAPI?.quitApp?.()">关闭 ReceiptBI</button>
-  </section>
-</main>
-</body></html>`)}`;
+function startupErrorUrls(win: BrowserWindow): ReadonlySet<string> {
+  return new Set(Object.values(windowPages.get(win) ?? {})
+    .flatMap((pages) => [pages.error, pages.assetsError]));
 }
 
 function loadBrandIconDataUrl(): string | null {
@@ -171,10 +78,19 @@ function loadBrandIconDataUrl(): string | null {
 }
 
 async function createWindow(): Promise<BrowserWindow> {
+  if (!processManager) throw new Error('Process manager is not initialized');
   frontendChunkRecovery = new ChunkLoadRecoveryGate();
+  rendererNavigationReady = false;
+  const windowState = windowStateKeeper({
+    defaultWidth: 1280,
+    defaultHeight: 800,
+    path: processManager.getUserDataDir(),
+  });
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    x: windowState.x,
+    y: windowState.y,
+    width: Math.max(DESKTOP_MIN_WIDTH, windowState.width),
+    height: windowState.height,
     minWidth: DESKTOP_MIN_WIDTH,
     minHeight: 600,
     title: 'ReceiptBI',
@@ -183,16 +99,36 @@ async function createWindow(): Promise<BrowserWindow> {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#101814' : '#fafaf9',
   });
+  const pages = {
+    zh: createStartupPages(brandIconDataUrl, 'zh'),
+    en: createStartupPages(brandIconDataUrl, 'en'),
+  };
+  windowPages.set(win, pages);
+  const startupUrl = startupPage(win, 'loading');
+  configureDesktopWindow(win, {
+    frontendUrl: processManager.getFrontendUrl(),
+    startupUrls: new Set(Object.values(pages).flatMap((locale) => Object.values(locale))),
+  }, (url) => shell.openExternal(url), (error) => logger.warn('Unable to open link', error));
+  closeGuards.set(win, installDesktopCloseGuard(win, ipcMain, {
+    locale: () => menuLocale,
+    showDialog: (options) => dialog.showMessageBox(win, options),
+    quit: () => app.quit(),
+    onError: (error) => logger.error('Unable to finish closing the window', error),
+  }));
   const removeChunkRequestMonitor = installChunkRequestMonitor(win);
   win.once('closed', removeChunkRequestMonitor);
+  win.webContents.on('did-start-navigation', (details) => {
+    if (details.isMainFrame && !details.isSameDocument) rendererNavigationReady = false;
+  });
 
   // 立即显示 loading 页面
-  await win.loadURL(loadingHtml(brandIconDataUrl));
+  await win.loadURL(startupUrl);
+  windowState.manage(win);
   win.show();
   logger.info('Loading screen shown');
 
@@ -211,7 +147,7 @@ function isCurrentFrontendUrl(value: string): boolean {
 async function showFrontendAssetError(win: BrowserWindow): Promise<void> {
   if (quitCleanupStarted || win.isDestroyed() || mainWindow !== win) return;
   try {
-    await win.loadURL(errorHtml(brandIconDataUrl, 'frontend-assets'));
+    await win.loadURL(startupPage(win, 'assetsError'));
   } catch (error) {
     logger.error('Failed to show the frontend startup error', error);
   }
@@ -346,6 +282,7 @@ ipcMain.on(RENDERER_CHUNK_FAILURE_CHANNEL, (event, report: unknown) => {
     !win ||
     win.isDestroyed() ||
     event.sender !== win.webContents ||
+    !isTrustedDesktopSender(event) ||
     !isRendererChunkFailureReport(report)
   ) {
     return;
@@ -360,7 +297,7 @@ ipcMain.on(RENDERER_CHUNK_FAILURE_CHANNEL, (event, report: unknown) => {
   );
 });
 
-async function showApplicationWindow(): Promise<void> {
+async function openApplicationWindow(): Promise<void> {
   if (quitCleanupStarted) return;
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -370,33 +307,97 @@ async function showApplicationWindow(): Promise<void> {
   }
 
   const win = await createWindow();
+  if (quitCleanupStarted || win.isDestroyed()) return;
   mainWindow = win;
   win.once('closed', () => {
-    if (mainWindow === win) mainWindow = null;
+    if (mainWindow === win) {
+      mainWindow = null;
+      rendererNavigationReady = false;
+    }
   });
 
+  await startWindowServices(win);
+}
+
+async function startWindowServices(win: BrowserWindow): Promise<void> {
+  const recovery = frontendChunkRecovery;
   try {
     if (!processManager) throw new Error('Process manager is not initialized');
-    // On macOS activate, an already-ready service pair is reused without restarting.
+    // Window reopening and a UI-only retry reuse the already-ready service pair.
     if (!processManager.isReady()) await processManager.startAll();
-    if (quitCleanupStarted || win.isDestroyed()) return;
+    if (quitCleanupStarted || win.isDestroyed() || mainWindow !== win
+      || frontendChunkRecovery !== recovery || recovery?.terminal) return;
 
     const frontendUrl = processManager.getFrontendUrl();
     await win.loadURL(frontendUrl);
-    if (!frontendChunkRecovery?.recoveryAttempted) {
+    if (!recovery?.recoveryAttempted) {
       logger.info(`Frontend loaded: ${frontendUrl}`);
     }
   } catch (error) {
-    if (frontendChunkRecovery?.recoveryAttempted) {
+    if (frontendChunkRecovery !== recovery || recovery?.recoveryAttempted) {
       logger.debug('Initial frontend navigation was superseded by chunk recovery');
       return;
     }
     logger.error('Failed to start services', error);
-    if (!quitCleanupStarted && !win.isDestroyed()) {
-      await win.loadURL(errorHtml(brandIconDataUrl));
+    if (!quitCleanupStarted && !win.isDestroyed() && mainWindow === win) {
+      await win.loadURL(startupPage(win, 'error'));
     }
   }
 }
+
+function showApplicationWindow(): Promise<void> {
+  if (openingWindow) return openingWindow;
+  openingWindow = openApplicationWindow().finally(() => { openingWindow = null; });
+  return openingWindow;
+}
+
+ipcMain.handle(STARTUP_ACTION_CHANNEL, createStartupRecoveryHandler({
+  currentWindow: () => quitCleanupStarted ? null : mainWindow,
+  errorUrls: startupErrorUrls,
+  retry: (win) => retryStartup({
+    pending: openingWindow,
+    isErrorPage: () => startupErrorUrls(win).has(win.webContents.getURL()),
+    isCurrent: () => !quitCleanupStarted && !win.isDestroyed() && mainWindow === win,
+    reset: () => {
+      frontendChunkRecovery = new ChunkLoadRecoveryGate();
+      rendererNavigationReady = false;
+    },
+    showLoading: () => win.loadURL(startupPage(win, 'loading')),
+    start: () => startWindowServices(win),
+  }),
+  openFolder: (folder) => {
+    if (!processManager) return Promise.resolve('unavailable');
+    return openStartupFolder(processManager.getStartupFolder(folder), (directory) => shell.openPath(directory));
+  },
+  onError: (error) => logger.error('Startup recovery action failed', error),
+}));
+
+function flushDesktopNavigation(): void {
+  const win = mainWindow;
+  if (!pendingNavigation || !rendererNavigationReady || !win || win.isDestroyed() || quitCleanupStarted) return;
+  if (!isCurrentFrontendUrl(win.webContents.getURL())) return;
+  const page = pendingNavigation;
+  pendingNavigation = null;
+  win.webContents.send(DESKTOP_NAVIGATE_CHANNEL, page);
+}
+
+function navigateFromDesktop(page: DesktopPage): void {
+  if (quitCleanupStarted || !desktopInitialization) return;
+  // Keep the most recent user intent while services/the renderer are starting.
+  pendingNavigation = page;
+  void desktopInitialization.then(showApplicationWindow).then(flushDesktopNavigation).catch(handleStartupFailure);
+}
+
+ipcMain.on(DESKTOP_NAVIGATION_READY_CHANNEL, (event, locale: unknown) => {
+  if (event.sender !== mainWindow?.webContents || !isTrustedDesktopSender(event)) return;
+  rendererNavigationReady = true;
+  const nextLocale = desktopLocale(locale);
+  if (nextLocale !== menuLocale) {
+    menuLocale = nextLocale;
+    installDesktopMenu(navigateFromDesktop, menuLocale);
+  }
+  flushDesktopNavigation();
+});
 
 function handleStartupFailure(error: unknown): void {
   if (startupFailureHandled) return;
@@ -435,6 +436,8 @@ if (!hasSingleInstanceLock) {
     }
     processManager = new ProcessManager(logger, desktopDataPaths);
     registerIpcHandlers(ipcMain, processManager, logger);
+    menuLocale = desktopLocale(app.getLocale());
+    installDesktopMenu(navigateFromDesktop, menuLocale);
   });
   showAfterInitialization();
 
@@ -445,6 +448,18 @@ if (!hasSingleInstanceLock) {
 
 app.on('before-quit', (event) => {
   if (quitCleanupFinished) return;
+  // Include a window still showing the startup page, before mainWindow is set.
+  const win = BrowserWindow.getAllWindows().find((candidate) => !candidate.isDestroyed() && closeGuards.has(candidate));
+  const guard = win && closeGuards.get(win);
+  if (!guard) return;
+  event.preventDefault();
+  void guard.requestQuit();
+});
+
+app.on('will-quit', (event) => {
+  if (quitCleanupFinished) return;
+  // before-quit can be canceled by an unsaved report. Only stop services after
+  // every window has really closed, so Cancel always leaves a usable workspace.
   event.preventDefault();
   if (quitCleanupStarted) return;
 

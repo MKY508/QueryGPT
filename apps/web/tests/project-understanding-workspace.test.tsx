@@ -9,7 +9,8 @@ import {
 } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReactElement } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mockSemanticDialogs, mockSemanticWidth } from "./semantic-dialog-mock";
 import {
   ProjectUnderstandingWorkspace,
   relationshipDefinition,
@@ -46,6 +47,7 @@ const candidate = (id: string, leftTable: string, rightTable: string): SemanticE
   entry_type: "relationship",
   state: "candidate",
   confidence: 0.55,
+  is_active: true,
   active_revision_id: `revision-${id}`,
   revision_number: 1,
   definition: {
@@ -107,8 +109,11 @@ const projectSource = (
 });
 
 describe("ProjectUnderstandingWorkspace", () => {
+  let restoreDialogs: () => void;
+  beforeEach(() => { restoreDialogs = mockSemanticDialogs(); mockSemanticWidth(true); });
   afterEach(() => {
     cleanup();
+    restoreDialogs();
     vi.restoreAllMocks();
     window.sessionStorage.clear();
     window.localStorage.clear();
@@ -936,7 +941,7 @@ describe("ProjectUnderstandingWorkspace", () => {
         data: {
           data: {
             action: "ignore",
-            items: [{ ...suggestion, is_active: false, validity: "stale" }],
+            items: [{ ...suggestion, is_active: false, validity: "stale", active_revision_id: "ignored-suggestion", revision_number: 2 }],
             queued_entry_ids: [],
           },
         },
@@ -1015,7 +1020,7 @@ describe("ProjectUnderstandingWorkspace", () => {
     expect(screen.queryByText("order date")).not.toBeInTheDocument();
     expect((await screen.findAllByText("销售额")).length).toBeGreaterThan(0);
     const recommendationCards = Array.from(
-      screen.getByTestId("semantic-card-list").querySelectorAll("article")
+      screen.getByTestId("semantic-table-list").querySelectorAll("tbody tr")
     ).map((card) => card.textContent || "");
     expect(recommendationCards.some((card) => card.includes("字段中文化与维度"))).toBe(
       true
@@ -1396,8 +1401,8 @@ describe("ProjectUnderstandingWorkspace", () => {
   });
 
   it("offers validation in bulk without offering unsafe candidate approval", async () => {
-    const first = candidate("one", "orders", "stores");
-    const second = candidate("two", "refunds", "stores");
+    const first = { ...candidate("one", "orders", "stores"), is_active: true };
+    const second = { ...candidate("two", "refunds", "stores"), is_active: true };
     let resolveValidationJob: ((value: unknown) => void) | null = null;
     let queued = false;
     const get = vi.spyOn(api, "get").mockImplementation(async (url) => {
@@ -1449,12 +1454,16 @@ describe("ProjectUnderstandingWorkspace", () => {
     await screen.findByText("共 792 条");
 
     fireEvent.click(screen.getByLabelText("选择本页"));
-    const validate = screen.getByRole("button", { name: "验证所选" });
-    const remember = screen.getByRole("button", { name: "采纳所选" });
+    fireEvent.click(screen.getByRole("button", { name: "查看并处理" }));
+    const selection = within(screen.getByRole("dialog", { name: "已选清单" }));
+    const validate = selection.getByRole("radio", { name: "验证" });
+    const remember = selection.getByRole("radio", { name: "采纳" });
     expect(validate).toBeEnabled();
     expect(remember).toBeDisabled();
 
     await act(async () => fireEvent.click(validate));
+    expect(post).not.toHaveBeenCalled();
+    await act(async () => fireEvent.click(selection.getByRole("button", { name: "验证 2 条" })));
     await waitFor(() =>
       expect(post).toHaveBeenCalledWith(
         "/api/v1/projects/project-1/knowledge/batch",
@@ -1841,17 +1850,14 @@ describe("ProjectUnderstandingWorkspace", () => {
     fireEvent.click(secondRow);
     expect(secondRow).toHaveAttribute("aria-selected", "true");
     expect(
-      screen.getByRole("complementary", { name: "项目理解详情" })
-    ).toHaveClass("translate-x-0");
-    expect(
-      screen.getByRole("complementary", { name: "项目理解详情" })
-    ).not.toHaveClass("translate-x-full");
+      screen.getByRole("complementary", { name: "门店关联 two" })
+    ).toBeVisible();
 
     fireEvent.click(within(firstRow).getByRole("button", { name: "查看 门店关联 one" }));
     expect(firstRow).toHaveAttribute("aria-selected", "true");
   });
 
-  it("uses the structured tree/list layout around 940px and a 2xl detail drawer", async () => {
+  it("keeps the desktop tree, single table and inspector independent of viewport mode", async () => {
     const first = candidate("one", "orders", "stores");
     vi.spyOn(api, "get").mockImplementation(async (url) => {
       if (url === "/api/v1/projects/project-1") {
@@ -1875,6 +1881,7 @@ describe("ProjectUnderstandingWorkspace", () => {
     });
 
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 940 });
+    mockSemanticWidth(false);
     const { container } = render(
       <ProjectUnderstandingWorkspace projectId="project-1" />
     );
@@ -1884,21 +1891,12 @@ describe("ProjectUnderstandingWorkspace", () => {
     expect(screen.getByRole("region", { name: "项目理解列表" })).toHaveClass(
       "overflow-hidden"
     );
-    expect(screen.getByRole("complementary", { name: "项目理解详情" })).toHaveClass(
-      "overflow-y-auto",
-      "overscroll-contain",
-      "fixed",
-      "2xl:static",
-      "translate-x-full"
-    );
-    expect(screen.getByTestId("semantic-browser-layout")).toHaveClass(
-      "md:grid-cols-[236px_minmax(0,1fr)]",
-      "2xl:grid-cols-[236px_minmax(0,1fr)_340px]"
-    );
-    expect(screen.getByTestId("semantic-scope-tree")).toHaveClass("hidden", "md:flex");
-    expect(screen.getByTestId("semantic-table-list")).toHaveClass("hidden", "2xl:block");
-    expect(screen.getByTestId("semantic-card-list")).toHaveClass("2xl:hidden");
-    expect(screen.getByTestId("semantic-card-list")).not.toHaveClass("overflow-x-auto");
+    expect(screen.getByTestId("semantic-detail-panel")).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("semantic-browser-layout")).toHaveClass("grid-cols-[200px_minmax(0,1fr)_320px]");
+    expect(screen.getByTestId("semantic-scope-tree")).toBeVisible();
+    expect(screen.getByTestId("semantic-table-list")).toBeVisible();
+    expect(screen.queryByTestId("semantic-card-list")).not.toBeInTheDocument();
   });
 
   it("uses server-authorized actions for mixed candidate states", async () => {
@@ -1947,9 +1945,10 @@ describe("ProjectUnderstandingWorkspace", () => {
     expect(screen.queryByText("用于后续调查")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("选择本页"));
-    expect(screen.getByRole("button", { name: "采纳所选" })).toBeDisabled();
-    const ignoreActions = screen.getAllByRole("button", { name: "不采用" });
-    expect(ignoreActions[ignoreActions.length - 1]).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "查看并处理" }));
+    const selection = within(screen.getByRole("dialog", { name: "已选清单" }));
+    expect(selection.getByRole("radio", { name: "采纳" })).toBeDisabled();
+    expect(selection.getByRole("radio", { name: "忽略" })).toBeEnabled();
   });
 
   it("keeps manual attestation distinct from remembering and refreshes project state", async () => {
@@ -1987,6 +1986,8 @@ describe("ProjectUnderstandingWorkspace", () => {
           items: [
             {
               ...attestable,
+              active_revision_id: "attested-head",
+              revision_number: 2,
               execution_state: "verified",
               validity: "active",
               allowed_actions: ["remember"],
@@ -2017,7 +2018,7 @@ describe("ProjectUnderstandingWorkspace", () => {
     );
     expect(refreshCurrent).toHaveBeenCalledTimes(1);
     expect(
-      await screen.findByText(/采用后即可用于后续调查/)
+      await within(screen.getByRole("region", { name: zhMessages.projectUnderstanding.list.aria })).findByText(/采用后即可用于后续调查/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/^已记住 1 条/)).not.toBeInTheDocument();
   });
@@ -2053,7 +2054,7 @@ describe("ProjectUnderstandingWorkspace", () => {
       data: {
         data: {
           action: "restore",
-          items: [{ ...ignored, is_active: true, validity: "unverified" }],
+          items: [{ ...ignored, is_active: true, validity: "unverified", active_revision_id: "restored-head", revision_number: 2 }],
           queued_entry_ids: [],
         },
       },
@@ -2672,7 +2673,7 @@ describe("ProjectUnderstandingWorkspace", () => {
     ).toBe(false);
   });
 
-  it("clears and disables selection while a replacement query is pending", async () => {
+  it("retains selection but disables page selection while a replacement query is pending", async () => {
     const first = candidate("one", "orders", "stores");
     let resolveReplacement: ((value: unknown) => void) | null = null;
     let pageCallCount = 0;
@@ -2715,7 +2716,8 @@ describe("ProjectUnderstandingWorkspace", () => {
       target: { value: "business_rule" },
     });
 
-    await waitFor(() => expect(screen.queryByText("已选 1 条")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText("选择本页")).toBeDisabled());
+    expect(screen.getByText("已选 1 条")).toBeInTheDocument();
     expect(screen.getByLabelText("选择本页")).toBeDisabled();
 
     await act(async () => {

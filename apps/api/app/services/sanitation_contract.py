@@ -13,12 +13,16 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from app.core.csv_options import CsvDelimiter, CsvEncoding
+
 SANITATION_CONTRACT_VERSION = 1
 
 EXECUTABLE_SANITATION_OPERATIONS = frozenset(
     {
         "select_sheet",
+        "read_csv",
         "select_header",
+        "use_generated_headers",
         "normalize_column_names",
         "drop_empty",
         "exclude_summary_rows",
@@ -27,6 +31,7 @@ EXECUTABLE_SANITATION_OPERATIONS = frozenset(
         "normalize_currency",
         "normalize_datetime",
         "fill_missing",
+        "replace_text_values",
     }
 )
 
@@ -37,6 +42,7 @@ VISUAL_SANITATION_OPERATIONS = frozenset(
         "normalize_currency",
         "normalize_datetime",
         "fill_missing",
+        "replace_text_values",
     }
 )
 
@@ -71,6 +77,12 @@ class _NamedOperation(_Operation):
         return value
 
 
+class ReadCsvOperation(_Operation):
+    operation: Literal["read_csv"]
+    delimiter: CsvDelimiter
+    encoding: CsvEncoding
+
+
 class SelectSheetOperation(_NamedOperation):
     operation: Literal["select_sheet"]
     sheet: str = Field(min_length=1, max_length=255)
@@ -84,6 +96,10 @@ class SelectSheetOperation(_NamedOperation):
 class SelectHeaderOperation(_Operation):
     operation: Literal["select_header"]
     row: int = Field(ge=1, le=1_000_000)
+
+
+class UseGeneratedHeadersOperation(_Operation):
+    operation: Literal["use_generated_headers"]
 
 
 class NormalizeColumnNamesOperation(_Operation):
@@ -162,6 +178,35 @@ class FillMissingOperation(_ColumnOperation):
         return value
 
 
+class TextValueReplacement(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    from_value: str = Field(max_length=1000)
+    to_value: str = Field(max_length=1000)
+
+    @field_validator("from_value", "to_value")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        if "\x00" in value:
+            raise ValueError("replacement text cannot contain NUL")
+        return value
+
+
+class ReplaceTextValuesOperation(_ColumnOperation):
+    operation: Literal["replace_text_values"]
+    replacements: list[TextValueReplacement] = Field(min_length=1, max_length=100)
+
+    @field_validator("replacements")
+    @classmethod
+    def validate_replacements(cls, values: list[TextValueReplacement]):
+        originals = [value.from_value for value in values]
+        if len(set(originals)) != len(originals):
+            raise ValueError("each original value can appear only once")
+        if any(value.from_value == value.to_value for value in values):
+            raise ValueError("a replacement must change the original value")
+        return values
+
+
 class ReplayPriorRecipeOperation(_Operation):
     operation: Literal["replay_prior_recipe"]
     source_id: str = Field(min_length=1, max_length=64)
@@ -200,8 +245,10 @@ class ReapplyRecipeOperation(_Operation):
 
 
 _OPERATION_MODELS: dict[str, type[_Operation]] = {
+    "read_csv": ReadCsvOperation,
     "select_sheet": SelectSheetOperation,
     "select_header": SelectHeaderOperation,
+    "use_generated_headers": UseGeneratedHeadersOperation,
     "normalize_column_names": NormalizeColumnNamesOperation,
     "drop_empty": DropEmptyOperation,
     "exclude_summary_rows": ExcludeSummaryRowsOperation,
@@ -210,6 +257,7 @@ _OPERATION_MODELS: dict[str, type[_Operation]] = {
     "normalize_currency": NormalizeCurrencyOperation,
     "normalize_datetime": NormalizeDatetimeOperation,
     "fill_missing": FillMissingOperation,
+    "replace_text_values": ReplaceTextValuesOperation,
     "replay_prior_recipe": ReplayPriorRecipeOperation,
     "replay_imported_recipe": ReplayImportedRecipeOperation,
     "reapply_recipe": ReapplyRecipeOperation,
@@ -270,6 +318,16 @@ def canonicalize_sanitation_operations(
         if not serialized.get("replayed"):
             serialized.pop("replayed", None)
         canonical.append(serialized)
+    names = {item["operation"] for item in canonical}
+    if sum(item["operation"] == "read_csv" for item in canonical) > 1:
+        raise SanitationContractError("CSV 读取设置不能重复指定")
+    if {"use_generated_headers", "select_header"} <= names:
+        raise SanitationContractError("无表头与指定表头行不能同时使用")
+    replacements = [item for item in canonical if item["operation"] == "replace_text_values"]
+    if len({item["column"] for item in replacements}) != len(replacements):
+        raise SanitationContractError("同一字段只能有一组统一取值规则")
+    if sum(len(item["replacements"]) for item in replacements) > 1000:
+        raise SanitationContractError("一套整理方法最多包含 1000 项取值替换")
     return canonical
 
 
@@ -283,6 +341,27 @@ def executable_sanitation_operations(
         for operation in canonicalize_sanitation_operations(operations)
         if operation["operation"] in EXECUTABLE_SANITATION_OPERATIONS
     ]
+
+
+def replace_sanitation_reader_operations(
+    operations: list[dict[str, Any]],
+    reader_operations: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Edit source/navigation settings without discarding downstream cleaning.
+
+    Validate the entire old method before filtering it: changing a reader must
+    not turn an unsupported or corrupt saved method into an executable one.
+    An omitted header choice means automatic detection, not the old header.
+    """
+
+    reader_names = {"read_csv", "select_sheet", "select_header", "use_generated_headers"}
+    existing = canonicalize_sanitation_operations(operations)
+    selected = canonicalize_sanitation_operations(reader_operations)
+    if not selected or any(step["operation"] not in reader_names for step in selected):
+        raise SanitationContractError("读取设置只能包含工作表、CSV 设置和表头选择")
+    return canonicalize_sanitation_operations(
+        [*selected, *(step for step in existing if step["operation"] not in reader_names)]
+    )
 
 
 def canonicalize_visual_sanitation_operations(

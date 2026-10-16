@@ -72,6 +72,28 @@ def _apply_payload(preview: dict, operations: list[dict]) -> dict:
     }
 
 
+def test_visual_cleaning_preserves_exact_column_names_when_merging_manual_steps() -> None:
+    names = ["amount", " amount ", "amount\u00a0", 'a\t"b"']
+    steps = [{"operation": "trim_text", "column": name} for name in names]
+    canonical = canonicalize_visual_sanitation_operations(steps)
+    assert [step["column"] for step in canonical] == names
+    assert len({projects_api._visual_operation_key(step) for step in canonical}) == 4
+    merged = projects_api._merge_visual_cleaning_operations(
+        steps,
+        [steps[2]],
+        [steps[1], steps[2]],
+    )
+    assert {step["column"] for step in merged} == {names[0], names[2], names[3]}
+    # Quoting protects the selected identifier; it does not normalize its name.
+    aliases = ", ".join(
+        f'{index} AS "{name.replace(chr(34), chr(34) * 2)}"' for index, name in enumerate(names)
+    )
+    with duckdb.connect(":memory:") as connection:
+        result = connection.execute(f"SELECT {aliases}")
+        assert [column[0] for column in result.description] == names
+        assert result.fetchone() == (0, 1, 2, 3)
+
+
 def test_visual_cleaning_contract_accepts_only_bounded_safe_operations() -> None:
     canonical = canonicalize_visual_sanitation_operations(
         [
@@ -170,7 +192,7 @@ async def test_preflight_worker_finishes_before_cancellation_reaches_directory_c
         await task
 
 
-def test_large_working_copy_comparison_stays_inside_duckdb(
+def test_large_working_copy_comparison_uses_bounded_batches(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -210,6 +232,37 @@ def test_large_working_copy_comparison_stays_inside_duckdb(
 
 
 @pytest.mark.asyncio
+async def test_preview_rejects_source_changes_during_impact_comparison(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "WORKSPACE_ROOT", tmp_path / "workspace")
+    project, source, source_path, working_path = await _ready_file_source(db_session, tmp_path)
+    original_compare = projects_api.compare_working_copies
+    original_working = fingerprint_file(working_path)
+
+    def compare_then_change(*args, **kwargs):
+        result = original_compare(*args, **kwargs)
+        source_path.write_text("store_id,amount,order_date\nC,999,2026/7/3\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(projects_api, "compare_working_copies", compare_then_change)
+    response = await client.post(
+        f"/api/v1/projects/{project.id}/sources/{source.id}/cleaning/preview",
+        json={"operations": [{"operation": "fill_missing", "column": "amount", "value": 0}]},
+    )
+    assert response.status_code == 409
+    assert "重新预览" in response.text
+    await db_session.refresh(source)
+    assert source.working_uri == str(working_path)
+    assert fingerprint_file(working_path) == original_working
+    assert await db_session.scalar(select(func.count(SanitationRecipeRecord.id))) == 0
+    assert not list((tmp_path / "workspace").rglob("*.parquet"))
+
+
+@pytest.mark.asyncio
 async def test_visual_cleaning_preview_is_non_persistent_then_apply_switches_copy(
     client: AsyncClient,
     db_session: AsyncSession,
@@ -226,13 +279,20 @@ async def test_visual_cleaning_preview_is_non_persistent_then_apply_switches_cop
     operations = [{"operation": "fill_missing", "column": "amount", "value": 0}]
     endpoint_thread_id = threading.get_ident()
     preflight_thread_ids: list[int] = []
+    comparison_thread_ids: list[int] = []
     original_run_preflight = projects_api.run_preflight
+    original_compare = projects_api.compare_working_copies
+
+    def observed_compare(*args, **kwargs):
+        comparison_thread_ids.append(threading.get_ident())
+        return original_compare(*args, **kwargs)
 
     def observed_run_preflight(*args, **kwargs):
         preflight_thread_ids.append(threading.get_ident())
         return original_run_preflight(*args, **kwargs)
 
     monkeypatch.setattr(projects_api, "run_preflight", observed_run_preflight)
+    monkeypatch.setattr(projects_api, "compare_working_copies", observed_compare)
 
     preview_response = await client.post(
         f"/api/v1/projects/{project.id}/sources/{source.id}/cleaning/preview",
@@ -251,6 +311,14 @@ async def test_visual_cleaning_preview_is_non_persistent_then_apply_switches_cop
     assert amount_change["changed_count"] == 1
     assert preview["before"]["sample"][1]["amount"] is None
     assert preview["after"]["sample"][1]["amount"] == 0
+    assert preview["comparison_basis"] == "position"
+    assert comparison_thread_ids and endpoint_thread_id not in comparison_thread_ids
+    assert [item["column"] for item in preview["profiles"]] == ["amount"]
+    impact = preview["profiles"][0]
+    assert impact["before"]["null_count"] == 1
+    assert impact["after"]["null_count"] == 0
+    assert impact["before"]["zero_count"] == 0
+    assert impact["after"]["zero_count"] == 1
 
     await db_session.refresh(source)
     assert source.working_uri == str(trusted_working_path)

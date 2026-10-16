@@ -39,6 +39,11 @@ from app.services.semantic_scopes import (
     reconcile_unscoped_semantic_entries,
     semantic_scope_runtime_payload,
 )
+from app.services.source_activation import (
+    BLOCKING_FILE_DRIFT_ISSUE_CODES,
+    file_source_blockers,
+    is_current_source,
+)
 
 
 def _view_name(source: ProjectDataSource) -> str:
@@ -99,7 +104,6 @@ _PLAYBOOK_STEP_PUBLIC_FIELDS = (
     "color",
 )
 
-_BLOCKING_FILE_DRIFT_ISSUE_CODES = frozenset({"recipe_replay_drift", "recipe_input_changed"})
 _RUNTIME_TRUSTED_REFERENCE_LIMIT = 5
 _RUNTIME_CONFIRMED_KNOWLEDGE_LIMIT = 48
 _RUNTIME_CANDIDATE_KNOWLEDGE_LIMIT = 24
@@ -801,16 +805,7 @@ def _file_source_runtime_blockers(
 ) -> set[str]:
     """Return data-drift reasons that make a file unsafe for analysis."""
 
-    if source.kind != "file":
-        return set()
-    blockers = {
-        str(item.get("code") or "")
-        for item in _profile_issues(profile)
-        if str(item.get("code") or "") in _BLOCKING_FILE_DRIFT_ISSUE_CODES
-    }
-    if str(profile.get("activation_state") or "") == "pending_confirmation":
-        blockers.add("activation_pending")
-    return blockers
+    return file_source_blockers(source.kind, profile)
 
 
 def _pending_source_payload(
@@ -823,7 +818,7 @@ def _pending_source_payload(
     if blockers:
         attention_reason = (
             "整理方法与当前文件不再一致，需要核对后才能用于分析。"
-            if blockers & _BLOCKING_FILE_DRIFT_ISSUE_CODES
+            if blockers & BLOCKING_FILE_DRIFT_ISSUE_CODES
             else "这个数据版本尚未确认，当前分析不会使用它。"
         )
     else:
@@ -1124,7 +1119,7 @@ async def load_project_context(
     for source in sources:
         profile = source.profile_data or {}
         runtime_blockers = _file_source_runtime_blockers(source, profile)
-        if profile.get("is_current") is False or runtime_blockers:
+        if not is_current_source(source):
             context.pending_sources.append(
                 _pending_source_payload(
                     source,

@@ -18,6 +18,27 @@ import {
   storedConversationIdForProject,
   useChatStore,
 } from "@/lib/stores/chat";
+import { getErrorMessage, UserFacingError } from "@/lib/types/api";
+
+const confirmationReport = {
+  status: "waiting_confirmation" as const, title: "请选择", summary: "请选择",
+  metrics: [], findings: [], evidence: [], follow_ups: [],
+  confirmation: { key: "revenue_rule", question: "退款如何处理？", reason: "影响收入", options: ["扣除退款", "保留退款订单"] },
+};
+
+function confirmationFixture() {
+  const message = { role: "assistant" as const, content: "请选择", analysisRunId: "run-1", projectId: "project-1", originalQuery: "比较门店收入", report: confirmationReport };
+  useChatStore.setState({ currentConversationId: "origin-conversation", lastProjectId: "project-1", messages: [message],
+    isLoading: false, activeStreamId: null, isConversationLoading: false, lastModelId: "model-original", lastConnectionId: "connection-original", lastContextRounds: 4 });
+  const response = { data: { data: { analysis_run_id: "run-1", resume_run_id: "run-1", project_id: "project-1", conversation_id: "origin-conversation",
+    key: "canonical_revenue_rule", selected_option: "扣除退款", ready_to_continue: true } } };
+  const confirm = () => useChatStore.getState().confirmBusinessDefinition("run-1", "revenue_rule", "扣除退款", "zh");
+  return { message, response, confirm };
+}
+
+function confirmationDoneStream() {
+  return (async function* () { yield { type: "done", data: { conversation_id: "origin-conversation", message_id: "resumed" } }; })();
+}
 
 function memoryStorage() {
   const values = new Map<string, string>();
@@ -757,6 +778,7 @@ describe("standing analysis resume", () => {
           analysisRunId: "run-1",
           projectId: "project-1",
           originalQuery: "比较门店收入",
+          report: confirmationReport,
         },
       ],
     });
@@ -782,5 +804,112 @@ describe("standing analysis resume", () => {
     await expect(confirmation).rejects.toThrow("你已切换到其他调查");
     expect(mocks.stream).not.toHaveBeenCalled();
     expect(useChatStore.getState().currentConversationId).toBe("other-conversation");
+  });
+
+  it("rejects confirmation before saving when busy or outside an available investigation", async () => {
+    for (const changed of [{ isLoading: true }, { activeStreamId: "another-stream" }, { currentConversationId: null },
+      { messages: [] }, { isConversationLoading: true }, { lastProjectId: "other-project" }]) {
+      const { confirm } = confirmationFixture(); useChatStore.setState(changed);
+      const error = await confirm().catch(error => error);
+      expect(error).toBeInstanceOf(UserFacingError);
+      expect(getErrorMessage(error)).toBe(error.message);
+    }
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(mocks.stream).not.toHaveBeenCalled();
+  });
+
+  it("locks confirmation across callers and releases the lock after failure for explicit retry", async () => {
+    const { response, confirm } = confirmationFixture();
+    let reject!: (error: Error) => void;
+    mocks.post.mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+    const first = confirm();
+    await expect(confirm()).rejects.toThrow("正在确认一个选择");
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    reject(new Error("network failure"));
+    await expect(first).rejects.toThrow("network failure");
+    mocks.post.mockResolvedValueOnce(response); mocks.stream.mockImplementation(confirmationDoneStream);
+    await confirm();
+    expect(mocks.post).toHaveBeenCalledTimes(2);
+    expect(mocks.stream).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects mismatched confirmation receipts without changing scope or marking a choice confirmed", async () => {
+    for (const changed of [null, { analysis_run_id: "other-run" }, { resume_run_id: "other-run" }, { conversation_id: "other-conversation" },
+      { project_id: "other-project" }, { selected_option: "保留退款订单" }, { ready_to_continue: false }]) {
+      const { response, confirm } = confirmationFixture();
+      mocks.post.mockResolvedValueOnce({ data: { data: changed === null ? null : { ...response.data.data, ...changed } } });
+      await expect(confirm()).rejects.toThrow("这次调查暂时无法继续");
+      expect(useChatStore.getState().currentConversationId).toBe("origin-conversation");
+      expect(useChatStore.getState().messages[0].confirmationResolved).toBeUndefined();
+    }
+    expect(mocks.stream).not.toHaveBeenCalled();
+    expect(localStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("does not resume a pending confirmation after a reload or over a newly running investigation", async () => {
+    for (const mode of ["reload", "running"] as const) {
+      const { message, response, confirm } = confirmationFixture();
+      let resolve!: (response: unknown) => void;
+      mocks.post.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+      const pending = confirm();
+      if (mode === "reload") useChatStore.setState({ messages: [{ ...message }] });
+      else useChatStore.setState({ activeStreamId: "new-stream" });
+      resolve(response);
+      await expect(pending).rejects.toThrow(mode === "reload" ? "你已切换到其他调查" : "选择已保存");
+      expect(useChatStore.getState().messages[0].confirmationResolved).toBeUndefined();
+      expect(useChatStore.getState().activeStreamId).toBe(mode === "running" ? "new-stream" : null);
+    }
+    expect(mocks.stream).not.toHaveBeenCalled();
+    expect(localStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("resumes a valid canonicalized confirmation with the original analysis context", async () => {
+    const { response, confirm } = confirmationFixture();
+    let resolve!: (response: unknown) => void;
+    mocks.post.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    mocks.stream.mockImplementation(confirmationDoneStream);
+    const pending = confirm();
+    useChatStore.setState({ lastModelId: "model-later", lastConnectionId: "connection-later", lastContextRounds: 9 });
+    resolve(response); await pending;
+    expect(mocks.post).toHaveBeenCalledExactlyOnceWith("/api/v1/chat/confirm", { analysis_run_id: "run-1", key: "revenue_rule", selected_option: "扣除退款" });
+    expect(mocks.stream.mock.calls[0][1]).toMatchObject({ conversation_id: "origin-conversation", project_id: "project-1", resume_run_id: "run-1",
+      model: "model-original", connection_id: "connection-original", context_rounds: "4", language: "zh" });
+    expect(useChatStore.getState().messages[0].confirmationResolved).toBe("扣除退款");
+    expect(useChatStore.getState().messages.at(-1)?.originalQuery).toBe("比较门店收入");
+  });
+
+  it("confirms only the matching question in a multi-question run without rewriting previous receipts", async () => {
+    const { message, response, confirm } = confirmationFixture();
+    const report = { status: "waiting_confirmation" as const, title: "请选择", summary: "请选择", metrics: [], findings: [], evidence: [], follow_ups: [],
+      confirmation: { key: "revenue_rule", question: "退款如何处理？", reason: "影响收入", options: ["扣除退款", "保留退款订单"] } };
+    const previous = { ...message, id: "previous", confirmationResolved: "全部门店", report: { ...report, confirmation: { ...report.confirmation, key: "store_scope", options: ["全部门店"] } } };
+    const current = { ...message, id: "current", report };
+    useChatStore.setState({ messages: [previous, current] });
+    await expect(useChatStore.getState().confirmBusinessDefinition("run-1", "revenue_rule", "不在选项内", "zh")).rejects.toThrow("暂时无法继续");
+    expect(mocks.post).not.toHaveBeenCalled();
+    mocks.post.mockResolvedValueOnce(response); mocks.stream.mockImplementation(confirmationDoneStream);
+    await confirm();
+    const saved = useChatStore.getState().messages;
+    expect(saved[0]).toBe(previous);
+    expect(saved[0].confirmationResolved).toBe("全部门店");
+    expect(saved[1].confirmationResolved).toBe("扣除退款");
+    expect(mocks.stream).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores confirmation history without spreading the last answer across the run", async () => {
+    const id = "d74f7238-64f7-4566-aec1-351105691620";
+    useChatStore.setState({ currentConversationId: id });
+    const question = (messageId: string, key: string) => ({ id: messageId, role: "assistant", content: "请选择", created_at: "2026-09-07T00:00:00Z",
+      metadata: { project_id: "project-1", analysis_run_id: "run-1", report: { ...confirmationReport, confirmation: { ...confirmationReport.confirmation, key } } } });
+    mocks.get.mockResolvedValueOnce({ data: { data: { id, project_id: "project-1", messages: [question("q1", "revenue_rule"),
+      { id: "receipt", role: "user", content: "扣除退款", created_at: "2026-09-07T00:00:01Z", metadata: {
+        kind: "business_confirmation", project_id: "project-1", analysis_run_id: "run-1", confirmation_key: "revenue_rule", selected_option: "扣除退款" } },
+      question("q2", "store_scope")],
+    } } });
+    await useChatStore.getState().loadConversation(id, "project-1");
+    expect(useChatStore.getState().messages.map(message => message.confirmationResolved)).toEqual(["扣除退款", undefined, undefined]);
+    expect(useChatStore.getState().conversationLoadError).toBeNull();
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(mocks.stream).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import type { AnalysisArtifact, AnalysisRunSummary } from "@/lib/types/api";
+import type { AnalysisArtifact, AnalysisHistoryItem } from "@/lib/types/api";
 import type { ReportBlock, ReportPage } from "@/lib/reports";
 import type { ReportDraftPlan, ReportDraftSection } from "@/lib/reports";
 import {
@@ -26,11 +26,11 @@ export interface ReportDraftCopy {
   locale: string;
 }
 
-function runTitle(run: AnalysisRunSummary, fallback: string): string {
+function runTitle(run: AnalysisHistoryItem, fallback: string): string {
   return run.report.title?.trim() || run.query.trim() || fallback;
 }
 
-function runSummary(run: AnalysisRunSummary): string {
+function runSummary(run: AnalysisHistoryItem): string {
   return (
     (typeof run.report.summary === "string" && run.report.summary.trim()) ||
     run.query.trim()
@@ -83,15 +83,15 @@ function applyHighlights(
   highlights: Record<string, string>
 ): ReportBlock[] {
   if (!highlights || !Object.keys(highlights).length) return blocks;
-  const normalized: Record<string, string> = {};
+  const normalized = new Map<string, string>();
   for (const [key, value] of Object.entries(highlights)) {
     if (typeof value === "string" && value.trim()) {
-      normalized[key] = value.trim();
+      normalized.set(key, value.trim());
     }
   }
-  if (!Object.keys(normalized).length) return blocks;
+  if (!normalized.size) return blocks;
   return blocks.map((block) => {
-    const text = block.artifact_id && normalized[block.artifact_id];
+    const text = block.artifact_id && normalized.get(block.artifact_id);
     if (!text) return block;
     return {
       ...block,
@@ -175,7 +175,7 @@ function orderBlocks(
  * another model call and every imported block keeps its original provenance.
  */
 export function createInvestigationReportDraft(
-  run: AnalysisRunSummary,
+  run: AnalysisHistoryItem,
   artifacts: AnalysisArtifact[],
   copy: ReportDraftCopy,
   startOrderIndex = 0
@@ -242,7 +242,7 @@ export function createInvestigationReportDraft(
  * written, including narrative-only sections.
  */
 export function createInvestigationReportDraftFromPlan(
-  run: AnalysisRunSummary,
+  run: AnalysisHistoryItem,
   artifacts: AnalysisArtifact[],
   plan: ReportDraftPlan,
   copy: ReportDraftCopy,

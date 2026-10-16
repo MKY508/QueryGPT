@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { WorkbookNavigator } from "@/components/chat/WorkbookNavigator";
+import { DataWorkspacePanel } from "@/components/chat/DataWorkspacePanel";
 import * as workbook from "@/lib/workbook";
 import { api } from "@/lib/api/client";
 import { useProjectStore } from "@/lib/stores/project";
@@ -81,6 +82,24 @@ it("requires a fresh workbook preview after rejection and a source read after an
   await waitFor(() => expect(done).toHaveBeenCalledTimes(1));
   expect(refresh).toHaveBeenCalledTimes(1);
   expect(prepare).toHaveBeenCalledTimes(2);
+});
+
+it("routes an attached Excel source through the navigator and closes it on a project switch", async () => {
+  const old = deferred<workbook.WorkbookPreview>();
+  const read = vi.spyOn(workbook, "readWorkbook").mockReturnValue(old.promise);
+  const post = vi.spyOn(api, "post");
+  useProjectStore.setState({ currentProjectId: "project-1", sources: [{
+    id: "source-1", project_id: "project-1", kind: "file", name: "orders.xlsx", format: "xlsx", status: "attached", profile_data: {}, created_at: "created", updated_at: "updated",
+  }], sourceAction: null, error: null });
+  render(<NextIntlClientProvider locale="zh" messages={messages}><DataWorkspacePanel open onClose={vi.fn()} onConfigureConnection={vi.fn()} settingsLoaded preprocessingEnabled /></NextIntlClientProvider>);
+  fireEvent.click(screen.getByRole("button", { name: messages.dataWorkspace.sourcePrepareButton }));
+  await screen.findByRole("dialog", { name: "选择工作表" });
+  expect(post).not.toHaveBeenCalled();
+  act(() => { useProjectStore.setState({ currentProjectId: "project-2", sources: [] }); });
+  await act(async () => old.resolve(catalog));
+  expect(screen.queryByRole("dialog", { name: "选择工作表" })).not.toBeInTheDocument();
+  expect(read.mock.calls[0][3]?.aborted).toBe(true);
+  expect(post).not.toHaveBeenCalled();
 });
 
 it("preserves exact workbook names and rejects responses for another source or worksheet", async () => {

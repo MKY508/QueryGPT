@@ -89,7 +89,9 @@ async def test_over_budget_checkpoint_is_rejected_before_restoring_dependencies(
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="旧检查点预算项目"),
-        resume_state=RestoredCheckpoint(manifest={'replay_journal': journal}, dataframes=rows_by_name),
+        resume_state=RestoredCheckpoint(
+            manifest={"replay_journal": journal}, dataframes=rows_by_name
+        ),
     )
     assert runtime.deps.dataframes == {}
 

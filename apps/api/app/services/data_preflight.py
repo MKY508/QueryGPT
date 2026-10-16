@@ -11,12 +11,14 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from threading import Event
+from typing import Any, Literal
 
-import duckdb
 import numpy as np
 import pandas as pd
 
+from app.services.file_formats import JSON_FILE_FORMATS
+from app.services.file_formats import SUPPORTED_FILE_FORMATS as SUPPORTED_FILE_FORMATS
 from app.services.result_filters import build_revenue_refund_option_strategies
 from app.services.sanitation_contract import (
     EXECUTABLE_SANITATION_OPERATIONS,
@@ -33,7 +35,6 @@ from app.services.semantic_field_roles import (
     infer_semantic_field_role,
 )
 
-SUPPORTED_FILE_FORMATS = {"csv", "xls", "xlsx", "parquet", "json"}
 TOTAL_MARKERS = {"total", "grand total", "subtotal", "合计", "总计", "小计"}
 REVENUE_INTENT_TERMS = (
     "收入",
@@ -56,6 +57,37 @@ REVENUE_INTENT_TERMS = (
 )
 RECIPE_METADATA_OPERATIONS = SANITATION_PROVENANCE_OPERATIONS
 SUPPORTED_RECIPE_OPERATIONS = EXECUTABLE_SANITATION_OPERATIONS
+
+
+class PreflightInputError(ValueError):
+    """Known user-correctable failures, without exposing arbitrary exception text."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: Literal[
+            "xlsx_formula_result_missing",
+            "xlsx_cell_error",
+            "xlsx_expanded_limit",
+            "xlsx_metadata_limit",
+            "parquet_schema_unsupported",
+            "parquet_size_limit",
+            "parquet_unreadable",
+            "json_unreadable",
+            "json_structure_unsupported",
+            "json_size_limit",
+            "json_lines_invalid",
+        ],
+        sheet: str = "",
+        cell: str = "",
+        line: int | None = None,
+    ):
+        super().__init__(message)
+        self.presentation_code = code
+        self.presentation_facts: dict[str, str | int] = {"sheet": sheet[:128], "cell": cell[:16]}
+        if line is not None:
+            self.presentation_facts["line"] = line
 
 
 @dataclass(slots=True)
@@ -89,11 +121,17 @@ def _normalize_name(value: Any, index: int) -> str:
 
 def _dedupe_columns(columns: list[Any]) -> list[str]:
     counts: dict[str, int] = {}
+    used: set[str] = set()
     normalized: list[str] = []
     for index, column in enumerate(columns):
         base = _normalize_name(column, index)
         counts[base] = counts.get(base, 0) + 1
-        normalized.append(base if counts[base] == 1 else f"{base}_{counts[base]}")
+        name = base if counts[base] == 1 else f"{base}_{counts[base]}"
+        while name.casefold() in used:
+            counts[base] += 1
+            name = f"{base}_{counts[base]}"
+        used.add(name.casefold())
+        normalized.append(name)
     return normalized
 
 
@@ -103,16 +141,6 @@ def _header_score(row: pd.Series) -> tuple[int, int]:
     ]
     textual = sum(not re.fullmatch(r"[-+]?\d+(\.\d+)?", value) for value in values)
     return textual, len(set(values))
-
-
-def _read_csv(path: Path, **kwargs: Any) -> tuple[pd.DataFrame, str]:
-    last_error: UnicodeError | None = None
-    for encoding in ("utf-8-sig", "gb18030"):
-        try:
-            return pd.read_csv(path, encoding=encoding, **kwargs), encoding
-        except UnicodeError as exc:
-            last_error = exc
-    raise ValueError("无法识别 CSV 编码，请另存为 UTF-8 或 GB18030") from last_error
 
 
 def _recipe_steps(operations: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -127,12 +155,14 @@ def _read_tabular(
     path: Path,
     recipe_operations: list[dict[str, Any]] | None = None,
 ) -> tuple[pd.DataFrame, int, dict[str, Any]]:
+    """Remaining materialized readers; the other formats use bounded staging."""
     suffix = path.suffix.lower().lstrip(".")
-    if suffix not in SUPPORTED_FILE_FORMATS:
+    if suffix != "xls":
         raise ValueError(f"不支持的文件格式: {suffix}")
 
     recipe_operations = recipe_operations or []
     header_step = _recipe_step(recipe_operations, "select_header")
+    headerless = _recipe_step(recipe_operations, "use_generated_headers") is not None
     requested_header = None
     if header_step is not None:
         try:
@@ -145,35 +175,15 @@ def _read_tabular(
     )
     replay_drift: list[str] = []
 
-    if suffix == "csv":
-        if requested_sheet:
-            replay_drift.append("当前文件不是 Excel，无法重放工作表选择")
-        raw, encoding = _read_csv(path, header=None, nrows=12)
-        inferred_header = (
-            max(range(len(raw.index)), key=lambda index: _header_score(raw.iloc[index]))
-            if len(raw.index)
-            else 0
-        )
-        if requested_header is not None and requested_header < len(raw.index):
-            header_row = requested_header
-        else:
-            header_row = inferred_header
-            if requested_header is not None:
-                replay_drift.append(f"原配方指定的第 {requested_header + 1} 行表头已不存在")
-        frame, _ = _read_csv(path, header=header_row)
-        return (
-            frame,
-            int(header_row),
-            {
-                "encoding": encoding,
-                "recipe_replay_drift": replay_drift,
-            },
-        )
-    if suffix in {"xls", "xlsx"}:
-        workbook = pd.ExcelFile(path)
+    with pd.ExcelFile(path) as workbook:
         sheet_candidates: list[tuple[tuple[int, int], int, str]] = []
         sheet_profiles: list[dict[str, Any]] = []
-        for sheet_name in workbook.sheet_names:
+        sheets_to_probe = (
+            [requested_sheet]
+            if requested_sheet and requested_sheet in workbook.sheet_names
+            else workbook.sheet_names
+        )
+        for sheet_name in sheets_to_probe:
             raw = pd.read_excel(workbook, sheet_name=sheet_name, header=None, nrows=12)
             if len(raw.index):
                 header_row = max(
@@ -217,30 +227,49 @@ def _read_tabular(
             selected_inferred_header = inferred_header
             if requested_sheet:
                 replay_drift.append(f"原配方指定的工作表“{requested_sheet}”已不存在")
-        if requested_header is not None and requested_header < len(selected_raw.index):
-            header_row = requested_header
-        else:
-            header_row = selected_inferred_header
-            if requested_header is not None:
+        header_row = selected_inferred_header
+        if requested_header is not None:
+            requested_raw = pd.read_excel(
+                workbook,
+                sheet_name=selected_sheet,
+                header=None,
+                skiprows=requested_header,
+                nrows=1,
+                keep_default_na=False,
+            )
+            if len(requested_raw.index) and any(
+                pd.notna(value) and str(value) != "" for value in requested_raw.iloc[0]
+            ):
+                header_row = requested_header
+            else:
                 replay_drift.append(f"原配方指定的第 {requested_header + 1} 行表头已不存在")
-        frame = pd.read_excel(workbook, sheet_name=selected_sheet, header=header_row)
+        if headerless:
+            frame = pd.read_excel(
+                workbook,
+                sheet_name=selected_sheet,
+                header=None,
+                dtype=object,
+                keep_default_na=False,
+            )
+            # Preserve stored strings rather than inferring types from invented
+            # field names. Real empty cells still participate in blank cleanup.
+            frame = frame.replace("", None).infer_objects()
+            frame.columns = _dedupe_columns([None] * len(frame.columns))
+            header_row = -1
+        else:
+            frame = pd.read_excel(workbook, sheet_name=selected_sheet, header=header_row)
         return (
             frame,
             int(header_row),
             {
                 "selected_sheet": selected_sheet,
+                "header_row": None if headerless else int(header_row) + 1,
+                "has_header": not headerless,
                 "sheet_names": workbook.sheet_names,
                 "sheet_profiles": sheet_profiles,
                 "recipe_replay_drift": replay_drift,
             },
         )
-    if suffix == "parquet":
-        if requested_sheet or requested_header is not None:
-            replay_drift.append("Parquet 文件不支持重放工作表或表头选择")
-        return pd.read_parquet(path), 0, {"recipe_replay_drift": replay_drift}
-    if requested_sheet or requested_header is not None:
-        replay_drift.append("JSON 文件不支持重放工作表或表头选择")
-    return pd.read_json(path), 0, {"recipe_replay_drift": replay_drift}
 
 
 def _json_safe(value: Any) -> Any:
@@ -261,71 +290,17 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
-_MAX_CLEANING_CHANGE_COLUMNS = 200
+def compare_working_copies(
+    before_path: Path,
+    after_path: Path,
+    *,
+    profile_columns: list[str] | None = None,
+    cancelled: Event | None = None,
+) -> dict[str, Any]:
+    """Keep the public cleaning API on the shared exact, bounded comparison path."""
+    from app.services.working_copy_comparison import compare_working_copies as compare
 
-
-def _require_working_copy(path: Path) -> None:
-    if not path.is_file() or path.suffix.casefold() != ".parquet":
-        raise ValueError("当前分析副本不存在或格式不受支持")
-
-
-def _quote_duckdb_identifier(value: str) -> str:
-    return f'"{value.replace(chr(34), chr(34) * 2)}"'
-
-
-def _duckdb_snapshot(connection: duckdb.DuckDBPyConnection, view: str) -> dict[str, Any]:
-    rows = int(connection.execute(f"SELECT COUNT(*) FROM {view}").fetchone()[0])
-    cursor = connection.execute(f"SELECT * FROM {view} LIMIT 8")
-    columns = [str(item[0]) for item in cursor.description]
-    sample = [
-        {column: _json_safe(value) for column, value in zip(columns, row, strict=True)}
-        for row in cursor.fetchall()
-    ]
-    return {"rows": rows, "columns": len(columns), "sample": sample, "column_names": columns}
-
-
-def compare_working_copies(before_path: Path, after_path: Path) -> dict[str, Any]:
-    """Compare Parquet copies in DuckDB without materializing either frame in Python."""
-
-    _require_working_copy(before_path)
-    _require_working_copy(after_path)
-    connection = duckdb.connect(database=":memory:")
-    try:
-        connection.read_parquet(str(before_path)).create_view("before_copy")
-        connection.read_parquet(str(after_path)).create_view("after_copy")
-        before = _duckdb_snapshot(connection, "before_copy")
-        after = _duckdb_snapshot(connection, "after_copy")
-        before_columns = list(before.pop("column_names"))
-        after_columns = list(after.pop("column_names"))
-        changes: list[dict[str, Any]] = []
-
-        # Positional cell counts are only truthful when both shapes and column order
-        # match. A row-removing operation shifts positions, so shape changes are already
-        # reported by before/after and deliberately omit misleading per-column counts.
-        if before["rows"] == after["rows"] and before_columns == after_columns:
-            compared_columns = before_columns[:_MAX_CLEANING_CHANGE_COLUMNS]
-            expressions = []
-            for index, column in enumerate(compared_columns):
-                identifier = _quote_duckdb_identifier(column)
-                expressions.append(
-                    "COUNT(*) FILTER (WHERE "
-                    f"to_json(before_copy.{identifier}) IS DISTINCT FROM "
-                    f"to_json(after_copy.{identifier})) AS change_{index}"
-                )
-            if expressions:
-                counts = connection.execute(
-                    "SELECT "
-                    + ", ".join(expressions)
-                    + " FROM before_copy POSITIONAL JOIN after_copy"
-                ).fetchone()
-                changes = [
-                    {"column": column, "changed_count": int(counts[index])}
-                    for index, column in enumerate(compared_columns)
-                ]
-
-        return {"before": before, "after": after, "changes": changes}
-    finally:
-        connection.close()
+    return compare(before_path, after_path, profile_columns=profile_columns, cancelled=cancelled)
 
 
 def _convert_currency(series: pd.Series) -> tuple[pd.Series, bool, int]:
@@ -371,6 +346,7 @@ def _infer_and_clean_types(
             "normalize_currency",
             "normalize_datetime",
             "fill_missing",
+            "replace_text_values",
         )
     }
     available_columns = {str(column) for column in frame.columns}
@@ -498,6 +474,29 @@ def _infer_and_clean_types(
                 "replayed": True,
             }
         )
+    for step in recipe_operations:
+        if step.get("operation") != "replace_text_values":
+            continue
+        column = step["column"]
+        if column not in available_columns:
+            continue
+        series = cleaned[column]
+        # Legacy XLS may have object columns mixing strings and typed cells.
+        # Never stringify numbers/dates to make a text rule appear applicable.
+        if (
+            not (
+                pd.api.types.is_object_dtype(series.dtype)
+                or pd.api.types.is_string_dtype(series.dtype)
+            )
+            or not series.dropna().map(lambda value: isinstance(value, str)).all()
+        ):
+            replay_drift.append(f"字段“{column}”已不再是文本，无法统一取值，已保留原值")
+            continue
+        replacements = {item["from_value"]: item["to_value"] for item in step["replacements"]}
+        cleaned[column] = series.map(
+            lambda value: replacements.get(value, value) if isinstance(value, str) else value
+        )
+        operations.append({**step, "replayed": True})
     return cleaned
 
 
@@ -643,6 +642,10 @@ def _business_ambiguities(frame: pd.DataFrame) -> list[dict[str, Any]]:
     if not (has_money and has_refund):
         return []
     strategies = build_revenue_refund_option_strategies(_json_safe(frame.to_dict(orient="records")))
+    return _revenue_refund_ambiguities(strategies)
+
+
+def _revenue_refund_ambiguities(strategies: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     if len(strategies) < 2:
         return []
     return [
@@ -676,6 +679,28 @@ def run_preflight(
     # Validate the complete persisted recipe before reading or writing user data.  This
     # also strips provenance records and upgrades known legacy omissions to v1.
     replay_steps = _recipe_steps(recipe_operations)
+    if _recipe_step(replay_steps, "read_csv") and source_path.suffix.casefold() != ".csv":
+        raise ValueError("CSV 读取设置不能用于其他文件格式")
+    if _recipe_step(
+        replay_steps, "use_generated_headers"
+    ) and source_path.suffix.casefold() not in {".csv", ".xls", ".xlsx"}:
+        raise ValueError("无表头选项仅适用于 CSV 和 Excel 文件")
+    if source_path.suffix.casefold() == ".csv":
+        from app.services.csv_preflight import run_csv_preflight
+
+        return run_csv_preflight(source_path, output_dir, replay_steps)
+    if source_path.suffix.casefold() == ".xlsx":
+        from app.services.xlsx_preflight import run_xlsx_preflight
+
+        return run_xlsx_preflight(source_path, output_dir, replay_steps)
+    if source_path.suffix.casefold() == ".parquet":
+        from app.services.parquet_preflight import run_parquet_preflight
+
+        return run_parquet_preflight(source_path, output_dir, replay_steps)
+    if source_path.suffix.casefold().lstrip(".") in JSON_FILE_FORMATS:
+        from app.services.json_preflight import run_json_preflight
+
+        return run_json_preflight(source_path, output_dir, replay_steps)
     input_fingerprint = fingerprint_file(source_path)
     frame, header_row, reader_details = _read_tabular(source_path, replay_steps)
     original_shape = tuple(frame.shape)
@@ -694,7 +719,9 @@ def run_preflight(
             }
         )
 
-    if header_row > 0 or "select_header" in expected_operation_names:
+    if reader_details.get("has_header") is False:
+        operations.append({"operation": "use_generated_headers", "replayed": True})
+    elif header_row > 0 or "select_header" in expected_operation_names:
         if header_row > 0:
             issues.append(
                 {
@@ -853,6 +880,42 @@ def run_preflight(
     frame.to_parquet(working_path, index=False)
     output_fingerprint = fingerprint_file(working_path)
     ambiguities = _business_ambiguities(frame)
+    return _finish_preflight(
+        ready_shape=frame.shape,
+        original_shape=original_shape,
+        reader_details=reader_details,
+        replay_steps=replay_steps,
+        replay_drift=replay_drift,
+        issues=issues,
+        operations=operations,
+        ambiguities=ambiguities,
+        preanalysis=preanalysis,
+        sample=_json_safe(frame.head(8).to_dict(orient="records")),
+        inferred_schema=_schema(frame, candidate_grain),
+        input_fingerprint=input_fingerprint,
+        output_fingerprint=output_fingerprint,
+        working_path=working_path,
+    )
+
+
+def _finish_preflight(
+    *,
+    ready_shape: tuple[int, int],
+    original_shape: tuple[int, int],
+    reader_details: dict[str, Any],
+    replay_steps: list[dict[str, Any]],
+    replay_drift: list[str],
+    issues: list[dict[str, Any]],
+    operations: list[dict[str, Any]],
+    ambiguities: list[dict[str, Any]],
+    preanalysis: dict[str, Any],
+    sample: list[dict[str, Any]],
+    inferred_schema: dict[str, Any],
+    input_fingerprint: str,
+    output_fingerprint: str,
+    working_path: Path,
+) -> PreflightResult:
+    """Keep activation, replay receipts, and business questions identical across readers."""
     sheet_profiles = reader_details.get("sheet_profiles") or []
     credible_sheets = [item for item in sheet_profiles if item.get("credible_table")]
     credible_sheets.sort(key=lambda item: int(item.get("quality_score") or 0), reverse=True)
@@ -914,7 +977,7 @@ def run_preflight(
 
     automatic_count = sum(1 for issue in issues if issue.get("automatic"))
     status = "needs_confirmation" if ambiguities or replay_drift else "ready"
-    summary = f"数据已准备好：{len(frame):,} 行、{len(frame.columns)} 列"
+    summary = f"数据已准备好：{ready_shape[0]:,} 行、{ready_shape[1]} 列"
     if automatic_count:
         summary += f"，自动处理了 {automatic_count} 类结构问题"
     if ambiguities:
@@ -925,8 +988,8 @@ def run_preflight(
     snapshot = {
         "summary_code": "file_preflight",
         "summary_facts": {
-            "rows": int(frame.shape[0]),
-            "columns": int(frame.shape[1]),
+            "rows": int(ready_shape[0]),
+            "columns": int(ready_shape[1]),
             "automatic_issue_count": automatic_count,
             "ambiguity_count": len(ambiguities),
             "recipe_step_count": len(replay_steps),
@@ -934,22 +997,22 @@ def run_preflight(
         },
         "original_rows": int(original_shape[0]),
         "original_columns": int(original_shape[1]),
-        "ready_rows": int(frame.shape[0]),
-        "ready_columns": int(frame.shape[1]),
+        "ready_rows": int(ready_shape[0]),
+        "ready_columns": int(ready_shape[1]),
         "reader": reader_details,
         "recipe_replay": {
             "requested_steps": len(replay_steps),
             "drift": replay_drift,
         },
         "preanalysis": preanalysis,
-        "sample": _json_safe(frame.head(8).to_dict(orient="records")),
+        "sample": sample,
     }
     return PreflightResult(
         status=status,
         summary=summary,
         issues=issues,
         ambiguities=ambiguities,
-        inferred_schema=_schema(frame, candidate_grain),
+        inferred_schema=inferred_schema,
         source_snapshot=json.loads(json.dumps(snapshot, ensure_ascii=False)),
         operations=canonicalize_sanitation_operations(operations),
         input_fingerprint=input_fingerprint,

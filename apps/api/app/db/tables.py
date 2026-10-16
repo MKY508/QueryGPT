@@ -6,19 +6,26 @@ from uuid import UUID
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
+    Uuid,
+    event,
+    func,
 )
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.analysis_history_keys import analysis_search_text
+from app.core.report_library_keys import report_name_key, report_search_text
 from app.db.base import Base, TimestampMixin, UUIDMixin
 
 
@@ -68,10 +75,10 @@ class Conversation(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "conversations"
 
     connection_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL")
+        Uuid(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL")
     )
     model_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
+        Uuid(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
     )
     title: Mapped[str | None] = mapped_column(String(200))
     status: Mapped[str] = mapped_column(String(20), default="active", index=True)
@@ -89,7 +96,7 @@ class Message(Base, UUIDMixin):
     __tablename__ = "messages"
 
     conversation_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("conversations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -112,10 +119,10 @@ class AppSettings(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     default_model_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
+        Uuid(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL")
     )
     default_connection_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL")
+        Uuid(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL")
     )
     context_rounds: Mapped[int] = mapped_column(Integer, default=5)
     python_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -164,10 +171,10 @@ class ProjectDataSource(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "project_data_sources"
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     connection_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL")
+        Uuid(as_uuid=True), ForeignKey("connections.id", ondelete="SET NULL")
     )
     kind: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -191,10 +198,10 @@ class PreflightReportRecord(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "preflight_reports"
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     data_source_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("project_data_sources.id", ondelete="CASCADE"),
         index=True,
     )
@@ -213,10 +220,10 @@ class SanitationRecipeRecord(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "sanitation_recipes"
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     data_source_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("project_data_sources.id", ondelete="CASCADE")
+        Uuid(as_uuid=True), ForeignKey("project_data_sources.id", ondelete="CASCADE")
     )
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="applied")
@@ -225,7 +232,7 @@ class SanitationRecipeRecord(Base, UUIDMixin, TimestampMixin):
     output_fingerprint: Mapped[str | None] = mapped_column(String(64))
     # Application-enforced pointer: keeping this FK-free avoids a circular DDL
     # dependency while revision rows remain append-only.
-    active_revision_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), index=True)
+    active_revision_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), index=True)
 
 
 class SanitationRecipeRevisionRecord(Base, UUIDMixin):
@@ -245,14 +252,14 @@ class SanitationRecipeRevisionRecord(Base, UUIDMixin):
     )
 
     recipe_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("sanitation_recipes.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
     parent_revision_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey(
             "sanitation_recipe_revisions.id",
             name="fk_sanitation_recipe_revisions_parent_revision_id",
@@ -304,13 +311,13 @@ class SemanticScopeNode(Base, UUIDMixin, TimestampMixin):
     )
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     parent_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_scope_nodes.id", ondelete="CASCADE"),
         index=True,
     )
@@ -342,10 +349,10 @@ class SemanticEntry(Base, UUIDMixin, TimestampMixin):
     __table_args__ = (UniqueConstraint("project_id", "key", name="uq_semantic_entry_project_key"),)
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     scope_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_scope_nodes.id", ondelete="SET NULL"),
         index=True,
     )
@@ -365,8 +372,8 @@ class SemanticEntry(Base, UUIDMixin, TimestampMixin):
     # Kept as an application-enforced pointer to avoid a circular DDL dependency.
     # Semantic revisions are immutable, so a successfully written pointer cannot dangle
     # unless the whole project is removed.
-    active_revision_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), index=True)
-    recommendation_batch_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), index=True)
+    active_revision_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), index=True)
+    recommendation_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), index=True)
 
     project: Mapped["Project"] = relationship(back_populates="semantic_entries")
     scope: Mapped["SemanticScopeNode | None"] = relationship(back_populates="semantic_entries")
@@ -385,21 +392,21 @@ class SemanticEntryRevision(Base, UUIDMixin):
     )
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     semantic_entry_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_entries.id", ondelete="RESTRICT"),
         index=True,
     )
     revision_number: Mapped[int] = mapped_column(Integer, nullable=False)
     parent_revision_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_entry_revisions.id", ondelete="RESTRICT"),
         index=True,
     )
     restored_from_revision_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_entry_revisions.id", ondelete="RESTRICT"),
         index=True,
     )
@@ -429,7 +436,7 @@ class SemanticValidationJob(Base, UUIDMixin, TimestampMixin):
     )
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
     requested_by: Mapped[str] = mapped_column(String(30), default="user")
@@ -464,19 +471,19 @@ class SemanticValidationJobItem(Base, UUIDMixin, TimestampMixin):
     )
 
     job_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_validation_jobs.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     semantic_entry_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_entries.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     semantic_revision_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_entry_revisions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -513,13 +520,13 @@ class SemanticInventoryJob(Base, UUIDMixin, TimestampMixin):
     )
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     source_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("project_data_sources.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -528,7 +535,7 @@ class SemanticInventoryJob(Base, UUIDMixin, TimestampMixin):
     depth: Mapped[str] = mapped_column(String(20), nullable=False)
     locale: Mapped[str] = mapped_column(String(5), nullable=False)
     model_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL"), index=True
+        Uuid(as_uuid=True), ForeignKey("models.id", ondelete="SET NULL"), index=True
     )
     tables: Mapped[list[str]] = mapped_column(JSON, default=list)
     relation_index_hash: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -584,7 +591,7 @@ class SemanticInventoryJobItem(Base, UUIDMixin, TimestampMixin):
     )
 
     job_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("semantic_inventory_jobs.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -599,7 +606,7 @@ class SemanticInventoryJobItem(Base, UUIDMixin, TimestampMixin):
     code: Mapped[str | None] = mapped_column(String(80))
     message: Mapped[str | None] = mapped_column(Text)
     profile_result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    recommendation_batch_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), index=True)
+    recommendation_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), index=True)
     candidate_count: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -621,13 +628,13 @@ class AnalysisCorrection(Base, UUIDMixin, TimestampMixin):
     )
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     analysis_run_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("analysis_runs.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("analysis_runs.id", ondelete="CASCADE"), index=True
     )
     semantic_entry_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("semantic_entries.id", ondelete="SET NULL"), index=True
+        Uuid(as_uuid=True), ForeignKey("semantic_entries.id", ondelete="SET NULL"), index=True
     )
     target_key: Mapped[str | None] = mapped_column(String(160), index=True)
     target_ref: Mapped[str | None] = mapped_column(String(96), index=True)
@@ -643,19 +650,29 @@ class AnalysisRun(Base, UUIDMixin, TimestampMixin):
     """Persisted state for an autonomous analysis investigation."""
 
     __tablename__ = "analysis_runs"
+    __table_args__ = (
+        Index("ix_analysis_history_updated", "project_id", "updated_at", "created_at", "id"),
+    )
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     conversation_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL")
+        Uuid(as_uuid=True), ForeignKey("conversations.id", ondelete="SET NULL")
     )
     query: Mapped[str] = mapped_column(Text, nullable=False)
     state: Mapped[str] = mapped_column(String(30), default="understanding", index=True)
     stage: Mapped[str] = mapped_column(String(30), default="understanding")
     report: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    history_search_text: Mapped[str] = mapped_column(Text, default="", server_default="")
     checkpoint: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     error: Mapped[str | None] = mapped_column(Text)
+
+
+@event.listens_for(AnalysisRun, "before_insert")
+@event.listens_for(AnalysisRun, "before_update")
+def _analysis_history_keys(_mapper, _connection, run: AnalysisRun) -> None:
+    run.history_search_text = analysis_search_text(run.query, run.report)
 
 
 class ArtifactRecord(Base, UUIDMixin, TimestampMixin):
@@ -664,10 +681,10 @@ class ArtifactRecord(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "artifacts"
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     analysis_run_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("analysis_runs.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("analysis_runs.id", ondelete="CASCADE"), index=True
     )
     kind: Mapped[str] = mapped_column(String(30), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -684,13 +701,19 @@ class ReportDocument(Base, UUIDMixin, TimestampMixin):
             "status IN ('draft', 'published', 'archived')",
             name="ck_report_document_status",
         ),
+        Index("ix_report_library_updated", "project_id", "updated_at", "id"),
+        Index("ix_report_library_created", "project_id", "created_at", "id"),
+        Index("ix_report_trash", "project_id", "deleted_at", "id"),
     )
 
     project_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
+    search_text: Mapped[str] = mapped_column(Text, default="", server_default="")
+    name_key: Mapped[str] = mapped_column(Text, default="", server_default="")
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
     version: Mapped[int] = mapped_column(Integer, default=1)
     extra_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
@@ -703,13 +726,84 @@ class ReportDocument(Base, UUIDMixin, TimestampMixin):
     )
 
 
+@event.listens_for(ReportDocument, "before_insert")
+@event.listens_for(ReportDocument, "before_update")
+def _update_report_library_keys(_mapper, _connection, report: ReportDocument) -> None:
+    # All current title/description writes use ORM flush. Bulk metadata writes
+    # must supply these derived keys too; version-only CAS does not change them.
+    report.search_text = report_search_text(report.title, report.description)
+    report.name_key = report_name_key(report.title)
+
+
+class FileUploadReceipt(Base):
+    """One committed upload intent, retained after the imported source is removed."""
+
+    __tablename__ = "file_upload_receipts"
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    request_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    source_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    byte_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReportCopyReceipt(Base):
+    """Creation identity survives source/target purge; retries never create again."""
+
+    __tablename__ = "report_copy_receipts"
+    project_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    request_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    source_report_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    source_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_report_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReportRevision(Base):
+    """Immutable saved report versions, independent from short-lived save retries."""
+
+    __tablename__ = "report_revisions"
+    report_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("report_documents.id", ondelete="CASCADE"), primary_key=True
+    )
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[str] = mapped_column(String(32), nullable=False)
+    page_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    block_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+
+
+class ReportSaveReceipt(Base):
+    """Bounded replay responses, committed atomically with a report save."""
+
+    __tablename__ = "report_save_receipts"
+    __table_args__ = (Index("ix_report_save_receipts_version", "report_id", "result_version"),)
+
+    request_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    report_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("report_documents.id", ondelete="CASCADE")
+    )
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    result_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+
 class ReportPage(Base, UUIDMixin, TimestampMixin):
     """One ordered page inside an editable report document."""
 
     __tablename__ = "report_pages"
 
     report_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("report_documents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -739,7 +833,7 @@ class ReportBlock(Base, UUIDMixin, TimestampMixin):
     )
 
     page_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("report_pages.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -749,12 +843,12 @@ class ReportBlock(Base, UUIDMixin, TimestampMixin):
     order_index: Mapped[int] = mapped_column(Integer, default=0, index=True)
     source_kind: Mapped[str] = mapped_column(String(20), nullable=False)
     analysis_run_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("analysis_runs.id", ondelete="SET NULL"),
         index=True,
     )
     artifact_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
+        Uuid(as_uuid=True),
         ForeignKey("artifacts.id", ondelete="SET NULL"),
         index=True,
     )

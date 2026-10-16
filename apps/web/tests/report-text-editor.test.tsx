@@ -141,7 +141,7 @@ describe("focused report writing", () => {
     const opener = screen.getByRole("button", { name: "Open writer" }); opener.focus(); fireEvent.click(opener);
     const dialog = screen.getByRole("dialog", { name: "Focus writing" });
     const body = within(dialog).getByRole("textbox", { name: "Body text" });
-    expect(body).toHaveFocus(); expect(body).toHaveValue(initial.content.value);
+    expect(body).toHaveFocus(); expect(body).toHaveValue("  original....\n第二段\t ");
     const raw = "  Revised conclusion!\n<script>alert(1)</script>\n尾部\t ";
     fireEvent.change(body, { target: { value: raw } });
     expect(changes).toHaveBeenLastCalledWith({ content: { ...initial.content, text: raw } });

@@ -1,7 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ReportActionMenu } from "./ReportActionMenu";
+import { readReportRefreshSource } from "@/lib/reports";
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -35,25 +38,45 @@ import {
   ChevronRight,
   Copy,
   MoreHorizontal,
+  PencilLine,
   RefreshCw,
   Trash2,
+  Table2,
 } from "lucide-react";
 import type { ReportBlock } from "@/lib/reports";
 import { cn } from "@/lib/utils";
 import { useLocale, useTranslations } from "next-intl";
-
 import type { ChartSelectionControl } from "@/lib/report-interactions";
 import { chartMarkSelection, renderReportSelectionDot } from "./report-chart-interactions";
 import { ReportSelectionControl } from "./ReportSelectionControl";
+import { DataViewDialog, type DataViewSnapshot } from "@/components/data/DataViewDialog";
+import { dataCellText, dataColumns, reportContentRows } from "@/lib/tabular-data";
+import {
+  chartField,
+  chartNumber,
+  chartNumberKey,
+  chartSourceValue,
+  compareNumericValues,
+  formatNumericValue,
+  isNumericCell,
+} from "@/lib/numeric-values";
+import { hasMetricResultField } from "@/lib/report-metrics";
+import { metricDisplayText, metricValue } from "@/lib/metric-display";
 import { ReportFilterControl } from "./ReportFilterControl";
+import { isReportTextBlock } from "@/lib/report-text";
+import { cleanReportProse, reportTextValue as textValue } from "@/lib/report-display-text";
 
 interface ReportBlockCardProps {
   block: ReportBlock;
   editing: boolean;
   selected: boolean;
   staticRendering?: boolean;
+  /** Retained row count before slicing a read-only picker preview. */
+  previewRowCount?: number;
   onSelect: () => void;
+  onEditText?: () => void;
   onMove: (direction: -1 | 1) => void;
+  onMoveToPage?: () => void;
   onResize: (direction: -1 | 1) => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -62,20 +85,12 @@ interface ReportBlockCardProps {
   refreshing?: boolean;
   filterValue?: string;
   filterConnectedCount?: number;
-  interaction?: ChartSelectionControl;
   onFilterValueChange?: (value: string) => void;
+  interaction?: ChartSelectionControl;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function cleanReportProse(value: string): string {
-  return value
-    .replace(/。{2,}/g, "。")
-    .replace(/！{2,}/g, "！")
-    .replace(/？{2,}/g, "？")
-    .replace(/\.{4,}/g, "…");
 }
 
 function isPngChart(block: ReportBlock): boolean {
@@ -103,7 +118,7 @@ function isPngChart(block: ReportBlock): boolean {
   );
 }
 
-function supportsRefresh(block: ReportBlock): boolean {
+export function supportsReportBlockRefresh(block: ReportBlock): boolean {
   const hasSavedRefreshBinding = isRecord(block.source_ref?.refresh_binding);
   return (
     !block.id.startsWith("local-") &&
@@ -111,28 +126,13 @@ function supportsRefresh(block: ReportBlock): boolean {
     block.source_kind === "artifact" &&
     (block.source_available === true || hasSavedRefreshBinding) &&
     (block.block_type === "table" ||
+      hasMetricResultField(block) ||
       (block.block_type === "chart" && !isPngChart(block)))
   );
 }
 
-function textValue(content: Record<string, unknown>, keys: string[]): string {
-  for (const key of keys) {
-    const value = content[key];
-    if (typeof value === "string" || typeof value === "number") {
-      return cleanReportProse(String(value));
-    }
-  }
-  return "";
-}
-
 function rowsFromContent(content: Record<string, unknown>): Record<string, unknown>[] {
-  const candidates = [content.rows, content.data, content.items, content.values];
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) {
-      return candidate.filter(isRecord);
-    }
-  }
-  return [];
+  return reportContentRows(content)?.rows || [];
 }
 
 function chartKeys(
@@ -141,9 +141,9 @@ function chartKeys(
 ): { x: string; ys: string[] } | null {
   const first = rows[0];
   if (!first) return null;
-  const keys = Object.keys(first);
+  const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   const isNumericField = (key: string) =>
-    keys.includes(key) && rows.some((row) => typeof row[key] === "number");
+    keys.includes(key) && rows.some((row) => isNumericCell(row[key]) && chartNumber(row[key]) !== null);
   const configuredX = typeof config.x_key === "string" ? config.x_key : "";
   const configuredY = typeof config.y_key === "string" ? config.y_key : "";
   const configuredYs = Array.isArray(config.y_keys)
@@ -155,7 +155,7 @@ function chartKeys(
   const fallbackY =
     configuredY && isNumericField(configuredY)
       ? configuredY
-      : keys.find((key) => typeof first[key] === "number" && key !== x) || keys[1];
+      : keys.find((key) => isNumericField(key) && key !== x);
   const ys = configuredYs.length ? configuredYs : fallbackY ? [fallbackY] : [];
   return x && ys.length ? { x, ys } : null;
 }
@@ -214,30 +214,7 @@ function formatChartValue(
   format: ChartValueFormat,
   locale: string
 ): string {
-  if (typeof value !== "number" || !Number.isFinite(value)) return String(value ?? "—");
-  if (format === "integer") {
-    return new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
-  }
-  if (format === "compact") {
-    return new Intl.NumberFormat(locale, {
-      notation: "compact",
-      maximumFractionDigits: 1,
-    }).format(value);
-  }
-  if (format === "currency") {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: "CNY",
-      maximumFractionDigits: 2,
-    }).format(value);
-  }
-  if (format === "percent") {
-    return new Intl.NumberFormat(locale, {
-      style: "percent",
-      maximumFractionDigits: 1,
-    }).format(value);
-  }
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+  return formatNumericValue(value, format, locale, 2);
 }
 
 function EmptyBlock({ message }: { message: string }) {
@@ -249,7 +226,8 @@ function EmptyBlock({ message }: { message: string }) {
 }
 
 function KpiBlock({ block, compact = false }: { block: ReportBlock; compact?: boolean }) {
-  const value = textValue(block.content, ["value", "metric", "amount", "result"]);
+  const locale = useLocale();
+  const value = cleanReportProse(metricDisplayText(block, locale));
   const context = textValue(block.content, ["context", "note", "summary", "description"]);
   const change = textValue(block.content, ["change", "delta", "comparison"]);
   const compactValueSize =
@@ -260,8 +238,8 @@ function KpiBlock({ block, compact = false }: { block: ReportBlock; compact?: bo
         : "text-[1.7rem]";
   return (
     <div className={cn("flex flex-col justify-end", compact ? "min-h-0" : "min-h-16")}>
-      <div className={cn(
-        "min-w-0 whitespace-nowrap font-mono font-semibold leading-none tracking-[-0.045em] text-foreground tabular-nums",
+      <div title={String(metricValue(block.content) ?? "—")} className={cn(
+        "min-w-0 break-all font-mono font-semibold leading-tight tracking-[-0.045em] text-foreground tabular-nums",
         compact ? compactValueSize : "text-[clamp(1.65rem,3cqi,2.6rem)]"
       )}>
         {value || "—"}
@@ -325,8 +303,8 @@ function ChartBlock({
   if (!supportedTypes.has(chartType)) {
     return <EmptyBlock message={t("unsupportedChart")} />;
   }
-  const numericKeys = Object.keys(rows[0]).filter((key) =>
-    rows.some((row) => typeof row[key] === "number")
+  const numericKeys = [...new Set(rows.flatMap((row) => Object.keys(row)))].filter((key) =>
+    rows.some((row) => isNumericCell(row[key]) && chartNumber(row[key]) !== null)
   );
   if (chartType === "scatter" && numericKeys.length < 2) {
     return <EmptyBlock message={t("scatterNeedsNumeric")} />;
@@ -371,26 +349,29 @@ function ChartBlock({
   const seriesFormat = (key: string) => seriesFormats[key] || numberFormat;
   const formatSeriesValue = (key: string, value: unknown) =>
     formatChartValue(value, seriesFormat(key), locale);
-  const seriesKeyFromName = (name: unknown) => {
-    const candidate = String(name ?? "");
-    return keys.ys.find(
-      (key) => key === candidate || seriesLabel(key) === candidate
-    );
-  };
-  const tooltipFormatter = (value: unknown, name: unknown) => {
-    const key = seriesKeyFromName(name);
-    return [
-      key
-        ? formatSeriesValue(key, value)
-        : formatChartValue(value, numberFormat, locale),
-      key ? seriesLabel(key) : String(name ?? ""),
-    ];
-  };
   const selectMark = interaction && !editing && !staticRendering ? (mark: unknown) => {
     const value = chartMarkSelection(mark, interaction.field);
     if (value !== undefined) interaction.onSelect(value);
   } : undefined;
   const selectionDot = selectMark ? (mark: unknown) => renderReportSelectionDot(mark, selectMark, colors[0]) : undefined;
+  const seriesKeyFromName = (name: unknown, dataKey?: unknown) => {
+    const field = chartField(dataKey);
+    if (numericKeys.includes(field)) return field;
+    const candidate = String(name ?? "");
+    return keys.ys.find(
+      (key) => key === candidate || seriesLabel(key) === candidate
+    );
+  };
+  const tooltipFormatter = (value: unknown, name: unknown, item?: { dataKey?: unknown; payload?: unknown }) => {
+    const key = seriesKeyFromName(name, item?.dataKey);
+    const original = key ? chartSourceValue(item?.payload, key, value) : value;
+    return [
+      key
+        ? formatSeriesValue(key, original)
+        : formatChartValue(original, numberFormat, locale),
+      key ? seriesLabel(key) : String(name ?? ""),
+    ];
+  };
   const common = (
     <>
       <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" vertical={false} />
@@ -432,13 +413,13 @@ function ChartBlock({
               <Line
                 key={key}
                 type="monotone"
-                dataKey={key}
+                dataKey={chartNumberKey(key)}
                 name={seriesLabel(key)}
                 isAnimationActive={!staticRendering}
                 stroke={colors[index % colors.length]}
                 strokeWidth={2}
-                dot={selectionDot ?? { r: 2, fill: colors[index % colors.length] }}
-                activeDot={selectionDot}
+                dot={selectMark ? selectionDot : { r: 2, fill: colors[index % colors.length] }}
+                activeDot={selectMark ? selectionDot : undefined}
               >
                 {showLabels && (
                   <LabelList
@@ -461,7 +442,7 @@ function ChartBlock({
               <Area
                 key={key}
                 type="monotone"
-                dataKey={key}
+                dataKey={chartNumberKey(key)}
                 name={seriesLabel(key)}
                 isAnimationActive={!staticRendering}
                 stroke={colors[index % colors.length]}
@@ -469,8 +450,8 @@ function ChartBlock({
                 fillOpacity={0.14}
                 strokeWidth={2}
                 stackId={stackId}
-                dot={selectionDot ?? false}
-                activeDot={selectionDot}
+                dot={selectMark ? selectionDot : false}
+                activeDot={selectMark ? selectionDot : undefined}
               >
                 {showLabels && (
                   <LabelList
@@ -485,14 +466,14 @@ function ChartBlock({
         ) : chartType === "pie" ? (
           <PieChart>
             <Tooltip
-              formatter={(value) => [
-                formatSeriesValue(keys.ys[0], value),
+              formatter={(value, _name, item) => [
+                formatSeriesValue(keys.ys[0], chartSourceValue(item.payload, keys.ys[0], value)),
                 seriesLabel(keys.ys[0]),
               ]}
             />
             <Pie
               data={rows}
-              dataKey={keys.ys[0]}
+              dataKey={chartNumberKey(keys.ys[0])}
               name={seriesLabel(keys.ys[0])}
               nameKey={keys.x}
               isAnimationActive={!staticRendering}
@@ -503,8 +484,8 @@ function ChartBlock({
               className={selectMark ? "cursor-pointer" : undefined}
               label={
                 showLabels
-                  ? ({ name, value }) =>
-                      `${String(name ?? "")}: ${formatSeriesValue(keys.ys[0], value)}`
+                  ? ({ name, value, payload }) =>
+                      `${String(name ?? "")}: ${formatSeriesValue(keys.ys[0], chartSourceValue(payload, keys.ys[0], value))}`
                   : false
               }
             >
@@ -517,7 +498,7 @@ function ChartBlock({
           <ScatterChart margin={{ top: 12, right: 10, bottom: 4, left: 0 }}>
             <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="2 4" />
             <XAxis
-              dataKey={scatterXKey}
+              dataKey={chartNumberKey(scatterXKey)}
               name={scatterXKey}
               type="number"
               tick={{ fontSize: 10 }}
@@ -525,7 +506,7 @@ function ChartBlock({
               tickFormatter={(value) => formatChartValue(value, numberFormat, locale)}
             />
             <YAxis
-              dataKey={scatterYKey}
+              dataKey={chartNumberKey(scatterYKey)}
               name={seriesLabel(scatterYKey)}
               type="number"
               tick={{ fontSize: 10 }}
@@ -538,9 +519,9 @@ function ChartBlock({
               data={rows}
               name={seriesLabel(scatterYKey)}
               fill={colors[0]}
+              isAnimationActive={!staticRendering}
               onClick={selectMark}
               className={selectMark ? "cursor-pointer" : undefined}
-              isAnimationActive={!staticRendering}
             >
               {showLabels && (
                 <LabelList
@@ -570,7 +551,7 @@ function ChartBlock({
             <Tooltip formatter={tooltipFormatter} />
             {keys.ys.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
             {keys.ys.map((key, index) => (
-              <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={colors[index % colors.length]} radius={[0, 2, 2, 0]} isAnimationActive={!staticRendering} stackId={stackId} onClick={selectMark} className={selectMark ? "cursor-pointer" : undefined}>
+              <Bar key={key} dataKey={chartNumberKey(key)} name={seriesLabel(key)} fill={colors[index % colors.length]} radius={[0, 2, 2, 0]} isAnimationActive={!staticRendering} stackId={stackId} onClick={selectMark} className={selectMark ? "cursor-pointer" : undefined}>
                 {showLabels && (
                   <LabelList
                     dataKey={key}
@@ -589,7 +570,7 @@ function ChartBlock({
           >
             {common}
             {keys.ys.map((key, index) => (
-              <Bar key={key} dataKey={key} name={seriesLabel(key)} fill={colors[index % colors.length]} radius={[2, 2, 0, 0]} isAnimationActive={!staticRendering} stackId={stackId} onClick={selectMark} className={selectMark ? "cursor-pointer" : undefined}>
+              <Bar key={key} dataKey={chartNumberKey(key)} name={seriesLabel(key)} fill={colors[index % colors.length]} radius={[2, 2, 0, 0]} isAnimationActive={!staticRendering} stackId={stackId} onClick={selectMark} className={selectMark ? "cursor-pointer" : undefined}>
                 {showLabels && (
                   <LabelList
                     dataKey={key}
@@ -610,21 +591,22 @@ function TableBlock({
   block,
   editing = false,
   staticRendering = false,
+  previewRowCount,
 }: {
   block: ReportBlock;
   editing?: boolean;
   staticRendering?: boolean;
+  previewRowCount?: number;
 }) {
   const t = useTranslations("reportWorkspace");
   const tBlocks = useTranslations("reportBlocks");
+  const tData = useTranslations("dataView");
   const locale = useLocale();
   const rows = rowsFromContent(block.content);
-  const [page, setPage] = useState(0);
+  const [requestedPage, setPage] = useState(0);
   const pageSize = 50;
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  useEffect(() => {
-    setPage((current) => Math.min(current, pageCount - 1));
-  }, [pageCount]);
+  const page = Math.min(requestedPage, pageCount - 1);
   if (!rows.length) {
     return (
       <EmptyBlock
@@ -636,7 +618,8 @@ function TableBlock({
       />
     );
   }
-  const columns = Object.keys(rows[0]).slice(0, 8);
+  const allColumns = dataColumns(rows);
+  const columns = allColumns.slice(0, 8);
   const pageRows = staticRendering
     ? rows
     : rows.slice(page * pageSize, (page + 1) * pageSize);
@@ -668,16 +651,18 @@ function TableBlock({
           {pageRows.map((row, rowIndex) => (
             <tr key={rowIndex} className="border-b border-border/70 last:border-b-0">
               {columns.map((column) => {
-                const numeric = typeof row[column] === "number";
+                const numeric = isNumericCell(row[column]);
                 return (
                   <td
                     key={column}
+                    title={dataCellText(row[column])}
                     className={cn(
                       "max-w-52 truncate px-3 py-2.5 text-muted-foreground",
-                      numeric && "text-right font-mono tabular-nums"
+                      numeric && "text-right font-mono tabular-nums",
+                      numeric && compareNumericValues(row[column], 0) === -1 && "text-destructive"
                     )}
                   >
-                    {String(row[column] ?? "—")}
+                    {row[column] === null || row[column] === undefined ? "—" : dataCellText(row[column])}
                   </td>
                 );
               })}
@@ -688,7 +673,9 @@ function TableBlock({
       </div>
       <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-card px-3 py-2 text-[10px] text-muted-foreground">
         <span>
-          {block.content._filter_applied === true
+          {previewRowCount !== undefined
+            ? tBlocks("tablePreviewRows", { count: rows.length.toLocaleString(locale), total: previewRowCount.toLocaleString(locale) })
+            : block.content._filter_applied === true
             ? tBlocks("tableFilteredRows", {
                 count: rows.length.toLocaleString(locale),
                 source: sourceRows.toLocaleString(locale),
@@ -705,23 +692,24 @@ function TableBlock({
                 end: end.toLocaleString(locale),
               })
             : ""}
+          {allColumns.length > columns.length && <span className="ml-3">{tData("previewColumns", { count: columns.length, total: allColumns.length })}</span>}
         </span>
         {!staticRendering && pageCount > 1 && (
           <nav
             aria-label={t("detailPagination", { title: block.title })}
-            className="flex items-center border border-border"
+            className="flex shrink-0 items-center gap-1"
           >
-            <button type="button" aria-label={t("previousDetailPage")} disabled={page === 0} onClick={() => setPage((current) => Math.max(0, current - 1))} className="inline-flex h-7 items-center gap-1 px-2 hover:bg-muted disabled:opacity-30">
+            <Button variant="ghost" size="sm" aria-label={t("previousDetailPage")} disabled={page === 0} onClick={() => setPage(Math.max(0, page - 1))}>
               <ChevronLeft size={12} />
-              <span className="hidden sm:inline">{t("previousDetailPage")}</span>
-            </button>
-            <span className="min-w-20 border-x border-border px-2 text-center tabular-nums">
+              <span>{t("previousDetailPage")}</span>
+            </Button>
+            <span className="min-w-20 px-2 text-center tabular-nums">
               {t("detailPagePosition", { current: page + 1, total: pageCount })}
             </span>
-            <button type="button" aria-label={t("nextDetailPage")} disabled={page >= pageCount - 1} onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))} className="inline-flex h-7 items-center gap-1 px-2 hover:bg-muted disabled:opacity-30">
-              <span className="hidden sm:inline">{t("nextDetailPage")}</span>
+            <Button variant="ghost" size="sm" aria-label={t("nextDetailPage")} disabled={page >= pageCount - 1} onClick={() => setPage(Math.min(pageCount - 1, page + 1))}>
+              <span>{t("nextDetailPage")}</span>
               <ChevronRight size={12} />
-            </button>
+            </Button>
           </nav>
         )}
       </footer>
@@ -733,7 +721,7 @@ function TextBlock({ block }: { block: ReportBlock }) {
   const t = useTranslations("reportBlocks");
   const text = textValue(block.content, ["text", "summary", "description", "value"]);
   return text ? (
-    <p className="whitespace-pre-wrap text-sm leading-7 text-foreground/85">{text}</p>
+    <p className="whitespace-pre-wrap break-words text-sm leading-7 text-foreground/85 [overflow-wrap:anywhere]">{text}</p>
   ) : (
     <EmptyBlock message={t("textPlaceholder")} />
   );
@@ -745,7 +733,7 @@ function EvidenceBlock({ block }: { block: ReportBlock }) {
   const text = textValue(block.content, ["text", "summary", "description", "value"]);
   return (
     <div className="border-l-2 border-primary/55 pl-4 text-sm leading-6">
-      {text && <p className="text-foreground/85">{text}</p>}
+      {text && <p className="whitespace-pre-wrap break-words text-foreground/85 [overflow-wrap:anywhere]">{text}</p>}
       {rows.length > 0 && (
         <ul className={cn("space-y-3", text && "mt-3")}>
           {rows.slice(0, 12).map((item, index) => {
@@ -781,13 +769,42 @@ function EvidenceBlock({ block }: { block: ReportBlock }) {
   );
 }
 
+type ReportBlockActionsProps = Pick<ReportBlockCardProps,
+  "selected" | "onMove" | "onMoveToPage" | "onResize" | "onDuplicate" | "onDelete" | "onRefresh" | "refreshDisabled" | "refreshing"
+> & { refreshVisible: boolean };
+
+function ReportBlockActions({ selected, onMove, onMoveToPage, onResize, onDuplicate, onDelete,
+  onRefresh, refreshDisabled, refreshing, refreshVisible }: ReportBlockActionsProps) {
+  const t = useTranslations("reportBlocks");
+  const [open, setOpen] = useState(false);
+  return <div className={cn("shrink-0 transition-opacity", selected || open ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100")}
+    onClick={event => event.stopPropagation()}>
+    <ReportActionMenu label={t("blockActions")} icon={<MoreHorizontal size={14} />} align="end"
+      open={open} onOpenChange={setOpen} actions={[
+        ...(refreshVisible ? [{ id: "refresh", label: t(refreshing ? "refreshing" : refreshDisabled ? "saveBeforeRefresh" : "refreshData"),
+          icon: <RefreshCw size={14} className={cn(refreshing && "animate-spin")} />,
+          disabled: refreshDisabled || refreshing, onSelect: () => onRefresh?.() }] : []),
+        { id: "up", label: t("moveUpAria"), icon: <ArrowUp size={14} />, onSelect: () => onMove(-1) },
+        { id: "down", label: t("moveDownAria"), icon: <ArrowDown size={14} />, onSelect: () => onMove(1) },
+        ...(onMoveToPage ? [{ id: "page", label: t("moveToPage"), icon: <ChevronRight size={14} />, onSelect: onMoveToPage }] : []),
+        { id: "shrink", label: t("shrinkAria"), icon: <ChevronLeft size={14} />, onSelect: () => onResize(-1) },
+        { id: "expand", label: t("expandAria"), icon: <ChevronRight size={14} />, onSelect: () => onResize(1) },
+        { id: "duplicate", label: t("duplicateAria"), icon: <Copy size={14} />, onSelect: onDuplicate },
+        { id: "delete", label: t("deleteAria"), icon: <Trash2 size={14} />, destructive: true, onSelect: onDelete },
+      ]} />
+  </div>;
+}
+
 export function ReportBlockCard({
   block,
   editing,
   selected,
   staticRendering = false,
+  previewRowCount,
   onSelect,
+  onEditText,
   onMove,
+  onMoveToPage,
   onResize,
   onDuplicate,
   onDelete,
@@ -796,26 +813,39 @@ export function ReportBlockCard({
   refreshing = false,
   filterValue,
   filterConnectedCount,
-  interaction,
   onFilterValueChange,
+  interaction,
 }: ReportBlockCardProps) {
   const t = useTranslations("reportBlocks");
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const refreshVisible = supportsRefresh(block) && Boolean(onRefresh);
+  const tData = useTranslations("dataView");
+  const tRefresh = useTranslations("reportRefresh");
+  const tWriting = useTranslations("reportWriting");
+  const refreshReceipt = isRecord(block.source_ref?.refresh_receipt) ? block.source_ref.refresh_receipt : null;
+  const refreshedSource = readReportRefreshSource(refreshReceipt?.source);
+  const [dataView, setDataView] = useState<DataViewSnapshot | null>(null);
+  const dataRows = (block.block_type === "table" || block.block_type === "chart") && !block.content.image_url
+    ? rowsFromContent(block.content) : [];
+  const openData = () => {
+    const source = typeof block.content._filter_source_rows === "number" ? block.content._filter_source_rows : dataRows.length;
+    const total = typeof block.content.rows_count === "number" ? block.content.rows_count : dataRows.length;
+    setDataView({ title: block.title, rows: structuredClone(dataRows),
+      notice: block.content._filter_applied === true
+        ? t("tableFilteredRows", { count: dataRows.length, source })
+        : total > dataRows.length ? t("tableRetainedRows", { count: dataRows.length, total }) : undefined,
+    });
+  };
+  const refreshVisible = supportsReportBlockRefresh(block) && Boolean(onRefresh);
   const highlight =
     typeof block.config.highlight === "string"
       ? cleanReportProse(block.config.highlight.trim())
       : "";
 
-  useEffect(() => {
-    if (!editing) setActionsOpen(false);
-  }, [block.id, editing]);
-
   return (
     <article
       data-report-block={block.id}
       role={editing ? "button" : undefined}
-      tabIndex={editing ? 0 : undefined}
+      aria-pressed={editing ? selected : undefined}
+      tabIndex={editing ? 0 : -1}
       onClick={(event) => {
         if (!editing) return;
         const target = event.target;
@@ -837,7 +867,7 @@ export function ReportBlockCard({
         onSelect();
       }}
       className={cn(
-        "group relative flex min-h-0 flex-col rounded-xl border bg-card px-5 pb-5 pt-4 text-card-foreground transition-colors",
+        "group relative flex min-h-0 flex-col rounded-xl border bg-card px-5 pb-5 pt-4 text-card-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40",
         editing ? "h-full" : "h-auto",
         block.block_type === "metric" &&
           (editing
@@ -855,6 +885,7 @@ export function ReportBlockCard({
       )}>
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold tracking-[-0.01em]">{block.title}</h3>
+          {!staticRendering && refreshedSource && <p className="mt-1 truncate text-[11px] text-muted-foreground">{tRefresh("lastSource", { source: refreshedSource.data_version ? tRefresh("fileVersion", { name: refreshedSource.name, version: refreshedSource.data_version }) : refreshedSource.name })}</p>}
           {typeof block.content.subtitle === "string" && block.content.subtitle && (
             <p className="mt-1 truncate text-xs text-muted-foreground">{block.content.subtitle}</p>
           )}
@@ -864,66 +895,23 @@ export function ReportBlockCard({
             </span>
           )}
         </div>
-        {editing && (
-          <div
-            className={cn(
-              "relative shrink-0 transition-opacity",
-              selected
-                ? "opacity-100"
-                : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-            )}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              aria-label={t("blockActions")}
-              aria-expanded={actionsOpen}
-              onClick={() => setActionsOpen((current) => !current)}
-              className="inline-flex h-7 w-7 items-center justify-center border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <MoreHorizontal size={14} />
-            </button>
-            {actionsOpen && (
-              <div className="absolute right-0 top-8 z-30 grid w-40 grid-cols-2 border border-border bg-popover p-1 shadow-lg">
-                {refreshVisible && (
-                  <button
-                    type="button"
-                    disabled={refreshDisabled || refreshing}
-                    onClick={() => {
-                      onRefresh?.();
-                      setActionsOpen(false);
-                    }}
-                    aria-label={
-                      refreshing
-                        ? t("refreshing")
-                        : refreshDisabled
-                          ? t("saveBeforeRefresh")
-                          : t("refreshData")
-                    }
-                    className="col-span-2 flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    <RefreshCw
-                      size={12}
-                      className={cn(refreshing && "animate-spin")}
-                    />
-                    {refreshing
-                      ? t("refreshing")
-                      : refreshDisabled
-                        ? t("saveBeforeRefresh")
-                        : t("refreshData")}
-                  </button>
-                )}
-                <button type="button" onClick={() => { onMove(-1); setActionsOpen(false); }} aria-label={t("moveUpAria")} className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"><ArrowUp size={12} />{t("moveUp")}</button>
-                <button type="button" onClick={() => { onMove(1); setActionsOpen(false); }} aria-label={t("moveDownAria")} className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"><ArrowDown size={12} />{t("moveDown")}</button>
-                <button type="button" onClick={() => { onResize(-1); setActionsOpen(false); }} aria-label={t("shrinkAria")} className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronLeft size={12} />{t("shrink")}</button>
-                <button type="button" onClick={() => { onResize(1); setActionsOpen(false); }} aria-label={t("expandAria")} className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"><ChevronRight size={12} />{t("expand")}</button>
-                <button type="button" onClick={() => { onDuplicate(); setActionsOpen(false); }} aria-label={t("duplicateAria")} className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"><Copy size={12} />{t("duplicate")}</button>
-                <button type="button" onClick={() => { onDelete(); setActionsOpen(false); }} aria-label={t("deleteAria")} className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] text-destructive hover:bg-destructive/10"><Trash2 size={12} />{t("delete")}</button>
-              </div>
-            )}
-          </div>
+        <div className="flex shrink-0 items-center gap-1">
+        {editing && !staticRendering && onEditText && isReportTextBlock(block) && <button type="button" onClick={onEditText}
+          aria-label={tWriting("openFor", { title: block.title })} title={tWriting("title")}
+          className="inline-flex h-7 w-7 items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary"><PencilLine size={14} /></button>}
+        {!staticRendering && !!dataRows.length && <button type="button" onClick={openData}
+          title={tData("open")} aria-label={tData("openFor", { title: block.title || tData("untitled") })}
+          className="inline-flex h-7 w-7 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"><Table2 size={14} /></button>}
+        {editing && !staticRendering && (
+          <ReportBlockActions key={block.id} selected={selected}
+            onMove={onMove} onMoveToPage={onMoveToPage} onResize={onResize} onDuplicate={onDuplicate} onDelete={onDelete}
+            onRefresh={onRefresh} refreshDisabled={refreshDisabled} refreshing={refreshing}
+            refreshVisible={refreshVisible} />
         )}
+        </div>
       </header>
+
+      {interaction && !editing && !staticRendering && <ReportSelectionControl control={interaction} />}
 
       <div className={cn(
         "min-h-0 flex-1",
@@ -932,13 +920,12 @@ export function ReportBlockCard({
           "overflow-auto"
       )}>
         {block.block_type === "metric" && <KpiBlock block={block} compact={editing} />}
-        {block.block_type === "chart" && !editing && !staticRendering && interaction && <ReportSelectionControl control={interaction} />}
         {block.block_type === "chart" && (
           <ChartBlock
-            interaction={interaction}
             block={block}
             editing={editing}
             staticRendering={staticRendering}
+            interaction={interaction}
           />
         )}
         {block.block_type === "table" && (
@@ -946,14 +933,15 @@ export function ReportBlockCard({
             block={block}
             editing={editing}
             staticRendering={staticRendering}
+            previewRowCount={previewRowCount}
           />
         )}
         {block.block_type === "text" && <TextBlock block={block} />}
         {block.block_type === "evidence" && <EvidenceBlock block={block} />}
         {block.block_type === "filter" && (
           <ReportFilterControl
-            connectedCount={filterConnectedCount}
             block={block}
+            connectedCount={filterConnectedCount}
             value={filterValue}
             onChange={onFilterValueChange}
             staticRendering={staticRendering}
@@ -984,6 +972,7 @@ export function ReportBlockCard({
           </p>
         </aside>
       )}
+      {dataView && !staticRendering && <DataViewDialog snapshot={dataView} onClose={() => setDataView(null)} />}
     </article>
   );
 }

@@ -2,10 +2,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SourceReplacementDialog } from "@/components/chat/SourceReplacementDialog";
+import { DataWorkspacePanel } from "@/components/chat/DataWorkspacePanel";
 import { api } from "@/lib/api/client";
 import * as replacement from "@/lib/source-replacement";
 import { useProjectStore } from "@/lib/stores/project";
-import type { ProjectDataSource } from "@/lib/types/api";
+import type { ProjectDataSource, SanitationRecipe } from "@/lib/types/api";
 import messages from "@/messages/zh.json";
 
 const source = (id: string, status: ProjectDataSource["status"] = "attached"): ProjectDataSource => ({
@@ -105,6 +106,29 @@ it("reviews distant fields and complete values using the current and replacement
   fireEvent.keyDown(region, { key: "Escape" });
   expect(opener).toHaveFocus();
   expect(screen.getByRole("dialog", { name: "更新数据" })).toBeInTheDocument();
+});
+
+it("opens from the current source and does not publish late replacement results into another project", async () => {
+  const write = deferred<ProjectDataSource>();
+  const apply = vi.spyOn(replacement, "applySourceReplacement").mockImplementation(() => write.promise);
+  const refresh = vi.fn().mockResolvedValue(undefined);
+  useProjectStore.setState({ currentProjectId: "project-1", sources: [old, ...candidates], recipes: [{ id: "recipe-1", data_source_id: "old", status: "applied", operations: [] } as unknown as SanitationRecipe], refreshCurrent: refresh });
+  vi.spyOn(replacement, "previewSourceReplacement").mockResolvedValue(result());
+  render(<NextIntlClientProvider locale="zh" messages={messages}><DataWorkspacePanel open onClose={vi.fn()} onConfigureConnection={vi.fn()} /></NextIntlClientProvider>);
+  fireEvent.click(screen.getByRole("button", { name: "查看数据：old.csv" }));
+  fireEvent.click(screen.getByRole("button", { name: "更新数据" }));
+  expect(screen.getByRole("dialog", { name: "更新数据" })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("新文件"), { target: { value: "new-1" } });
+  fireEvent.click(screen.getByRole("button", { name: "预览更新" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "确认更新" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "确认更新" }));
+  expect(apply).toHaveBeenCalledTimes(1);
+  const other = { ...source("other", "ready"), project_id: "project-2" };
+  act(() => useProjectStore.setState({ currentProjectId: "project-2", sources: [other], recipes: [], sourceAction: null }));
+  expect(screen.queryByRole("dialog", { name: "更新数据" })).not.toBeInTheDocument();
+  await act(async () => write.resolve({ ...candidates[0], status: "ready", profile_data: { is_current: true } }));
+  expect(useProjectStore.getState().sources).toEqual([other]);
+  expect(refresh).not.toHaveBeenCalled();
 });
 
 it("rejects preview evidence for another source and malformed row counts", async () => {

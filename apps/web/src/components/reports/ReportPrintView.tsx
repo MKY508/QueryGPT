@@ -1,13 +1,13 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { useTranslations } from "next-intl";
 import type { ReportBlock, ReportDocument } from "@/lib/reports";
 import { ReportBlockCard } from "./ReportBlockCard";
-import { useTranslations } from "next-intl";
 import type { ReportSelection } from "@/lib/report-interactions";
 import { readReportPage } from "@/lib/report-reading";
-import { connectedReportFilters } from "@/lib/report-filter-connections";
 import { selectionLabel } from "./ReportSelectionControl";
+import { connectedReportFilters } from "@/lib/report-filter-connections";
 import { ReportFilterControl } from "./ReportFilterControl";
 
 function blockStyle(block: ReportBlock): CSSProperties {
@@ -22,27 +22,36 @@ const noop = () => undefined;
 export function ReportPrintView({
   report,
   filterValues,
+  imagePageId,
+  pageIds,
   preview = false,
   selections = [],
 }: {
   report: ReportDocument;
   filterValues: Record<string, string>;
+  imagePageId?: string;
+  pageIds?: readonly string[];
   preview?: boolean;
   selections?: ReportSelection[];
 }) {
   const t = useTranslations("reportInteractions");
   const connected = connectedReportFilters(report);
-  const pages = [...report.pages].sort(
+  const ordered = [...report.pages].sort(
     (left, right) => left.order_index - right.order_index
   );
+  // Keep the complete document above for inherited filters from omitted pages.
+  // Image captures retain original report numbering; selected PDF pages renumber.
+  const included = pageIds ? new Set(pageIds) : null;
+  const pages = included && !imagePageId ? ordered.filter(page => included.has(page.id)) : ordered;
 
   return (
     <section
-      className={preview ? "report-print-view report-recovery-preview" : "report-print-view"}
+      className={preview ? "report-print-view report-recovery-preview" : imagePageId ? "report-print-view report-image-view" : "report-print-view"}
       data-testid="report-print-view"
       aria-hidden={preview ? undefined : true}
     >
       {pages.map((page, pageIndex) => {
+        if (imagePageId && page.id !== imagePageId) return null;
         const reading = readReportPage(page, { filters: filterValues, selections }, connected);
         const { inheritedFilters, selections: activeSelections } = reading;
         const narrative =
@@ -87,8 +96,8 @@ export function ReportPrintView({
                       onResize={noop}
                       onDuplicate={noop}
                       onDelete={noop}
-                      filterConnectedCount={filterConnectedCount}
                       filterValue={filterValues[block.id] || ""}
+                      filterConnectedCount={filterConnectedCount}
                       onFilterValueChange={noop}
                     />
                   </div>

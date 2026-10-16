@@ -77,6 +77,31 @@ def _relationship_definition() -> dict:
 
 
 @pytest.mark.asyncio
+async def test_exact_knowledge_lookup_is_project_scoped_and_never_writes(client: AsyncClient):
+    project = await _project(client)
+    other = await _project(client)
+    entry = await _knowledge(client, project["id"])
+    lookup = f"/api/v1/projects/{project['id']}/knowledge/lookup"
+    result = await client.get(lookup, params={"key": entry["key"]})
+    assert result.status_code == 200, result.text
+    assert result.json()["data"]["id"] == entry["id"]
+    for project_id, key in [(other["id"], entry["key"]), (project["id"], "metric:reven")]:
+        missing = await client.get(
+            f"/api/v1/projects/{project_id}/knowledge/lookup", params={"key": key}
+        )
+        assert missing.status_code == 200
+        assert missing.json()["data"] is None
+    unknown_project = await client.get(
+        f"/api/v1/projects/{uuid4()}/knowledge/lookup", params={"key": entry["key"]}
+    )
+    assert unknown_project.status_code == 404
+    history = await client.get(
+        f"/api/v1/projects/{project['id']}/knowledge/{entry['id']}/revisions"
+    )
+    assert [item["id"] for item in history.json()["data"]] == [entry["active_revision_id"]]
+
+
+@pytest.mark.asyncio
 async def test_revision_api_uses_optimistic_head_and_restore_appends(client: AsyncClient):
     project = await _project(client)
     first = await _knowledge(client, project["id"])

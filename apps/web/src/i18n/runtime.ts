@@ -2,6 +2,34 @@ import { defaultLocale, type Locale } from "@/i18n/config";
 
 const runtimeMessages = {
   en: {
+    requestFailedHttp: "The request could not be completed. Please retry.",
+    unrecognizedAnalysisEvent: "The investigation was interrupted. Please retry.",
+    missingResponseBody: "The investigation was interrupted. Please retry.",
+    executionFailed: "The investigation could not be completed.",
+    analysisAlreadyRunning:
+      "An investigation is already running. Finish or stop it before starting another.",
+    analysisConnectionInterrupted:
+      "The analysis connection ended unexpectedly without a completion event. Please retry.",
+    analysisAlreadyRunningForCheck:
+      "An investigation is already running. Finish or stop it before checking changes.",
+    confirmationSavedElsewhere:
+      "The confirmation was saved, but you switched investigations. Return to the original investigation to continue.",
+    confirmationCannotContinue:
+      "This investigation is not ready to continue. Please reopen it and retry.",
+    confirmationInProgress:
+      "A choice is being confirmed. Please wait before confirming another.",
+    confirmationWaitingForRun:
+      "Your choice was saved. Finish or stop the running investigation, then confirm again to continue this one.",
+    invalidConversationRecord:
+      "This investigation cannot be opened right now. Please retry.",
+    conversationProjectMismatch:
+      "This investigation record belongs to another project and could not be restored.",
+    conversationOpenFailed:
+      "This investigation record cannot be opened right now. Please retry later.",
+    savingInvestigationResult: "Saving investigation results",
+    investigationStopped: "This investigation was stopped.",
+    investigationStoppedSaved: "This investigation was stopped.",
+    dataPreparationFailed: "Data preparation failed. Please retry later.",
     fileUploadEmpty: "This file is empty. Choose a file with data.",
     fileUploadTooLarge: "This file is too large. Split it into smaller files before uploading.",
     fileUploadUnsupported: "Choose a CSV, Excel, Parquet, JSON, JSONL, or NDJSON file.",
@@ -26,28 +54,6 @@ const runtimeMessages = {
     fileUploadQueuePending: "Continue or cancel the waiting files before adding more.",
     fileUploadQueueLimit: "Keep up to 100 files in this list. Clear finished records or select fewer files.",
     fileUploadListRefreshFailed: "The source list could not be refreshed. Please try again later.",
-    requestFailedHttp: "The request could not be completed. Please retry.",
-    unrecognizedAnalysisEvent: "The investigation was interrupted. Please retry.",
-    missingResponseBody: "The investigation was interrupted. Please retry.",
-    executionFailed: "The investigation could not be completed.",
-    analysisAlreadyRunning:
-      "An investigation is already running. Finish or stop it before starting another.",
-    analysisConnectionInterrupted:
-      "The analysis connection ended unexpectedly without a completion event. Please retry.",
-    analysisAlreadyRunningForCheck:
-      "An investigation is already running. Finish or stop it before checking changes.",
-    confirmationSavedElsewhere:
-      "The confirmation was saved, but you switched investigations. Return to the original investigation to continue.",
-    invalidConversationRecord:
-      "This investigation cannot be opened right now. Please retry.",
-    conversationProjectMismatch:
-      "This investigation record belongs to another project and could not be restored.",
-    conversationOpenFailed:
-      "This investigation record cannot be opened right now. Please retry later.",
-    savingInvestigationResult: "Saving investigation results",
-    investigationStopped: "This investigation was stopped.",
-    investigationStoppedSaved: "This investigation was stopped.",
-    dataPreparationFailed: "Data preparation failed. Please retry later.",
     noProjectToView: "There is no project available to view.",
     recipeHistoryLoadFailed: "Recipe history could not be loaded. Please retry.",
     noProjectToUpdate: "There is no project available to update.",
@@ -90,6 +96,24 @@ const runtimeMessages = {
     statusUnchecked: "Not checked"
   },
   zh: {
+    requestFailedHttp: "请求未能完成，请重试。",
+    unrecognizedAnalysisEvent: "这次调查中断，请重试。",
+    missingResponseBody: "这次调查中断，请重试。",
+    executionFailed: "这次调查未能完成。",
+    analysisAlreadyRunning: "已有一项调查正在进行，请完成或停止后再开始新的调查。",
+    analysisConnectionInterrupted: "分析连接意外中断，未收到完成状态，请重试。",
+    analysisAlreadyRunningForCheck: "已有一项调查正在进行，请完成或停止后再检查变化。",
+    confirmationSavedElsewhere: "确认已经保存；你已切换到其他调查，请回到原调查后继续。",
+    confirmationCannotContinue: "这次调查暂时无法继续，请重新打开后重试。",
+    confirmationInProgress: "正在确认一个选择，请稍后再确认其他选择。",
+    confirmationWaitingForRun: "选择已保存。请先完成或停止正在进行的调查，再确认一次以继续本次调查。",
+    invalidConversationRecord: "这份调查暂时无法打开，请重试。",
+    conversationProjectMismatch: "这份调查记录不属于当前项目，已停止恢复。",
+    conversationOpenFailed: "这份调查记录暂时无法打开，请稍后重试。",
+    savingInvestigationResult: "正在保存调查结果",
+    investigationStopped: "这次调查已停止。",
+    investigationStoppedSaved: "这次调查已停止。",
+    dataPreparationFailed: "数据准备失败，请稍后重试。",
     fileUploadEmpty: "这份文件是空的，请选择有内容的文件。",
     fileUploadTooLarge: "这份文件过大，请拆分后再上传。",
     fileUploadUnsupported: "请选择 CSV、Excel、Parquet、JSON、JSONL 或 NDJSON 文件。",
@@ -114,21 +138,6 @@ const runtimeMessages = {
     fileUploadQueuePending: "请先继续或取消等待中的文件，再加入其他文件。",
     fileUploadQueueLimit: "列表最多保留 100 份文件，请清除已结束的记录或减少本次选择。",
     fileUploadListRefreshFailed: "来源列表暂时无法刷新，请稍后再试。",
-    requestFailedHttp: "请求未能完成，请重试。",
-    unrecognizedAnalysisEvent: "这次调查中断，请重试。",
-    missingResponseBody: "这次调查中断，请重试。",
-    executionFailed: "这次调查未能完成。",
-    analysisAlreadyRunning: "已有一项调查正在进行，请完成或停止后再开始新的调查。",
-    analysisConnectionInterrupted: "分析连接意外中断，未收到完成状态，请重试。",
-    analysisAlreadyRunningForCheck: "已有一项调查正在进行，请完成或停止后再检查变化。",
-    confirmationSavedElsewhere: "确认已经保存；你已切换到其他调查，请回到原调查后继续。",
-    invalidConversationRecord: "这份调查暂时无法打开，请重试。",
-    conversationProjectMismatch: "这份调查记录不属于当前项目，已停止恢复。",
-    conversationOpenFailed: "这份调查记录暂时无法打开，请稍后重试。",
-    savingInvestigationResult: "正在保存调查结果",
-    investigationStopped: "这次调查已停止。",
-    investigationStoppedSaved: "这次调查已停止。",
-    dataPreparationFailed: "数据准备失败，请稍后重试。",
     noProjectToView: "当前没有可查看的项目。",
     recipeHistoryLoadFailed: "整理方法的修改记录暂时无法加载，请重试。",
     noProjectToUpdate: "当前没有可更新的项目。",

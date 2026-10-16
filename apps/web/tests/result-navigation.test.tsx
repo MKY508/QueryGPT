@@ -33,7 +33,7 @@ const title = (value: string) => {
   const canvas = screen.queryByRole("region", {name: zh.workbench.result}) || screen.getByRole("region", {name: en.workbench.result});
   expect(within(canvas).getByRole("heading", {level: 1})).toHaveTextContent(value);
 };
-const observers: { notify: () => void; disconnect: ReturnType<typeof vi.fn> }[] = [];
+const observers: { notify: () => void; disconnect: ReturnType<typeof vi.fn<() => void>> }[] = [];
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks(); observers.length = 0; });
 
 function scrolling() {

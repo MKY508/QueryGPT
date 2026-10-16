@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 
+COPY --from=ghcr.io/astral-sh/uv:0.8.11 /uv /uvx /bin/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
@@ -10,7 +12,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Export the same workspace lock used by CI and desktop packaging. Copy the
+# manifests first so code-only changes reuse the installed dependency layer.
+COPY pyproject.toml uv.lock README.md /workspace/
 COPY apps/api/pyproject.toml ./pyproject.toml
+
+RUN uv export --locked --package receiptbi-api --extra dev --extra analytics \
+    --no-dev --no-emit-workspace --no-hashes --output-file /tmp/api-requirements.txt \
+    && uv pip install --system -r /tmp/api-requirements.txt \
+    && rm /tmp/api-requirements.txt
+
 COPY apps/api/run-tests.sh ./run-tests.sh
 COPY apps/api/alembic.ini ./alembic.ini
 COPY apps/api/alembic ./alembic
@@ -18,8 +29,7 @@ COPY apps/api/app ./app
 COPY docker/scripts/api-bootstrap.sh /opt/receiptbi/scripts/api-bootstrap.sh
 
 RUN chmod +x ./run-tests.sh /opt/receiptbi/scripts/api-bootstrap.sh \
-    && python -m pip install --upgrade pip \
-    && python -m pip install -e ".[dev,analytics]"
+    && uv pip install --system --no-deps -e .
 
 EXPOSE 8000
 

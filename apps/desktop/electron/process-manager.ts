@@ -13,6 +13,7 @@ import {
   type LegacyModelMigrationPreparation,
 } from './legacy-model-migration.js';
 import { validateFrontendBundle } from './frontend-bundle.js';
+import { BACKEND_READY_TIMEOUT_MS, FRONTEND_READY_TIMEOUT_MS, waitForServiceReady } from './service-readiness.js';
 import {
   extractNextStaticScriptUrls,
   isHtmlContentType,
@@ -483,22 +484,21 @@ export class ProcessManager {
 
   private async waitForServices(generation: number): Promise<void> {
     const http = await import('node:http');
-    const maxAttempts = 60;
-    const delay = 500;
     const backend = this.backendProcess;
     const frontend = this.frontendProcess;
     if (!backend || !frontend) throw new Error('Services were not started');
 
     const backendHealth = await this.waitForService(
       backend,
+      frontend,
       generation,
-      maxAttempts,
-      delay,
-      () =>
+      BACKEND_READY_TIMEOUT_MS,
+      (signal) =>
         this.checkHttp(
           `http://127.0.0.1:${BACKEND_PORT}/health`,
           http,
-          this.instanceToken
+          this.instanceToken,
+          signal
         )
     );
     this.acknowledgePendingLegacyModelMigration(backendHealth);
@@ -507,10 +507,10 @@ export class ProcessManager {
 
     await this.waitForService(
       frontend,
+      backend,
       generation,
-      maxAttempts,
-      delay,
-      () => this.checkFrontendReady(`http://127.0.0.1:${FRONTEND_PORT}`, http)
+      FRONTEND_READY_TIMEOUT_MS,
+      (signal) => this.checkFrontendReady(`http://127.0.0.1:${FRONTEND_PORT}`, http, signal)
     );
     this.frontendReady = true;
     this.logger.info('Frontend is ready');
@@ -530,38 +530,33 @@ export class ProcessManager {
 
   private async waitForService<T>(
     owned: OwnedProcess,
+    peer: OwnedProcess,
     generation: number,
-    maxAttempts: number,
-    delay: number,
-    readinessCheck: () => Promise<T>
+    timeoutMs: number,
+    readinessCheck: (signal: AbortSignal) => Promise<T>
   ): Promise<T> {
-    for (let i = 0; i < maxAttempts; i++) {
-      if (generation !== this.lifecycleGeneration) throw new Error('Service startup was cancelled');
-      if (owned.exited) throw new Error(`${owned.name} exited before becoming ready`);
-      try {
-        const payload = await readinessCheck();
-        if (generation !== this.lifecycleGeneration || owned.exited) {
-          throw new Error('Service startup was cancelled');
-        }
-        return payload;
-      } catch (error) {
-        if (generation !== this.lifecycleGeneration || owned.exited) throw error;
-        if (i === maxAttempts - 1) {
-          throw new Error(`${owned.name} failed to become ready`, { cause: error });
-        }
-        await new Promise((r) => setTimeout(r, delay));
-      }
-    }
-    throw new Error(`${owned.name} failed to become ready`);
+    return waitForServiceReady({
+      name: owned.name,
+      timeoutMs,
+      exited: Promise.race([owned.exitPromise, peer.exitPromise]),
+      assertActive: () => {
+        if (generation !== this.lifecycleGeneration) throw new Error('Service startup was cancelled');
+        if (owned.exited) throw new Error(`${owned.name} exited before becoming ready`);
+        if (peer.exited) throw new Error(`${peer.name} exited during service startup`);
+      },
+      check: readinessCheck,
+    });
   }
 
   private checkHttp(
     url: string,
     http: typeof import('node:http'),
-    expectedInstanceToken?: string
+    expectedInstanceToken?: string,
+    signal?: AbortSignal
   ): Promise<BackendHealthPayload | undefined> {
     return new Promise((resolve, reject) => {
-      const req = http.get(url, (response) => {
+      const req = http.get(url, { signal }, (response) => {
+        response.on('error', reject);
         const status = response.statusCode ?? 0;
         if (status < 200 || status >= 300) {
           response.resume();
@@ -609,10 +604,12 @@ export class ProcessManager {
   private readHttpText(
     url: string,
     http: typeof import('node:http'),
-    maxBytes: number
+    maxBytes: number,
+    signal?: AbortSignal
   ): Promise<{ body: string; contentType: string | string[] | undefined }> {
     return new Promise((resolve, reject) => {
-      const req = http.get(url, (response) => {
+      const req = http.get(url, { signal }, (response) => {
+        response.on('error', reject);
         const status = response.statusCode ?? 0;
         if (status < 200 || status >= 300) {
           response.resume();
@@ -650,10 +647,12 @@ export class ProcessManager {
 
   private checkStaticJavaScript(
     url: string,
-    http: typeof import('node:http')
+    http: typeof import('node:http'),
+    signal?: AbortSignal
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const req = http.get(url, (response) => {
+      const req = http.get(url, { signal }, (response) => {
+        response.on('error', reject);
         const status = response.statusCode ?? 0;
         if (status < 200 || status >= 300) {
           response.resume();
@@ -677,7 +676,6 @@ export class ProcessManager {
           }
           resolve();
         });
-        response.on('error', reject);
       });
       req.on('error', reject);
       req.setTimeout(5000, () => req.destroy(new Error('Timeout')));
@@ -686,9 +684,10 @@ export class ProcessManager {
 
   private async checkFrontendReady(
     url: string,
-    http: typeof import('node:http')
+    http: typeof import('node:http'),
+    signal?: AbortSignal
   ): Promise<void> {
-    const { body, contentType } = await this.readHttpText(url, http, 1024 * 1024);
+    const { body, contentType } = await this.readHttpText(url, http, 1024 * 1024, signal);
     if (!isHtmlContentType(contentType) || !/<html(?:\s|>)/i.test(body)) {
       throw new Error('Frontend root did not return an HTML document');
     }
@@ -701,7 +700,7 @@ export class ProcessManager {
       throw new Error(`Frontend HTML referenced too many JavaScript chunks: ${scriptUrls.length}`);
     }
 
-    await Promise.all(scriptUrls.map((scriptUrl) => this.checkStaticJavaScript(scriptUrl, http)));
+    await Promise.all(scriptUrls.map((scriptUrl) => this.checkStaticJavaScript(scriptUrl, http, signal)));
   }
 
   private acknowledgePendingLegacyModelMigration(
@@ -884,5 +883,11 @@ export class ProcessManager {
 
   getUserDataDir(): string {
     return this.userDataDir;
+  }
+
+  getStartupFolder(folder: 'backups' | 'logs'): string {
+    return folder === 'backups'
+      ? path.join(path.dirname(this.databasePath), '.receiptbi-backups')
+      : path.join(this.userDataDir, 'logs');
   }
 }

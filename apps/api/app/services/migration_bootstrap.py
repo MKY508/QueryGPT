@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.db.base import Base
+from app.db.sqlite_migration import run_sqlite_migration
 
 
 class UnsafeLocalSchemaError(RuntimeError):
@@ -561,6 +562,99 @@ _GENERATIONS: Final[tuple[SchemaGeneration, ...]] = (
             ),
         ),
     ),
+    SchemaGeneration(
+        revision="0023_report_library",
+        required_columns=(("report_documents", frozenset({"search_text", "name_key"})),),
+    ),
+    SchemaGeneration(
+        revision="0025_report_save_receipts",
+        required_tables=frozenset({"report_save_receipts"}),
+        required_columns=(
+            (
+                "report_save_receipts",
+                frozenset(
+                    {
+                        "request_id",
+                        "report_id",
+                        "request_hash",
+                        "result_version",
+                        "snapshot",
+                    }
+                ),
+            ),
+        ),
+    ),
+    SchemaGeneration(
+        revision="0026_report_revisions",
+        required_tables=frozenset({"report_revisions"}),
+        required_columns=(
+            (
+                "report_revisions",
+                frozenset(
+                    {
+                        "report_id",
+                        "version",
+                        "title",
+                        "saved_at",
+                        "reason",
+                        "page_count",
+                        "block_count",
+                        "snapshot",
+                        "snapshot_hash",
+                    }
+                ),
+            ),
+        ),
+    ),
+    SchemaGeneration(
+        revision="0027_report_trash",
+        required_tables=frozenset(),
+        required_columns=(("report_documents", frozenset({"deleted_at"})),),
+    ),
+    SchemaGeneration(
+        revision="0028_report_copy_receipts",
+        required_tables=frozenset({"report_copy_receipts"}),
+        required_columns=(
+            (
+                "report_copy_receipts",
+                frozenset(
+                    {
+                        "project_id",
+                        "request_id",
+                        "source_report_id",
+                        "source_version",
+                        "target_report_id",
+                        "request_hash",
+                        "created_at",
+                    }
+                ),
+            ),
+        ),
+    ),
+    SchemaGeneration(
+        revision="0029_file_upload_receipts",
+        required_tables=frozenset({"file_upload_receipts"}),
+        required_columns=(
+            (
+                "file_upload_receipts",
+                frozenset(
+                    {
+                        "project_id",
+                        "request_id",
+                        "source_id",
+                        "filename",
+                        "byte_size",
+                        "fingerprint",
+                        "created_at",
+                    }
+                ),
+            ),
+        ),
+    ),
+    SchemaGeneration(
+        revision="0030_analysis_history",
+        required_columns=(("analysis_runs", frozenset({"history_search_text"})),),
+    ),
 )
 
 # Migrations without new tables or columns share the same markers as their last
@@ -573,6 +667,7 @@ _SCHEMA_REVISION_ALIASES: Final[dict[str, str]] = {
     "0019_retire_legacy_candidates": "0018_semantic_scope_nodes",
     "0020_retire_stale_recos": "0018_semantic_scope_nodes",
     "0022_retire_legacy_user_scope": "0021_semantic_inventory_jobs",
+    "0024_sqlite_uuid_text": "0023_report_library",
 }
 
 
@@ -695,6 +790,13 @@ def _infer_revision(schema: dict[str, frozenset[str]]) -> str:
             "0017_semantic_validation_jobs",
             "0018_semantic_scope_nodes",
             "0021_semantic_inventory_jobs",
+            "0023_report_library",
+            "0025_report_save_receipts",
+            "0026_report_revisions",
+            "0027_report_trash",
+            "0028_report_copy_receipts",
+            "0029_file_upload_receipts",
+            "0030_analysis_history",
         }:
             raise UnsafeLocalSchemaError("本地数据库过早移除了旧设置表，拒绝猜测迁移版本")
 
@@ -762,6 +864,19 @@ def _bootstrap_sync(connection: Connection, script_location: Path) -> str:
     final_revision = _current_revision(connection)
     if final_revision != head or _infer_revision(final_schema) != _structural_revision(head):
         raise UnsafeLocalSchemaError("数据库迁移没有得到完整 head 结构，拒绝启动")
+    # Column names alone cannot distinguish SQLite's old NUMERIC-affinity UUID
+    # declaration from the corrected CHAR representation. Check the current
+    # runtime mapping after migration, including an already-stamped database.
+    inspector = inspect(connection)
+    for table in Base.metadata.tables.values():
+        names = {column.name for column in table.columns if isinstance(column.type, sa.Uuid)}
+        if not names:
+            continue
+        actual = {column["name"]: column["type"] for column in inspector.get_columns(table.name)}
+        if any(not isinstance(actual.get(name), sa.String) for name in names):
+            raise UnsafeLocalSchemaError(
+                f"本地数据库表 {table.name} 的标识存储类型不完整，拒绝启动"
+            )
     return head
 
 
@@ -776,24 +891,15 @@ async def migrate_local_sqlite_to_head(
     if not database_url.startswith(("sqlite://", "sqlite+aiosqlite://")):
         raise UnsafeLocalSchemaError("桌面数据库必须使用本地 SQLite")
     location = script_location or _script_location()
-    # SQLite's copy-and-move batch migrations must drop the old table.  That is
-    # blocked while another retained table references it, even though the
-    # replacement has the same primary keys.  Disable enforcement before the
-    # migration transaction, then prove the resulting graph is intact before
-    # enabling it again.
+    _config, scripts = _alembic_runtime(location)
+    target = scripts.get_current_head()
+    if target is None:
+        raise UnsafeLocalSchemaError("数据库迁移没有唯一 head，无法安全启动")
+    # Share the same real DDL transaction and pre-commit association check as
+    # the Alembic CLI. Never commit the upgraded schema before checking its graph.
     async with engine.connect() as connection:
-        await connection.exec_driver_sql("PRAGMA foreign_keys = OFF")
-        await connection.commit()
-        try:
-            migrated_to = await connection.run_sync(_bootstrap_sync, location)
-            await connection.commit()
-            violations = (await connection.exec_driver_sql("PRAGMA foreign_key_check")).all()
-            await connection.commit()
-            if violations:
-                raise UnsafeLocalSchemaError("数据库迁移后存在失效的关联，拒绝启动")
-            return migrated_to
-        finally:
-            if connection.in_transaction():
-                await connection.rollback()
-            await connection.exec_driver_sql("PRAGMA foreign_keys = ON")
-            await connection.commit()
+        return await connection.run_sync(
+            lambda sync: run_sqlite_migration(
+                sync, lambda: _bootstrap_sync(sync, location), target_revision=target
+            )
+        )

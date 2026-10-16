@@ -12,11 +12,12 @@ import {
   FileSpreadsheet,
   Filter,
   FolderTree,
+  History,
+  ListChecks,
   Loader2,
   PencilLine,
   Plus,
   RefreshCw,
-  Search,
   ShieldCheck,
   Sparkles,
   UserCheck,
@@ -34,6 +35,16 @@ import {
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { SemanticGovernanceDialog } from "@/components/semantic/SemanticGovernanceDialog";
+import { Button } from "@/components/ui/button";
+import { SearchField } from "@/components/ui/SearchField";
+import { SemanticDetailPanel } from "@/components/semantic/SemanticDetailPanel";
+import { SemanticHistoryDialog } from "@/components/semantic/SemanticHistoryDialog";
+import { DiscardChangesDialog } from "@/components/ui/DiscardChangesDialog";
+import { SemanticSaveRecovery } from "@/components/semantic/SemanticSaveRecovery";
+import { SemanticSelectionDialog } from "@/components/semantic/SemanticSelectionDialog";
+import { SEMANTIC_SELECTION_LIMIT, reconcileSemanticSelection, removeSemanticSelection, toggleSemanticSelection, type SemanticSelection } from "@/lib/semantic-selection";
+import { inspectSemanticBatchResult } from "@/lib/semantic-batch";
+import { inspectSemanticSaveEntry, type SemanticSaveTarget } from "@/lib/semantic-save-recovery";
 import { SemanticInventoryProgress } from "@/components/semantic/SemanticInventoryProgress";
 import {
   normalizeSemanticInventoryJob,
@@ -43,7 +54,7 @@ import {
   semanticInventoryReviewItem,
 } from "@/components/semantic/semantic-inventory";
 import { api } from "@/lib/api/client";
-import { useModalFocus } from "@/lib/use-modal-focus";
+import { SemanticDefinitionEditor } from "@/components/semantic/SemanticDefinitionEditor";
 import { useProjectStore } from "@/lib/stores/project";
 import { PROJECT_STORAGE_KEY } from "@/lib/storage/legacy";
 import {
@@ -51,7 +62,6 @@ import {
   type Project,
   type ProjectDataSource,
   type SemanticBatchAction,
-  type SemanticBatchResult,
   type SemanticEntry,
   type SemanticInventoryJob,
   type SemanticKnowledgePage,
@@ -63,6 +73,7 @@ import {
   type SemanticValidationJobItem,
 } from "@/lib/types/api";
 import { cn } from "@/lib/utils";
+import fieldStyles from "@/components/ui/FieldControl.module.css";
 
 const PAGE_SIZE = 50;
 
@@ -1283,9 +1294,10 @@ function relationshipDraft(
       )
     : undefined;
   const display = entry ? semanticDisplayContent(entry) : null;
+  const alternate = entry ? semanticDisplayContent(entry, "en") : null;
   return {
     key: entry?.key || "",
-    businessName: display?.businessName || entry?.value || "",
+    businessName: display?.businessName || alternate?.businessName || entry?.value || "",
     value: entry?.value || "",
     entryType: entry?.entry_type || "business_rule",
     state: entry?.state || "candidate",
@@ -1294,7 +1306,7 @@ function relationshipDraft(
       entry?.entry_type !== "relationship" && entry?.definition
         ? JSON.stringify(entry.definition, null, 2)
         : "",
-    synonymsText: display?.synonyms.join("、") || "",
+    synonymsText: Array.from(new Set([...(display?.synonyms || []), ...(alternate?.synonyms || [])])).join("、"),
     bindingSourceId: bindingSource?.id || "",
     bindingTable: nonEmptyString(binding?.table_or_view) || "",
     bindingColumn:
@@ -1694,6 +1706,21 @@ function entryDescription(entry: SemanticEntry, t: Translate, locale = "zh"): st
   return t("details.definitionPurposeFallback", { name: title });
 }
 
+function historyPresentation(entry: SemanticEntry, t: Translate, locale: string) {
+  // History compares authored meaning: changing the UI language must not turn
+  // both versions into the same generated placeholder. Keep technical filtering.
+  const display = userFacingDisplayContent(entry, locale);
+  const fallback = userFacingDisplayContent(entry, locale === "en" ? "zh" : "en");
+  const safeValue = !containsTechnicalField(entry.value, entry) && !containsImplementationDetail(entry.value) ? entry.value : null;
+  return {
+    title: display.businessName || fallback.businessName || entryTitle(entry, t, locale),
+    description: display.description || fallback.description || safeValue,
+    type: semanticTypeLabel(entry.entry_type, t), state: governanceLabel(entry, t),
+    formula: display.formulaSummary || fallback.formulaSummary,
+    synonyms: Array.from(new Set([...display.synonyms, ...fallback.synonyms])),
+  };
+}
+
 const VALIDATION_POLL_INTERVAL_MS = 800;
 const VALIDATION_RECOVERY_INTERVAL_MS = 35_000;
 
@@ -1761,6 +1788,10 @@ function businessErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string }) {
+  return <ProjectUnderstandingSession key={projectId} projectId={projectId} />;
+}
+
+function ProjectUnderstandingSession({ projectId }: { projectId: string }) {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations("projectUnderstanding") as Translate;
@@ -1779,7 +1810,10 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
   const [rightTable, setRightTable] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [offset, setOffset] = useState(0);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selection, setSelection] = useState<SemanticSelection>(() => new Map());
+  const [selectionOpen, setSelectionOpen] = useState(false);
+  const batchInFlight = useRef(false);
+  const selectedIds = useMemo(() => new Set(selection.keys()), [selection]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1791,6 +1825,20 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
   );
   const [editorError, setEditorError] = useState<string | null>(null);
   const [savingEditor, setSavingEditor] = useState(false);
+  const [discardEditorOpen, setDiscardEditorOpen] = useState(false);
+  const [editorRecovery, setEditorRecovery] = useState<{ target: SemanticSaveTarget; conflict: boolean } | null>(null);
+  const editorCreateKey = useRef<string | null>(null);
+  const editorBaseline = useRef<SemanticEditorDraft | null>(null);
+  const editorSavingRef = useRef(false), sessionActiveRef = useRef(false);
+  const editorDirty = editorEntry !== undefined && editorBaseline.current !== null
+    && (Object.keys(editorDraft) as (keyof SemanticEditorDraft)[]).some(key => editorDraft[key] !== editorBaseline.current?.[key]);
+  useEffect(() => { sessionActiveRef.current = true; return () => { sessionActiveRef.current = false; }; }, []);
+  useEffect(() => {
+    if (!editorDirty && !savingEditor) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [editorDirty, savingEditor]);
   const [reloadVersion, setReloadVersion] = useState(0);
   const [governanceDialogOpen, setGovernanceDialogOpen] = useState(false);
   const [recommendationBatch, setRecommendationBatch] =
@@ -1811,9 +1859,16 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
   const [validationJob, setValidationJob] = useState<SemanticValidationJob | null>(null);
   const [validationJobError, setValidationJobError] = useState<string | null>(null);
   const [validationPollVersion, setValidationPollVersion] = useState(0);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [historyEntry, setHistoryEntry] = useState<{ id: string; label: string } | null>(null);
+  const [detailFocusRequest, setDetailFocusRequest] = useState(0);
+  const detailSearchRef = useRef<HTMLInputElement>(null);
+  const selectionWasOpen = useRef(false);
+  useEffect(() => {
+    if (selectionWasOpen.current && !selectionOpen && selection.size === 0) detailSearchRef.current?.focus();
+    selectionWasOpen.current = selectionOpen;
+  }, [selectionOpen, selection.size]);
+  const detailTriggers = useRef(new Map<string, HTMLElement>());
   const governanceTriggerRef = useRef<HTMLButtonElement>(null);
-  const editorDialogRef = useRef<HTMLElement>(null);
   const editorNameRef = useRef<HTMLInputElement>(null);
   const catalogRefreshEpochRef = useRef(0);
   const inventoryLoadedSourcesRef = useRef<Set<string>>(new Set());
@@ -1970,9 +2025,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
       setRecommendationBatchId(null);
       setRecommendationBatch(null);
     }
-    setSelectedIds(new Set());
     setActiveId(null);
-    setDetailOpen(false);
     setOffset(0);
     setFeedback(null);
   };
@@ -2052,17 +2105,6 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
       useProjectStore.setState({ currentProjectId: projectId });
     }
   }, [projectId]);
-
-  useEffect(() => {
-    if (!detailOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && editorEntry === undefined && !governanceDialogOpen) {
-        setDetailOpen(false);
-      }
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [detailOpen, editorEntry, governanceDialogOpen]);
 
   useEffect(() => {
     let active = true;
@@ -2265,7 +2307,6 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
 
   useEffect(() => {
     const controller = new AbortController();
-    setSelectedIds(new Set());
     setLoading(true);
     setError(null);
     const fallbackExactTable = !selectedScopeBackendId && selectedScopeKind === "table";
@@ -2324,7 +2365,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                   offset + PAGE_SIZE < exactItems.length ? offset + PAGE_SIZE : null,
               }
             : nextPage;
-        if (scopedPage.items.some((entry) => !Array.isArray(entry.allowed_actions))) {
+        if (scopedPage.items.some((entry) => entry.project_id !== projectId || !Array.isArray(entry.allowed_actions))) {
           throw new UserFacingError(t("errors.actionsUnavailable"));
         }
         if (scopedPage.total === 0 && scopedPage.offset > 0) {
@@ -2336,6 +2377,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
           return;
         }
         setPage(scopedPage);
+        setSelection(current => reconcileSemanticSelection(current, scopedPage.items));
         setActiveId((current) =>
           current && scopedPage.items.some((entry) => entry.id === current)
             ? current
@@ -2390,7 +2432,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
         schedulePoll();
         return;
       }
-      setSelectedIds(new Set());
+      setSelection(current => removeSemanticSelection(current, nextJob.items.map(item => item.entry_id)));
       await useProjectStore.getState().refreshCurrent().catch(() => undefined);
       if (!active) return;
       setReloadVersion((current) => current + 1);
@@ -2452,12 +2494,8 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
   }, [projectId, t, validationJobId, validationPollVersion]);
 
   const selectedEntries = useMemo(
-    () =>
-      (recommendationBatchId
-        ? sortRecommendationEntries(page?.items || [])
-        : page?.items || []
-      ).filter((entry) => selectedIds.has(entry.id)),
-    [page, recommendationBatchId, selectedIds]
+    () => [...selection.values()].map(item => item.entry),
+    [selection]
   );
   const displayEntries = useMemo(
     () =>
@@ -2490,6 +2528,11 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
     selectableEntries.length > 0 && selectableEntries.every((entry) => selectedIds.has(entry.id));
   const somePageSelected =
     !allPageSelected && selectableEntries.some((entry) => selectedIds.has(entry.id));
+  const pageSelectionExceedsLimit = !allPageSelected && selection.size
+    + selectableEntries.filter(entry => !selection.has(entry.id)).length > SEMANTIC_SELECTION_LIMIT;
+  const visibleSelectedIds = new Set(loading ? [] : displayEntries.filter(entry => selection.has(entry.id)).map(entry => entry.id));
+  const selectedElsewhere = selection.size - visibleSelectedIds.size;
+  const selectionNeedsReview = [...selection.values()].some(item => item.needsReview);
   const currentPage = page ? Math.floor(page.offset / page.limit) + 1 : 1;
   const pageCount = page ? Math.max(1, Math.ceil(page.total / page.limit)) : 1;
   const activeFilterCount =
@@ -2516,28 +2559,28 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
   );
 
   const toggleSelection = (entryId: string) => {
-    if (loading || entryValidationPending(entryId)) return;
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(entryId)) next.delete(entryId);
-      else next.add(entryId);
-      return next;
-    });
+    if (loading || batchInFlight.current || entryValidationPending(entryId)) return;
+    const entry = selectableEntries.find(item => item.id === entryId);
+    if (entry) setSelection(current => toggleSemanticSelection(current, [entry]));
   };
 
   const openDetails = (entryId: string) => {
     setActiveId(entryId);
-    setDetailOpen(true);
+    setDetailFocusRequest(current => current + 1);
+  };
+
+  const returnToDetailsList = () => {
+    const target = activeId ? detailTriggers.current.get(`table:${activeId}`) : null;
+    (target?.isConnected ? target : detailSearchRef.current)?.focus({ preventScroll: true });
+    target?.scrollIntoView?.({ block: "nearest" });
   };
 
   const togglePageSelection = () => {
-    if (loading) return;
-    setSelectedIds(
-      allPageSelected ? new Set() : new Set(selectableEntries.map((entry) => entry.id))
-    );
+    if (loading || batchInFlight.current) return;
+    setSelection(current => toggleSemanticSelection(current, selectableEntries));
   };
 
-  const openEditor = (entry: SemanticEntry | null) => {
+  const draftForEntry = (entry: SemanticEntry | null) => {
     const entrySourceIds = sourceIdsFromEntry(entry);
     const entryTables = entry ? scopeTableNames(entry) : [];
     const inferredScope = entry?.scope_id
@@ -2553,30 +2596,38 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             scope.kind === "source" &&
             Boolean(scope.sourceId && entrySourceIds.includes(scope.sourceId))
         );
-    setEditorEntry(entry);
-    setEditorDraft(
-      relationshipDraft(
+    return relationshipDraft(
         entry,
         sources,
         inferredScope?.key || (entry && !entry.scope_id ? "preserve" : selectedScope?.key || "")
-      )
-    );
+      );
+  };
+  const openEditor = (entry: SemanticEntry | null) => {
+    if (editorSavingRef.current || editorEntry !== undefined) return;
+    const draft = draftForEntry(entry);
+    editorCreateKey.current = null;
+    setEditorRecovery(null);
+    editorBaseline.current = draft;
+    setEditorEntry(entry);
+    setEditorDraft(draft);
+    setDiscardEditorOpen(false);
     setEditorError(null);
     setFeedback(null);
   };
 
-  const closeEditor = () => {
-    if (savingEditor) return;
+  const discardEditor = () => {
+    if (editorSavingRef.current) return;
+    editorBaseline.current = null;
     setEditorEntry(undefined);
     setEditorError(null);
+    setDiscardEditorOpen(false);
+    setEditorRecovery(null);
   };
-
-  useModalFocus({
-    active: editorEntry !== undefined,
-    containerRef: editorDialogRef,
-    onClose: closeEditor,
-    initialFocusRef: editorNameRef,
-  });
+  const closeEditor = () => {
+    if (editorSavingRef.current || discardEditorOpen) return;
+    if (editorDirty) setDiscardEditorOpen(true);
+    else discardEditor();
+  };
 
   const updateEditorDraft = <Key extends keyof SemanticEditorDraft>(
     key: Key,
@@ -2587,9 +2638,10 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
 
   const saveEditor = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (editorSavingRef.current || discardEditorOpen || editorRecovery || editorEntry === undefined) return;
     const businessName = editorDraft.businessName.trim();
     const editorScope = browserScopes.find((scope) => scope.key === editorDraft.scopeKey);
-    const key = editorEntry?.key || internalSemanticKey(
+    const key = editorEntry?.key || editorCreateKey.current || internalSemanticKey(
       businessName,
       editorDraft.entryType,
       editorScope?.key || "project"
@@ -2608,10 +2660,15 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
       return;
     }
 
+    editorSavingRef.current = true;
     setSavingEditor(true);
     setEditorError(null);
+    const target: SemanticSaveTarget = { projectId, key, entryId: editorEntry?.id, expectedHead: editorEntry?.active_revision_id, previousVersion: editorEntry?.revision_number,
+      content: { value, entryType: editorDraft.entryType, state: editorDraft.state, businessName } };
+    let sent = false;
     try {
       const definition = await editorDefinition(editorDraft, sources, editorEntry || null, t);
+      if (!sessionActiveRef.current) return;
       const relationshipSourceIds = Array.from(
         new Set(
           [editorDraft.leftSourceId, editorDraft.rightSourceId].filter(
@@ -2668,6 +2725,8 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             ? { scope_id: editorScope.backendId }
             : { scope_id: null }),
       };
+      if (!editorEntry) editorCreateKey.current = key;
+      sent = true;
       const response = editorEntry
         ? await api.put(`/api/v1/projects/${projectId}/knowledge/${editorEntry.id}`, {
             expected_active_revision_id: editorEntry.active_revision_id,
@@ -2676,8 +2735,11 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
         : await api.post(`/api/v1/projects/${projectId}/knowledge`, {
             ...basePayload,
           });
-      const saved = response.data.data as SemanticEntry;
+      const saved = inspectSemanticSaveEntry(response.data.data, target, true);
+      if (!sessionActiveRef.current) return;
       await refreshProjectState();
+      if (!sessionActiveRef.current) return;
+      editorBaseline.current = null;
       setEditorEntry(undefined);
       setEntryType(saved.entry_type);
       setState("all");
@@ -2688,9 +2750,16 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
       setFeedback(editorEntry ? t("feedback.updated") : t("feedback.added"));
       setReloadVersion((current) => current + 1);
     } catch (requestError) {
-      setEditorError(errorMessage(requestError, t));
+      if (sessionActiveRef.current) {
+        const status = requestStatus(requestError);
+        if (sent && (status === null || status === 0 || status === 404 || status === 408 || status === 409 || status >= 500)) {
+          setEditorRecovery({ target, conflict: status === 409 });
+        }
+        setEditorError(businessErrorMessage(requestError, t("editor.saveFailed")));
+      }
     } finally {
-      setSavingEditor(false);
+      editorSavingRef.current = false;
+      if (sessionActiveRef.current) setSavingEditor(false);
     }
   };
 
@@ -2723,7 +2792,6 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
     setRightTable("");
     setSearch("");
     setAdvancedOpen(false);
-    setSelectedIds(new Set());
     setActiveId(sortedItems[0]?.id || null);
     setOffset(0);
     setFeedback(t("recommendationBatch.generated", { count: result.items.length }));
@@ -2847,7 +2915,6 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
     setRightTable("");
     setSearch("");
     setAdvancedOpen(false);
-    setSelectedIds(new Set());
     setActiveId(null);
     setOffset(0);
     setFeedback(t("inventoryJob.reviewingTable", { table: item.table }));
@@ -2858,13 +2925,18 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
     entries: SemanticEntry[] = selectedEntries
   ) => {
     if (
+      batchInFlight.current ||
       loading ||
+      entries.length > SEMANTIC_SELECTION_LIMIT ||
+      entries.some(entry => entry.project_id !== projectId || !entry.active_revision_id) ||
+      (entries === selectedEntries && selectionNeedsReview) ||
       !actionAllowed(action, entries) ||
       entries.some((entry) => entryValidationPending(entry.id)) ||
       (action === "queue_validation" && validationInProgress)
     ) {
       return;
     }
+    batchInFlight.current = true;
     setBatchAction(action);
     setError(null);
     setFeedback(null);
@@ -2879,8 +2951,12 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
           })),
         }
       );
-      const result = response.data.data as SemanticBatchResult;
+      if (!sessionActiveRef.current) return;
+      const result = inspectSemanticBatchResult(response.data.data, projectId, action, entries);
+      setSelection(current => removeSemanticSelection(current, entries.map(entry => entry.id)));
+      setSelectionOpen(false);
       await refreshProjectState();
+      if (!sessionActiveRef.current) return;
       if (action === "queue_validation" && result.validation_job_id) {
         const queuedIds = result.queued_entry_ids.length
           ? result.queued_entry_ids
@@ -2910,7 +2986,6 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
         });
         setValidationJobError(null);
         setValidationJobId(result.validation_job_id);
-        setSelectedIds(new Set());
         setReloadVersion((current) => current + 1);
         return;
       }
@@ -2929,9 +3004,21 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
       );
       setReloadVersion((current) => current + 1);
     } catch (requestError) {
-      setError(errorMessage(requestError, t));
+      if (!sessionActiveRef.current) return;
+      const status = requestStatus(requestError);
+      const uncertain = !status || status === 404 || status === 408 || status === 409 || status >= 500;
+      if (uncertain) setSelection(current => {
+        const next = new Map(current);
+        for (const entry of entries) {
+          const selected = next.get(entry.id);
+          if (selected) next.set(entry.id, { ...selected, needsReview: true });
+        }
+        return next;
+      });
+      setError(uncertain ? t("selection.unconfirmed") : errorMessage(requestError, t));
     } finally {
-      setBatchAction(null);
+      batchInFlight.current = false;
+      if (sessionActiveRef.current) setBatchAction(null);
     }
   };
 
@@ -2959,93 +3046,52 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
     : null;
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col items-center overflow-hidden bg-secondary/20 text-foreground">
-      <header className="flex min-h-14 w-full max-w-[1480px] shrink-0 flex-wrap items-center justify-between gap-3 border-x border-b border-border bg-background px-4 py-2.5 md:px-6">
+    <div className="flex h-dvh min-h-0 min-w-[var(--desktop-min-width)] flex-col items-center overflow-hidden bg-background p-2 text-foreground">
+      <header className="flex h-[var(--shell-header-height)] w-full shrink-0 items-center justify-between gap-3 rounded-t-xl border border-border bg-card px-6">
         <div className="flex min-w-0 items-center gap-4">
-          <button
-            type="button"
+          <Button variant="ghost"
+            
             onClick={() => router.push("/")}
-            className="inline-flex h-9 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            
           >
             <ArrowLeft size={16} />
             {t("navigation.backToProject")}
-          </button>
+          </Button>
           <span className="h-5 w-px bg-border" />
           <div className="min-w-0 truncate text-sm font-semibold">
             {project?.name || t("navigation.currentProject")}
           </div>
         </div>
         <div className="flex min-w-0 shrink-0 items-center gap-2">
-          <button
+          <Button variant="primary"
             ref={governanceTriggerRef}
-            type="button"
+            
             onClick={() => setGovernanceDialogOpen(true)}
-            className="inline-flex h-9 items-center justify-center gap-2 bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            
           >
             <Sparkles size={15} />
             {t("header.governance")}
-          </button>
+          </Button>
         </div>
       </header>
 
-      <main className="flex min-h-0 w-full max-w-[1480px] flex-1 flex-col overflow-hidden border-x border-border bg-background">
-        <section className="shrink-0 border-b border-border px-4 py-4 md:px-6">
-          <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
+      <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-b-xl border-x border-b border-border bg-card">
+        <section className="shrink-0 border-b border-border px-6 py-4">
+          <div className="flex flex-col gap-4">
             <div className="shrink-0">
-              <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
+              <h1 className="text-xl font-semibold tracking-tight">
                 {t("header.title")}
               </h1>
-              <p className="mt-1 text-xs text-muted-foreground md:text-sm">{t("header.description")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t("header.description")}</p>
             </div>
-            <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 md:grid-cols-[minmax(220px,1fr)_auto_auto_auto] lg:max-w-4xl">
-              <label className="relative col-span-2 min-w-0 md:col-span-1">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <input
-                  aria-label={t("search.label")}
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t("search.placeholder")}
-                  className="h-10 w-full border border-border bg-background pl-9 pr-9 text-sm outline-none transition-colors focus:border-primary"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    aria-label={t("search.clear")}
-                    onClick={() => setSearch("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </label>
-              <select
-                aria-label={t("filters.source")}
-                value={selectedScope?.key || ""}
-                onChange={(event) => {
-                  if (!event.target.value) {
-                    setSelectedScopeKey(null);
-                    return;
-                  }
-                  const scope = browserScopes.find((item) => item.key === event.target.value);
-                  if (scope) chooseScope(scope);
-                }}
-                className="col-span-2 h-10 max-w-full border border-border bg-background px-3 text-sm outline-none focus:border-primary md:hidden"
-              >
-                <option value="">{t("header.allDefinitions")}</option>
-                {browserScopes.map((scope) => (
-                  <option key={scope.key} value={scope.key}>
-                    {`${"— ".repeat(Math.max(0, scope.depth))}${scope.businessName}`}
-                  </option>
-                ))}
-              </select>
+            <div className="grid min-w-0 flex-1 grid-cols-[minmax(220px,1fr)_auto_auto_auto] gap-2">
+              <SearchField value={search} onChange={setSearch} inputRef={detailSearchRef}
+                label={t("search.label")} clearLabel={t("search.clear")} />
               <select
                 aria-label={t("filters.contentType")}
                 value={entryType}
                 onChange={(event) => setEntryType(event.target.value as EntryTypeFilter)}
-                className="h-10 min-w-0 border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                className="h-9 min-w-0 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
               >
                 {TYPE_OPTIONS.map((option) => (
                   <option key={option} value={option}>
@@ -3061,7 +3107,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                 aria-expanded={advancedOpen}
                 aria-controls="semantic-advanced-filters"
                 className={cn(
-                  "inline-flex h-10 items-center justify-center gap-2 border px-3 text-sm transition-colors",
+                  "inline-flex h-9 rounded-md items-center justify-center gap-2 border px-3 text-sm transition-colors",
                   advancedOpen || activeFilterCount
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border text-muted-foreground hover:text-foreground"
@@ -3075,7 +3121,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
               <button
                 type="button"
                 onClick={() => openEditor(null)}
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                className="inline-flex h-9 rounded-md shrink-0 items-center justify-center gap-2 bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 <Plus size={15} />
                 {t("actions.addDefinition")}
@@ -3086,13 +3132,13 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
           {advancedOpen && (
             <div
               id="semantic-advanced-filters"
-              className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-4"
+              className="mt-4 grid gap-3 border-t border-border pt-4 grid-cols-4"
             >
               <select
                 aria-label={t("filters.governanceState")}
                 value={state}
                 onChange={(event) => setState(event.target.value as StateFilter)}
-                className="h-9 border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
               >
                 {STATE_OPTIONS.map((option) => (
                   <option key={option} value={option}>
@@ -3104,7 +3150,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                 aria-label={t("filters.validity")}
                 value={validity}
                 onChange={(event) => setValidity(event.target.value as ValidityFilter)}
-                className="h-9 border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
               >
                 {VALIDITY_OPTIONS.map((option) => (
                   <option key={option} value={option}>
@@ -3117,14 +3163,14 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                 onChange={(event) => setLeftTable(event.target.value)}
                 placeholder={t("filters.leftTable")}
                 aria-label={t("filters.leftTable")}
-                className="h-9 border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
               />
               <input
                 value={rightTable}
                 onChange={(event) => setRightTable(event.target.value)}
                 placeholder={t("filters.rightTable")}
                 aria-label={t("filters.rightTable")}
-                className="h-9 border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+                className="h-9 rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
               />
             </div>
           )}
@@ -3132,12 +3178,12 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
 
         <div
           data-testid="semantic-browser-layout"
-          className="relative grid min-h-0 flex-1 overflow-hidden md:grid-cols-[236px_minmax(0,1fr)] 2xl:grid-cols-[236px_minmax(0,1fr)_340px]"
+          className="relative grid min-h-0 flex-1 overflow-hidden grid-cols-[200px_minmax(0,1fr)_320px]"
         >
           <nav
             aria-label={t("scopeTree.aria")}
             data-testid="semantic-scope-tree"
-            className="hidden min-h-0 flex-col overflow-hidden border-r border-border bg-card/45 md:flex"
+            className="flex min-h-0 flex-col overflow-hidden border-r border-border bg-card/45"
           >
             <div className="shrink-0 border-b border-border px-4 py-4">
               <div className="flex items-center gap-2 text-xs font-semibold">
@@ -3238,7 +3284,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             aria-label={t("list.aria")}
             className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
           >
-            <div className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4 md:px-5">
+            <div className="flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-5">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate text-sm font-semibold">
@@ -3274,7 +3320,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             </div>
 
             {inventoryRestoreFailures.length ? (
-              <div className="mx-5 mt-4 grid shrink-0 gap-2 md:mx-8 lg:grid-cols-2">
+              <div className="mx-5 mt-4 grid shrink-0 gap-2 grid-cols-2">
                 {inventoryRestoreFailures.map((failure) => (
                   <div
                     key={failure.sourceId}
@@ -3308,7 +3354,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             ) : null}
 
             {inventoryJobList.length ? (
-              <div className="mx-5 mt-4 grid max-h-48 shrink-0 gap-2 overflow-y-auto md:mx-8 lg:grid-cols-2">
+              <div className="mx-5 mt-4 grid max-h-48 shrink-0 gap-2 overflow-y-auto grid-cols-2">
                 {inventoryJobList.map((job) => {
                   const source = sources.find((item) => item.id === job.source_id);
                   return (
@@ -3333,7 +3379,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             {recommendationBatchId && (
               <div
                 data-testid="recommendation-batch-filter"
-                className="mx-5 mt-4 flex shrink-0 flex-col gap-3 border border-primary/25 bg-primary/[0.035] px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:mx-8"
+                className="mx-5 mt-4 flex shrink-0 gap-3 rounded-xl border border-primary/25 bg-primary/[0.035] px-4 py-3 items-center justify-between"
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -3366,7 +3412,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
               <div
                 role="status"
                 aria-label={t("validationJob.aria")}
-                className="mx-5 mt-4 shrink-0 border border-border bg-secondary/35 px-4 py-3 md:mx-8"
+                className="mx-5 mt-4 shrink-0 border border-border bg-secondary/35 px-4 py-3"
               >
                 {validationJob && (
                   <>
@@ -3440,7 +3486,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             )}
 
             {error && (
-              <div role="alert" className="mx-5 mt-4 flex shrink-0 items-center gap-2 bg-destructive/[0.06] px-3 py-2 text-sm text-destructive md:mx-8">
+              <div role="alert" className="mx-5 mt-4 flex shrink-0 items-center gap-2 bg-destructive/[0.06] px-3 py-2 text-sm text-destructive">
                 <CircleAlert size={15} />
                 <span className="flex-1">{error}</span>
                 <button type="button" onClick={() => setReloadVersion((current) => current + 1)} className="font-medium">
@@ -3449,33 +3495,33 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
               </div>
             )}
             {feedback && (
-              <div role="status" className="mx-5 mt-4 flex shrink-0 items-center gap-2 bg-success/[0.06] px-3 py-2 text-sm text-success md:mx-8">
+              <div role="status" className="mx-5 mt-4 flex shrink-0 items-center gap-2 bg-success/[0.06] px-3 py-2 text-sm text-success">
                 <Check size={15} />
                 {feedback}
               </div>
             )}
 
+            <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-5 py-2">
+              <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 text-xs text-muted-foreground has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40">
+                <input type="checkbox" aria-label={t("list.selectPage")} checked={allPageSelected}
+                  aria-checked={somePageSelected ? "mixed" : allPageSelected}
+                  ref={element => { if (element) element.indeterminate = somePageSelected; }}
+                  disabled={loading || !!batchAction || !selectableEntries.length || pageSelectionExceedsLimit}
+                  onChange={togglePageSelection} className="accent-primary" />
+                {t("list.selectPage")}
+              </label>
+              {selection.size > 0 && <span role="status" className="text-[11px] tabular-nums text-muted-foreground">{t("selection.capacity", { count: selection.size, limit: SEMANTIC_SELECTION_LIMIT })}</span>}
+              {pageSelectionExceedsLimit && <span className="text-[11px] text-muted-foreground">{t("selection.pageLimit")}</span>}
+            </div>
+
             <div
               data-testid="semantic-table-list"
-              className="hidden min-h-0 flex-1 overflow-auto overscroll-contain 2xl:block"
+              className="min-h-0 flex-1 overflow-auto overscroll-contain"
             >
               <table className="w-full min-w-[680px] border-collapse text-left">
                 <thead>
                   <tr className="border-b border-border text-[11px] font-medium text-muted-foreground">
-                    <th className="w-12 px-4 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        aria-label={t("list.selectPage")}
-                        checked={allPageSelected}
-                        aria-checked={somePageSelected ? "mixed" : allPageSelected}
-                        ref={(element) => {
-                          if (element) element.indeterminate = somePageSelected;
-                        }}
-                        disabled={loading || selectableEntries.length === 0}
-                        onChange={togglePageSelection}
-                        className="accent-primary disabled:opacity-40"
-                      />
-                    </th>
+                    <th className="w-12 px-4 py-3"><span className="sr-only">{t("selection.items")}</span></th>
                     <th className="px-3 py-3">{t("list.columnBusinessMeaning")}</th>
                     <th className="w-56 px-3 py-3">{t("list.columnScope")}</th>
                     <th className="w-32 px-3 py-3">{t("list.columnState")}</th>
@@ -3499,6 +3545,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                       return (
                         <tr
                           key={entry.id}
+                          ref={node => { if (node) detailTriggers.current.set(`table:${entry.id}`, node); else detailTriggers.current.delete(`table:${entry.id}`); }}
                           aria-selected={active}
                           tabIndex={0}
                           onClick={() => openDetails(entry.id)}
@@ -3522,6 +3569,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                               })}
                               checked={selected}
                               disabled={
+                                !!batchAction || (!selected && selection.size >= SEMANTIC_SELECTION_LIMIT) ||
                                 entryValidationPending(entry.id) ||
                                 !selectableEntries.some((item) => item.id === entry.id)
                               }
@@ -3597,120 +3645,8 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             </div>
 
             <div
-              data-testid="semantic-card-list"
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-2 2xl:hidden md:px-5"
-            >
-              {loading && !page ? (
-                <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-                  <Loader2 size={18} className="mr-2 animate-spin" />
-                  {t("list.loading")}
-                </div>
-              ) : page?.items.length ? (
-                <div className="divide-y divide-border border-y border-border">
-                  {displayEntries.map((entry) => {
-                    const selected = selectedIds.has(entry.id);
-                    const active = activeId === entry.id;
-                    const display = userFacingDisplayContent(entry, locale);
-                    const breadcrumb = scopeBreadcrumb(entry, selectedScope, browserScopes, t);
-                    return (
-                      <article
-                        key={entry.id}
-                        data-active={active || undefined}
-                        tabIndex={0}
-                        onClick={() => openDetails(entry.id)}
-                        onKeyDown={(event) => {
-                          if (event.currentTarget !== event.target) return;
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            openDetails(entry.id);
-                          }
-                        }}
-                        className={cn(
-                          "cursor-pointer px-1 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 sm:px-2",
-                          active && "bg-primary/[0.045]"
-                        )}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="pt-1"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              aria-label={t("list.selectCardEntry", {
-                                title: entryTitle(entry, t, locale),
-                              })}
-                              checked={selected}
-                              disabled={
-                                entryValidationPending(entry.id) ||
-                                !selectableEntries.some((item) => item.id === entry.id)
-                              }
-                              onChange={() => toggleSelection(entry.id)}
-                              className="accent-primary disabled:opacity-40"
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <h3 className="min-w-0 text-sm font-semibold leading-6">
-                                {entryTitle(entry, t, locale)}
-                              </h3>
-                              <span
-                                className={cn(
-                                  "shrink-0 text-xs font-medium",
-                                  governanceTone(entry)
-                                )}
-                              >
-                                {governanceLabel(entry, t)}
-                              </span>
-                            </div>
-                            {recommendationBatchId ? (
-                              <div className="mt-1 flex flex-wrap items-center gap-2">
-                                <span className="border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                  {recommendationGroupLabel(entry, t)}
-                                </span>
-                                {looksLikeUntranslatedField(entry, locale) ? (
-                                  <span className="text-xs text-warning">
-                                    {t("recommendationBatch.namingIncomplete")}
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : null}
-                            {(display.exampleQuestions[0] ||
-                              (looksLikeUntranslatedField(entry, locale)
-                                ? display.description || untranslatedFieldPlaceholder(entry, t)
-                                : null)) && (
-                              <p className="mt-1 text-sm leading-6 text-foreground/70">
-                                {display.exampleQuestions[0]
-                                  ? `“${display.exampleQuestions[0]}”`
-                                  : display.description || untranslatedFieldPlaceholder(entry, t)}
-                              </p>
-                            )}
-                            <div className="mt-2 truncate text-[11px] text-muted-foreground">
-                              {breadcrumb}
-                            </div>
-                          </div>
-                          <ChevronRight size={16} className="mt-1 shrink-0 text-muted-foreground" />
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex h-48 flex-col items-center justify-center text-center">
-                  <BookOpenText size={20} className="mb-3 text-muted-foreground" />
-                  <div className="text-sm font-medium">{t("list.emptyTitle")}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {selectedScope?.kind === "source" && selectedScope.childCount > 0
-                      ? t("scopeTree.chooseTablePrompt")
-                      : t("list.emptyDescription")}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div
               className={cn(
-                "flex min-h-16 shrink-0 items-center justify-between border-t border-border px-5 md:px-8",
+                "flex min-h-16 shrink-0 items-center justify-between border-t border-border px-5",
                 selectedEntries.length > 0 && "mb-16"
               )}
             >
@@ -3740,40 +3676,19 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
             </div>
           </section>
 
-          {detailOpen && (
-            <button
-              type="button"
-              aria-label={t("details.close")}
-              onClick={() => setDetailOpen(false)}
-              className="fixed inset-0 z-40 bg-foreground/25 2xl:hidden"
-            />
-          )}
-
-          <aside
-            aria-label={t("details.aria")}
-            data-testid="semantic-detail-drawer"
-            className={cn(
-              "fixed inset-y-0 right-0 z-50 min-h-0 w-[min(380px,calc(100vw-1rem))] overflow-y-auto overscroll-contain border-l border-border bg-card shadow-2xl transition-transform duration-200 2xl:static 2xl:z-auto 2xl:w-full 2xl:translate-x-0 2xl:shadow-none",
-              detailOpen ? "translate-x-0" : "translate-x-full"
-            )}
-          >
+          <SemanticDetailPanel covered={editorEntry !== undefined || governanceDialogOpen || historyEntry !== null || selectionOpen} focusRequest={detailFocusRequest}
+            title={activeEntry ? entryTitle(activeEntry, t, locale) : t("details.selectPrompt")}
+            index={displayEntries.findIndex(entry => entry.id === activeId)} count={displayEntries.length}
+            busy={loading || Boolean(batchAction)} onReturnFocus={returnToDetailsList}
+            onNavigate={direction => {
+              const index = displayEntries.findIndex(entry => entry.id === activeId);
+              const next = index >= 0 ? displayEntries[index + direction] : null;
+              if (next && !loading && !batchAction) openDetails(next.id);
+            }}>
             {activeEntry ? (
               <div className="p-5">
-                <div className="mb-3 flex justify-end 2xl:hidden">
-                  <button
-                    type="button"
-                    aria-label={t("details.close")}
-                    onClick={() => setDetailOpen(false)}
-                    className="-m-2 p-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold leading-7">
-                      {entryTitle(activeEntry, t, locale)}
-                    </h2>
+                  <div className="min-w-0">
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       {scopeBreadcrumb(activeEntry, selectedScope, browserScopes, t)}
                     </p>
@@ -3782,6 +3697,9 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                     {governanceLabel(activeEntry, t)}
                   </span>
                 </div>
+
+                {error && <p role="alert" className="mt-4 bg-destructive/[0.06] px-3 py-2 text-xs leading-5 text-destructive">{error}</p>}
+                {feedback && <p role="status" className="mt-4 bg-success/[0.06] px-3 py-2 text-xs leading-5 text-success">{feedback}</p>}
 
                 <div className="mt-6 space-y-5 border-y border-border py-5">
                   <div>
@@ -3833,9 +3751,14 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                 </div>
 
                 <div className="mt-6 space-y-2">
+                  <Button variant="outline"  disabled={loading || Boolean(batchAction) || !activeEntry.active_revision_id}
+                    onClick={() => setHistoryEntry({ id: activeEntry.id, label: entryTitle(activeEntry, t, locale) })}
+                    className="w-full">
+                    <History size={14} />{t("actions.history")}
+                  </Button>
                   {(canQueueValidation(activeEntry) || entryValidationPending(activeEntry.id)) && (
-                    <button
-                      type="button"
+                    <Button variant="primary"
+                      
                       disabled={
                         loading ||
                         Boolean(batchAction) ||
@@ -3843,43 +3766,43 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                         entryValidationPending(activeEntry.id)
                       }
                       onClick={() => void runBatch("queue_validation", [activeEntry])}
-                      className="inline-flex w-full items-center justify-center gap-2 bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                      className="w-full"
                     >
                       <ShieldCheck size={15} />
                       {t("actions.systemValidate")}
-                    </button>
+                    </Button>
                   )}
                   {canRemember(activeEntry) && (
-                    <button
-                      type="button"
+                    <Button variant="primary"
+                      
                       disabled={
                         loading ||
                         Boolean(batchAction) ||
                         entryValidationPending(activeEntry.id)
                       }
                       onClick={() => void runBatch("remember", [activeEntry])}
-                      className="inline-flex w-full items-center justify-center gap-2 bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                      className="w-full"
                     >
                       <Check size={15} />
                       {t("actions.adopt")}
-                    </button>
+                    </Button>
                   )}
                   {canIgnore(activeEntry) && (
-                    <button
-                      type="button"
+                    <Button variant="ghost"
+                      
                       disabled={
                         loading ||
                         Boolean(batchAction) ||
                         entryValidationPending(activeEntry.id)
                       }
                       onClick={() => void runBatch("ignore", [activeEntry])}
-                      className="w-full px-4 py-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      className="w-full"
                     >
                       {t("actions.ignore")}
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    type="button"
+                  <Button variant="outline"
+                    
                     disabled={
                       !activeEntry.active_revision_id ||
                       activeEntry.is_active === false ||
@@ -3888,36 +3811,36 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                       entryValidationPending(activeEntry.id)
                     }
                     onClick={() => openEditor(activeEntry)}
-                    className="inline-flex w-full items-center justify-center gap-2 border border-border px-4 py-2.5 text-sm text-foreground hover:border-primary/50 disabled:opacity-50"
+                    className="w-full"
                   >
                     <PencilLine size={14} />
                     {t("actions.editDefinition")}
-                  </button>
+                  </Button>
                   {canAttest(activeEntry) && (
-                    <button
-                      type="button"
+                    <Button variant="outline"
+                      
                       disabled={
                         loading ||
                         Boolean(batchAction) ||
                         entryValidationPending(activeEntry.id)
                       }
                       onClick={() => void runBatch("attest", [activeEntry])}
-                      className="inline-flex w-full items-center justify-center gap-2 border border-primary/50 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/5 disabled:opacity-50"
+                      className="w-full"
                     >
                       <UserCheck size={15} />
                       {t("actions.manualReview")}
-                    </button>
+                    </Button>
                   )}
                   {canRestore(activeEntry) && (
-                    <button
-                      type="button"
+                    <Button variant="outline"
+                      
                       disabled={loading || Boolean(batchAction)}
                       onClick={() => void runBatch("restore", [activeEntry])}
-                      className="inline-flex w-full items-center justify-center gap-2 border border-border px-4 py-2.5 text-sm text-foreground hover:border-primary/50 disabled:opacity-50"
+                      className="w-full"
                     >
                       <RefreshCw size={14} />
                       {t("actions.restore")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -3926,7 +3849,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                 {t("details.selectPrompt")}
               </div>
             )}
-          </aside>
+          </SemanticDetailPanel>
         </div>
       </main>
 
@@ -3940,39 +3863,36 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
         onCatalogRefreshed={handleCatalogRefreshed}
       />
 
-      {editorEntry !== undefined && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 p-4">
-          <section
-            ref={editorDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={editorEntry ? t("editor.editTitle") : t("editor.addTitle")}
-            tabIndex={-1}
-            className="flex max-h-[min(860px,calc(100dvh-2rem))] w-full max-w-3xl flex-col overflow-hidden bg-background shadow-2xl"
-          >
-            <div className="flex shrink-0 items-start justify-between border-b border-border px-6 py-5">
-              <div>
-                <h2 className="text-xl font-semibold">
-                  {editorEntry ? t("editor.editTitle") : t("editor.addTitle")}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("editor.description")}
-                </p>
-              </div>
-              <button
-                type="button"
-                aria-label={t("editor.close")}
-                disabled={savingEditor}
-                onClick={closeEditor}
-                className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-40"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      {historyEntry && <SemanticHistoryDialog key={`${projectId}:${historyEntry.id}`} projectId={projectId} entryId={historyEntry.id} label={historyEntry.label}
+        present={entry => historyPresentation(entry, t, locale)} onClose={() => setHistoryEntry(null)} onRestored={entry => {
+          showAllDefinitions();
+          setSearch(rawPresentationBusinessName(entry) ?? "");
+          setPage(current => current ? { ...current, items: current.items.map(item => item.id === entry.id ? entry : item) } : current);
+          setActiveId(entry.id); setFeedback(t("feedback.historyRestored")); setSelection(current => removeSemanticSelection(current, [entry.id]));
+          setReloadVersion(value => value + 1); void refreshProjectState();
+        }} />}
 
-            <form onSubmit={saveEditor} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              <div className="space-y-5 px-6 py-6">
-                {editorError && (
+      {editorEntry !== undefined && (
+          <SemanticDefinitionEditor editing={Boolean(editorEntry)} busy={savingEditor} dirty={editorDirty}
+            saveBlocked={Boolean(editorRecovery) || discardEditorOpen} writingRef={editorSavingRef}
+            initialFocusRef={editorNameRef} onClose={closeEditor} onSubmit={saveEditor}
+            confirmation={discardEditorOpen && <DiscardChangesDialog title={t("editor.discardTitle")} description={t("editor.discardDescription")}
+              continueLabel={t("editor.continueEditing")} discardLabel={t("editor.discardAndClose")}
+              disabled={savingEditor} fallbackFocus={editorNameRef} onContinue={() => setDiscardEditorOpen(false)} onDiscard={discardEditor} />}>
+              {editorRecovery && <SemanticSaveRecovery target={editorRecovery.target} conflict={editorRecovery.conflict}
+                draft={{ title: editorDraft.businessName, description: editorDraft.value }} present={entry => historyPresentation(entry, t, locale)}
+                fallbackFocus={editorNameRef} onRetry={() => { setEditorRecovery(null); setEditorError(null); editorNameRef.current?.focus(); }}
+                onLoad={entry => {
+                  if (editorSavingRef.current) return;
+                  const draft = draftForEntry(entry);
+                  editorBaseline.current = draft;
+                  setEditorEntry(entry); setEditorDraft(draft); setEditorRecovery(null); setEditorError(null);
+                  setDiscardEditorOpen(false);
+                  editorNameRef.current?.focus({ preventScroll: true });
+                  setPage(current => current ? { ...current, items: current.items.map(item => item.id === entry.id ? entry : item) } : current);
+                }} />}
+              <fieldset disabled={savingEditor} className="min-w-0 space-y-5 px-6 py-6 disabled:opacity-70">
+                {editorError && !editorRecovery && (
                   <div role="alert" className="flex items-start gap-2 bg-destructive/[0.06] px-3 py-2.5 text-sm text-destructive">
                     <CircleAlert size={15} className="mt-0.5 shrink-0" />
                     <span>{editorError}</span>
@@ -4000,7 +3920,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                           : {}),
                       }));
                     }}
-                    className="h-10 w-full border border-border bg-background px-3 font-normal outline-none focus:border-primary"
+                    className={cn(fieldStyles.control, "font-normal")}
                   >
                     {editorDraft.scopeKey === "preserve" && editorEntry && (
                       <option value="preserve">
@@ -4026,7 +3946,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                     onChange={(event) => updateEditorDraft("businessName", event.target.value)}
                     maxLength={160}
                     placeholder={t("editor.namePlaceholder")}
-                    className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                    className={cn(fieldStyles.control, "font-normal")}
                   />
                 </label>
 
@@ -4038,7 +3958,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                     onChange={(event) => updateEditorDraft("value", event.target.value)}
                     rows={3}
                     placeholder={t("editor.businessDefinitionPlaceholder")}
-                    className="w-full resize-y border border-border bg-background px-3 py-2.5 text-sm font-normal leading-6 outline-none focus:border-primary"
+                    className={cn(fieldStyles.control, "resize-y font-normal leading-6")}
                   />
                 </label>
 
@@ -4050,14 +3970,14 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                     onChange={(event) => updateEditorDraft("synonymsText", event.target.value)}
                     rows={2}
                     placeholder={t("editor.synonymsPlaceholder")}
-                    className="w-full resize-y border border-border bg-background px-3 py-2.5 text-sm font-normal leading-6 outline-none focus:border-primary"
+                    className={cn(fieldStyles.control, "resize-y font-normal leading-6")}
                   />
                   <span className="block text-xs font-normal leading-5 text-muted-foreground">
                     {t("editor.synonymsHint")}
                   </span>
                 </label>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 grid-cols-2">
                   <label className="space-y-2 text-sm font-medium">
                     <span>{t("editor.definitionType")}</span>
                     <select
@@ -4070,7 +3990,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                           event.target.value as SemanticEntry["entry_type"]
                         )
                       }
-                      className="h-10 w-full border border-border bg-background px-3 font-normal outline-none focus:border-primary"
+                      className={cn(fieldStyles.control, "font-normal")}
                     >
                       {editorDraft.entryType === "scope_presentation" ? (
                         <option value="scope_presentation">
@@ -4092,7 +4012,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                       onChange={(event) =>
                         updateEditorDraft("state", event.target.value as SemanticEntry["state"])
                       }
-                      className="h-10 w-full border border-border bg-background px-3 font-normal outline-none focus:border-primary"
+                      className={cn(fieldStyles.control, "font-normal")}
                     >
                       {EDITABLE_STATE_OPTIONS.map((option) => (
                         <option key={option} value={option}>
@@ -4120,7 +4040,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                         ? t("editor.metricBinding")
                         : t("editor.dimensionBinding")}
                     </legend>
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 grid-cols-3">
                       <label className="space-y-1.5 text-xs font-medium">
                         <span>{t("editor.dataSource")}</span>
                         <select
@@ -4134,7 +4054,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                               bindingColumn: "",
                             }))
                           }
-                          className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                          className={cn(fieldStyles.control, "font-normal")}
                         >
                           <option value="">{t("editor.select")}</option>
                           {sources.map((source) => (
@@ -4156,7 +4076,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                               bindingColumn: "",
                             }))
                           }
-                          className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                          className={cn(fieldStyles.control, "font-normal")}
                         >
                           <option value="">{t("editor.select")}</option>
                           {editorBindingTables.map((table) => (
@@ -4182,7 +4102,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                           onChange={(event) =>
                             updateEditorDraft("bindingColumn", event.target.value)
                           }
-                          className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                          className={cn(fieldStyles.control, "font-normal")}
                         >
                           <option value="">{t("editor.select")}</option>
                           {editorBindingColumns.map((column) => (
@@ -4205,7 +4125,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                               event.target.value as "sum" | "avg"
                             )
                           }
-                          className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                          className={cn(fieldStyles.control, "font-normal")}
                         >
                           <option value="sum">{t("editor.aggregationSum")}</option>
                           <option value="avg">{t("editor.aggregationAverage")}</option>
@@ -4223,7 +4143,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                               event.target.value as SemanticEditorDraft["dimensionRole"]
                             )
                           }
-                          className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                          className={cn(fieldStyles.control, "font-normal")}
                         >
                           <option value="time">{t("editor.dimensionTime")}</option>
                           <option value="category">{t("editor.dimensionCategory")}</option>
@@ -4254,7 +4174,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                       const columns = isLeft ? editorLeftColumns : editorRightColumns;
                       const sideLabel = isLeft ? t("editor.left") : t("editor.right");
                       return (
-                        <fieldset key={side} className="grid gap-3 sm:grid-cols-3">
+                        <fieldset key={side} className="grid gap-3 grid-cols-3">
                           <legend className="mb-2 text-xs font-medium text-muted-foreground">{sideLabel}</legend>
                           <label className="space-y-1.5 text-xs font-medium">
                             <span>{t("editor.dataSource")}</span>
@@ -4269,7 +4189,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                                   [isLeft ? "leftColumn" : "rightColumn"]: "",
                                 }))
                               }
-                              className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                              className={cn(fieldStyles.control, "font-normal")}
                             >
                               <option value="">{t("editor.select")}</option>
                               {sources.map((source) => (
@@ -4291,7 +4211,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                                   event.target.value
                                 )
                               }
-                              className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                              className={cn(fieldStyles.control, "font-normal")}
                             />
                             <datalist id={`semantic-${side}-tables`}>
                               {tables.map((table) => (
@@ -4311,7 +4231,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                                   event.target.value
                                 )
                               }
-                              className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                              className={cn(fieldStyles.control, "font-normal")}
                             />
                             <datalist id={`semantic-${side}-columns`}>
                               {columns.map((column) => (
@@ -4323,7 +4243,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                       );
                     })}
 
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 grid-cols-3">
                       <label className="space-y-1.5 text-xs font-medium">
                         <span>{t("editor.joinType")}</span>
                         <select
@@ -4332,7 +4252,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                           onChange={(event) =>
                             updateEditorDraft("defaultJoin", event.target.value as "left" | "inner")
                           }
-                          className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                          className={cn(fieldStyles.control, "font-normal")}
                         >
                           <option value="left">{t("editor.joinLeft")}</option>
                           <option value="inner">{t("editor.joinInner")}</option>
@@ -4349,7 +4269,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                               event.target.value as SemanticEditorDraft["cardinality"]
                             )
                           }
-                          className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                          className={cn(fieldStyles.control, "font-normal")}
                         >
                           <option value="">{t("editor.cardinalityUnknown")}</option>
                           <option value="one_to_one">{t("editor.oneToOne")}</option>
@@ -4369,7 +4289,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                               event.target.value as SemanticEditorDraft["normalization"]
                             )
                           }
-                          className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                          className={cn(fieldStyles.control, "font-normal")}
                         >
                           <option value="auto">{t("editor.normalizationAuto")}</option>
                           <option value="exact">{t("editor.normalizationExact")}</option>
@@ -4385,7 +4305,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                       <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
                         {t("editor.validationBounds")}
                       </summary>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="mt-3 grid gap-3 grid-cols-2">
                         <label className="space-y-1.5 text-xs font-medium">
                           <span>{t("editor.minimumLeftMatchRate")}</span>
                           <input
@@ -4398,7 +4318,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                             onChange={(event) =>
                               updateEditorDraft("minimumLeftMatchRate", event.target.value)
                             }
-                            className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                            className={cn(fieldStyles.control, "font-normal")}
                           />
                         </label>
                         <label className="space-y-1.5 text-xs font-medium">
@@ -4412,7 +4332,7 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                             onChange={(event) =>
                               updateEditorDraft("maximumExpansionRatio", event.target.value)
                             }
-                            className="h-10 w-full border border-border bg-background px-3 text-sm font-normal outline-none focus:border-primary"
+                            className={cn(fieldStyles.control, "font-normal")}
                           />
                         </label>
                       </div>
@@ -4420,103 +4340,28 @@ export function ProjectUnderstandingWorkspace({ projectId }: { projectId: string
                   </div>
                 ) : null}
 
-              </div>
+              </fieldset>
 
-              <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-border bg-background px-6 py-4">
-                <button
-                  type="button"
-                  disabled={savingEditor}
-                  onClick={closeEditor}
-                  className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
-                >
-                  {t("actions.cancel")}
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingEditor}
-                  className="inline-flex items-center gap-2 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                >
-                  {savingEditor && <Loader2 size={14} className="animate-spin" />}
-                  {editorEntry ? t("actions.saveChanges") : t("actions.submitAddDefinition")}
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
+          </SemanticDefinitionEditor>
       )}
 
-      {selectedEntries.length > 0 && (
-        <div className="fixed bottom-2 left-1/2 z-30 flex w-[min(720px,calc(100vw-1rem))] -translate-x-1/2 flex-nowrap items-center gap-2 overflow-x-auto bg-foreground px-4 py-3 text-background shadow-2xl">
-          <div className="mr-auto shrink-0 text-sm">
-            {t("bulk.selected", { count: selectedEntries.length })}
-          </div>
-          <button
-            type="button"
-            disabled={
-              loading ||
-              validationInProgress ||
-              selectedHasPendingValidation ||
-              !actionAllowed("queue_validation", selectedEntries) ||
-              Boolean(batchAction)
-            }
-            onClick={() => void runBatch("queue_validation")}
-            className="shrink-0 px-3 py-1.5 text-sm disabled:opacity-35"
-          >
-            {t("bulk.validate")}
-          </button>
-          <button
-            type="button"
-            disabled={
-              loading ||
-              selectedHasPendingValidation ||
-              !actionAllowed("attest", selectedEntries) ||
-              Boolean(batchAction)
-            }
-            onClick={() => void runBatch("attest")}
-            className="shrink-0 px-3 py-1.5 text-sm disabled:opacity-35"
-          >
-            {t("bulk.attest")}
-          </button>
-          <button
-            type="button"
-            disabled={
-              loading ||
-              selectedHasPendingValidation ||
-              !actionAllowed("remember", selectedEntries) ||
-              Boolean(batchAction)
-            }
-            onClick={() => void runBatch("remember")}
-            className="shrink-0 px-3 py-1.5 text-sm disabled:opacity-35"
-          >
-            {t("bulk.remember")}
-          </button>
-          <button
-            type="button"
-            disabled={
-              loading ||
-              selectedHasPendingValidation ||
-              !actionAllowed("ignore", selectedEntries) ||
-              Boolean(batchAction)
-            }
-            onClick={() => void runBatch("ignore")}
-            className="shrink-0 px-3 py-1.5 text-sm disabled:opacity-35"
-          >
-            {t("actions.ignore")}
-          </button>
-          <button
-            type="button"
-            disabled={loading || !actionAllowed("restore", selectedEntries) || Boolean(batchAction)}
-            onClick={() => void runBatch("restore")}
-            className="shrink-0 px-3 py-1.5 text-sm disabled:opacity-35"
-          >
-            {t("actions.restore")}
-          </button>
-          <button type="button" aria-label={t("bulk.clear")} onClick={() => setSelectedIds(new Set())} className="p-1.5 opacity-70 hover:opacity-100">
-            <X size={15} />
-          </button>
-          {batchAction && <Loader2 size={15} className="animate-spin" />}
-        </div>
-      )}
+      {selectedEntries.length > 0 && <div className="fixed bottom-2 left-1/2 z-30 flex w-[min(540px,calc(100vw-1rem))] -translate-x-1/2 items-center gap-3 border border-primary/25 bg-foreground px-4 py-3 text-background shadow-2xl">
+        <ListChecks size={19} className="shrink-0" />
+        <div className="mr-auto min-w-0"><p className="text-sm font-medium">{t("bulk.selected", { count: selectedEntries.length })}</p>
+          {selectedElsewhere > 0 && <p className="mt-0.5 text-[11px] opacity-65">{t("selection.elsewhere", { count: selectedElsewhere })}</p>}</div>
+        <button type="button" disabled={!!batchAction} onClick={() => setSelectionOpen(true)} className="min-h-10 shrink-0 bg-background px-3 text-xs font-semibold text-foreground disabled:opacity-40">{t("selection.review")}</button>
+        <button type="button" disabled={!!batchAction} aria-label={t("bulk.clear")} onClick={() => { setSelection(new Map()); setSelectionOpen(false); detailSearchRef.current?.focus(); }} className="inline-flex size-9 shrink-0 items-center justify-center opacity-70 hover:opacity-100 disabled:opacity-40"><X size={16} /></button>
+      </div>}
+      {selectionOpen && selection.size > 0 && <SemanticSelectionDialog selection={selection} visibleIds={visibleSelectedIds}
+        present={entry => {
+          const display = historyPresentation(entry, t, locale);
+          const scope = scopeBreadcrumb(entry, undefined, browserScopes, t);
+          return { title: display.title, description: display.description ?? "", scope: scope === t("header.allDefinitions") ? semanticSourceLabel(entry, t, locale) : scope };
+        }}
+        allowed={action => !loading && !selectionNeedsReview && !selectedHasPendingValidation && actionAllowed(action, selectedEntries) && (action !== "queue_validation" || !validationInProgress)}
+        busy={!!batchAction} error={error}
+        onRemove={id => { if (!batchInFlight.current) { setSelection(current => removeSemanticSelection(current, [id])); if (selection.size === 1) { setSelectionOpen(false); detailSearchRef.current?.focus(); } } }}
+        onApply={action => void runBatch(action)} onClose={() => { if (!batchInFlight.current) setSelectionOpen(false); }} />}
     </div>
   );
 }

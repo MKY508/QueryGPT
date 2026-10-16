@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import hashlib
 import json
 import logging
@@ -11,6 +12,7 @@ import shutil
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Event
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
@@ -19,6 +21,7 @@ from fastapi import (
     BackgroundTasks,
     Depends,
     File,
+    Header,
     HTTPException,
     Query,
     UploadFile,
@@ -27,9 +30,10 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from pydantic_ai import Agent
-from sqlalchemy import case, delete, func, or_, select
+from sqlalchemy import case, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.api.upload_route import SingleFileUploadRoute
 from app.core import encryptor
 from app.core.config import settings
 from app.db import get_db
@@ -38,6 +42,7 @@ from app.db.tables import (
     AnalysisRun,
     ArtifactRecord,
     Connection,
+    FileUploadReceipt,
     PreflightReportRecord,
     Project,
     ProjectDataSource,
@@ -99,6 +104,8 @@ from app.models import (
 from app.models.workspace import (
     AnalysisCorrectionTargetOptionResponse,
     AnalysisPlaybookStructuredQueryPlan,
+    CsvPreviewResponse,
+    CsvSelectionRequest,
     MetricColumnCorrectionSelection,
     ProjectUpdate,
     RelationIndexRefreshResponse,
@@ -116,6 +123,8 @@ from app.models.workspace import (
     SourceCleaningApplyResponse,
     SourceCleaningPreviewRequest,
     SourceCleaningPreviewResponse,
+    WorkbookPreviewResponse,
+    WorkbookSelectionRequest,
     is_executable_semantic_definition,
     validate_semantic_definition_compatibility,
 )
@@ -129,7 +138,6 @@ from app.services.correction_targets import (
     resolve_report_correction_target,
 )
 from app.services.data_preflight import (
-    SUPPORTED_FILE_FORMATS,
     compare_working_copies,
     fingerprint_file,
     run_preflight,
@@ -142,6 +150,13 @@ from app.services.database_value_preflight import (
 )
 from app.services.dependency_manager import ProjectDependencyManager
 from app.services.execution_context import ExecutionContextResolver
+from app.services.file_formats import SUPPORTED_FILE_FORMATS
+from app.services.file_upload import (
+    UploadRejectedError,
+    check_upload_size,
+    remove_upload_copy,
+    store_upload,
+)
 from app.services.golden_regression import normalize_query_key
 from app.services.model_engine import model_session
 from app.services.project_context import (
@@ -149,11 +164,13 @@ from app.services.project_context import (
     load_project_context,
     resolve_confirmed_ambiguity,
 )
+from app.services.project_write_guard import lock_project_for_publication
 from app.services.sanitation_contract import (
     SANITATION_PROVENANCE_OPERATIONS,
     SanitationContractError,
     canonicalize_sanitation_operations,
     canonicalize_visual_sanitation_operations,
+    replace_sanitation_reader_operations,
 )
 from app.services.sanitation_revisions import (
     SanitationRevisionConflictError,
@@ -229,6 +246,7 @@ from app.services.standing_workspace import (
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+file_upload_router = APIRouter(route_class=SingleFileUploadRoute)
 logger = logging.getLogger(__name__)
 
 _RELATION_INDEX_REFRESH_TIMEOUT_SECONDS = 15.0
@@ -270,6 +288,32 @@ def excel_sheet_selection_key(source_id: UUID) -> str:
     """Scope a workbook decision to the source whose working copy it changes."""
 
     return f"{_EXCEL_SHEET_SELECTION_KEY}:{source_id}"
+
+
+def _preparation_source_revision(
+    source: ProjectDataSource, recipe: SanitationRecipeRecord | None = None
+) -> str:
+    return stable_payload_hash(
+        {
+            "id": str(source.id),
+            "updated_at": source.updated_at.isoformat(),
+            "source_uri": source.source_uri,
+            "working_uri": source.working_uri,
+            "fingerprint": source.fingerprint,
+            "status": source.status,
+            "profile": source.profile_data,
+            "recipe": (
+                {
+                    "id": str(recipe.id),
+                    "active_revision_id": str(recipe.active_revision_id),
+                    "status": recipe.status,
+                    "operations": recipe.operations,
+                }
+                if recipe is not None
+                else None
+            ),
+        }
+    )
 
 
 def parse_excel_sheet_selection_key(key: str) -> UUID | None:
@@ -338,9 +382,24 @@ def _database_manager_for_connection(connection: Connection):
 
 
 def _safe_filename(filename: str | None) -> str:
-    raw = Path(filename or "data.csv").name
+    raw = (filename or "data.csv").replace("\\", "/").rsplit("/", 1)[-1]
     safe = re.sub(r"[^\w.\-\u4e00-\u9fff]", "-", raw, flags=re.UNICODE)
-    return safe[:180] or "data.csv"
+    suffix = Path(safe).suffix
+    stem = safe[: -len(suffix)] if suffix else safe
+    if stem.upper().split(".", 1)[0] in {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        *(f"COM{i}" for i in range(1, 10)),
+        *(f"LPT{i}" for i in range(1, 10)),
+    }:
+        stem = f"_{stem}"
+    # Preserve the extension and stay below common filesystem byte limits,
+    # including multi-byte Chinese names. Unsupported extensions still fail below.
+    suffix = suffix[:16]
+    stem = stem.encode("utf-8")[: 180 - len(suffix.encode("utf-8"))].decode("utf-8", "ignore")
+    return f"{stem or 'data'}{suffix}"
 
 
 def _source_series_key(filename: str) -> str:
@@ -505,6 +564,20 @@ def _profile_schema_signature(profile: dict[str, Any], table: str | None = None)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _reader_profile(result: Any) -> dict[str, Any]:
+    reader = (result.source_snapshot or {}).get("reader") or {}
+    return {
+        "selected_sheet": reader.get("selected_sheet"),
+        "header_row": reader.get("header_row"),
+        "has_header": reader.get("has_header"),
+        "csv_options": (
+            {"delimiter": reader.get("delimiter"), "encoding": reader.get("encoding")}
+            if reader.get("engine") == "csv_stream_v1"
+            else None
+        ),
+    }
+
+
 def _sanitation_contracts(result: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     """Persist bounded, inspectable proof of what one cleaning revision consumed."""
 
@@ -517,6 +590,8 @@ def _sanitation_contracts(result: Any) -> tuple[dict[str, Any], dict[str, Any]]:
         "columns": snapshot.get("original_columns"),
         "selected_sheet": reader.get("selected_sheet"),
         "header_row": reader.get("header_row"),
+        "has_header": reader.get("has_header"),
+        "csv_options": _reader_profile(result)["csv_options"],
     }
     output_contract = {
         "version": 1,
@@ -537,6 +612,7 @@ async def _record_sanitation_result(
     state: str,
     actor_source: str,
     reason: str,
+    expected_revision_id: UUID | None = None,
 ) -> SanitationRecipeRevisionRecord:
     """Create or advance one recipe head without rewriting its prior revisions."""
 
@@ -554,6 +630,8 @@ async def _record_sanitation_result(
         return revision
 
     active = await ensure_sanitation_revision_head(db, recipe)
+    if expected_revision_id is not None and active.id != expected_revision_id:
+        raise SanitationRevisionConflictError(expected_revision_id, active.id)
     if (
         active.state == state
         and active.operations == canonical_operations
@@ -901,6 +979,39 @@ async def _run_preflight_in_thread(
         except Exception:
             break
     if cancellation_requested:
+        try:
+            worker.result()
+        except BaseException:
+            pass
+        raise asyncio.CancelledError
+    return worker.result()
+
+
+async def _compare_cleaning_in_thread(
+    before_path: Path,
+    after_path: Path,
+    *,
+    profile_columns: list[str],
+) -> dict[str, Any]:
+    """Cancel between batches, then drain before the preview directory is removed."""
+    cancelled = Event()
+    worker = asyncio.create_task(
+        asyncio.to_thread(
+            compare_working_copies,
+            before_path,
+            after_path,
+            profile_columns=profile_columns,
+            cancelled=cancelled,
+        )
+    )
+    while not worker.done():
+        try:
+            await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            cancelled.set()
+        except Exception:
+            break
+    if cancelled.is_set():
         try:
             worker.result()
         except BaseException:
@@ -2263,6 +2374,7 @@ async def apply_excel_sheet_selection_decision(
             "sample": result.source_snapshot.get("sample", []),
             "issues": result.issues,
             "ambiguities": result.ambiguities,
+            **_reader_profile(result),
         }
 
         report_result = await db.execute(
@@ -2888,11 +3000,17 @@ async def remove_project_source(
     )
 
 
-@router.post("/{project_id}/sources/files", response_model=APIResponse[DataSourceResponse])
+@file_upload_router.post(
+    "/{project_id}/sources/files", response_model=APIResponse[DataSourceResponse]
+)
 async def upload_file_source(
     project_id: UUID,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    upload_request_id: UUID | None = Header(default=None, alias="Idempotency-Key"),
+    expected_sha256: str | None = Header(
+        default=None, alias="X-File-SHA256", min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
+    ),
 ):
     await _project_or_404(db, project_id)
     filename = _safe_filename(file.filename)
@@ -2900,28 +3018,152 @@ async def upload_file_source(
     if suffix not in SUPPORTED_FILE_FORMATS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"当前支持 CSV、Excel、Parquet 和 JSON，不支持 .{suffix or '未知'}",
+            detail={
+                "code": "file_upload_unsupported",
+                "message": "当前支持 CSV、Excel、Parquet、JSON、JSONL 和 NDJSON",
+            },
         )
 
-    source = ProjectDataSource(
-        project_id=project_id,
-        kind="file",
-        name=filename,
-        format=suffix,
-        status="attached",
+    # End the initial project read before doing filesystem work. Publication
+    # rechecks ownership under the same project lock used by source updates.
+    await db.rollback()
+    source_id = uuid4()
+    source_dir = settings.WORKSPACE_ROOT / str(project_id) / "sources" / str(source_id)
+    try:
+        if file.size is not None:
+            check_upload_size(file.size, settings.FILE_UPLOAD_MAX_BYTES)
+        stored = await store_upload(
+            file.file, source_dir, filename, max_bytes=settings.FILE_UPLOAD_MAX_BYTES
+        )
+    except UploadRejectedError as exc:
+        raise HTTPException(
+            status_code=exc.status_code, detail={"code": exc.code, "message": str(exc)}
+        ) from exc
+    except OSError as exc:
+        logger.exception("Failed to store upload %s", source_id)
+        no_space = exc.errno in {errno.ENOSPC, errno.EDQUOT}
+        raise HTTPException(
+            status_code=507 if no_space else 503,
+            detail={
+                "code": "file_upload_no_space" if no_space else "file_upload_write_failed",
+                "message": "可用空间不足" if no_space else "文件暂时无法保存",
+            },
+        ) from exc
+
+    commit_started = False
+    try:
+        # Bind publication to the bytes verified before the upload was dispatched.
+        if expected_sha256 is not None and stored.fingerprint != expected_sha256:
+            raise HTTPException(status_code=409, detail={"code": "file_upload_content_changed"})
+        if await lock_project_for_publication(db, project_id) is None:
+            raise HTTPException(status_code=404, detail="项目不存在")
+        if upload_request_id is not None:
+            receipt = await db.get(FileUploadReceipt, (project_id, upload_request_id))
+            if receipt is not None:
+                if (receipt.filename, receipt.byte_size, receipt.fingerprint) != (
+                    filename,
+                    stored.size,
+                    stored.fingerprint,
+                ):
+                    raise HTTPException(status_code=409, detail={"code": "file_upload_key_reused"})
+                existing = await db.get(ProjectDataSource, receipt.source_id)
+                if existing is None or existing.project_id != project_id:
+                    raise HTTPException(
+                        status_code=409, detail={"code": "file_upload_source_removed"}
+                    )
+                response = APIResponse.ok(
+                    data=DataSourceResponse.model_validate(existing), message="文件已加入项目"
+                )
+                await db.rollback()
+                remove_upload_copy(source_dir)
+                return response
+        source = ProjectDataSource(
+            id=source_id,
+            project_id=project_id,
+            kind="file",
+            name=filename,
+            format=suffix,
+            status="attached",
+            source_uri=str(stored.path),
+            fingerprint=stored.fingerprint,
+        )
+        db.add(source)
+        if upload_request_id is not None:
+            db.add(
+                FileUploadReceipt(
+                    project_id=project_id,
+                    request_id=upload_request_id,
+                    source_id=source_id,
+                    filename=filename,
+                    byte_size=stored.size,
+                    fingerprint=stored.fingerprint,
+                )
+            )
+        await db.flush()
+        # Validate while rollback is still safe; do not refresh an already
+        # committed source and turn a response-read failure into a lost upload.
+        response = APIResponse.ok(
+            data=DataSourceResponse.model_validate(source), message="文件已加入项目"
+        )
+        commit_started = True
+        await db.commit()
+        return response
+    except BaseException as exc:
+        if not commit_started:
+            try:
+                await db.rollback()
+            finally:
+                remove_upload_copy(source_dir)
+        else:
+            # A disconnected commit can have succeeded remotely. Preserve its
+            # file until reconciliation; rollback alone cannot prove absence.
+            logger.warning("Upload commit outcome uncertain; retained source %s", source_id)
+            if isinstance(exc, Exception):
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "file_upload_outcome_unknown",
+                        "message": "暂时无法确认文件是否已加入，请刷新来源列表后再决定是否重试",
+                    },
+                ) from exc
+        raise
+
+
+router.include_router(file_upload_router)
+
+
+@router.get("/{project_id}/source-uploads/{request_id}", response_model=APIResponse[dict | None])
+async def resolve_file_upload(
+    project_id: UUID, request_id: UUID, db: AsyncSession = Depends(get_db)
+):
+    """Read a committed outcome only; absence is not a cancellation of an in-flight upload."""
+    await _project_or_404(db, project_id)
+    result = await db.execute(
+        select(FileUploadReceipt, ProjectDataSource.id)
+        .outerjoin(
+            ProjectDataSource,
+            (ProjectDataSource.id == FileUploadReceipt.source_id)
+            & (ProjectDataSource.project_id == FileUploadReceipt.project_id),
+        )
+        .where(
+            FileUploadReceipt.project_id == project_id, FileUploadReceipt.request_id == request_id
+        )
     )
-    db.add(source)
-    await db.flush()
-    source_dir = settings.WORKSPACE_ROOT / str(project_id) / "sources" / str(source.id)
-    source_dir.mkdir(parents=True, exist_ok=True)
-    original_path = source_dir / filename
-    with original_path.open("wb") as destination:
-        shutil.copyfileobj(file.file, destination)
-    source.source_uri = str(original_path.resolve())
-    source.fingerprint = fingerprint_file(original_path)
-    await db.commit()
-    await db.refresh(source)
-    return APIResponse.ok(data=DataSourceResponse.model_validate(source), message="文件已加入项目")
+    row = result.first()
+    if row is None:
+        return APIResponse.ok(data=None)
+    receipt, live_id = row
+    return APIResponse.ok(
+        data={
+            "project_id": str(project_id),
+            "request_id": str(request_id),
+            "source_id": str(receipt.source_id),
+            "filename": receipt.filename,
+            "byte_size": receipt.byte_size,
+            "fingerprint": receipt.fingerprint,
+            "status": "added" if live_id is not None else "removed",
+        }
+    )
 
 
 @router.post("/{project_id}/sources/connections", response_model=APIResponse[DataSourceResponse])
@@ -3295,7 +3537,10 @@ async def _record_preflight_failure(
     *,
     project_id: UUID,
     source_id: UUID,
+    error: Exception | None = None,
 ) -> str:
+    from app.services.data_preflight import PreflightInputError
+
     source = await _source_or_404(db, project_id, source_id)
     profile = dict(source.profile_data or {})
     trusted_copy_preserved = bool(
@@ -3320,6 +3565,13 @@ async def _record_preflight_failure(
         "severity": "critical",
         "automatic": False,
     }
+    if isinstance(error, PreflightInputError):
+        issue.update(
+            {
+                "presentation_code": error.presentation_code,
+                "presentation_facts": error.presentation_facts,
+            }
+        )
     if trusted_copy_preserved:
         source.profile_data = {
             **profile,
@@ -3362,6 +3614,74 @@ async def _record_preflight_failure(
     return summary
 
 
+@router.get(
+    "/{project_id}/sources/{source_id}/workbook",
+    response_model=APIResponse[WorkbookPreviewResponse],
+)
+async def inspect_source_workbook(
+    project_id: UUID,
+    source_id: UUID,
+    sheet: str | None = Query(default=None, min_length=1, max_length=128),
+    db: AsyncSession = Depends(get_db),
+    start_row: int = Query(default=1, ge=1, le=1_000_000),
+):
+    from app.services.workbook_preview import preview_workbook
+
+    source = await _source_or_404(db, project_id, source_id)
+    if source.kind != "file" or Path(source.source_uri or "").suffix.casefold() not in {
+        ".xls",
+        ".xlsx",
+    }:
+        raise HTTPException(status_code=422, detail={"code": "workbook_unavailable"})
+    recipe = await _single_recipe_for_source(db, project_id=project_id, source_id=source.id)
+    try:
+        preview = await asyncio.to_thread(
+            preview_workbook, Path(source.source_uri), sheet, start_row
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=409, detail={"code": "workbook_preview_failed"}) from exc
+    return APIResponse.ok(
+        data=WorkbookPreviewResponse(
+            source_id=source.id,
+            source_revision=_preparation_source_revision(source, recipe),
+            **preview,
+        )
+    )
+
+
+@router.get(
+    "/{project_id}/sources/{source_id}/csv",
+    response_model=APIResponse[CsvPreviewResponse],
+)
+async def inspect_source_csv(
+    project_id: UUID,
+    source_id: UUID,
+    delimiter: str = Query(default=",", pattern=r"^[,;\t|]$"),
+    encoding: str | None = Query(default=None, pattern=r"^(utf-8-sig|gb18030)$"),
+    start_row: int = Query(default=1, ge=1, le=1_000_000),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.csv_preview import preview_csv
+
+    source = await _source_or_404(db, project_id, source_id)
+    if source.kind != "file" or Path(source.source_uri or "").suffix.casefold() != ".csv":
+        raise HTTPException(status_code=422, detail={"code": "csv_unavailable"})
+    recipe = await _single_recipe_for_source(db, project_id=project_id, source_id=source.id)
+    try:
+        preview = await asyncio.to_thread(
+            preview_csv, Path(source.source_uri), delimiter, encoding, start_row
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=409, detail={"code": "csv_preview_failed"}) from exc
+    return APIResponse.ok(
+        data=CsvPreviewResponse(
+            source_id=source.id,
+            source_revision=_preparation_source_revision(source, recipe),
+            **preview,
+        )
+    )
+
+
 @router.post(
     "/{project_id}/sources/{source_id}/preflight",
     response_model=APIResponse[PreflightReportResponse],
@@ -3371,6 +3691,7 @@ async def preflight_source(
     source_id: UUID,
     replay_recipe_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
+    selection: WorkbookSelectionRequest | CsvSelectionRequest | None = None,
 ):
     app_settings = await get_or_create_app_settings(db)
     if not app_settings.preprocessing_enabled:
@@ -3384,15 +3705,21 @@ async def preflight_source(
             source_id,
             replay_recipe_id=replay_recipe_id,
             db=db,
+            selection=selection,
         )
     except HTTPException:
+        await db.rollback()
         raise
+    except SanitationRevisionConflictError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="整理方法已经变化，请重新预览") from exc
     except Exception as exc:
         await db.rollback()
         failure_detail = await _record_preflight_failure(
             db,
             project_id=project_id,
             source_id=source_id,
+            error=exc,
         )
         logger.exception("Preflight failed for project %s source %s", project_id, source_id)
         raise HTTPException(
@@ -3401,32 +3728,108 @@ async def preflight_source(
         ) from exc
 
 
+async def _previewed_reader_operations(
+    source: ProjectDataSource,
+    recipe: SanitationRecipeRecord | None,
+    selection: WorkbookSelectionRequest | CsvSelectionRequest,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Validate one raw-reader choice for both preparation and version preview."""
+
+    if _preparation_source_revision(source, recipe) != selection.source_revision:
+        raise HTTPException(status_code=409, detail={"code": "workbook_selection_changed"})
+    if isinstance(selection, CsvSelectionRequest):
+        from app.services.csv_preview import preview_csv
+
+        reader = {"delimiter": selection.delimiter, "encoding": selection.encoding}
+        operations = [{"operation": "read_csv", **reader}]
+        preview = await asyncio.to_thread(
+            preview_csv,
+            Path(source.source_uri or ""),
+            selection.delimiter,
+            selection.encoding,
+            selection.header_row or 1,
+        )
+    else:
+        from app.services.workbook_preview import preview_workbook
+
+        reader = {"selected_sheet": selection.sheet}
+        operations = [{"operation": "select_sheet", "sheet": selection.sheet}]
+        preview = await asyncio.to_thread(
+            preview_workbook,
+            Path(source.source_uri or ""),
+            selection.sheet,
+            selection.header_row or 1,
+        )
+    if selection.headerless:
+        operations.append({"operation": "use_generated_headers"})
+        reader.update(has_header=False, header_row=None)
+    elif selection.header_row is not None:
+        operations.append({"operation": "select_header", "row": selection.header_row})
+        reader.update(has_header=True, header_row=selection.header_row)
+    if preview["input_fingerprint"] != selection.input_fingerprint:
+        raise HTTPException(status_code=409, detail={"code": "workbook_selection_changed"})
+    if selection.header_row is not None and selection.header_row not in preview["nonempty_rows"]:
+        raise HTTPException(status_code=409, detail={"code": "workbook_header_unavailable"})
+    return operations, reader
+
+
 async def _preflight_source_impl(
     project_id: UUID,
     source_id: UUID,
     replay_recipe_id: UUID | None = None,
     db: AsyncSession = Depends(get_db),
+    selection: WorkbookSelectionRequest | CsvSelectionRequest | None = None,
 ):
     source = await _source_or_404(db, project_id, source_id)
+    current_recipe = None
+    if source.kind == "file":
+        if source.status == "superseded":
+            raise HTTPException(
+                status_code=409, detail="历史版本不能直接重新整理，请在当前版本上继续"
+            )
+        current_recipe = await _single_recipe_for_source(
+            db, project_id=project_id, source_id=source.id
+        )
+    selection_operations: list[dict[str, Any]] = []
+    selected_reader: dict[str, Any] = {}
+    selected_recipe_revision_id = current_recipe.active_revision_id if current_recipe else None
+    if selection is not None:
+        if replay_recipe_id is not None or source.kind != "file" or source.status == "superseded":
+            raise HTTPException(status_code=409, detail={"code": "workbook_selection_changed"})
+        selection_operations, selected_reader = await _previewed_reader_operations(
+            source, current_recipe, selection
+        )
     if source.kind == "file":
         if not source.source_uri:
             raise HTTPException(status_code=400, detail="文件路径不可用")
-        replay_recipe: SanitationRecipeRecord | None = None
+        # A repeated Prepare action edits/replays this source's one method. It
+        # must not guess another source's method or create a competing recipe.
+        replay_recipe = current_recipe
         replay_revision: SanitationRecipeRevisionRecord | None = None
         if replay_recipe_id is not None:
-            replay_recipe = await db.get(SanitationRecipeRecord, replay_recipe_id)
-            if (
-                replay_recipe is None
-                or replay_recipe.project_id != project_id
-                or replay_recipe.data_source_id != source.id
-            ):
+            if replay_recipe is None or replay_recipe.id != replay_recipe_id:
                 raise HTTPException(status_code=404, detail="整理记录不存在")
-            if source.status == "superseded":
-                raise HTTPException(
-                    status_code=409,
-                    detail="历史版本不能直接重新整理，请在当前版本上继续",
-                )
+        previous_manual_operations = None
+        if replay_recipe is not None:
             replay_revision = await ensure_sanitation_revision_head(db, replay_recipe)
+            if (
+                selection is not None
+                and selected_recipe_revision_id is not None
+                and replay_revision.id != selected_recipe_revision_id
+            ):
+                raise HTTPException(status_code=409, detail="整理方法已经变化，请重新预览")
+            if canonicalize_sanitation_operations(replay_recipe.operations) != (
+                canonicalize_sanitation_operations(replay_revision.operations)
+            ):
+                raise HTTPException(status_code=409, detail="当前整理方法与版本记录不一致")
+            previous_manual_operations = _stored_visual_cleaning_operations(
+                source, replay_revision.id
+            )
+        effective_operations = replay_revision.operations if replay_revision else None
+        if selection is not None:
+            effective_operations = replace_sanitation_reader_operations(
+                effective_operations or [], selection_operations
+            )
         # Never let an in-progress attempt overwrite the last trusted working copy.
         # The source pointer is switched only after the complete attempt is persisted.
         output_dir = (
@@ -3441,8 +3844,21 @@ async def _preflight_source_impl(
         result = await _run_preflight_in_thread(
             Path(source.source_uri),
             output_dir,
-            recipe_operations=replay_revision.operations if replay_revision else None,
+            recipe_operations=effective_operations,
         )
+        if selection and (
+            result.input_fingerprint != selection.input_fingerprint
+            or any(
+                (result.source_snapshot.get("reader") or {}).get(key) != value
+                for key, value in selected_reader.items()
+            )
+        ):
+            raise HTTPException(status_code=409, detail={"code": "workbook_selection_changed"})
+        if selection is not None and replay_recipe is not None and _template_replay_drift(result):
+            raise HTTPException(
+                status_code=409,
+                detail="新的读取设置与已有整理步骤不匹配，请核对工作表或表头；当前数据未改变",
+            )
         recipe_operations = list(result.operations)
         prior_source: ProjectDataSource | None = None
         prior_recipe: SanitationRecipeRecord | None = None
@@ -3453,13 +3869,15 @@ async def _preflight_source_impl(
         schema_overlap_ratio = 0.0
 
         if replay_recipe is not None:
-            recipe_operations.insert(
-                0,
-                {
-                    "operation": "reapply_recipe",
-                    "recipe_id": str(replay_recipe.id),
-                },
-            )
+            if selection is not None:
+                recipe_operations = _materialized_cleaning_operations(
+                    replay_revision.operations, result.operations
+                )
+            else:
+                recipe_operations.insert(
+                    0,
+                    {"operation": "reapply_recipe", "recipe_id": str(replay_recipe.id)},
+                )
             if (
                 replay_recipe.input_fingerprint
                 and replay_recipe.input_fingerprint != result.input_fingerprint
@@ -3475,7 +3893,7 @@ async def _preflight_source_impl(
                 )
                 result.status = "needs_confirmation"
                 result.summary += "，原文件变化需要确认"
-        else:
+        elif selection is None:
             (
                 prior_source,
                 added_columns,
@@ -3524,7 +3942,7 @@ async def _preflight_source_impl(
                 removed_columns=removed_columns,
                 type_changes=type_changes,
             )
-        elif replay_recipe is None:
+        elif replay_recipe is None and selection is None:
             project = await db.get(Project, project_id)
             imported_templates = _stored_recipe_templates(project) if project else []
             compatible_template = next(
@@ -3577,7 +3995,7 @@ async def _preflight_source_impl(
             ):
                 pending_prior_source = candidate
 
-        if pending_prior_source is not None and replay_recipe is not None:
+        if pending_prior_source is not None:
             (
                 added_columns,
                 removed_columns,
@@ -3612,7 +4030,7 @@ async def _preflight_source_impl(
         if pending_replay_still_blocked:
             result.status = "needs_confirmation"
 
-        if replay_recipe is not None:
+        if replay_recipe is not None or selection is not None:
             logical_name = str(existing_profile.get("logical_name") or _view_name(source))
             version = int(existing_profile.get("version") or 1)
         else:
@@ -3671,6 +4089,22 @@ async def _preflight_source_impl(
                 "active_source_id": str(source.id),
             }
 
+        if selection is not None:
+            claimed = await db.execute(
+                update(ProjectDataSource)
+                .where(
+                    ProjectDataSource.id == source.id,
+                    ProjectDataSource.updated_at == source.updated_at,
+                    ProjectDataSource.working_uri == source.working_uri,
+                    ProjectDataSource.fingerprint == source.fingerprint,
+                    ProjectDataSource.status == source.status,
+                )
+                .values(updated_at=datetime.now(UTC))
+                .execution_options(synchronize_session=False)
+            )
+            if claimed.rowcount != 1:
+                await db.rollback()
+                raise HTTPException(status_code=409, detail={"code": "workbook_selection_changed"})
         source.working_uri = str(result.working_path.resolve()) if result.working_path else None
         source.fingerprint = result.input_fingerprint
         source.status = result.status
@@ -3681,6 +4115,7 @@ async def _preflight_source_impl(
             "sample": result.source_snapshot.get("sample", []),
             "issues": result.issues,
             "ambiguities": result.ambiguities,
+            **_reader_profile(result),
             "recipe_replayed_from": (
                 str(prior_source.id)
                 if prior_recipe
@@ -3718,19 +4153,30 @@ async def _preflight_source_impl(
                 or schema_requires_confirmation
                 or pending_replay_still_blocked
             )
-            await _record_sanitation_result(
+            revision = await _record_sanitation_result(
                 db,
                 replay_recipe,
                 result,
                 operations=recipe_operations,
                 state="candidate" if recipe_needs_attention else "confirmed",
-                actor_source="system",
+                actor_source="user" if selection is not None else "system",
                 reason=(
-                    "重新执行整理方法，变化等待用户确认"
+                    "更新读取设置并沿用已有整理步骤"
+                    if selection is not None
+                    else "重新执行整理方法，变化等待用户确认"
                     if recipe_needs_attention
                     else "重新执行并核对整理方法"
                 ),
+                expected_revision_id=replay_revision.id,
             )
+            if previous_manual_operations is not None and not _template_replay_drift(result):
+                source.profile_data = {
+                    **source.profile_data,
+                    "visual_cleaning": {
+                        "operations": previous_manual_operations,
+                        "active_revision_id": str(revision.id),
+                    },
+                }
             db.add(report)
         else:
             recipe_needs_attention = any(
@@ -3935,7 +4381,23 @@ async def preview_source_cleaning(
         if before_path is None or result.working_path is None:
             raise HTTPException(status_code=409, detail="预览没有生成可比较的分析副本")
 
-        comparison = compare_working_copies(before_path, result.working_path)
+        comparison = await _compare_cleaning_in_thread(
+            before_path,
+            result.working_path,
+            profile_columns=list(
+                dict.fromkeys(
+                    operation["column"]
+                    for operation in [*selected_operations, *(previous_manual_operations or [])]
+                    if "column" in operation
+                )
+            )[:100],
+        )
+        if (
+            await asyncio.to_thread(fingerprint_file, source_path) != result.input_fingerprint
+            or (await asyncio.to_thread(_working_copy_proof, source))[1]
+            != current_working_fingerprint
+        ):
+            raise HTTPException(status_code=409, detail="文件或当前分析副本发生变化，请重新预览")
         materialized_operations = _materialized_cleaning_operations(
             active_operations,
             result.operations,
@@ -3955,6 +4417,9 @@ async def preview_source_cleaning(
             before=comparison["before"],
             after=comparison["after"],
             changes=comparison["changes"],
+            comparison_basis=comparison["comparison_basis"],
+            profiles=comparison["profiles"],
+            profiles_omitted=comparison["profiles_omitted"],
             can_apply=True,
         )
         return APIResponse.ok(data=response, message="已预览变化，当前分析数据没有改变")
@@ -4108,6 +4573,7 @@ async def apply_source_cleaning(
             "sample": result.source_snapshot.get("sample", []),
             "issues": result.issues,
             "ambiguities": result.ambiguities,
+            **_reader_profile(result),
             "is_current": existing_profile.get("is_current", True),
             "visual_cleaning": {
                 "operations": selected_operations,
@@ -4435,6 +4901,7 @@ async def bind_recipe_template(
             "sample": result.source_snapshot.get("sample", []),
             "issues": result.issues,
             "ambiguities": result.ambiguities,
+            **_reader_profile(result),
             "is_current": existing_profile.get("is_current", True),
         }
         await _clear_inferred_candidates_for_source(db, source)
@@ -6275,6 +6742,28 @@ async def create_knowledge(
     await db.commit()
     await db.refresh(entry)
     return APIResponse.ok(data=await _semantic_entry_response(db, entry), message="理解已保存")
+
+
+@router.get(
+    "/{project_id}/knowledge/lookup",
+    response_model=APIResponse[SemanticEntryResponse | None],
+)
+async def lookup_knowledge_entry(
+    project_id: UUID,
+    key: str = Query(..., min_length=1, max_length=160),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read an exact create target without retrying an uncertain write."""
+    await _project_or_404(db, project_id)
+    result = await db.execute(
+        select(SemanticEntry).where(
+            SemanticEntry.project_id == project_id, SemanticEntry.key == key
+        )
+    )
+    entry = result.scalar_one_or_none()
+    return APIResponse.ok(
+        data=await _semantic_entry_response(db, entry) if entry is not None else None
+    )
 
 
 @router.get(

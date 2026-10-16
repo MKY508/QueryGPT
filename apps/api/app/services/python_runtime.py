@@ -58,6 +58,21 @@ BLOCKED_MODULES = frozenset(
         "nis",
         "syslog",
         "commands",
+        "importlib",
+        "builtins",
+        "pathlib",
+        "shutil",
+        "io",
+        "pickle",
+        "marshal",
+        "tempfile",
+        "zipfile",
+        "tarfile",
+        "inspect",
+        "gc",
+        "asyncio",
+        "sysconfig",
+        "site",
     }
 )
 
@@ -86,6 +101,7 @@ BLOCKED_BUILTINS = frozenset(
         "credits",
         "license",
         "help",
+        "get_ipython",
     }
 )
 
@@ -119,7 +135,7 @@ class PythonSecurityAnalyzer(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
-        if node.attr in ("__builtins__", "__globals__", "__locals__", "__code__"):
+        if node.attr.startswith("__") and node.attr.endswith("__"):
             self.violations.append(f"禁止访问危险属性: {node.attr}")
         self.generic_visit(node)
 
@@ -183,6 +199,8 @@ class PythonExecutionRuntime:
 
     def get_ipython(self):
         if self._ipython is None:
+            import platform
+
             from IPython.core.interactiveshell import InteractiveShell
 
             self._ipython = InteractiveShell()
@@ -192,10 +210,22 @@ class PythonExecutionRuntime:
             font_loaded = os.path.exists(self.font_path)
             if font_loaded:
                 logger.info("Loading bundled font", path=self.font_path)
+                font_setup = (
+                    f"fm.fontManager.addfont(r'{self.font_path}')\n"
+                    "plt.rcParams['font.family'] = 'Noto Sans SC'"
+                )
             else:
                 logger.warning(
                     "Bundled font not found, falling back to system fonts", path=self.font_path
                 )
+                system = platform.system()
+                if system == "Darwin":
+                    sans_serif = "['Arial Unicode MS', 'PingFang SC', 'Heiti SC']"
+                elif system == "Windows":
+                    sans_serif = "['Microsoft YaHei', 'SimHei']"
+                else:
+                    sans_serif = "['WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'DejaVu Sans']"
+                font_setup = f"plt.rcParams['font.sans-serif'] = {sans_serif}"
 
             self._ipython.run_cell(
                 f"""
@@ -205,22 +235,8 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import os
 
-font_path = r'{self.font_path}'
-if os.path.exists(font_path):
-    fm.fontManager.addfont(font_path)
-    plt.rcParams['font.family'] = 'Noto Sans SC'
-else:
-    import platform
-    system = platform.system()
-    if system == 'Darwin':
-        plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang SC', 'Heiti SC']
-    elif system == 'Windows':
-        plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei']
-    else:
-        plt.rcParams['font.sans-serif'] = ['WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'DejaVu Sans']
-
+{font_setup}
 plt.rcParams['axes.unicode_minus'] = False
 plt.rcParams['font.size'] = 12
 """,

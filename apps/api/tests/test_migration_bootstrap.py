@@ -20,7 +20,7 @@ from app.services.migration_bootstrap import (
     migrate_local_sqlite_to_head,
 )
 
-HEAD = "0022_retire_legacy_user_scope"
+HEAD = "0030_analysis_history"
 
 
 def _engine(path: Path) -> AsyncEngine:
@@ -62,6 +62,10 @@ def _create_pre_retirement_schema(sync_connection) -> None:
     sync_connection.exec_driver_sql(
         "ALTER TABLE semantic_entries DROP COLUMN recommendation_batch_id"
     )
+    sync_connection.exec_driver_sql("DROP TABLE file_upload_receipts")
+    sync_connection.exec_driver_sql("DROP TABLE report_copy_receipts")
+    sync_connection.exec_driver_sql("DROP TABLE report_revisions")
+    sync_connection.exec_driver_sql("DROP TABLE report_save_receipts")
     sync_connection.exec_driver_sql("DROP TABLE report_blocks")
     sync_connection.exec_driver_sql("DROP TABLE report_pages")
     sync_connection.exec_driver_sql("DROP TABLE report_documents")

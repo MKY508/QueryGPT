@@ -13,6 +13,8 @@ from typing import Any, Literal
 from uuid import UUID
 
 from app.db.tables import ProjectDataSource
+from app.services.file_formats import JSON_FILE_FORMATS
+from app.services.source_activation import is_current_source
 
 SemanticSourceScope = Literal[
     "project",
@@ -30,7 +32,6 @@ SemanticSourceScopeFilter = SemanticSourceScope | Literal["file"]
 
 _LOCAL_DATABASE_FORMATS = {"sqlite", "sqlite3", "duckdb"}
 _EXCEL_FORMATS = {"excel", "xls", "xlsb", "xlsm", "xlsx"}
-_JSON_FORMATS = {"json", "jsonl", "ndjson"}
 
 
 @dataclass(frozen=True)
@@ -85,7 +86,7 @@ class SemanticSourceCatalog:
     ) -> SemanticSourceCatalog:
         indexed: list[_CatalogSource] = []
         for source, connection_driver in rows:
-            if source.status == "superseded" or source.kind not in {"file", "connection"}:
+            if not is_current_source(source) or source.kind not in {"file", "connection"}:
                 continue
             kind: Literal["file", "connection"] = "file" if source.kind == "file" else "connection"
             profile_logical_name = str(
@@ -186,7 +187,7 @@ def _classify_source_scope(
         return "excel"
     if source_format == "parquet":
         return "parquet"
-    if source_format in _JSON_FORMATS:
+    if source_format in JSON_FILE_FORMATS:
         return "json"
     return "other_file"
 

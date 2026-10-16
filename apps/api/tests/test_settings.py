@@ -8,6 +8,17 @@ from pathlib import Path
 from app.core.config import get_settings
 
 
+def test_release_version_cannot_be_overridden_by_runtime_settings(tmp_path, monkeypatch):
+    from app import __version__
+    from app.core.config import Settings
+
+    env_file = tmp_path / "stale.env"
+    env_file.write_text("APP_VERSION=8.8.8\n", encoding="utf-8")
+    monkeypatch.setenv("APP_VERSION", "9.9.9")
+    assert Settings(_env_file=env_file, APP_VERSION="7.7.7").APP_VERSION == __version__
+    assert "APP_VERSION" not in Settings.model_fields
+
+
 def test_desktop_env_file_is_loaded_from_explicit_runtime_path(tmp_path: Path, monkeypatch):
     encryption_key = base64.urlsafe_b64encode(b"q" * 32).decode()
     env_file = tmp_path / "desktop.env"

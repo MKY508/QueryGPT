@@ -29,6 +29,7 @@ from app.services.analysis_playbook_runner import (
     AnalysisPlaybookRunnerError,
     AnalysisPlaybookRunResult,
 )
+from app.services.report_refresh import RefreshSourceState
 
 
 async def _seed_analysis(
@@ -282,7 +283,7 @@ def _fake_refresh_result(
         playbook_shape_hash=playbook.shape_hash,
         source_role="orders",
         source_kind="file",
-        source_id="source-1",
+        source_id="00000000-0000-4000-8000-000000000001",
         source_schema_signature="a" * 64,
         plan_hash="b" * 64,
         result_name="result_1",
@@ -309,9 +310,13 @@ def _stub_refresh_runtime(
     monkeypatch: pytest.MonkeyPatch,
     result: AnalysisPlaybookRunResult,
 ) -> None:
+    # These cases isolate report serialization/CAS from source execution. Real
+    # catalog/file publication guards are exercised by the source-boundary cases.
+    source = {"id": "00000000-0000-4000-8000-000000000001", "name": "orders.csv", "kind": "file"}
+
     async def load_context(*_args, **_kwargs):
         return SimpleNamespace(
-            sources=[],
+            sources=[source],
             project_dir=Path("/tmp"),
             connection_configs={},
         )
@@ -319,6 +324,10 @@ def _stub_refresh_runtime(
     async def run_playbook(*_args, **_kwargs):
         return result
 
+    async def capture_source(*_args, **_kwargs):
+        return RefreshSourceState(source, "a" * 64)
+
+    monkeypatch.setattr(reports_api, "capture_refresh_source", capture_source)
     monkeypatch.setattr(reports_api, "load_project_context", load_context)
     monkeypatch.setattr(reports_api, "run_analysis_playbook", run_playbook)
     monkeypatch.setattr(
@@ -545,7 +554,7 @@ async def test_report_source_references_are_project_scoped(
 
 
 @pytest.mark.asyncio
-async def test_delete_report_cascades_editable_tree_but_keeps_analysis_artifact(
+async def test_trash_then_purge_cascades_editable_tree_but_keeps_analysis_artifact(
     client: AsyncClient,
     db_session: AsyncSession,
 ):
@@ -571,16 +580,24 @@ async def test_delete_report_cascades_editable_tree_but_keeps_analysis_artifact(
         },
     )
     report_id = created.json()["data"]["id"]
-
-    deleted = await client.delete(f"/api/v1/projects/{project.id}/reports/{report_id}")
+    project_id, run_id, artifact_id = str(project.id), run.id, artifact.id
+    deleted = await client.delete(
+        f"/api/v1/projects/{project_id}/reports/{report_id}", params={"expected_version": 1}
+    )
 
     assert deleted.status_code == 200
     assert deleted.json()["data"] == {"id": report_id, "deleted": True}
+    assert await db_session.scalar(select(func.count(ReportDocument.id))) == 1
+    assert await db_session.scalar(select(func.count(ReportBlock.id))) == 1
+    purged = await client.delete(
+        f"/api/v1/projects/{project_id}/report-trash/{report_id}", params={"expected_version": 2}
+    )
+    assert purged.status_code == 200, purged.text
     assert await db_session.scalar(select(func.count(ReportDocument.id))) == 0
     assert await db_session.scalar(select(func.count(ReportPage.id))) == 0
     assert await db_session.scalar(select(func.count(ReportBlock.id))) == 0
-    assert await db_session.get(AnalysisRun, run.id) is not None
-    assert await db_session.get(ArtifactRecord, artifact.id) is not None
+    assert await db_session.get(AnalysisRun, run_id) is not None
+    assert await db_session.get(ArtifactRecord, artifact_id) is not None
 
 
 @pytest.mark.asyncio
@@ -869,6 +886,373 @@ async def test_unknown_block_type_is_rejected_before_persistence(
     assert await db_session.scalar(select(func.count(ReportDocument.id))) == 0
 
 
+async def _seed_file_refresh_boundary(db, tmp_path, monkeypatch):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from app.db.tables import ProjectDataSource, SanitationRecipeRecord
+    from app.services import project_context
+    from app.services.data_preflight import fingerprint_file
+    from app.services.structured_query import profile_schema_signature
+
+    project, playbook, _, _, report = await _seed_refreshable_report(db)
+    monkeypatch.setattr(project_context.settings, "WORKSPACE_ROOT", tmp_path)
+    directory = tmp_path / str(project.id)
+    directory.mkdir()
+    original = directory / "orders.csv"
+    working = directory / "orders.parquet"
+    original.write_text("region,revenue\nEast,120\n", encoding="utf-8")
+    pq.write_table(pa.table({"region": ["East"], "revenue": [120.0]}), working)
+    profile = {
+        "logical_name": "orders",
+        "version": 1,
+        "is_current": True,
+        "schema": {
+            "columns": [
+                {"name": "region", "type": "VARCHAR"},
+                {"name": "revenue", "type": "DOUBLE"},
+            ]
+        },
+    }
+    source = ProjectDataSource(
+        project_id=project.id,
+        name="orders.csv",
+        kind="file",
+        format="csv",
+        source_uri=str(original),
+        working_uri=str(working),
+        status="ready",
+        fingerprint=fingerprint_file(original),
+        profile_data=profile,
+    )
+    db.add(source)
+    await db.flush()
+    db.add(
+        SanitationRecipeRecord(
+            project_id=project.id,
+            data_source_id=source.id,
+            name="orders",
+            status="applied",
+            operations=[],
+            input_fingerprint=source.fingerprint,
+            output_fingerprint=fingerprint_file(working),
+        )
+    )
+    playbook = playbook.model_copy(
+        update={
+            "source_roles": [
+                playbook.source_roles[0].model_copy(
+                    update={"schema_signature": profile_schema_signature(profile)}
+                )
+            ]
+        }
+    )
+    playbook = playbook.model_copy(
+        update={"shape_hash": analysis_playbook_runner._shape_hash(playbook)}
+    )
+    project.extra_data = {"analysis_playbooks": [playbook.model_dump(mode="json")]}
+    block = report.pages[0].blocks[0]
+    block.source_ref = {
+        **block.source_ref,
+        "refresh_binding": {
+            "version": 1,
+            "kind": "analysis_playbook",
+            "playbook_id": playbook.id,
+            "playbook_shape_hash": playbook.shape_hash,
+            "result_name": "result_1",
+        },
+    }
+    url = f"/api/v1/projects/{project.id}/reports/{report.id}/pages/{report.pages[0].id}/blocks/{block.id}/refresh"
+    ids = (project.id, report.id, report.pages[0].id, block.id, source.id)
+    await db.commit()
+    return url, ids, original, working
+
+
+@pytest.mark.asyncio
+async def test_refresh_source_boundary_real_file_query_then_changed_import_preserves_result(
+    client, db_session, tmp_path, monkeypatch
+):
+    url, ids, original, _ = await _seed_file_refresh_boundary(db_session, tmp_path, monkeypatch)
+    refreshed = await client.post(url, json={"expected_version": 1})
+    assert refreshed.status_code == 200, refreshed.text
+    current = refreshed.json()["data"]
+    assert current["pages"][0]["blocks"][0]["content"]["rows"] == [
+        {"region": "East", "revenue": 120.0}
+    ]
+    original.write_text("region,revenue\nEast,990\n", encoding="utf-8")
+    refused = await client.post(url, json={"expected_version": 2})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == {"code": "report_refresh_preparation_required"}
+    kept = await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")
+    assert kept.json()["data"] == current
+
+
+@pytest.mark.asyncio
+async def test_refresh_source_boundary_rejects_governance_changes_after_query(
+    client, db_session, tmp_path, monkeypatch
+):
+    from app.db.tables import ProjectDataSource
+
+    url, ids, _, _ = await _seed_file_refresh_boundary(db_session, tmp_path, monkeypatch)
+    before = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    real_run = reports_api.run_analysis_playbook
+
+    async def run_with_pending_replacement(*args, **kwargs):
+        result = await real_run(*args, **kwargs)
+        source = await db_session.get(ProjectDataSource, ids[-1])
+        db_session.add(
+            ProjectDataSource(
+                project_id=ids[0],
+                name="orders-next.csv",
+                kind="file",
+                status="needs_confirmation",
+                profile_data={
+                    **source.profile_data,
+                    "is_current": False,
+                    "replacement_of": str(source.id),
+                },
+            )
+        )
+        await db_session.commit()
+        return result
+
+    monkeypatch.setattr(reports_api, "run_analysis_playbook", run_with_pending_replacement)
+    refused = await client.post(url, json={"expected_version": 1})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == {"code": "report_refresh_source_unavailable"}
+    kept = await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")
+    assert kept.json()["data"] == before
+
+
+@pytest.mark.asyncio
+async def test_refresh_source_boundary_rejects_working_copy_change_after_query(
+    client, db_session, tmp_path, monkeypatch
+):
+    url, ids, _, working = await _seed_file_refresh_boundary(db_session, tmp_path, monkeypatch)
+    before = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    real_run = reports_api.run_analysis_playbook
+
+    async def run_with_file_change(*args, **kwargs):
+        result = await real_run(*args, **kwargs)
+        with working.open("ab") as handle:
+            handle.write(b"changed after query")
+        return result
+
+    monkeypatch.setattr(reports_api, "run_analysis_playbook", run_with_file_change)
+    refused = await client.post(url, json={"expected_version": 1})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == {"code": "report_refresh_preparation_required"}
+    kept = await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")
+    assert kept.json()["data"] == before
+
+
+@pytest.mark.asyncio
+async def test_refresh_source_boundary_rejects_same_source_revision_change(
+    client, db_session, tmp_path, monkeypatch
+):
+    from app.db.tables import ProjectDataSource
+
+    url, ids, _, _ = await _seed_file_refresh_boundary(db_session, tmp_path, monkeypatch)
+    before = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    real_run = reports_api.run_analysis_playbook
+
+    async def run_with_revision_change(*args, **kwargs):
+        result = await real_run(*args, **kwargs)
+        source = await db_session.get(ProjectDataSource, ids[-1])
+        source.profile_data = {**source.profile_data, "version": 2}
+        await db_session.commit()
+        return result
+
+    monkeypatch.setattr(reports_api, "run_analysis_playbook", run_with_revision_change)
+    refused = await client.post(url, json={"expected_version": 1})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == {"code": "report_refresh_source_changed"}
+    kept = await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")
+    assert kept.json()["data"] == before
+
+
+async def _seed_page_refresh_boundary(db, tmp_path, monkeypatch):
+    _, ids, _, _ = await _seed_file_refresh_boundary(db, tmp_path, monkeypatch)
+    report = await reports_api._load_report(db, ids[0], ids[1])
+    page = report.pages[0]
+    binding = dict(page.blocks[0].source_ref["refresh_binding"])
+    chart = {
+        "version": 1,
+        "type": "bar",
+        "title": "保留图表标题",
+        "data_ref": {"result_name": "result_1", "result_hash": "1" * 64},
+        "encoding": {"x": {"field": "region"}, "y": [{"field": "revenue", "format": "currency"}]},
+        "data": [{"region": "Old", "revenue": 1}],
+    }
+    page.blocks.extend(
+        [
+            ReportBlock(
+                block_type="chart",
+                title="收入图",
+                source_kind="artifact",
+                order_index=1,
+                source_ref={"refresh_binding": binding},
+                content={"chart": chart},
+                config={"palette": "keep"},
+                layout={"w": 6},
+            ),
+            ReportBlock(
+                block_type="text",
+                title="说明",
+                source_kind="manual",
+                order_index=2,
+                content={"text": "人工说明"},
+            ),
+            ReportBlock(
+                block_type="metric",
+                title="手工指标",
+                source_kind="manual",
+                order_index=3,
+                content={"value": "100.00"},
+            ),
+            ReportBlock(
+                block_type="chart",
+                title="静态图",
+                source_kind="artifact",
+                order_index=4,
+                source_ref={"refresh_binding": binding},
+                content={"format": "png", "image_url": "/static.png"},
+            ),
+        ]
+    )
+    report.pages.append(
+        ReportPage(
+            title="不刷新的页面",
+            order_index=1,
+            blocks=[
+                ReportBlock(block_type="text", source_kind="manual", content={"text": "保持不变"})
+            ],
+        )
+    )
+    await db.commit()
+    return f"/api/v1/projects/{ids[0]}/reports/{ids[1]}/pages/{ids[2]}/refresh", ids
+
+
+@pytest.mark.asyncio
+async def test_page_refresh_shares_query_and_publishes_all_data_once(
+    client, db_session, tmp_path, monkeypatch
+):
+    url, ids = await _seed_page_refresh_boundary(db_session, tmp_path, monkeypatch)
+    before = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    calls = 0
+    real_run = reports_api.run_analysis_playbook
+
+    async def counted_run(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        assert not db_session.in_transaction()
+        return await real_run(*args, **kwargs)
+
+    monkeypatch.setattr(reports_api, "run_analysis_playbook", counted_run)
+    refreshed = await client.post(url, json={"expected_version": 1})
+    assert refreshed.status_code == 200, refreshed.text
+    current = refreshed.json()["data"]
+    assert calls == 1
+    assert current["version"] == current["pages"][0]["version"] == 2
+    table, chart, *manual = current["pages"][0]["blocks"]
+    assert table["version"] == chart["version"] == 2
+    assert (
+        table["content"]["rows"]
+        == chart["content"]["chart"]["data"]
+        == [{"region": "East", "revenue": 120.0}]
+    )
+    assert chart["content"]["chart"]["title"] == "保留图表标题"
+    assert chart["config"] == {"palette": "keep"}
+    assert manual == before["pages"][0]["blocks"][2:]
+    assert current["pages"][1] == before["pages"][1]
+
+
+@pytest.mark.asyncio
+async def test_page_refresh_later_query_failure_keeps_entire_page(
+    client, db_session, tmp_path, monkeypatch
+):
+    url, ids = await _seed_page_refresh_boundary(db_session, tmp_path, monkeypatch)
+    project = await db_session.get(Project, ids[0])
+    first = AnalysisPlaybookResponse.model_validate(project.extra_data["analysis_playbooks"][0])
+    second = first.model_copy(update={"id": "pb_22222222222222222222"})
+    project.extra_data = {
+        "analysis_playbooks": [first.model_dump(mode="json"), second.model_dump(mode="json")]
+    }
+    report = await reports_api._load_report(db_session, ids[0], ids[1])
+    chart = report.pages[0].blocks[1]
+    chart.source_ref = {
+        "refresh_binding": {**chart.source_ref["refresh_binding"], "playbook_id": second.id}
+    }
+    await db_session.commit()
+    before = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    calls = 0
+    real_run = reports_api.run_analysis_playbook
+
+    async def fail_second(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise AnalysisPlaybookRunnerError("synthetic query failure")
+        return await real_run(*args, **kwargs)
+
+    monkeypatch.setattr(reports_api, "run_analysis_playbook", fail_second)
+    refused = await client.post(url, json={"expected_version": 1})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["detail"] == {"code": "report_refresh_failed"}
+    assert calls == 2
+    after = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    assert after == before
+
+
+@pytest.mark.asyncio
+async def test_page_refresh_cas_rejection_rolls_back_every_staged_block(
+    client, db_session, tmp_path, monkeypatch
+):
+    from sqlalchemy import update
+
+    url, ids = await _seed_page_refresh_boundary(db_session, tmp_path, monkeypatch)
+    before = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    real_run = reports_api.run_analysis_playbook
+
+    async def concurrent_page_edit(*args, **kwargs):
+        result = await real_run(*args, **kwargs)
+        await db_session.execute(
+            update(ReportPage).where(ReportPage.id == ids[2]).values(title="另一处修改", version=2)
+        )
+        await db_session.commit()
+        return result
+
+    monkeypatch.setattr(reports_api, "run_analysis_playbook", concurrent_page_edit)
+    monkeypatch.setattr(reports_api, "_assert_expected_version", lambda *_args: None)
+    refused = await client.post(url, json={"expected_version": 1})
+    assert refused.status_code == 409, refused.text
+    after = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    assert after["pages"][0]["title"] == "另一处修改"
+    assert after["pages"][0]["version"] == 2
+    assert after["pages"][0]["blocks"] == before["pages"][0]["blocks"]
+    assert after["version"] == before["version"]
+
+
+@pytest.mark.asyncio
+async def test_page_refresh_admission_and_deadline_keep_previous_results(
+    client, db_session, tmp_path, monkeypatch
+):
+    url, ids = await _seed_page_refresh_boundary(db_session, tmp_path, monkeypatch)
+    before = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+    for setting, value, code in [
+        ("_REPORT_PAGE_REFRESH_LIMIT", 1, "report_refresh_page_limit"),
+        ("_REPORT_REFRESH_CONTENT_BYTES", 1, "report_refresh_page_limit"),
+        ("_REPORT_REFRESH_TIMEOUT_SECONDS", 0, "report_refresh_timed_out"),
+    ]:
+        with monkeypatch.context() as scoped:
+            scoped.setattr(reports_api, setting, value)
+            refused = await client.post(url, json={"expected_version": 1})
+        assert refused.status_code == 409, refused.text
+        assert refused.json()["detail"] == {"code": code}
+        after = (await client.get(f"/api/v1/projects/{ids[0]}/reports/{ids[1]}")).json()["data"]
+        assert after == before
+
+
 def test_report_source_kind_requires_explicit_provenance() -> None:
     # FastAPI/Pydantic handles malformed provenance before touching the database.
     from app.models.reports import ReportBlockCreate
@@ -1060,10 +1444,13 @@ async def test_refresh_rechecks_saved_method_after_releasing_read_transaction(
         query=playbook.query,
         limit=50,
     )
+    _stub_refresh_runtime(monkeypatch, _fake_refresh_result(playbook, []))
 
     async def load_context(*_args, **_kwargs):
         return SimpleNamespace(
-            sources=[],
+            sources=[
+                {"id": "00000000-0000-4000-8000-000000000001", "name": "orders.csv", "kind": "file"}
+            ],
             project_dir=Path("/tmp"),
             connection_configs={},
         )
@@ -1390,9 +1777,13 @@ async def test_refresh_runner_or_receipt_failure_leaves_old_snapshot_unchanged(
     old_content = dict(block.content)
     old_source_ref = dict(block.source_ref)
 
+    _stub_refresh_runtime(monkeypatch, _fake_refresh_result(playbook, []))
+
     async def load_context(*_args, **_kwargs):
         return SimpleNamespace(
-            sources=[],
+            sources=[
+                {"id": "00000000-0000-4000-8000-000000000001", "name": "orders.csv", "kind": "file"}
+            ],
             project_dir=Path("/tmp"),
             connection_configs={},
         )
@@ -1485,7 +1876,17 @@ async def test_export_report_xlsx_is_safe_and_contains_structured_business_data(
                             "title": "趋势/明细",
                             "order_index": 1,
                             "source_kind": "manual",
-                            "content": {"rows": [{"门店": "南京", "订单": 12}]},
+                            "content": {
+                                "rows": [
+                                    {
+                                        "门店": "南京",
+                                        "订单": 12,
+                                        "订单号": "9007199254740993",
+                                        "退款": "-9007199254740993.0123",
+                                        "时间": "00:00:00.123456789",
+                                    }
+                                ],
+                            },
                         },
                         {
                             "block_type": "chart",
@@ -1528,6 +1929,15 @@ async def test_export_report_xlsx_is_safe_and_contains_structured_business_data(
     assert trend["A2"].data_type == "s"
     assert trend["C3"].value == '{"状态": "已确认", "详情": {}}'
     assert workbook["单列值"]["A2"].value == "'@SUM(A1:A2)"
+    detail = workbook["趋势 明细 (2)"]
+    assert [cell.value for cell in detail[2]] == [
+        "南京",
+        12,
+        "9007199254740993",
+        "-9007199254740993.0123",
+        "00:00:00.123456789",
+    ]
+    assert all(detail.cell(2, column).data_type == "s" for column in (3, 4, 5))
 
     all_values = {
         str(cell.value)

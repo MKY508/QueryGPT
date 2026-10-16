@@ -3,6 +3,12 @@
 import { useId, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  chartField,
+  chartNumberKey,
+  chartSourceValue,
+  formatNumericValue as formatChartValue,
+} from "@/lib/numeric-values";
+import {
   AreaChart as AreaChartIcon,
   BarChart3,
   BarChartHorizontal,
@@ -21,7 +27,6 @@ import {
   LineChart,
   Pie,
   PieChart,
-  ResponsiveContainer,
   Scatter,
   ScatterChart,
   Tooltip,
@@ -32,9 +37,9 @@ import {
 import {
   getChartPalette,
   type ChartSpec,
-  type ChartValueFormat,
   type ChartYEncoding,
 } from "@/lib/charts";
+import { ChartViewport } from "./ChartViewport";
 
 interface ChartDisplayProps {
   spec: ChartSpec;
@@ -60,47 +65,6 @@ const TYPE_OPTIONS_BASE: Array<{
   { value: "area", Icon: AreaChartIcon },
   { value: "pie", Icon: PieChartIcon },
 ];
-
-function formatChartValue(
-  value: unknown,
-  format: ChartValueFormat = "auto",
-  locale = "en",
-): string {
-  if (value === null || value === undefined) return "—";
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return String(value);
-  }
-  switch (format) {
-    case "integer":
-      return new Intl.NumberFormat(locale, {
-        maximumFractionDigits: 0,
-      }).format(value);
-    case "compact":
-      return new Intl.NumberFormat(locale, {
-        notation: "compact",
-        maximumFractionDigits: 1,
-      }).format(value);
-    case "currency":
-      return new Intl.NumberFormat(locale, {
-        style: "currency",
-        currency: "CNY",
-        maximumFractionDigits: 2,
-      }).format(value);
-    case "percent":
-      return new Intl.NumberFormat(locale, {
-        style: "percent",
-        maximumFractionDigits: 1,
-      }).format(value);
-    case "number":
-      return new Intl.NumberFormat(locale, {
-        maximumFractionDigits: 2,
-      }).format(value);
-    default:
-      return new Intl.NumberFormat(locale, {
-        maximumFractionDigits: 4,
-      }).format(value);
-  }
-}
 
 function encodingLabel(encoding: { field: string; label?: string }): string {
   return encoding.label || encoding.field;
@@ -166,11 +130,10 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
     name: unknown,
     dataKey?: unknown,
   ): ChartYEncoding | undefined => {
-    const renderedKey = typeof dataKey === "string" ? dataKey : "";
+    const renderedKey = chartField(dataKey);
     const renderedName = String(name);
-    return y.find(
+    return y.find((item) => item.field === renderedKey) ?? y.find(
       (item) =>
-        item.field === renderedKey ||
         item.field === renderedName ||
         encodingLabel(item) === renderedName,
     );
@@ -180,11 +143,13 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
       contentStyle={TOOLTIP_STYLE}
       formatter={(value, name, item) => {
         const encoding = findEncoding(name, item.dataKey);
+        const field = encoding?.field || (String(name) === encodingLabel(x) ? x.field : String(name));
+        const original = chartSourceValue(item.payload, field, value);
         return [
           // stackOffset="expand" normalizes only the rendered stack. Tooltip
           // payloads still contain the original measure, so preserve its own
           // format instead of turning values such as 120 into 12,000%.
-          formatChartValue(value, encoding?.format, locale),
+          formatChartValue(original, encoding?.format, locale),
           encoding ? encodingLabel(encoding) : String(name),
         ];
       }}
@@ -263,11 +228,12 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
             {y.map((encoding, index) => (
               <Bar
                 key={encoding.field}
-                dataKey={encoding.field}
+                dataKey={chartNumberKey(encoding.field)}
                 name={encodingLabel(encoding)}
                 fill={palette[index % palette.length]}
                 stackId={stacked ? "series" : undefined}
-                radius={stacked ? 0 : [4, 4, 0, 0]}
+                maxBarSize={48}
+                radius={stacked ? 0 : horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
               />
             ))}
           </BarChart>
@@ -298,7 +264,7 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
               <Line
                 key={encoding.field}
                 type="monotone"
-                dataKey={encoding.field}
+                dataKey={chartNumberKey(encoding.field)}
                 name={encodingLabel(encoding)}
                 stroke={palette[index % palette.length]}
                 strokeWidth={2}
@@ -345,7 +311,7 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
               <Area
                 key={encoding.field}
                 type="monotone"
-                dataKey={encoding.field}
+                dataKey={chartNumberKey(encoding.field)}
                 name={encodingLabel(encoding)}
                 stroke={palette[index % palette.length]}
                 fill={palette[index % palette.length]}
@@ -363,7 +329,7 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
           <PieChart>
             <Pie
               data={spec.data}
-              dataKey={value.field}
+              dataKey={chartNumberKey(value.field)}
               nameKey={x.field}
               name={encodingLabel(value)}
               cx="50%"
@@ -393,14 +359,14 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
             <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
             <XAxis
               type="number"
-              dataKey={x.field}
+              dataKey={chartNumberKey(x.field)}
               name={encodingLabel(x)}
               tick={{ fontSize: 12 }}
               className="stroke-muted-foreground"
             />
             <YAxis
               type="number"
-              dataKey={value.field}
+              dataKey={chartNumberKey(value.field)}
               name={encodingLabel(value)}
               tick={{ fontSize: 12 }}
               tickFormatter={(axisValue) =>
@@ -422,7 +388,7 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
   };
 
   return (
-    <figure className="mt-4 bg-card p-4" aria-labelledby={`${chartId}-title`}>
+    <figure className="receiptbi-chart mt-4 bg-card p-4" aria-labelledby={`${chartId}-title`}>
       <figcaption
         id={`${chartId}-title`}
         className="mb-3 flex items-center justify-between gap-3"
@@ -435,7 +401,7 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
           {spec.title || t("defaultTitle")}
         </span>
         <span
-          className="flex items-center gap-0.5 border border-border bg-background p-0.5"
+          className="flex items-center gap-0.5 rounded-lg border border-border bg-background p-0.5"
           role="group"
           aria-label={t("switchTypeAria")}
         >
@@ -463,9 +429,9 @@ export function ChartDisplay({ spec }: ChartDisplayProps) {
         </span>
       </figcaption>
       <div className="h-64" role="img" aria-label={summary}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ChartViewport>
           {renderChart()}
-        </ResponsiveContainer>
+        </ChartViewport>
       </div>
       <table className="sr-only">
         <caption>{summary}</caption>

@@ -1,10 +1,10 @@
 """Editable report API contracts."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ReportStatus = Literal["draft", "published", "archived"]
 ReportSourceKind = Literal["manual", "analysis_run", "artifact"]
@@ -44,6 +44,9 @@ class ReportBlockCreate(_ReportModel):
 
 class ReportBlockSync(_ReportModel):
     id: UUID | None = None
+    # A new block may inherit trusted provenance from this same report's
+    # saved block. This is a request-only reference, never stored as identity.
+    copy_source_block_id: UUID | None = None
     block_type: ReportBlockType
     title: str | None = Field(default=None, max_length=200)
     order_index: int = Field(default=0, ge=0)
@@ -66,7 +69,9 @@ class ReportBlockSync(_ReportModel):
             raise ValueError("人工区块不能冒充调查或产物来源")
         if self.source_kind == "analysis_run" and self.artifact_id is not None:
             raise ValueError("调查区块不能同时声明 artifact_id")
-        if self.id is None:
+        if self.id is not None and self.copy_source_block_id is not None:
+            raise ValueError("已有区块不能同时声明复制来源")
+        if self.id is None and self.copy_source_block_id is None:
             if self.source_kind == "analysis_run" and self.analysis_run_id is None:
                 raise ValueError("新调查区块必须引用 analysis_run_id")
             if self.source_kind == "artifact" and self.artifact_id is None:
@@ -103,6 +108,45 @@ class ReportBlockUpdate(_ReportModel):
 
 class ReportBlockRefreshRequest(_ReportModel):
     expected_version: int = Field(ge=1)
+    source_plan: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+class ReportPageRefreshRequest(_ReportModel):
+    expected_version: int = Field(ge=1)
+    source_plan: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+
+class ReportRefreshSourceLabel(_ReportModel):
+    source_id: UUID
+    name: str
+    kind: Literal["file", "connection"]
+    data_version: int | None = Field(default=None, ge=1)
+
+
+class ReportRefreshReceipt(_ReportModel):
+    version: Literal[1] = 1
+    refreshed_at: datetime
+    source: ReportRefreshSourceLabel
+    source_catalog_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ReportRefreshPlanBlock(_ReportModel):
+    block_id: UUID
+    title: str
+    previous_source: ReportRefreshSourceLabel | None = None
+    refreshed_at: datetime | None = None
+    next_source: ReportRefreshSourceLabel
+
+
+class ReportRefreshPlanResponse(_ReportModel):
+    project_id: UUID
+    report_id: UUID
+    page_id: UUID
+    block_id: UUID | None = None
+    expected_version: int
+    source_plan: str
+    blocks: list[ReportRefreshPlanBlock]
 
 
 class ReportBlockRefreshBinding(_ReportModel):
@@ -113,6 +157,9 @@ class ReportBlockRefreshBinding(_ReportModel):
     playbook_id: str = Field(pattern=r"^pb_[0-9a-f]{20}$")
     playbook_shape_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     result_name: str = Field(pattern=r"^result_[1-9][0-9]*$")
+    value_column: str | None = Field(
+        default=None, min_length=1, max_length=1000, exclude_if=lambda value: value is None
+    )
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -156,6 +203,9 @@ class ReportCreate(_ReportModel):
 
 class ReportUpdate(_ReportModel):
     expected_version: int = Field(ge=1)
+    save_request_id: UUID | None = None
+    # A retry may execute only if this base is still current, or replay a receipt.
+    retry_save: bool = False
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=4000)
     status: ReportStatus | None = None
@@ -206,7 +256,17 @@ class ReportPageResponse(_ReportModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ReportDocumentResponse(_ReportModel):
+class _ReportDeletionResponse(_ReportModel):
+    deleted_at: datetime | None = None
+
+    @field_validator("deleted_at")
+    @classmethod
+    def explicit_deletion_timezone(cls, value: datetime | None) -> datetime | None:
+        # SQLite strips timezone information from a UTC DateTime column.
+        return value.replace(tzinfo=UTC) if value is not None and value.tzinfo is None else value
+
+
+class ReportDocumentResponse(_ReportDeletionResponse):
     id: UUID
     project_id: UUID
     title: str
@@ -221,7 +281,7 @@ class ReportDocumentResponse(_ReportModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ReportSummaryResponse(_ReportModel):
+class ReportSummaryResponse(_ReportDeletionResponse):
     id: UUID
     project_id: UUID
     title: str
@@ -232,6 +292,15 @@ class ReportSummaryResponse(_ReportModel):
     block_count: int
     created_at: datetime
     updated_at: datetime
+
+
+class ReportLibraryResponse(_ReportModel):
+    items: list[ReportSummaryResponse]
+    total: int
+    count: int
+    page: int
+    page_size: int
+    page_count: int
 
 
 class ReportDeleteResponse(_ReportModel):

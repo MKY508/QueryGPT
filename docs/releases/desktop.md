@@ -1,5 +1,8 @@
 ## 安装说明 / Installation
 
+本次构建需要 macOS 13 或更高版本，或 64 位 Windows 10/11。
+This build requires macOS 13 or later, or 64-bit Windows 10/11.
+
 打开 DMG 后，将 ReceiptBI 拖入“应用程序”文件夹。
 
 若系统阻止首次打开未签名的 macOS 构建，请在终端运行：

@@ -535,19 +535,6 @@ describe("task-first workspace", () => {
       created_at: "2026-07-01T00:00:00Z",
       updated_at: "2026-07-02T00:00:00Z",
     } satisfies StandingAnalysis;
-    const recent = {
-      id: "run-1",
-      project_id: "project-1",
-      conversation_id: "conversation-1",
-      query: "商品与渠道关联",
-      state: "completed",
-      stage: "completed",
-      report: { title: "商品与线上渠道关联" },
-      checkpoint: {},
-      created_at: "2026-07-01T00:00:00Z",
-      updated_at: "2026-07-02T00:00:00Z",
-    } satisfies AnalysisRunSummary;
-
     render(
       <NextIntlClientProvider locale="zh" messages={messages}>
         <MessageList
@@ -555,7 +542,6 @@ describe("task-first workspace", () => {
           isLoading={false}
           sources={[]}
           standingAnalyses={[standing]}
-          recentRuns={[recent]}
           emptyComposer={<button type="button">描述任务</button>}
           activityLoading={false}
           modelReady={true}
@@ -585,22 +571,6 @@ describe("task-first workspace", () => {
 
   it("keeps the task surface clear of a second horizontal report browser", () => {
     const onOpenReport = vi.fn();
-    const reports = ["收入变化", "退款异常", "门店表现"].map(
-      (title, index) =>
-        ({
-          id: `run-${index + 1}`,
-          project_id: "project-1",
-          conversation_id: `conversation-${index + 1}`,
-          query: `调查${title}`,
-          state: "completed",
-          stage: "completed",
-          report: { title },
-          checkpoint: {},
-          created_at: "2026-07-01T00:00:00Z",
-          updated_at: `2026-07-0${index + 1}T00:00:00Z`,
-        }) satisfies AnalysisRunSummary
-    );
-
     render(
       <NextIntlClientProvider locale="zh" messages={messages}>
         <MessageList
@@ -608,7 +578,6 @@ describe("task-first workspace", () => {
           isLoading={false}
           sources={[]}
           standingAnalyses={[]}
-          recentRuns={reports}
           emptyComposer={<div>任务输入</div>}
           activityLoading={false}
           modelReady={true}

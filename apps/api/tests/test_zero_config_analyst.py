@@ -898,7 +898,9 @@ async def test_python_execution_auto_installs_a_missing_project_module_once(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(settings, "WORKSPACE_ROOT", tmp_path)
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel())
+    )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="依赖项目"),
@@ -1592,7 +1594,9 @@ async def test_pydantic_agent_loop_returns_a_typed_business_report(
             ],
         },
     )
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model)
+    )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="经营分析项目"),
@@ -1696,7 +1700,9 @@ async def test_missing_data_returns_an_explicit_product_action(
             },
         },
     )
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model)
+    )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="经营分析项目"),
@@ -1726,7 +1732,9 @@ async def test_business_confirmation_requires_a_pending_question(
             "summary": "后续会沿用该口径。",
         },
     )
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(test_model)
+    )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(name="经营分析项目"),
@@ -2704,7 +2712,9 @@ async def test_checkpoint_revision_reservation_is_unique_under_parallel_tools(
 async def test_safe_boundary_freezes_tool_state_before_checkpoint_callback(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel())
+    )
     captured: list[dict] = []
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
@@ -2793,11 +2803,18 @@ async def test_render_chart_checkpoint_restores_verified_artifacts_and_rejects_t
     assert restored.python_images == [image]
     assert checkpoint_manifest_is_readable(tmp_path, checkpoint) is True
 
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel())
+    )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="恢复图表项目"),
-        resume_state=RestoredCheckpoint(manifest=restored.manifest, dataframes=restored.dataframes, python_output=restored.python_output, python_images=restored.python_images),
+        resume_state=RestoredCheckpoint(
+            manifest=restored.manifest,
+            dataframes=restored.dataframes,
+            python_output=restored.python_output,
+            python_images=restored.python_images,
+        ),
     )
     restore_session_checkpoint(runtime.deps, runtime.resume_state)
     assert runtime.deps.python_output == [output]
@@ -2807,7 +2824,12 @@ async def test_render_chart_checkpoint_restores_verified_artifacts_and_rejects_t
     drifted_runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="漂移图表项目"),
-        resume_state=RestoredCheckpoint(manifest=restored.manifest, dataframes=restored.dataframes, python_output=restored.python_output, python_images=restored.python_images),
+        resume_state=RestoredCheckpoint(
+            manifest=restored.manifest,
+            dataframes=restored.dataframes,
+            python_output=restored.python_output,
+            python_images=restored.python_images,
+        ),
     )
     with pytest.raises(CheckpointError, match="暂停时不一致"):
         restore_session_checkpoint(drifted_runtime.deps, drifted_runtime.resume_state)

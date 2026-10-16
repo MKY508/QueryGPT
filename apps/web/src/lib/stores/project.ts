@@ -1,10 +1,17 @@
 "use client";
 
-import { inspectProject, inspectProjectDirectory, PROJECT_NAME_LIMIT, ProjectOperationBusy } from "@/lib/project-directory";
-
 import { create } from "zustand";
+import type { WorkbookSelection } from "@/lib/workbook";
+import type { CsvSelection } from "@/lib/csv-import";
+import { applySourceReplacement, type ReplacementRequest } from "@/lib/source-replacement";
+import { applyRecipeReplay, type RecipeReplayRequest } from "@/lib/recipe-replay";
 import { runtimeMessage } from "@/i18n/runtime";
+import { inspectProject, inspectProjectDirectory, ProjectOperationBusy, PROJECT_NAME_LIMIT } from "@/lib/project-directory";
 import { api } from "@/lib/api/client";
+import { FileUploadQueue } from "@/lib/file-upload-queue";
+import { resolveFileUpload } from "@/lib/file-upload";
+import { listPendingUploads, subscribeUploadJournal, uploadJournal } from "@/lib/upload-journal";
+import { useUploadQueueStore } from "@/lib/stores/uploads";
 import {
   migrateProjectStorage,
   PROJECT_STORAGE_KEY,
@@ -33,7 +40,12 @@ let refreshGeneration = 0;
 let projectDirectoryGeneration = 0, projectNavigationGeneration = 0;
 let creatingProject = false;
 const renamingProjects = new Set<string>();
+const sourceReplacements = new Set<string>();
+const recipeReplays = new Set<string>();
 const cleaningApplications = new Set<string>();
+// Project-owned operations survive navigation; they must not own another
+// project's busy state or submit a duplicate from an overlapping drop/click.
+const sourceAdditions = new Set<string>();
 
 interface ProjectBootstrapDefaults {
   name: string;
@@ -83,7 +95,7 @@ interface ProjectState {
   isUpdatingKnowledge: boolean;
   sourceAction: {
     sourceId: string;
-    kind: "profile" | "reorganize" | "accept_replacement" | "keep_trusted" | "remove";
+    kind: "profile" | "reorganize" | "accept_replacement" | "keep_trusted" | "remove" | "replace";
   } | null;
   error: string | null;
   bootstrap: (defaults: ProjectBootstrapDefaults) => Promise<void>;
@@ -91,8 +103,9 @@ interface ProjectState {
   createProject: (name: string, options?: { activate?: boolean }) => Promise<Project>;
   renameProject: (id: string, name: string) => Promise<Project>;
   selectProject: (id: string) => Promise<void>;
-  refreshCurrent: () => Promise<void>;
+  refreshCurrent: (options?: { throwOnError?: boolean }) => Promise<void>;
   loadRecipeRevisions: (id: string) => Promise<SanitationRecipeRevision[]>;
+  replayRecipe: (projectId: string, sourceId: string, recipeId: string, request: RecipeReplayRequest & { proof: string }) => Promise<void>;
   restoreRecipeRevision: (
     id: string,
     revisionId: string
@@ -142,10 +155,20 @@ interface ProjectState {
     >
   ) => Promise<SemanticEntry>;
   uploadFile: (file: File) => Promise<void>;
+  uploadFiles: (files: readonly File[]) => Promise<void>;
+  checkUpload: (itemId: string, projectId?: string) => Promise<void>;
+  reselectUpload: (itemId: string, file: File, projectId: string) => Promise<void>;
+  resumeUploads: (projectId?: string) => Promise<void>;
+  pauseUploads: (projectId?: string) => void;
+  retryUpload: (id: string, projectId?: string) => Promise<void>;
+  cancelQueuedUpload: (id: string, projectId?: string) => void;
+  cancelQueuedUploads: (projectId?: string) => void;
+  clearUploads: (projectId?: string) => void;
   attachConnection: (connectionId: string, name?: string) => Promise<void>;
-  profileSource: (sourceId: string) => Promise<void>;
+  profileSource: (sourceId: string, selection?: WorkbookSelection | CsvSelection) => Promise<void>;
   reorganizeSource: (sourceId: string) => Promise<void>;
   acceptReplacement: (sourceId: string) => Promise<void>;
+  replaceSource: (projectId: string, sourceId: string, request: ReplacementRequest & { proof: string }) => Promise<void>;
   keepTrustedSource: (sourceId: string) => Promise<void>;
   removeSource: (sourceId: string) => Promise<void>;
 }
@@ -334,9 +357,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   selectProject: async (id) => {
     projectNavigationGeneration++;
+    // Remembering a choice is optional; blocked browser storage must not turn
+    // a deliberate switch into a failed operation after the old chat closes.
     try { localStorage.setItem(PROJECT_STORAGE_KEY, id); } catch { /* session-only choice */ }
     set({
       currentProjectId: id,
+      isUploading: sourceAdditions.has(id),
       sources: [],
       preflightReports: [],
       recipes: [],
@@ -363,7 +389,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     await get().refreshCurrent();
   },
 
-  refreshCurrent: async () => {
+  refreshCurrent: async (options) => {
     const projectId = get().currentProjectId;
     if (!projectId) return;
     const generation = ++refreshGeneration;
@@ -420,6 +446,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         generation === refreshGeneration
       ) {
         set({ error: messageFrom(error) });
+        if (options?.throwOnError) throw error;
       }
     }
   },
@@ -1037,63 +1064,125 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   uploadFile: async (file) => {
     const projectId = get().currentProjectId;
-    if (!projectId) return;
-    set({ isUploading: true, error: null });
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      await api.post(
-        `/api/v1/projects/${projectId}/sources/files`,
-        form,
-        { headers: { "Content-Type": "multipart/form-data" }, timeout: 120000 }
-      );
-      await get().refreshCurrent();
-    } catch (error) {
-      const message = messageFrom(error);
-      if (get().currentProjectId === projectId) await get().refreshCurrent();
-      if (get().currentProjectId === projectId) set({ error: message });
-    } finally {
-      set({ isUploading: false });
+    if (!projectId || sourceAdditions.has(projectId)) return;
+    set({ error: null });
+    await fileUploads.enqueue(projectId, [file]);
+    if (get().currentProjectId === projectId) {
+      const snapshot = fileUploads.snapshot(projectId);
+      const errorKey = snapshot.notice ?? snapshot.items.at(-1)?.errorKey;
+      if (errorKey) set({ error: runtimeMessage(errorKey) });
     }
+  },
+
+  uploadFiles: async (files) => {
+    const projectId = get().currentProjectId;
+    if (!projectId) return;
+    set({ error: null });
+    await fileUploads.enqueue(projectId, files);
+  },
+
+  checkUpload: async (itemId, projectId) => {
+    const id = projectId ?? get().currentProjectId;
+    if (id) await fileUploads.check(id, itemId);
+  },
+
+  reselectUpload: async (itemId, file, projectId) => {
+    await fileUploads.reselect(projectId, itemId, file);
+  },
+
+  pauseUploads: (projectId) => {
+    const id = projectId ?? get().currentProjectId;
+    if (id) fileUploads.pause(id);
+  },
+
+  resumeUploads: async (projectId) => {
+    const id = projectId ?? get().currentProjectId;
+    if (id) await fileUploads.resume(id);
+  },
+
+  retryUpload: async (itemId, projectId) => {
+    const id = projectId ?? get().currentProjectId;
+    if (id) await fileUploads.retry(id, itemId);
+  },
+
+  cancelQueuedUpload: (itemId, projectId) => {
+    const id = projectId ?? get().currentProjectId;
+    if (id) fileUploads.cancel(id, itemId);
+  },
+
+  cancelQueuedUploads: (projectId) => {
+    const id = projectId ?? get().currentProjectId;
+    if (id) fileUploads.cancelWaiting(id);
+  },
+
+  clearUploads: (projectId) => {
+    const id = projectId ?? get().currentProjectId;
+    if (id) void fileUploads.clear(id);
   },
 
   attachConnection: async (connectionId, name) => {
     const projectId = get().currentProjectId;
-    if (!projectId) return;
+    if (!projectId || sourceAdditions.has(projectId)) return;
+    sourceAdditions.add(projectId);
     set({ isUploading: true, error: null });
     try {
       await api.post(
         `/api/v1/projects/${projectId}/sources/connections`,
         { connection_id: connectionId, name }
       );
-      await get().refreshCurrent();
+      if (get().currentProjectId === projectId) await get().refreshCurrent();
     } catch (error) {
       const message = messageFrom(error);
       if (get().currentProjectId === projectId) await get().refreshCurrent();
       if (get().currentProjectId === projectId) set({ error: message });
     } finally {
-      set({ isUploading: false });
+      sourceAdditions.delete(projectId);
+      if (get().currentProjectId === projectId) set({ isUploading: false });
     }
   },
 
-  profileSource: async (sourceId) => {
+  profileSource: async (sourceId, selection) => {
     const projectId = get().currentProjectId;
     if (!projectId) return;
-    set({ sourceAction: { sourceId, kind: "profile" }, error: null });
+    if (get().sourceAction) throw new Error("A source action is already running");
+    const action = { sourceId, kind: "profile" as const };
+    set({ sourceAction: action, error: null });
     try {
       await api.post(
         `/api/v1/projects/${projectId}/sources/${sourceId}/preflight`,
-        undefined,
+        selection,
         { timeout: 120000 }
       );
-      await get().refreshCurrent();
+      if (get().currentProjectId === projectId) await get().refreshCurrent();
     } catch (error) {
       const message = messageFrom(error);
       if (get().currentProjectId === projectId) await get().refreshCurrent();
       if (get().currentProjectId === projectId) set({ error: message });
       throw error;
     } finally {
-      set({ sourceAction: null });
+      if (get().currentProjectId === projectId && get().sourceAction === action) set({ sourceAction: null });
+    }
+  },
+
+  replayRecipe: async (projectId, sourceId, recipeId, request) => {
+    if (get().currentProjectId !== projectId || get().sourceAction || get().cleaningAction || recipeReplays.has(projectId)) {
+      throw new Error("The project or source action has changed");
+    }
+    const action = { sourceId, kind: "reorganize" as const };
+    recipeReplays.add(projectId);
+    set({ sourceAction: action, error: null });
+    try {
+      const source = await applyRecipeReplay(projectId, sourceId, recipeId, request);
+      if (get().currentProjectId === projectId) {
+        set((state) => ({ sources: state.sources.map((item) => item.id === source.id ? source : item),
+          recipeRevisionsByRecipe: { ...state.recipeRevisionsByRecipe, [recipeId]: [] } }));
+        // A successful write must not become an apparent failure just because the following read fails.
+        await get().refreshCurrent();
+        if (get().currentProjectId === projectId) await get().loadRecipeRevisions(recipeId).catch(() => undefined);
+      }
+    } finally {
+      recipeReplays.delete(projectId);
+      if (get().currentProjectId === projectId && get().sourceAction === action) set({ sourceAction: null });
     }
   },
 
@@ -1130,6 +1219,27 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       ) {
         set({ sourceAction: null });
       }
+    }
+  },
+
+  replaceSource: async (projectId, sourceId, request) => {
+    if (get().currentProjectId !== projectId || get().sourceAction || sourceReplacements.has(projectId)) {
+      throw new Error("The project or source action has changed");
+    }
+    const action = { sourceId, kind: "replace" as const };
+    sourceReplacements.add(projectId);
+    set({ sourceAction: action, error: null });
+    try {
+      const accepted = await applySourceReplacement(projectId, sourceId, request);
+      if (get().currentProjectId === projectId) {
+        set((state) => ({ sources: state.sources.map((source) => source.id === accepted.id ? accepted
+          : source.id === sourceId ? { ...source, status: "superseded", profile_data: { ...source.profile_data, is_current: false, superseded_by: accepted.id } }
+            : source) }));
+        await get().refreshCurrent();
+      }
+    } finally {
+      sourceReplacements.delete(projectId);
+      if (get().currentProjectId === projectId && get().sourceAction === action) set({ sourceAction: null });
     }
   },
 
@@ -1229,3 +1339,77 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 }));
+
+const fileUploads = new FileUploadQueue({
+  journal: uploadJournal,
+  claim(projectId) {
+    if (sourceAdditions.has(projectId)) return false;
+    sourceAdditions.add(projectId);
+    return true;
+  },
+  release(projectId) { sourceAdditions.delete(projectId); },
+  changed(projectId, snapshot) {
+    useUploadQueueStore.setState((state) => {
+      const byProject = { ...state.byProject };
+      if (!snapshot.items.length && !snapshot.notice && !snapshot.busy) delete byProject[projectId];
+      else byProject[projectId] = snapshot;
+      return { byProject };
+    });
+    const state = useProjectStore.getState();
+    const busy = sourceAdditions.has(projectId);
+    if (state.currentProjectId === projectId && state.isUploading !== busy) {
+      useProjectStore.setState({ isUploading: busy });
+    }
+  },
+  resolve: resolveFileUpload,
+  async send(projectId, file, progress, requestId, sha256) {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await api.post(`/api/v1/projects/${projectId}/sources/files`, form, {
+      headers: { "Content-Type": undefined, "Idempotency-Key": requestId, ...(sha256 ? { "X-File-SHA256": sha256 } : {}) },
+      timeout: 120000,
+      onUploadProgress(event) {
+        progress(event.total && event.total > 0 ? event.loaded / event.total : null);
+      },
+    });
+    const source = response?.data?.data;
+    if (!source || typeof source.id !== "string" || !source.id || source.project_id !== projectId || source.kind !== "file"
+      || (sha256 && source.fingerprint !== sha256)) {
+      throw new Error("Upload acknowledgement did not identify the project source");
+    }
+  },
+  async settled(projectId) {
+    const state = useProjectStore.getState();
+    if (state.currentProjectId === projectId) await state.refreshCurrent({ throwOnError: true });
+  },
+});
+
+let recoveryRead: Promise<void> | undefined;
+let recoveryReadRequested = false;
+
+/** Coalesce focus/window notifications; restoring never triggers an API call. */
+export function refreshUploadRecovery(): Promise<void> {
+  recoveryReadRequested = true;
+  if (recoveryRead) return recoveryRead;
+  const read = (async () => {
+    useUploadQueueStore.setState({ recovery: "loading" });
+    do {
+      recoveryReadRequested = false;
+      try {
+        const records = await listPendingUploads();
+        fileUploads.restore(records);
+        useUploadQueueStore.setState({ recovery: "ready" });
+      } catch { useUploadQueueStore.setState({ recovery: "error" }); }
+    } while (recoveryReadRequested);
+  })();
+  recoveryRead = read;
+  void read.finally(() => { if (recoveryRead === read) recoveryRead = undefined; });
+  return read;
+}
+
+export function subscribeUploadRecovery(): () => void {
+  const refresh = () => { void refreshUploadRecovery(); };
+  const unsubscribe = subscribeUploadJournal(refresh);
+  refresh();
+  return unsubscribe;
+}

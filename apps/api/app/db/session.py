@@ -29,11 +29,14 @@ engine = create_async_engine(_db_url, **_engine_kwargs)
 
 
 def _set_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
-    """Enable SQLite FK enforcement for every pooled DB-API connection."""
+    """Enable SQLite FK enforcement and concurrency pragmas for every pooled DB-API connection."""
 
     cursor = dbapi_connection.cursor()
     try:
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
     finally:
         cursor.close()
 

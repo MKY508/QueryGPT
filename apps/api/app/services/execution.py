@@ -1271,7 +1271,7 @@ class ExecutionService:
         """Stage the result and related records in the caller's completion transaction."""
         self.execution_policy.validate_result_boundary(result_data)
         report = dict(result_data.get("report") or {})
-        state = AnalysisState(result_data.get("analysis_state"))
+        state = AnalysisState(str(result_data.get("analysis_state") or ""))
         if state not in TERMINAL_ANALYSIS_STATES:
             raise ValueError("A final result must carry a terminal investigation state")
         if report.get("status") and REPORT_ANALYSIS_STATES.get(report["status"]) != state:
@@ -2835,6 +2835,7 @@ class ExecutionService:
                     **self._run_event_context(run),
                 )
                 return
+            active_error: Exception = exc
             fallback_events: list[SSEEvent] | None = None
             try:
                 fallback_result = await self._build_minimal_verified_report(
@@ -2890,7 +2891,7 @@ class ExecutionService:
             except Exception as fallback_error:
                 await self.db.rollback()
                 logger.exception("Unable to complete the verified table-only report")
-                exc = fallback_error
+                active_error = fallback_error
             if fallback_events is not None:
                 for event in fallback_events:
                     yield event
@@ -2898,10 +2899,10 @@ class ExecutionService:
             logger.exception(
                 "Runtime error during execution",
                 conversation_id=str(conversation_id),
-                exception_detail=self._diagnostic_error(exc),
+                exception_detail=self._diagnostic_error(active_error),
             )
-            await self._mark_run_needs_attention(run, exc)
-            model_error = _public_model_error(exc)
+            await self._mark_run_needs_attention(run, active_error)
+            model_error = _public_model_error(active_error)
             if model_error is not None:
                 code, message, category = model_error
                 await self._record_model_failure_safely(category)
@@ -2918,7 +2919,7 @@ class ExecutionService:
                 attempt=1,
                 phase="execution",
                 status="error",
-                message=f"{type(exc).__name__}: {str(exc) or 'runtime error'}",
+                message=f"{type(active_error).__name__}: {str(active_error) or 'runtime error'}",
                 error_code="RUNTIME_ERROR",
                 error_category="execution",
                 recoverable=resumable,

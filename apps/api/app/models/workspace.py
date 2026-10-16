@@ -5,8 +5,17 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Discriminator, Field, StringConstraints, Tag, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Discriminator,
+    Field,
+    StringConstraints,
+    Tag,
+    model_validator,
+)
 
+from app.core.csv_options import CsvDelimiter, CsvEncoding
 from app.models.analysis_state import AnalysisState
 
 KnowledgeState = Literal["candidate", "confirmed", "locked"]
@@ -549,6 +558,64 @@ class RelationIndexRefreshResponse(BaseModel):
     semantic_scope_table_count: int = Field(..., ge=0)
 
 
+class FileSelectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    header_row: int | None = Field(default=None, ge=1, le=1_000_000, strict=True)
+    headerless: bool = Field(default=False, strict=True)
+    input_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def validate_header_choice(self):
+        if self.headerless and self.header_row is not None:
+            raise ValueError("无表头与指定表头行不能同时使用")
+        return self
+
+
+class WorkbookSelectionRequest(FileSelectionRequest):
+    sheet: str = Field(min_length=1, max_length=128)
+
+
+class CsvSelectionRequest(FileSelectionRequest):
+    kind: Literal["csv"]
+    delimiter: CsvDelimiter
+    encoding: CsvEncoding
+
+
+class CsvPreviewResponse(BaseModel):
+    source_id: UUID
+    source_revision: str
+    input_fingerprint: str
+    delimiter: CsvDelimiter
+    encoding: CsvEncoding
+    start_row: int
+    rows: list[list[str | None]]
+    nonempty_rows: list[int]
+    has_more_rows: bool
+    truncated_columns: bool
+    truncated_cells: bool
+
+
+class WorkbookSheetResponse(BaseModel):
+    name: str
+    hidden: bool | None = None
+
+
+class WorkbookPreviewResponse(BaseModel):
+    source_id: UUID
+    source_revision: str
+    input_fingerprint: str
+    sheets: list[WorkbookSheetResponse]
+    selected_sheet: str | None = None
+    start_row: int = Field(default=1, ge=1, le=1_000_000)
+    rows: list[list[str | None]]
+    nonempty_rows: list[int] = Field(default_factory=list)
+    has_more_rows: bool = False
+    truncated_columns: bool = False
+    truncated_cells: bool = False
+    missing_formula_results: int = 0
+
+
 class PreflightIssue(BaseModel):
     code: str
     title: str
@@ -557,7 +624,9 @@ class PreflightIssue(BaseModel):
     automatic: bool = True
     count: int | None = None
     presentation_code: str | None = Field(default=None, exclude_if=lambda value: value is None)
-    presentation_facts: dict[str, str | int] = Field(default_factory=dict, exclude_if=lambda value: not value)
+    presentation_facts: dict[str, str | int] = Field(
+        default_factory=dict, exclude_if=lambda value: not value
+    )
 
 
 class PreflightAmbiguity(BaseModel):
@@ -734,6 +803,31 @@ class SourceCleaningColumnChange(BaseModel):
     changed_count: int = Field(..., ge=0)
 
 
+class SourceCleaningFrequentValue(BaseModel):
+    value: str | int | float | bool
+    count: int = Field(..., ge=1, le=1000)
+
+
+class SourceCleaningColumnProfile(BaseModel):
+    kind: Literal["number", "text", "temporal", "boolean", "other"]
+    rows: int = Field(..., ge=0)
+    null_count: int = Field(..., ge=0)
+    blank_count: int | None = Field(default=None, ge=0)
+    zero_count: int | None = Field(default=None, ge=0)
+    non_finite_count: int | None = Field(default=None, ge=0)
+    minimum: str | int | float | None = None
+    maximum: str | int | float | None = None
+    sample_rows: int = Field(..., ge=0, le=1000)
+    omitted_long_values: int = Field(default=0, ge=0, le=1000)
+    top_values: list[SourceCleaningFrequentValue] = Field(default_factory=list, max_length=5)
+
+
+class SourceCleaningColumnImpact(BaseModel):
+    column: str = Field(..., min_length=1, max_length=10_000)
+    before: SourceCleaningColumnProfile | None
+    after: SourceCleaningColumnProfile | None
+
+
 class SourceCleaningPreviewResponse(BaseModel):
     """Proof that can be replayed verbatim before switching the working copy."""
 
@@ -746,6 +840,9 @@ class SourceCleaningPreviewResponse(BaseModel):
     before: SourceCleaningSnapshot
     after: SourceCleaningSnapshot
     changes: list[SourceCleaningColumnChange] = Field(default_factory=list, max_length=100_000)
+    comparison_basis: Literal["position", "unavailable"] = "unavailable"
+    profiles: list[SourceCleaningColumnImpact] = Field(default_factory=list, max_length=100)
+    profiles_omitted: int = Field(default=0, ge=0)
     can_apply: bool
 
 

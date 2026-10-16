@@ -1092,7 +1092,9 @@ async def test_runtime_context_exposes_compact_candidate_and_prompt_requires_rev
         & {"source_id", "sql", "code", "last_run_id", "row_count", "truncated"}
     )
 
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel())
+    )
     runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     try:
         instructions = runtime._instructions()

@@ -1910,11 +1910,29 @@ class SQLiteAdapter:
             raise ValueError("Invalid database identifier")
         return f'"{identifier.replace(chr(34), chr(34) * 2)}"'
 
+    @staticmethod
+    def _is_internal_metadata_database(database_path: Path) -> bool:
+        if database_path.name.lower() in {"receiptbi.db", "querygpt.db"}:
+            return True
+        from app.core.config import settings
+
+        db_url = str(settings.DATABASE_URL or "")
+        for prefix in ("sqlite+aiosqlite:///", "sqlite:///"):
+            if db_url.startswith(prefix):
+                raw_target = db_url[len(prefix) :].split("?", 1)[0]
+                if raw_target and raw_target != ":memory:":
+                    with contextlib.suppress(OSError):
+                        if database_path == Path(raw_target).expanduser().resolve():
+                            return True
+        return False
+
     def create_connection(self, config: DatabaseConfig) -> Any:
         import sqlite3
 
         if config.database != ":memory:":
             database_path = Path(config.database).expanduser().resolve()
+            if self._is_internal_metadata_database(database_path):
+                raise PermissionError("禁止连接 ReceiptBI 内部元数据数据库")
             if not database_path.is_file():
                 raise FileNotFoundError(f"SQLite database does not exist: {database_path}")
             conn = sqlite3.connect(f"{database_path.as_uri()}?mode=ro", uri=True)

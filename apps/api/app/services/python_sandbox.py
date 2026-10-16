@@ -9,6 +9,7 @@ import importlib
 import importlib.machinery
 import importlib.util
 import multiprocessing
+import os
 import sys
 import time
 from typing import Any
@@ -18,10 +19,20 @@ import structlog
 
 logger = structlog.get_logger()
 
+_SENSITIVE_ENV_SUFFIXES = ("_API_KEY", "_SECRET", "_TOKEN", "_PASSWORD")
+
+
+def _scrub_sandbox_environment() -> None:
+    for key in list(os.environ):
+        upper_key = key.upper()
+        if upper_key == "ENCRYPTION_KEY" or upper_key.endswith(_SENSITIVE_ENV_SUFFIXES):
+            os.environ.pop(key, None)
+
 
 def _sandbox_worker(connection: Any, extra_paths: list[str]) -> None:
     """Own the stateful IPython runtime inside a disposable child process."""
 
+    _scrub_sandbox_environment()
     from app.services.python_runtime import PythonExecutionRuntime
 
     runtime = PythonExecutionRuntime(extra_paths=extra_paths)

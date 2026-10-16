@@ -96,7 +96,9 @@ def _runtime(
     knowledge_key: str = REFUND_AMBIGUITY["key"],
     language: str = "zh",
 ) -> tuple[PydanticAnalystRuntime, CompletedModelProbe]:
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel())
+    )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=_project_context(
@@ -372,7 +374,9 @@ async def test_generated_gate_resumes_same_run_but_rejects_unsupported_completio
             "summary": "同一项调查已经继续完成。",
         },
     )
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(model))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(model)
+    )
     service = ExecutionService(db_session, project_id=project.id)
 
     class Inputs:

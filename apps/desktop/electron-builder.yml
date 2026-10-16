@@ -44,6 +44,7 @@ extraResources:
 
 # macOS
 mac:
+  minimumSystemVersion: '13.0'
   category: public.app-category.business
   target:
     - dmg

@@ -881,6 +881,8 @@ export interface AnalysisHistoryPage {
   current_run_id: string | null;
 }
 
+export type AnalysisArtifactSummary = Omit<AnalysisArtifact, "payload" | "technical_details">;
+
 export interface AnalysisArtifact {
   id: string;
   project_id: string;

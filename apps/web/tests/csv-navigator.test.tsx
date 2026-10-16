@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CsvNavigator } from "@/components/chat/CsvNavigator";
+import { DataWorkspacePanel } from "@/components/chat/DataWorkspacePanel";
 import * as csv from "@/lib/csv-import";
 import { api } from "@/lib/api/client";
 import { useProjectStore } from "@/lib/stores/project";
@@ -83,6 +84,33 @@ it("requires a new CSV preview after rejection and never resubmits an uncertain 
   fireEvent.click(screen.getByRole("button", { name: "刷新来源" }));
   await waitFor(() => expect(done).toHaveBeenCalledTimes(1));
   expect(refresh).toHaveBeenCalledTimes(1);
+});
+
+it("opens attached CSV import settings with saved options and ignores a late read after switching projects", async () => {
+  const old = deferred<csv.CsvPreview>();
+  const initial = deferred<csv.CsvPreview>();
+  const read = vi.spyOn(csv, "readCsv").mockReturnValueOnce(initial.promise).mockReturnValue(old.promise);
+  const post = vi.spyOn(api, "post");
+  useProjectStore.setState({ currentProjectId: "project-1", sources: [{
+    id: "source-1", project_id: "project-1", kind: "file", name: "orders.csv", format: "csv", status: "attached", fingerprint: "b".repeat(64), profile_data: { csv_options: { delimiter: ";", encoding: "gb18030" }, has_header: false, header_row: null }, created_at: "created", updated_at: "updated",
+  }], sourceAction: null, error: null });
+  render(<NextIntlClientProvider locale="zh" messages={messages}><DataWorkspacePanel open onClose={vi.fn()} onConfigureConnection={vi.fn()} settingsLoaded preprocessingEnabled /></NextIntlClientProvider>);
+  fireEvent.click(screen.getByRole("button", { name: messages.dataWorkspace.sourcePrepareButton }));
+  await screen.findByRole("dialog", { name: "CSV 导入设置" });
+  expect(screen.getByLabelText("分隔符")).toHaveValue(";");
+  expect(screen.getByLabelText("文件编码")).toHaveValue("gb18030");
+  expect(post).not.toHaveBeenCalled();
+  await act(async () => initial.resolve({ ...preview(";", "gb18030"), input_fingerprint: "c".repeat(64) }));
+  expect(screen.getByText(messages.csvImport.headerlessSelected)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "无表头" })).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByText(messages.csvImport.headerChanged)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "使用这些设置" })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("分隔符"), { target: { value: "|" } });
+  expect(screen.getByText(messages.csvImport.headerlessSelected)).toBeInTheDocument();
+  act(() => { useProjectStore.setState({ currentProjectId: "project-2", sources: [] }); });
+  await act(async () => old.resolve(preview(";", "gb18030")));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(read.mock.calls[1][5]?.aborted).toBe(true);
 });
 
 it("validates CSV source, dialect, encoding and record identity before exposing preview data", async () => {

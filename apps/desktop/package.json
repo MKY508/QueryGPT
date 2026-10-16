@@ -2,6 +2,9 @@
   "name": "receiptbi-desktop",
   "productName": "ReceiptBI",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "description": "ReceiptBI — 本地优先的私人数据分析工作台",
   "main": "dist-electron/main.js",
   "author": "ReceiptBI Team",
@@ -11,7 +14,10 @@
     "url": "https://github.com/MoonMao42/ReceiptBI.git"
   },
   "scripts": {
+    "version:check": "node ../../scripts/version.mjs --check",
+    "version:sync": "node ../../scripts/version.mjs --write",
     "dev": "npm run compile:electron && electron .",
+    "test": "tsx --test tests/*.test.ts",
     "test:logger": "tsx --test tests/logger.test.ts",
     "test:migration": "tsx --test tests/data-migration.test.ts tests/cold-data-migration.test.ts tests/legacy-model-migration.test.ts",
     "test:legacy-model-migration": "tsx --test tests/legacy-model-migration.test.ts",
@@ -19,7 +25,9 @@
     "test:startup-reliability": "tsx --test tests/startup-reliability.test.ts",
     "migrate:legacy-data": "tsx scripts/migrate-legacy-data.ts",
     "build": "npm run build:electron",
-    "compile:electron": "tsc -p tsconfig.electron.json",
+    "compile:electron": "node scripts/build-electron.mjs",
+    "test:desktop-security": "tsx --test tests/desktop-security.test.ts",
+    "smoke:desktop": "npm run compile:electron && electron scripts/smoke-desktop.cjs",
     "build:resources": "tsx scripts/build-all.ts",
     "build:electron": "npm run build:resources && electron-builder --config electron-builder.yml",
     "build:electron:mac": "npm run build:resources && electron-builder --mac --config electron-builder.yml",
@@ -28,12 +36,14 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "electron-log": "^5.2.4"
+    "electron-log": "^5.2.4",
+    "electron-window-state": "^5.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "electron": "^39.8.5",
+    "electron": "^44.2.0",
     "electron-builder": "^26.15.7",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },

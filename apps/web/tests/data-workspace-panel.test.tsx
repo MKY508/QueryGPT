@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -10,6 +10,7 @@ import {
   parseSavedVisualCleaningOperations,
 } from "@/components/chat/VisualCleaningEditor";
 import { useProjectStore } from "@/lib/stores/project";
+import * as recipeReplay from "@/lib/recipe-replay";
 import enMessages from "@/messages/en.json";
 import messages from "@/messages/zh.json";
 import type {
@@ -246,17 +247,28 @@ describe("DataWorkspacePanel project understanding", () => {
     expect(relationshipEdges).toHaveLength(0);
     expect(understandingSummary).toHaveTextContent("89");
     expect(understandingSummary).toHaveTextContent("80");
+    act(() => useProjectStore.setState({
+      sources: mapSources.map((source, index) => ({
+        ...source, status: index === 0 ? "needs_confirmation" : source.status,
+      })),
+      knowledgeTotal: 90,
+    }));
+    // Updating the parent must preserve the existing map DOM, not remount it.
+    expect(container.querySelector("[data-source-overview-node]")).toBe(sourceNodes[0]);
+    expect(sourceNodes[0]).toHaveTextContent(messages.dataWorkspace.statusNeedsReview);
+    expect(sourceNodes[0]).not.toHaveTextContent(messages.dataWorkspace.statusReady);
+    expect(understandingSummary).toHaveTextContent("90");
   });
 
-  it("keeps attached data untouched until the user explicitly prepares it", async () => {
+  it("keeps attached Parquet data untouched until the user explicitly prepares it", async () => {
     const originalProfileSource = useProjectStore.getState().profileSource;
     const profileSource = vi.fn().mockResolvedValue(undefined);
     const source: ProjectDataSource = {
       id: "source-attached",
       project_id: "project-1",
       kind: "file",
-      name: "orders.csv",
-      format: "csv",
+      name: "orders.parquet",
+      format: "parquet",
       status: "attached",
       profile_data: {},
       created_at: "2026-07-22T00:00:00Z",
@@ -305,7 +317,7 @@ describe("DataWorkspacePanel project understanding", () => {
   it("builds only the approved visual cleaning operations", () => {
     expect(buildVisualCleaningOperation("trim_text", " customer ")).toEqual({
       operation: "trim_text",
-      column: "customer",
+      column: " customer ",
     });
     expect(buildVisualCleaningOperation("fill_missing", "amount")).toEqual({
       operation: "fill_missing",
@@ -973,7 +985,7 @@ describe("DataWorkspacePanel project understanding", () => {
       });
       const retryButton = screen.getByRole("button", { name: "重新整理" });
 
-      expect(screen.getByText("等你选择")).toBeInTheDocument();
+      expect(within(screen.getByRole("region", { name: "数据详情：orders-august.csv" })).getByText("等你选择")).toBeInTheDocument();
       expect(screen.getByText(/这版数据还没有用于分析/)).toBeInTheDocument();
       expect(acceptButton).toBeInTheDocument();
       expect(keepButton).toBeInTheDocument();
@@ -1029,9 +1041,21 @@ describe("DataWorkspacePanel project understanding", () => {
 
 
 
-  it("shows cleaning history in plain language and restores without changing data immediately", async () => {
+  it("shows cleaning history in plain language and previews before restoring and applying", async () => {
     const originalLoadRecipeRevisions = useProjectStore.getState().loadRecipeRevisions;
-    const originalRestoreRecipeRevision = useProjectStore.getState().restoreRecipeRevision;
+    const originalReplayRecipe = useProjectStore.getState().replayRecipe;
+    const originalShow = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal");
+    const originalClose = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "close");
+    Object.defineProperties(HTMLDialogElement.prototype, {
+      showModal: { configurable: true, value: function (this: HTMLDialogElement) { this.open = true; } },
+      close: { configurable: true, value: function (this: HTMLDialogElement) { this.open = false; } },
+    });
+    const preview = vi.spyOn(recipeReplay, "previewRecipeReplay").mockResolvedValue({
+      source_id: "source-1", recipe_id: "recipe-1", revision_id: "recipe-revision-1", revision_number: 1,
+      proof: "a".repeat(64), before: { rows: 2, columns: 1, sample: [{ amount: "9007199254740993" }] },
+      after: { rows: 2, columns: 1, sample: [{ amount: "9007199254740995" }] },
+      input_changed: false, pending_replacement: false, added_columns: [], removed_columns: [], type_changes: [], unresolved_questions: 0, can_apply: true,
+    });
     const source: ProjectDataSource = {
       id: "source-1",
       project_id: "project-1",
@@ -1089,29 +1113,7 @@ describe("DataWorkspacePanel project understanding", () => {
       });
       return revisions;
     });
-    const restoreRecipeRevision = vi.fn(async () => {
-      const restored: SanitationRecipeRevision = {
-        ...revisions[0],
-        id: "recipe-revision-3",
-        revision_number: 3,
-        parent_revision_id: "recipe-revision-2",
-        state: "reverted",
-        reason: "恢复首次方法",
-      };
-      useProjectStore.setState({
-        recipes: [
-          {
-            ...recipe,
-            status: "reverted",
-            active_revision_id: restored.id,
-          },
-        ],
-        recipeRevisionsByRecipe: {
-          [recipe.id]: [restored, ...revisions],
-        },
-      });
-      return restored;
-    });
+    const replayRecipe = vi.fn().mockResolvedValue(undefined);
     useProjectStore.setState({
       currentProjectId: "project-1",
       sources: [source],
@@ -1123,7 +1125,7 @@ describe("DataWorkspacePanel project understanding", () => {
       recipeRevisionErrorByRecipe: {},
       knowledge: [],
       loadRecipeRevisions,
-      restoreRecipeRevision,
+      replayRecipe,
     });
 
     try {
@@ -1146,19 +1148,21 @@ describe("DataWorkspacePanel project understanding", () => {
       fireEvent.click(
         screen.getByRole("button", { name: /恢复 .* 的整理方法/ })
       );
-      expect(screen.getByText(/不会立刻改变当前分析/)).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "确认恢复" }));
-
-      expect(restoreRecipeRevision).toHaveBeenCalledWith(
-        recipe.id,
-        "recipe-revision-1"
-      );
-      expect(await screen.findByText(/点击“重新应用”后才会用于当前分析/)).toBeInTheDocument();
-      expect(screen.getByText("待重新应用")).toBeInTheDocument();
+      expect(await screen.findByText("9007199254740995")).toBeInTheDocument();
+      expect(screen.getByText("9007199254740993")).toBeInTheDocument();
+      expect(replayRecipe).not.toHaveBeenCalled();
+      expect(useProjectStore.getState().recipes[0].active_revision_id).toBe("recipe-revision-2");
+      fireEvent.click(screen.getByRole("button", { name: "恢复并应用" }));
+      expect(replayRecipe).toHaveBeenCalledWith("project-1", source.id, recipe.id, { revision_id: "recipe-revision-1", proof: "a".repeat(64) });
+      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     } finally {
+      cleanup();
+      preview.mockRestore();
+      if (originalShow) Object.defineProperty(HTMLDialogElement.prototype, "showModal", originalShow); else Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
+      if (originalClose) Object.defineProperty(HTMLDialogElement.prototype, "close", originalClose); else Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
       useProjectStore.setState({
         loadRecipeRevisions: originalLoadRecipeRevisions,
-        restoreRecipeRevision: originalRestoreRecipeRevision,
+        replayRecipe: originalReplayRecipe,
       });
     }
   });
@@ -1209,6 +1213,23 @@ describe("DataWorkspacePanel project understanding", () => {
               severity: "warning",
               automatic: false,
             },
+            ...["formula_results_review", "date_format_review", "numeric_precision_review", "refund_values_review"].map((code) => ({
+              code,
+              title: "新增的服务端中文提示",
+              detail: "不直接显示处理细节",
+              severity: "warning" as const,
+              automatic: false,
+              count: 12,
+            })),
+            {
+              code: "preflight_failed",
+              title: "不应显示原始异常",
+              detail: "不要显示公式或文件路径",
+              severity: "critical",
+              automatic: false,
+              presentation_code: "xlsx_formula_result_missing",
+              presentation_facts: { sheet: "Orders", cell: "B21" },
+            },
           ],
           ambiguities: [],
           source_snapshot: {
@@ -1247,12 +1268,62 @@ describe("DataWorkspacePanel project understanding", () => {
       expect(
         screen.getAllByText("A data preparation item needs your review"),
       ).toHaveLength(1);
+      expect(screen.getByText("“Orders” B21 has no saved formula result. Recalculate and save the workbook before importing.")).toBeInTheDocument();
+      const showNotes = screen.getByRole("button", { name: "Show all 7 notes" });
+      expect(showNotes).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText("Review how refund statuses should affect the calculation")).not.toBeInTheDocument();
+      fireEvent.click(showNotes);
+      expect(screen.getByText("Check that 12 saved formula results are up to date")).toBeInTheDocument();
+      expect(screen.getByText("Some dates remain text; review their format")).toBeInTheDocument();
+      expect(screen.getByText("Some long numbers were kept as text to preserve their values")).toBeInTheDocument();
+      expect(screen.getByText("Review how refund statuses should affect the calculation")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Show fewer notes" }));
+      expect(screen.queryByText("Review how refund statuses should affect the calculation")).not.toBeInTheDocument();
       expect(
         screen.getByText("Data ready: 1,234 rows · 7 columns")
       ).toBeInTheDocument();
       expect(screen.queryByText("服务端固定中文摘要")).not.toBeInTheDocument();
       expect(screen.queryByText("未知的服务端中文问题")).not.toBeInTheDocument();
       expect(numberFormat).toHaveBeenCalledWith("en");
+      act(() => {
+        useProjectStore.setState((state) => ({
+          preflightReports: state.preflightReports.map((report) => ({
+            ...report,
+            issues: report.issues.map((issue) => issue.code === "preflight_failed"
+              ? { ...issue, presentation_code: "parquet_schema_unsupported" }
+              : issue),
+          })),
+        }));
+      });
+      expect(screen.getByText("Some fields cannot yet be prepared without changing their meaning. Export nested or special fields as ordinary columns.")).toBeInTheDocument();
+      for (const [code, message] of [
+        ["json_unreadable", enMessages.dataWorkspace.issueJsonUnreadable],
+        ["json_structure_unsupported", enMessages.dataWorkspace.issueJsonStructure],
+        ["json_size_limit", enMessages.dataWorkspace.issueJsonSizeLimit],
+        ["json_lines_invalid", enMessages.dataWorkspace.issueJsonLinesInvalid],
+        ["json_values_preserved", enMessages.dataWorkspace.issueJsonValuesPreserved],
+      ]) {
+        act(() => useProjectStore.setState((state) => ({
+          preflightReports: state.preflightReports.map((report) => ({ ...report, issues: [{
+            code: code === "json_values_preserved" ? code : "preflight_failed",
+            presentation_code: code, title: "private parser details", detail: "private /file/path",
+            severity: "warning" as const, automatic: false,
+          }] })),
+        })));
+        expect(screen.getByText(message)).toBeInTheDocument();
+        expect(screen.queryByText(/private parser|private \/file/)).not.toBeInTheDocument();
+      }
+      for (const line of [2, -1, "private line", 1_000_000_001]) {
+        act(() => useProjectStore.setState((state) => ({
+          preflightReports: state.preflightReports.map((report) => ({ ...report, issues: [{
+            code: "preflight_failed", presentation_code: "json_lines_invalid", presentation_facts: { line },
+            title: "private parser details", detail: "private /file/path", severity: "critical" as const, automatic: false,
+          }] })),
+        })));
+        const expected = line === 2 ? `Line 2: ${enMessages.dataWorkspace.issueJsonLinesInvalid}` : enMessages.dataWorkspace.issueJsonLinesInvalid;
+        expect(screen.getByText(expected)).toBeInTheDocument();
+        expect(screen.queryByText(/private line|private parser|private \/file/)).not.toBeInTheDocument();
+      }
     } finally {
       numberFormat.mockRestore();
     }
@@ -1351,7 +1422,10 @@ describe("DataWorkspacePanel project understanding", () => {
       </NextIntlClientProvider>,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "查看数据：orders.csv" }));
     expect(screen.getByText("数据已准备好：28 行 · 6 列")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: messages.sourceDirectory.backToList }));
+    fireEvent.click(screen.getByRole("button", { name: "查看数据：warehouse" }));
     expect(screen.getByText("已发现 12 张表 · 已检查 3 张")).toBeInTheDocument();
     expect(screen.queryByText(/persisted English/)).not.toBeInTheDocument();
   });

@@ -83,6 +83,7 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
             if failure is not None:
                 raise failure
             if fallback:
+
                 class Output(BaseModel):
                     required: str
 
@@ -121,6 +122,7 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
         service._load_execution_inputs = AsyncMock(
             return_value=ExecutionInputs(synthetic_model_config(), None, [])
         )
+
         async def prepare(**_kwargs):
             if project:
                 run.checkpoint = {
@@ -134,6 +136,7 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
         service._persist_explicit_confirmation = AsyncMock(return_value=None)
         service._build_engine = Mock(return_value=runtime)
         service.get_runtime_snapshot = AsyncMock(return_value={})
+
         def create_service(**kwargs):
             service.stream_attempt_id = kwargs["stream_attempt_id"]
             return service
@@ -154,6 +157,7 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
             context_rounds=3,
             db=self.db,
         )
+
         async def close_stream():
             await response.body_iterator.aclose()
 
@@ -394,7 +398,9 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
         )
         async with self.sessions() as observer:
             old_run = await observer.get(AnalysisRun, old_run_id)
-            self.assertEqual(old_run.state, "completed" if mode == "completed" else "needs_attention")
+            self.assertEqual(
+                old_run.state, "completed" if mode == "completed" else "needs_attention"
+            )
 
     async def test_older_completion_keeps_history_without_replacing_current_conversation(self):
         await self._check_superseded_stream("completed")
@@ -452,7 +458,9 @@ class AnalysisCompletionTests(unittest.IsolatedAsyncioTestCase):
         run.checkpoint = {"stream_attempt_id": "old-attempt"}
         new_state = ConversationTurnState(self.conversation_id, "new-attempt")
         await new_state.claim(self.db, is_current=lambda: True)
-        await new_state.apply(self.db, lambda conversation: setattr(conversation, "status", "completed"))
+        await new_state.apply(
+            self.db, lambda conversation: setattr(conversation, "status", "completed")
+        )
         await self.db.commit()
         self.assertEqual(await recover_interrupted_analysis_runs(self.db), 1)
         await self.db.commit()

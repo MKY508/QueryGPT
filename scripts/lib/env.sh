@@ -30,12 +30,10 @@ find_python() {
 
 set_node_command() {
   check_command node || error "找不到 node"
-  if check_command pnpm; then
-    NPM_CMD="pnpm"
-  elif check_command npm; then
+  if check_command npm; then
     NPM_CMD="npm"
   else
-    error "找不到 npm 或 pnpm"
+    error "找不到 npm"
   fi
 }
 
@@ -81,12 +79,8 @@ venv_python_version() {
 }
 
 node_lock_file() {
-  if [ "$NPM_CMD" = "pnpm" ] && [ -f "$WEB_DIR/pnpm-lock.yaml" ]; then
-    echo "$WEB_DIR/pnpm-lock.yaml"
-  elif [ -f "$WEB_DIR/package-lock.json" ]; then
+  if [ -f "$WEB_DIR/package-lock.json" ]; then
     echo "$WEB_DIR/package-lock.json"
-  elif [ -f "$WEB_DIR/pnpm-lock.yaml" ]; then
-    echo "$WEB_DIR/pnpm-lock.yaml"
   else
     echo "$WEB_DIR/package.json"
   fi
@@ -98,7 +92,7 @@ python_profile_fingerprint() {
   local venv_version
   selected_version="$(selected_python_version)"
   venv_version="$(venv_python_version || true)"
-  echo "$profile|selected=${selected_version}|venv=${venv_version:-none}|$(checksum_file "$API_DIR/pyproject.toml")"
+  echo "locked-v1|$profile|selected=${selected_version}|venv=${venv_version:-none}|$(checksum_file "$API_DIR/pyproject.toml")|$(checksum_file "$API_DIR/../../pyproject.toml")|$(checksum_file "$API_DIR/../../uv.lock")"
 }
 
 node_fingerprint() {
@@ -119,7 +113,7 @@ setup_node_env() {
   fi
 
   info "安装前端依赖..."
-  (cd "$WEB_DIR" && "$NPM_CMD" install)
+  (cd "$WEB_DIR" && "$NPM_CMD" ci)
   mkdir -p "$(dirname "$NODE_FINGERPRINT")"
   echo "$expected_fingerprint" > "$NODE_FINGERPRINT"
   success "前端依赖已就绪"

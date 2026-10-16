@@ -267,6 +267,25 @@ class TestSQLiteManager:
                 pass
         assert not missing.exists()
 
+    def test_blocks_connecting_to_internal_metadata_database(self, tmp_path):
+        internal_db = tmp_path / "receiptbi.db"
+        sqlite3.connect(internal_db).close()
+        manager = DatabaseManager(DatabaseConfig(driver="sqlite", database=str(internal_db)))
+        with pytest.raises(PermissionError, match="禁止连接 ReceiptBI 内部元数据数据库"):
+            with manager.connect():
+                pass
+
+    def test_validate_read_only_allows_semicolons_and_dashes_inside_string_literals(
+        self, sqlite_manager
+    ):
+        sqlite_manager.validate_read_only(
+            "SELECT * FROM orders WHERE note = 'a;b' AND code = 'A--B' AND tag = '/*ok*/';"
+        )
+        with pytest.raises(ValueError, match="禁止执行多语句查询"):
+            sqlite_manager.validate_read_only("SELECT 1; SELECT 2")
+        with pytest.raises(ValueError, match="禁止在查询中使用 SQL 注释"):
+            sqlite_manager.validate_read_only("SELECT 1 -- comment")
+
 
 class TestQueryResult:
     """Test QueryResult class"""

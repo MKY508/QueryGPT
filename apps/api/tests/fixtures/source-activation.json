@@ -1,0 +1,18 @@
+[
+  {"name":"ready file","source":{"kind":"file","status":"ready","profile_data":{}},"current":true,"blockers":[],"display":"ready"},
+  {"name":"unprepared file is not a retired version","source":{"kind":"file","status":"attached","profile_data":{}},"current":true,"blockers":[],"display":"attached"},
+  {"name":"ordinary business confirmation","source":{"kind":"file","status":"needs_confirmation","profile_data":{"issues":[{"code":"refund_policy"}]}},"current":true,"blockers":[],"display":"needs_confirmation"},
+  {"name":"superseded wins over old markers","source":{"kind":"file","status":"superseded","profile_data":{"activation_state":"pending_confirmation"}},"current":false,"blockers":["activation_pending"],"display":"history"},
+  {"name":"inactive file","source":{"kind":"file","status":"ready","profile_data":{"is_current":false}},"current":false,"blockers":[],"display":"history"},
+  {"name":"legacy activation without current flag","source":{"kind":"file","status":"ready","profile_data":{"activation_state":"pending_confirmation"}},"current":false,"blockers":["activation_pending"],"display":"activation_pending"},
+  {"name":"inactive candidate is not history","source":{"kind":"file","status":"ready","profile_data":{"activation_state":"pending_confirmation","is_current":false}},"current":false,"blockers":["activation_pending"],"display":"activation_pending"},
+  {"name":"legacy cleaning drift","source":{"kind":"file","status":"ready","profile_data":{"issues":[{"code":"recipe_replay_drift"}]}},"current":false,"blockers":["recipe_replay_drift"],"display":"preparation_review"},
+  {"name":"legacy changed input","source":{"kind":"file","status":"ready","profile_data":{"issues":[{"code":"recipe_input_changed"}]}},"current":false,"blockers":["recipe_input_changed"],"display":"preparation_review"},
+  {"name":"inactive drift remains actionable","source":{"kind":"file","status":"error","profile_data":{"is_current":false,"issues":[{"code":"recipe_input_changed"}]}},"current":false,"blockers":["recipe_input_changed"],"display":"preparation_review"},
+  {"name":"combined markers and malformed issues","source":{"kind":"file","status":"ready","profile_data":{"activation_state":"pending_confirmation","issues":[null,"plain",17,{}, {"code":"recipe_input_changed"},{"code":"recipe_input_changed"},{"code":"recipe_replay_drift"}]}},"current":false,"blockers":["activation_pending","recipe_input_changed","recipe_replay_drift"],"display":"activation_pending"},
+  {"name":"database ignores file markers","source":{"kind":"connection","status":"attached","profile_data":{"activation_state":"pending_confirmation","replacement_of":"old","issues":[{"code":"recipe_input_changed"}]}},"current":true,"blockers":[],"display":"attached"},
+  {"name":"inactive database","source":{"kind":"connection","status":"ready","profile_data":{"is_current":false}},"current":false,"blockers":[],"display":"history"},
+  {"name":"legacy missing profile","source":{"kind":"file","status":"ready","profile_data":null},"current":true,"blockers":[],"display":"ready"},
+  {"name":"legacy malformed profile","source":{"kind":"file","status":"ready","profile_data":[]},"current":true,"blockers":[],"display":"ready"},
+  {"name":"only explicit false retires a version","source":{"kind":"file","status":"ready","profile_data":{"is_current":0,"issues":{"code":"recipe_input_changed"}}},"current":true,"blockers":[],"display":"ready"}
+]

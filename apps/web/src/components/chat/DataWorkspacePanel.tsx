@@ -1,13 +1,23 @@
 "use client";
 
-import type { DataWorkspaceView } from "@/lib/workbench-pane";
-
 import { useId, useRef, useState } from "react";
 import { useDataWorkspacePresentation } from "./useDataWorkspacePresentation";
 import { Button } from "@/components/ui/button";
 import { TabList } from "@/components/ui/TabList";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { FILE_UPLOAD_ACCEPT } from "@/lib/file-formats";
+import { SourceUploadQueue } from "./SourceUploadQueue";
+import { SourceDirectory } from "./SourceDirectory";
+import { SourceStatus } from "./SourceStatus";
+import { SourceDataPreview } from "./SourceDataPreview";
+import { sourceAwaitsReplacement, sourceDisplayState } from "@/lib/source-directory";
+import { sourceIsCurrent } from "@/lib/source-activation";
+import { WorkbookNavigator } from "./WorkbookNavigator";
+import { CsvNavigator } from "./CsvNavigator";
+import { SourceReplacementDialog } from "./SourceReplacementDialog";
+import type { CsvSelection } from "@/lib/csv-import";
+import type { WorkbookSelection } from "@/lib/workbook";
 import {
   AlertCircle,
   ArrowRight,
@@ -35,6 +45,9 @@ import type {
 import { useProjectStore } from "@/lib/stores/project";
 import { cn } from "@/lib/utils";
 import { VisualCleaningEditor } from "./VisualCleaningEditor";
+import { sourceCleaningColumns } from "@/lib/cleaning-field-names";
+import { RecipeReplayDialog } from "./RecipeReplayDialog";
+import type { DataWorkspaceView } from "@/lib/workbench-pane";
 
 interface DataWorkspacePanelProps {
   embedded?: boolean;
@@ -47,18 +60,6 @@ interface DataWorkspacePanelProps {
   connections?: ConnectionSummary[];
   view?: DataWorkspaceView;
   onViewChange?: (view: DataWorkspaceView) => void;
-}
-
-function inferredColumnNames(schema: Record<string, unknown> | undefined): string[] {
-  const columns = schema?.columns;
-  if (!Array.isArray(columns)) return [];
-  return columns
-    .map((column) =>
-      column && typeof column === "object" && "name" in column
-        ? String(column.name || "").trim()
-        : ""
-    )
-    .filter(Boolean);
 }
 
 function isBusinessFacingKnowledge(entry: SemanticEntry): boolean {
@@ -77,6 +78,69 @@ export function getPendingUnderstandingCount(knowledge: SemanticEntry[]): number
     .filter(isBusinessFacingKnowledge)
     .filter((entry) => !(entry.state === "candidate" && entry.validity === "stale"));
   return visibleKnowledge.filter((entry) => entry.state === "candidate").length;
+}
+
+function UnderstandingMap({
+  sources,
+  reports,
+  knowledgeCount,
+  relationshipCount,
+}: {
+  sources: ProjectDataSource[];
+  reports: PreflightReport[];
+  knowledgeCount: number;
+  relationshipCount: number;
+}) {
+  const t = useTranslations("dataWorkspace");
+  if (!sources.length) {
+    return (
+      <div className="flex min-h-40 w-full items-center justify-center border border-dashed border-border bg-background/70 px-6 text-center text-xs leading-5 text-muted-foreground rounded-xl">
+        {t("emptyUnderstandingHint")}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="border border-border bg-background/70 p-3 rounded-xl"
+      aria-label={t("understandingMapAria")}
+    >
+      <div className="grid grid-cols-2 gap-2">
+        {sources.map((source) => {
+          return (
+            <div
+              key={source.id}
+              data-source-overview-node={source.id}
+              className="min-w-0 border border-primary/20 bg-card px-3.5 py-3 rounded-xl"
+            >
+              <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground">
+                {source.kind === "connection" ? <Database size={13} /> : <FileSpreadsheet size={13} />}
+                {t("dataSourcesTab")}
+              </div>
+              <div className="mt-2 truncate text-sm font-semibold text-foreground">
+                {source.name}
+              </div>
+              <SourceStatus source={source} report={reports.find((report) => report.data_source_id === source.id)} compact className="mt-1" />
+            </div>
+          );
+        })}
+      </div>
+      <div
+        data-understanding-summary
+        className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-success/30 bg-success/[0.05] px-4 py-3 rounded-xl"
+      >
+        <div className="flex items-center gap-2 text-xs font-semibold text-success">
+          <BookOpenText size={14} />
+          {t("knowledgeCount", { count: knowledgeCount })}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {relationshipCount
+            ? t("relationsCount", { count: relationshipCount })
+            : t("relationsOnDemand")}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function DataWorkspacePanel(props: DataWorkspacePanelProps) {
@@ -99,82 +163,6 @@ function ProjectDataWorkspace({
   const tabsId = useId();
   const t = useTranslations("dataWorkspace");
 
-  const sourceStatus = (status: string) => {
-    if (status === "ready") return { label: t("statusReady"), tone: "text-success bg-success/[0.06]" };
-    if (status === "needs_confirmation") {
-      return { label: t("statusNeedsReview"), tone: "text-warning bg-warning/[0.06]" };
-    }
-    if (status === "error") return { label: t("statusNeedsAttention"), tone: "text-destructive bg-destructive/[0.06]" };
-    if (status === "attached") return { label: t("statusAwaitingPreparation"), tone: "text-muted-foreground bg-muted" };
-    return { label: t("statusSanitizing"), tone: "text-muted-foreground bg-muted" };
-  };
-
-  const UnderstandingMap = ({
-    sources,
-    knowledgeCount,
-    relationshipCount,
-  }: {
-    sources: ProjectDataSource[];
-    knowledgeCount: number;
-    relationshipCount: number;
-  }) => {
-    if (!sources.length) {
-      return (
-        <Button variant="outline" size="sm"
-          type="button"
-          className="flex min-h-40 w-full items-center justify-center border border-dashed border-border bg-background/70 px-6 text-center text-xs leading-5 text-muted-foreground h-auto min-h-7 whitespace-normal"
-        >
-          {t("emptyUnderstandingHint")}
-        </Button>
-      );
-    }
-
-    return (
-      <div
-        className="border border-border bg-background/70 p-3 rounded-xl"
-        aria-label={t("understandingMapAria")}
-      >
-        <div className="grid grid-cols-2 gap-2">
-          {sources.map((source) => (
-            <div
-              key={source.id}
-              data-source-overview-node={source.id}
-              className="min-w-0 border border-primary/20 bg-card px-3.5 py-3 rounded-xl"
-            >
-              <div className="flex items-center gap-2 text-[10px] font-semibold tracking-[0.12em] text-muted-foreground">
-                {source.kind === "connection" ? (
-                  <Database size={13} />
-                ) : (
-                  <FileSpreadsheet size={13} />
-                )}
-                {t("dataSourcesTab")}
-              </div>
-              <div className="mt-2 truncate text-sm font-semibold text-foreground">
-                {source.name}
-              </div>
-              <div className="mt-1 text-[11px] text-success">{t("readyBadge")}</div>
-            </div>
-          ))}
-        </div>
-
-        <div
-          data-understanding-summary
-          className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-success/30 bg-success/[0.05] px-4 py-3 rounded-xl"
-        >
-          <div className="flex items-center gap-2 text-xs font-semibold text-success">
-            <BookOpenText size={14} />
-            {t("knowledgeCount", { count: knowledgeCount })}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {relationshipCount
-              ? t("relationsCount", { count: relationshipCount })
-              : t("relationsOnDemand")}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [localView, setLocalView] = useState<DataWorkspaceView>("sources");
@@ -185,16 +173,19 @@ function ProjectDataWorkspace({
   };
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null);
   const [expandedRecipeHistoryIds, setExpandedRecipeHistoryIds] = useState<string[]>([]);
-  const [pendingRecipeRestore, setPendingRecipeRestore] = useState<{
-    recipeId: string;
-    revisionId: string;
+  const [replayTarget, setReplayTarget] = useState<{
+    projectId: string; sourceId: string; recipeId: string; revisionId?: string;
   } | null>(null);
   const [recipeHistoryFeedback, setRecipeHistoryFeedback] = useState<{
     recipeId: string;
     message: string;
   } | null>(null);
   const [removingSourceId, setRemovingSourceId] = useState<string | null>(null);
-  const [cleaningSourceId, setCleaningSourceId] = useState<string | null>(null);
+  const [cleaningTarget, setCleaningTarget] = useState<{
+    projectId: string; sourceId: string; column?: string;
+  } | null>(null);
+  const [workbookTarget, setWorkbookTarget] = useState<{ projectId: string; sourceId: string } | null>(null);
+  const [replacementTarget, setReplacementTarget] = useState<{ projectId: string; sourceId: string } | null>(null);
   const [sourceFeedback, setSourceFeedback] = useState<{
     sourceId: string;
     tone: "success" | "error";
@@ -225,11 +216,10 @@ function ProjectDataWorkspace({
     isUploading,
     sourceAction,
     error,
-    uploadFile,
+    uploadFiles,
     attachConnection,
     profileSource,
     loadRecipeRevisions,
-    restoreRecipeRevision,
     previewRecipeTemplate,
     bindRecipeTemplate,
     reorganizeSource,
@@ -242,8 +232,8 @@ function ProjectDataWorkspace({
     sources.map((source) => source.connection_id).filter(Boolean)
   );
 
-  const acceptFile = (file?: File) => {
-    if (file) void uploadFile(file);
+  const acceptFiles = (files: File[]) => {
+    if (files.length && currentProjectId) void uploadFiles(files);
   };
 
   const performSourceAction = async (
@@ -270,7 +260,6 @@ function ProjectDataWorkspace({
       opening ? [...current, recipeId] : current.filter((id) => id !== recipeId)
     );
     if (!opening) {
-      if (pendingRecipeRestore?.recipeId === recipeId) setPendingRecipeRestore(null);
       return;
     }
     if (recipeHistoryFeedback?.recipeId === recipeId) setRecipeHistoryFeedback(null);
@@ -282,18 +271,15 @@ function ProjectDataWorkspace({
     }
   };
 
-  const performRecipeRestore = async (recipeId: string, revisionId: string) => {
-    setRecipeHistoryFeedback(null);
-    try {
-      await restoreRecipeRevision(recipeId, revisionId);
-      setPendingRecipeRestore(null);
-      setRecipeHistoryFeedback({
-        recipeId,
-        message: t("sanitationRestored"),
-      });
-    } catch {
-      setPendingRecipeRestore(null);
+  const reviewRecipe = (sourceId: string, revisionId?: string) => {
+    if (!currentProjectId || sourceAction) return;
+    const recipe = recipes.find((item) => item.data_source_id === sourceId);
+    if (!recipe) {
+      void performSourceAction(sourceId, () => reorganizeSource(sourceId), t("recipeReapplied"));
+      return;
     }
+    setRecipeHistoryFeedback(null);
+    setReplayTarget({ projectId: currentProjectId, sourceId, recipeId: recipe.id, revisionId });
   };
 
   const performTemplatePreview = async (templateId: string, sourceId: string) => {
@@ -335,26 +321,48 @@ function ProjectDataWorkspace({
       return priority[left.state] - priority[right.state];
     });
   const displayedKnowledge = visibleKnowledge.slice(0, 8);
-  const cleaningSource = sources.find((source) => source.id === cleaningSourceId);
+  // A project round trip must not reopen a previous project's editor.
+  if (cleaningTarget && cleaningTarget.projectId !== currentProjectId) setCleaningTarget(null);
+  const cleaningSource = cleaningTarget?.projectId === currentProjectId
+    ? sources.find((source) => source.id === cleaningTarget.sourceId && source.project_id === cleaningTarget.projectId) : undefined;
+  const replacementSource = replacementTarget?.projectId === currentProjectId
+    ? sources.find((source) => source.id === replacementTarget.sourceId) : undefined;
+  const replacementCandidates = sources.filter((source) => source.kind === "file"
+    && ["attached", "error"].includes(source.status) && !source.profile_data.replacement_of
+    && !recipes.some((recipe) => recipe.data_source_id === source.id));
+  const workbookSource = workbookTarget?.projectId === currentProjectId
+    ? sources.find((source) => source.id === workbookTarget.sourceId) : undefined;
+  const PreparationNavigator = workbookSource && (workbookSource.format?.toLowerCase() === "csv" || /\.csv$/i.test(workbookSource.name)) ? CsvNavigator : WorkbookNavigator;
   const cleaningRecipe = recipes.find(
-    (recipe) => recipe.data_source_id === cleaningSourceId,
+    (recipe) => recipe.data_source_id === cleaningSource?.id,
   );
   const cleaningReport = preflightReports.find(
-    (report) => report.data_source_id === cleaningSourceId,
+    (report) => report.data_source_id === cleaningSource?.id,
   );
-  const cleaningColumns = Array.from(
-    new Set(
-      [
-        ...(cleaningSource?.profile_data.sample || []).flatMap((row) =>
-          Object.keys(row),
-        ),
-        ...inferredColumnNames(cleaningReport?.inferred_schema),
-      ],
-    ),
-  );
+  const cleaningColumns = sourceCleaningColumns(cleaningSource?.profile_data, cleaningReport?.inferred_schema);
+  const openCleaning = (source: ProjectDataSource, column?: string) => {
+    if (!currentProjectId || source.project_id !== currentProjectId || source.kind !== "file" || source.status === "attached") return;
+    const report = preflightReports.find((item) => item.data_source_id === source.id);
+    if (column !== undefined && !sourceCleaningColumns(source.profile_data, report?.inferred_schema).includes(column)) return;
+    setCleaningTarget({ projectId: currentProjectId, sourceId: source.id, column });
+  };
 
   return (
     <>
+    {open && replayTarget && replayTarget.projectId === currentProjectId && sources.some((source) => source.id === replayTarget.sourceId) && <RecipeReplayDialog
+      key={`${replayTarget.projectId}:${replayTarget.recipeId}:${replayTarget.revisionId || "current"}`}
+      {...replayTarget} name={sources.find((source) => source.id === replayTarget.sourceId)!.name}
+      canApply={settingsLoaded && preprocessingEnabled && !sourceAction}
+      onApply={async (request) => {
+        await useProjectStore.getState().replayRecipe(replayTarget.projectId, replayTarget.sourceId, replayTarget.recipeId, request);
+        if (useProjectStore.getState().currentProjectId === replayTarget.projectId) setRecipeHistoryFeedback({ recipeId: replayTarget.recipeId, message: t("recipeReapplied") });
+      }}
+      onRefresh={async () => { if (useProjectStore.getState().currentProjectId !== replayTarget.projectId) throw new Error("Project changed"); await useProjectStore.getState().refreshCurrent({ throwOnError: true }); }}
+      onClose={() => setReplayTarget(null)} />}
+    {replacementSource && currentProjectId && <SourceReplacementDialog key={`${currentProjectId}:${replacementSource.id}`} projectId={currentProjectId} source={replacementSource} candidates={replacementCandidates} canApply={settingsLoaded && preprocessingEnabled && !sourceAction}
+      onApply={(request) => useProjectStore.getState().replaceSource(currentProjectId, replacementSource.id, request)}
+      onRefresh={async () => { if (useProjectStore.getState().currentProjectId !== currentProjectId) throw new Error("Project changed"); await useProjectStore.getState().refreshCurrent({ throwOnError: true }); }}
+      onClose={() => setReplacementTarget(null)} />}
     <aside
       className={cn(
         embedded
@@ -394,9 +402,14 @@ function ProjectDataWorkspace({
           <input
             ref={inputRef}
             type="file"
-            accept=".csv,.xls,.xlsx,.parquet,.json"
+            multiple
+            accept={FILE_UPLOAD_ACCEPT}
             className="hidden"
-            onChange={(event) => acceptFile(event.target.files?.[0])}
+            onChange={(event) => {
+              const files = Array.from(event.currentTarget.files ?? []);
+              event.currentTarget.value = "";
+              acceptFiles(files);
+            }}
           />
           <Button variant="outline" size="sm"
             type="button"
@@ -410,27 +423,30 @@ function ProjectDataWorkspace({
             onDrop={(event) => {
               event.preventDefault();
               setDragging(false);
-              acceptFile(event.dataTransfer.files?.[0]);
+              acceptFiles(Array.from(event.dataTransfer.files ?? []));
             }}
             className={cn("h-auto min-h-7 whitespace-normal",
-              "flex w-full flex-col items-center border border-dashed px-5 py-7 text-center transition-colors",
+              "flex w-full items-center rounded-lg border border-dashed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+              sources.length ? "gap-3 px-4 py-3 text-left" : "flex-col px-5 py-7 text-center",
               dragging
                 ? "border-primary bg-primary/5"
                 : "border-border bg-muted/30 hover:border-primary/60 hover:bg-primary/5"
             )}
           >
             {isUploading ? (
-              <Loader2 className="animate-spin text-primary" size={24} />
+              <Loader2 className="shrink-0 animate-spin text-primary" size={sources.length ? 20 : 24} />
             ) : (
-              <UploadCloud className="text-primary" size={24} />
+              <UploadCloud className="shrink-0 text-primary" size={sources.length ? 20 : 24} />
             )}
-            <span className="mt-3 text-sm font-semibold text-foreground">
-              {t("uploadHint", { state: isUploading ? t("uploadBusy") : t("uploadIdle") })}
-            </span>
-            <span className="mt-1 text-xs text-muted-foreground">
-              {t("uploadFormats")}
+            <span className={cn("min-w-0", !sources.length && "mt-3")}>
+              <span className="block text-sm font-semibold text-foreground">
+                {t("uploadHint", { state: isUploading ? t("uploadBusy") : t("uploadIdle") })}
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">{t("uploadFormats")}</span>
             </span>
           </Button>
+
+          <SourceUploadQueue />
 
           {error && (
             <div className="flex gap-2 border border-destructive/30 bg-destructive/[0.06] px-3 py-3 text-xs leading-5 text-destructive rounded-xl">
@@ -643,13 +659,10 @@ function ProjectDataWorkspace({
             </section>
           )}
 
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">{t("projectSourcesTitle")}</h3>
-              <span className="text-xs text-muted-foreground">{t("projectSourcesCount", { count: sources.length })}</span>
-            </div>
-            <div className="space-y-2">
-              {sources.map((source) => {
+          <SourceDirectory key={currentProjectId} sources={sources} reports={preflightReports}>
+              {(source) => {
+                const isWorkbook = source.kind === "file" && (["xls", "xlsx"].includes((source.format || "").toLowerCase()) || /\.xlsx?$/i.test(source.name));
+                const isCsv = source.kind === "file" && (source.format?.toLowerCase() === "csv" || /\.csv$/i.test(source.name));
                 const report = preflightReports.find(
                   (item) => item.data_source_id === source.id
                 );
@@ -662,19 +675,10 @@ function ProjectDataWorkspace({
                 const recipeRevisions = recipe
                   ? recipeRevisionsByRecipe[recipe.id] || []
                   : [];
-                const replacement = report?.source_snapshot?.replacement;
-                const isPendingReplacement =
-                  (source.profile_data.activation_state === "pending_confirmation" &&
-                    Boolean(source.profile_data.replacement_of)) ||
-                  (replacement?.status === "pending_confirmation" &&
-                    Boolean(
-                      replacement.replaces_source_id || replacement.active_source_id
-                    ));
-                const status = isPendingReplacement
-                  ? { label: t("sourceStatusWaiting"), tone: "text-warning bg-warning/[0.06]" }
-                  : sourceStatus(source.status);
+                const isPendingReplacement = sourceAwaitsReplacement(source, report);
+                const displayState = sourceDisplayState(source, report);
                 const needsAction =
-                  source.status === "needs_confirmation" || source.status === "error";
+                  ["activation_pending", "preparation_review", "needs_confirmation", "error"].includes(displayState);
                 const detailsOpen = expandedSourceId === source.id;
                 const removing = removingSourceId === source.id;
                 const busy = sourceAction?.sourceId === source.id;
@@ -693,28 +697,31 @@ function ProjectDataWorkspace({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-foreground">
+                        <div className="break-words text-sm font-medium text-foreground [overflow-wrap:anywhere]">
                           {source.name}
                         </div>
                         <div className="mt-1 text-xs leading-5 text-muted-foreground">
                           {businessPreflightSummary(report, source)}
                         </div>
+                        {isWorkbook && typeof source.profile_data.selected_sheet === "string" && <p className="mt-1 truncate text-xs text-muted-foreground">{t("selectedSheet", { sheet: source.profile_data.selected_sheet })}{source.profile_data.has_header === false ? ` · ${t("noHeader")}` : typeof source.profile_data.header_row === "number" ? ` · ${t("selectedHeader", { row: source.profile_data.header_row })}` : ""}</p>}
                       </div>
-                      <span className={cn("shrink-0 px-2 py-1 text-[11px]", status.tone)}>
-                        {status.label}
-                      </span>
+                      <SourceStatus source={source} report={report} className="shrink-0" />
                     </div>
 
-                    {source.kind === "file" && source.status !== "attached" && (
-                      <div className="mt-3 border-t border-border pt-3">
-                        <Button variant="ghost" size="sm"
+                    {source.kind === "file" && (source.status !== "attached" || isWorkbook || isCsv) && (
+                      <div className="mt-3 flex flex-wrap gap-4 border-t border-border pt-3">
+                        {recipe?.status === "applied" && ["ready", "needs_confirmation"].includes(source.status) && sourceIsCurrent(source) && !isPendingReplacement && <Button variant="ghost" size="sm" type="button" disabled={!!sourceAction || !currentProjectId || !settingsLoaded || !preprocessingEnabled} onClick={() => { if (currentProjectId) setReplacementTarget({ projectId: currentProjectId, sourceId: source.id }); }} className="inline-flex items-center gap-1.5 text-xs text-primary h-auto min-h-7 whitespace-normal"><RefreshCw size={13} />{t("sourceUpdateFile")}</Button>}
+                        {(isWorkbook || isCsv) && <Button variant="ghost" size="sm" type="button" disabled={busy || !currentProjectId} onClick={() => {
+                          if (currentProjectId) setWorkbookTarget({ projectId: currentProjectId, sourceId: source.id });
+                        }} className="inline-flex items-center gap-1.5 text-xs text-primary h-auto min-h-7 whitespace-normal"><FileSpreadsheet size={13} />{t(isCsv ? "sourceCsvOptions" : "sourceSheets")}</Button>}
+                        {source.status !== "attached" && <Button variant="ghost" size="sm"
                           type="button"
-                          onClick={() => setCleaningSourceId(source.id)}
+                          onClick={() => openCleaning(source)}
                           className="inline-flex items-center gap-1.5 text-xs text-primary h-auto min-h-7 whitespace-normal"
                         >
                           <FileSpreadsheet size={13} />
                           {t("sourceCleanButton")}
-                        </Button>
+                        </Button>}
                       </div>
                     )}
 
@@ -723,13 +730,14 @@ function ProjectDataWorkspace({
                         <Button variant="ghost" size="sm"
                           type="button"
                           disabled={busy || !settingsLoaded || !preprocessingEnabled}
-                          onClick={() =>
-                            void performSourceAction(
+                          onClick={() => {
+                            if ((isWorkbook || isCsv) && currentProjectId) setWorkbookTarget({ projectId: currentProjectId, sourceId: source.id });
+                            else void performSourceAction(
                               source.id,
                               () => profileSource(source.id),
                               t("sourcePrepared")
-                            )
-                          }
+                            );
+                          }}
                           className="inline-flex items-center gap-1.5 text-xs text-primary h-auto min-h-7 whitespace-normal"
                         >
                           {busy && sourceAction?.kind === "profile" ? (
@@ -815,15 +823,9 @@ function ProjectDataWorkspace({
                           </Button>
                           <Button variant="ghost" size="sm"
                             type="button"
-                            disabled={busy}
+                            disabled={!!sourceAction || !settingsLoaded || !preprocessingEnabled || source.status === "superseded"}
                             title={t("sourceReviewOnly")}
-                            onClick={() =>
-                              void performSourceAction(
-                                source.id,
-                                () => reorganizeSource(source.id),
-                                t("sourceRetryHint")
-                              )
-                            }
+                            onClick={() => reviewRecipe(source.id)}
                             className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary h-auto min-h-7 whitespace-normal"
                           >
                             {busy && sourceAction?.kind === "reorganize" ? (
@@ -906,7 +908,7 @@ function ProjectDataWorkspace({
                           </div>
                         )}
                         {displayedIssues
-                          .slice(0, needsAction ? 8 : 3)
+                          .slice(0, needsAction ? 8 : detailsOpen ? displayedIssues.length : 3)
                           .map((issue, issueIndex) => (
                           <div
                             key={`${issue.code}-${issue.title}-${issueIndex}`}
@@ -929,6 +931,18 @@ function ProjectDataWorkspace({
                             {businessIssueTitle(issue)}
                           </div>
                           ))}
+                        {!needsAction && displayedIssues.length > 3 && (
+                          <Button variant="ghost" size="sm"
+                            type="button"
+                            aria-expanded={detailsOpen}
+                            onClick={() => setExpandedSourceId(detailsOpen ? null : source.id)}
+                            className="mt-1 text-xs text-muted-foreground hover:text-foreground h-auto min-h-7 whitespace-normal"
+                          >
+                            {detailsOpen
+                              ? t("sourceCollapseIssues")
+                              : t("sourceShowAllIssues", { count: displayedIssues.length })}
+                          </Button>
+                        )}
                         {drift && detailsOpen && (
                           <div className="mt-2 border-l-2 border-primary/40 bg-muted/40 px-2.5 py-2 text-xs leading-5 text-muted-foreground">
                             {businessColumnSummary(drift.added_columns) ? (
@@ -982,14 +996,8 @@ function ProjectDataWorkspace({
                           </Button>
                           <Button variant="ghost" size="sm"
                             type="button"
-                            disabled={busy}
-                            onClick={() =>
-                              void performSourceAction(
-                                source.id,
-                                () => reorganizeSource(source.id),
-                                t("recipeReapplied")
-                              )
-                            }
+                            disabled={!!sourceAction || !settingsLoaded || !preprocessingEnabled || source.status === "superseded"}
+                            onClick={() => reviewRecipe(source.id)}
                             className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary h-auto min-h-7 whitespace-normal"
                           >
                             {busy && sourceAction?.kind === "reorganize" ? (
@@ -1039,9 +1047,6 @@ function ProjectDataWorkspace({
                                   {recipeRevisions.map((revision) => {
                                     const current =
                                       revision.id === recipe.active_revision_id;
-                                    const pending =
-                                      pendingRecipeRestore?.recipeId === recipe.id &&
-                                      pendingRecipeRestore.revisionId === revision.id;
                                     const restoring =
                                       recipeRevisionRestoringByRecipe[recipe.id];
                                     const formattedTime = revisionTime(
@@ -1078,57 +1083,18 @@ function ProjectDataWorkspace({
                                         <p className="mt-1 text-xs leading-5 text-foreground">
                                           {summary}
                                         </p>
-                                        {!current && !pending && (
+                                        {!current && (
                                           <Button variant="ghost" size="sm"
                                             type="button"
-                                            disabled={Boolean(restoring)}
+                                            disabled={Boolean(restoring) || !!sourceAction || !settingsLoaded || !preprocessingEnabled || source.status === "superseded"}
                                             aria-label={t("restoreRecipeAria", {
                                               time: formattedTime,
                                             })}
-                                            onClick={() =>
-                                              setPendingRecipeRestore({
-                                                recipeId: recipe.id,
-                                                revisionId: revision.id,
-                                              })
-                                            }
+                                            onClick={() => reviewRecipe(source.id, revision.id)}
                                             className="mt-1 text-[11px] text-primary h-auto min-h-7 whitespace-normal"
                                           >
                                             {t("recipeRestoreButton")}
                                           </Button>
-                                        )}
-                                        {pending && (
-                                          <div className="mt-2 border border-warning/30 bg-warning/[0.06] px-2.5 py-2 text-[11px] leading-5 text-warning rounded-xl">
-                                            <p>
-                                              {t("recipeRestoreHint")}
-                                            </p>
-                                            <div className="mt-1.5 flex gap-3">
-                                              <Button variant="ghost" size="sm"
-                                                type="button"
-                                                disabled={Boolean(restoring)}
-                                                onClick={() =>
-                                                  void performRecipeRestore(
-                                                    recipe.id,
-                                                    revision.id
-                                                  )
-                                                }
-                                                className="text-primary h-auto min-h-7 whitespace-normal"
-                                              >
-                                                {restoring === revision.id
-                                                  ? t("recipeRestoring")
-                                                  : t("recipeRestoreConfirm")}
-                                              </Button>
-                                              <Button variant="ghost" size="sm"
-                                                type="button"
-                                                disabled={Boolean(restoring)}
-                                                onClick={() =>
-                                                  setPendingRecipeRestore(null)
-                                                }
-                                                className="text-muted-foreground hover:text-foreground h-auto min-h-7 whitespace-normal"
-                                              >
-                                                {t("recipeRestoreCancel")}
-                                              </Button>
-                                            </div>
-                                          </div>
                                         )}
                                       </li>
                                     );
@@ -1147,16 +1113,11 @@ function ProjectDataWorkspace({
                         )}
                       </div>
                     )}
+                    <SourceDataPreview source={source} report={report} onCleanColumn={(column) => openCleaning(source, column)} />
                   </div>
                 );
-              })}
-              {!sources.length && (
-                <div className="border border-border px-4 py-5 text-center text-xs leading-5 text-muted-foreground rounded-xl">
-                  {t("emptyData")}
-                </div>
-              )}
-            </div>
-          </section>
+              }}
+          </SourceDirectory>
 
           {connections?.some((item) => !attachedConnections.has(item.id)) && (
             <section>
@@ -1258,6 +1219,7 @@ function ProjectDataWorkspace({
                 </div>
                 <UnderstandingMap
                   sources={sources}
+                  reports={preflightReports}
                   knowledgeCount={knowledgeTotal}
                   relationshipCount={relationshipKnowledgeCount}
                 />
@@ -1318,13 +1280,26 @@ function ProjectDataWorkspace({
         </div>
       </div>
     </aside>
+    {workbookSource && workbookTarget && <PreparationNavigator key={`${workbookTarget.projectId}:${workbookTarget.sourceId}`}
+      projectId={workbookTarget.projectId} sourceId={workbookSource.id} name={workbookSource.name}
+      initialOptions={{ ...(workbookSource.profile_data.csv_options as object || {}), header_row: workbookSource.profile_data.header_row, has_header: workbookSource.profile_data.has_header, input_fingerprint: workbookSource.fingerprint }}
+      canPrepare={settingsLoaded && preprocessingEnabled && workbookSource.status !== "superseded" && !sourceAction}
+      onPrepare={async (selection: WorkbookSelection | CsvSelection) => {
+        if (useProjectStore.getState().currentProjectId !== workbookTarget.projectId) throw new Error("Project changed");
+        await profileSource(workbookSource.id, selection);
+      }}
+      onRefreshSource={async () => {
+        if (useProjectStore.getState().currentProjectId !== workbookTarget.projectId) throw new Error("Project changed");
+        await useProjectStore.getState().refreshCurrent({ throwOnError: true });
+      }} onClose={() => setWorkbookTarget(null)} />}
     {cleaningSource?.kind === "file" && (
       <VisualCleaningEditor
-        key={cleaningSource.id}
+        key={`${cleaningSource.project_id}:${cleaningSource.id}`}
         source={cleaningSource}
         columns={cleaningColumns}
+        initialColumn={cleaningTarget?.column}
         recipeOperations={cleaningRecipe?.operations || []}
-        onClose={() => setCleaningSourceId(null)}
+        onClose={() => setCleaningTarget(null)}
       />
     )}
     </>

@@ -18,13 +18,15 @@ from app.services.metric_formula import metric_formula_columns, validate_metric_
 
 def validate_read_only(sql: str) -> None:
     normalized = sql.strip().rstrip(";")
-    if ";" in normalized or not re.match(
-        r"^(select|with|show|describe|explain)\b", normalized, re.I
+    without_strings = re.sub(r"'[^']*'|\"[^\"]*\"", "", normalized)
+    if ";" in without_strings or not re.match(
+        r"^(select|with|show|describe|explain)\b", without_strings, re.I
     ):
         raise ValueError("只允许单条只读查询")
-    without_strings = re.sub(r"'[^']*'|\"[^\"]*\"", "", normalized)
+    if re.search(r"--|/\*|\*/", without_strings):
+        raise ValueError("查询包含不允许的操作")
     if re.search(
-        r"\b(insert|update|delete|drop|alter|create|attach|copy|install|load|pragma|into|outfile|dumpfile)\b",
+        r"\b(insert|update|delete|drop|alter|create|truncate|replace|merge|grant|revoke|commit|rollback|exec|execute|attach|copy|install|load|pragma|into|outfile|dumpfile)\b",
         without_strings,
         re.I,
     ):

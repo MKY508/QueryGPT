@@ -6,10 +6,12 @@
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import Field, SecretStr, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app import __version__
 
 
 class Settings(BaseSettings):
@@ -24,12 +26,14 @@ class Settings(BaseSettings):
 
     # ===== 应用配置 =====
     APP_NAME: str = "ReceiptBI"
-    APP_VERSION: str = "1.0.0"
+    # Build identity is not a runtime setting; a stale .env must not advertise
+    # a different release through /health or OpenAPI.
+    APP_VERSION: ClassVar[str] = __version__
     DEBUG: bool = False
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
 
     # ===== 服务器配置 =====
-    HOST: str = "0.0.0.0"
+    HOST: str = "127.0.0.1"
     PORT: int = 8000
     WORKERS: int = 1
     RECEIPTBI_INSTANCE_TOKEN: str | None = None
@@ -47,14 +51,27 @@ class Settings(BaseSettings):
     # ===== 数据库配置 =====
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/receiptbi"
     WORKSPACE_ROOT: Path = Path("./data/projects")
-    # The visual editor currently materializes a full table while preparing a
-    # preview. These caps are a safety stop, not a streaming large-file promise.
+    # Enforced during multipart parsing and again when publishing the source.
+    FILE_UPLOAD_MAX_BYTES: int = Field(default=512 * 1024 * 1024, ge=1)
+    FILE_UPLOAD_MAX_CONCURRENT: int = Field(default=2, ge=1, le=16)
+    FILE_UPLOAD_RECEIVE_TIMEOUT_SECONDS: float = Field(default=120, ge=1, le=3600)
+    # Admission caps remain useful for streamed readers too; not every format
+    # or library allocation has a hard memory bound.
     VISUAL_CLEANING_MAX_SOURCE_BYTES: int = Field(
         default=256 * 1024 * 1024,
         ge=1,
     )
     VISUAL_CLEANING_MAX_XLSX_EXPANDED_BYTES: int = Field(
         default=512 * 1024 * 1024,
+        ge=1,
+    )
+    FILE_PREPARATION_MAX_XLSX_EXPANDED_BYTES: int = Field(
+        default=512 * 1024 * 1024,
+        ge=1,
+    )
+    # Read-only openpyxl still loads shared strings/styles/workbook metadata.
+    FILE_PREPARATION_MAX_XLSX_METADATA_BYTES: int = Field(
+        default=32 * 1024 * 1024,
         ge=1,
     )
 

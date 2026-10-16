@@ -10,7 +10,7 @@
  * 5. 复制输出到 apps/desktop/backend/
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname, relative } from 'node:path';
 import { assertNoBundledRuntimeData } from './packaging-policy.js';
@@ -35,6 +35,10 @@ function run(cmd: string, opts?: { cwd?: string; stdio?: 'inherit' | 'pipe' }) {
     env: process.env,
     shell: true,
   });
+}
+
+function runFile(file: string, args: string[]): void {
+  execFileSync(file, args, { cwd: ROOT, stdio: 'inherit', env: process.env });
 }
 
 function fixSymlinks(dir: string) {
@@ -81,58 +85,30 @@ async function main() {
   // 1. 生成 requirements.txt
   console.log('[1/5] Generating requirements.txt...');
   const requirementsPath = join(BUILD_DIR, 'requirements.txt');
-  const hasUvForCompile = (() => {
-    try { execSync('uv --version', { encoding: 'utf-8' }); return true; } catch { return false; }
-  })();
-  if (hasUvForCompile) {
-    run(`uv pip compile pyproject.toml --output-file "${requirementsPath}" --no-annotate --no-header --no-emit-package receiptbi-api -q`, { cwd: API_DIR });
-  } else {
-    const apiVenvPip = join(API_DIR, '.venv', process.platform === 'win32' ? 'Scripts/pip.exe' : 'bin/pip');
-    const requirements = execSync(`"${apiVenvPip}" freeze`, { encoding: 'utf-8', cwd: API_DIR });
-    const frozenPkgs = requirements.split('\n').filter((line) => {
-      const l = line.trim();
-      return l && !l.startsWith('git+') && !l.startsWith('-e ') && !l.startsWith('#');
-    }).join('\n');
-    writeFileSync(requirementsPath, frozenPkgs);
+  try {
+    execFileSync('uv', ['--version'], { stdio: 'pipe' });
+  } catch {
+    throw new Error('Desktop packaging requires uv to install the committed uv.lock. See docs/DEVELOPMENT.md.');
   }
+  const exportArgs = [
+    'export', '--locked', '--package', 'receiptbi-api', '--no-dev',
+    '--no-emit-workspace', '--no-hashes', '--no-annotate', '--no-header',
+  ];
+  runFile('uv', [...exportArgs, '--output-file', requirementsPath]);
+  const buildRequirementsPath = join(BUILD_DIR, 'build-requirements.txt');
+  runFile('uv', [...exportArgs, '--extra', 'desktop-build', '--output-file', buildRequirementsPath]);
 
-  // 2. 创建 build venv（使用 Python 3.13，PyInstaller 6.19.0 需要）
+  // 2. Build with the same Python minor version as the release runners.
   console.log('\n[2/5] Creating build venv with Python 3.13...');
   const venvDir = join(BUILD_DIR, '.build-venv');
   if (existsSync(venvDir)) rmSync(venvDir, { recursive: true });
-  let pythonBin: string;
-  if (process.platform === 'win32') {
-    pythonBin = execSync('where python', { encoding: 'utf-8' }).trim().split('\n')[0].trim();
-  } else {
-    pythonBin = execSync('which python3.13 || which python3', { encoding: 'utf-8' }).trim();
-  }
-
-  // Try uv first (handles uv-installed Python where ensurepip fails), fall back to stdlib venv
-  const hasUv = (() => { try { execSync('which uv', { encoding: 'utf-8' }); return true; } catch { return false; } })();
-  if (hasUv) {
-    run(`uv venv ${venvDir} --python ${pythonBin}`);
-  } else {
-    run(`${pythonBin} -m venv ${venvDir}`);
-  }
+  runFile('uv', ['venv', venvDir, '--python', '3.13']);
 
   const python = join(venvDir, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python3');
 
-  // Use uv pip if available (faster + works without pip in venv), fall back to venv pip
-  const pip = join(venvDir, process.platform === 'win32' ? 'Scripts/pip.exe' : 'bin/pip');
-  const pipInstall = (pkg: string) => {
-    if (hasUv) {
-      run(`uv pip install --python ${python} ${pkg}`);
-    } else {
-      run(`${pip} install ${pkg}`);
-    }
-  };
-
   // 安装 pyinstaller 和依赖
   console.log('Installing PyInstaller and dependencies...');
-  pipInstall('pyinstaller==6.19.0');
-  pipInstall(`-r ${join(BUILD_DIR, 'requirements.txt')}`);
-  // 显式安装 aiosqlite（pydantic-settings 动态加载时需要）
-  pipInstall('aiosqlite');
+  runFile('uv', ['pip', 'sync', '--python', python, buildRequirementsPath]);
 
   // Generate the exact distribution inventory from the build environment. The
   // runtime dependency installer uses importlib.metadata to decide which
@@ -155,12 +131,10 @@ from packaging.utils import canonicalize_name
 
 inventory_path = Path(sys.argv[1])
 requirements_path = Path(sys.argv[2])
-required_names = {"aiosqlite": "aiosqlite", "pip": "pip"}
+required_names = {}
 
-# requirements.txt is compiled before the build venv is created, so it is the
-# authoritative runtime dependency closure. pip is also an application
-# dependency but pip freeze deliberately omits it; aiosqlite is installed as an
-# explicit desktop runtime dependency.
+# requirements.txt is exported from uv.lock without build-only tools, so it
+# is the authoritative runtime dependency closure on the current platform.
 for line_number, raw_line in enumerate(
     requirements_path.read_text(encoding="utf-8").splitlines(),
     start=1,
@@ -197,7 +171,7 @@ inventory_path.write_text(
     encoding="utf-8",
 )
 `);
-  run(`"${python}" "${inventoryWriterPath}" "${inventoryPath}" "${requirementsPath}"`);
+  runFile(python, [inventoryWriterPath, inventoryPath, requirementsPath]);
 
   const inventory = JSON.parse(readFileSync(inventoryPath, 'utf-8')) as {
     distributions?: Array<{ name?: string; canonical_name?: string; version?: string }>;
@@ -228,6 +202,7 @@ inventory_path.write_text(
     'openai', 'anthropic', 'wren_core',
     'pandas', 'numpy', 'matplotlib', 'matplotlib.backends.backend_agg',
     'seaborn', 'duckdb', 'polars', 'pyarrow', 'plotly', 'openpyxl', 'xlrd', 'IPython',
+    'ijson', 'ijson.backends.yajl2_c', 'ijson.backends._yajl2', 'ijson.backends.python',
     'pip', 'pip._internal', 'pip._internal.cli.main',
     'slowapi', 'httpx', 'structlog', 'cryptography', 'alembic',
     'sse_starlette', 'asyncpg', 'pymysql', 'psycopg2',
@@ -339,7 +314,7 @@ coll = COLLECT(
 
   writeFileSync(specPath, spec);
 
-  run(`${python} -m PyInstaller --clean -y ${specPath}`, { stdio: 'inherit' });
+  runFile(python, ['-m', 'PyInstaller', '--clean', '-y', specPath]);
   assertNoBundledRuntimeData(outDir, 'PyInstaller output');
 
   // 5. 复制输出到 backend/
@@ -370,7 +345,7 @@ coll = COLLECT(
   // low-coupling Rust sidecar into the same resource directory as the frozen
   // API; non-desktop development intentionally keeps the Python fallback.
   console.log('\nBuilding trusted SQLite sidecar...');
-  run(`cargo build --release -p ${SQLITE_SIDECAR_PACKAGE}`, { cwd: SQLITE_EXECUTOR_WORKSPACE });
+  runFile('cargo', ['build', '--locked', '--release', '-p', SQLITE_SIDECAR_PACKAGE]);
   const configuredTargetDir = process.env.CARGO_TARGET_DIR;
   const rustTargetDir = configuredTargetDir
     ? resolve(SQLITE_EXECUTOR_WORKSPACE, configuredTargetDir)

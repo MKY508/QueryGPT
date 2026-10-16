@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from app.core.config import settings
 from app.db.base import Base
+from app.db.sqlite_migration import run_sqlite_migration
 from app.db.tables import *  # noqa: F401, F403 - 导入所有表
 
 config = context.config
@@ -37,11 +38,26 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection: Connection) -> None:
+def _run_migrations(connection: Connection) -> None:
     context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():
         context.run_migrations()
+
+
+def do_run_migrations(connection: Connection) -> None:
+    if connection.dialect.name == "sqlite":
+        try:
+            target = context.get_revision_argument()
+            if target is None:
+                target = "base"
+        except KeyError:
+            target = None  # Read-only commands such as `alembic current`.
+        run_sqlite_migration(
+            connection, lambda: _run_migrations(connection), target_revision=target
+        )
+    else:
+        _run_migrations(connection)
 
 
 async def run_async_migrations() -> None:

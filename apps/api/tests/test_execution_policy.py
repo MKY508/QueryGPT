@@ -80,7 +80,9 @@ async def test_python_policy_hides_tools_and_blocks_defensive_execution(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(settings, "WORKSPACE_ROOT", tmp_path)
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel())
+    )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="受限项目"),
@@ -111,7 +113,9 @@ async def test_auto_repair_off_does_not_install_missing_python_modules(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(settings, "WORKSPACE_ROOT", tmp_path)
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel())
+    )
     runtime = PydanticAnalystRuntime(
         model_config=synthetic_model_config(),
         project_context=ProjectRuntimeContext(project_id=uuid4(), name="无自动修复项目"),

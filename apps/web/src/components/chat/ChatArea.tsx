@@ -15,6 +15,7 @@ import { useChatStore } from "@/lib/stores/chat";
 import { useProjectStore } from "@/lib/stores/project";
 import { MessageList } from "./MessageList";
 import { InputBar } from "./InputBar";
+import { SourceUploadQueue } from "./SourceUploadQueue";
 import { ChatHeader } from "./ChatHeader";
 import { DataWorkspacePanel } from "./DataWorkspacePanel";
 import { useAnalysisModelSelection } from "./useAnalysisModelSelection";
@@ -104,6 +105,7 @@ export function ChatArea({
     error: projectError,
     bootstrap,
     uploadFile,
+    uploadFiles,
     refreshCurrent,
   } = useProjectStore();
   const parkedTask = usePendingTask(currentProjectId);
@@ -307,6 +309,8 @@ export function ChatArea({
       isUploading={isUploading}
       onOpenData={() => openDataPanel("sources")}
       onUploadFile={(file) => void uploadFile(file)}
+      onUploadFiles={(files) => void uploadFiles(files)}
+      uploadStatus={dataPanelOpen ? null : <SourceUploadQueue />}
       input={input}
       onInputChange={setInput}
       onAccepted={onAccepted}

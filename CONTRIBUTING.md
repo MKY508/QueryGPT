@@ -6,7 +6,7 @@ Thank you for helping improve ReceiptBI. 中文贡献同样欢迎；Issue 和 Pu
 
 - 提交前先搜索已有 Issue，并选择 Bug、功能建议或使用帮助模板。
 - 涉及较大行为或界面变化时，请先开 Issue 对齐方向。
-- 开发环境需要 Python 3.11 和 Node.js 20；修改 SQLite 执行器时才需要 Rust。
+- 开发环境需要 Python 3.11+、uv 和 Node.js 24 LTS（见 `.nvmrc`），前端统一使用 npm；修改 SQLite 执行器时才需要 Rust。
 - Pull Request 需要写清问题、结果和验证方式；界面改动请附截图。
 - 不要上传凭据、个人信息或私有业务数据。
 
@@ -20,7 +20,7 @@ Thank you for helping improve ReceiptBI. 中文贡献同样欢迎；Issue 和 Pu
 
 ## Development setup
 
-ReceiptBI development uses Python 3.11 and Node.js 20. Rust is required only when changing the SQLite executor.
+ReceiptBI development uses Python 3.11+, uv, Node.js 24 LTS (see `.nvmrc`), and npm. Rust is required only when changing the SQLite executor. See [development prerequisites](docs/DEVELOPMENT.md#prerequisites) for installation guidance.
 
 ```bash
 git clone https://github.com/MoonMao42/ReceiptBI.git

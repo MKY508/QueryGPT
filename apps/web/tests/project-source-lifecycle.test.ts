@@ -54,7 +54,7 @@ describe("project source lifecycle actions", () => {
     mocks.get.mockReset();
     mocks.post.mockReset();
     mocks.delete.mockReset();
-    mocks.post.mockResolvedValue({ data: { data: {} } });
+    mocks.post.mockImplementation(async (url: string) => ({ data: { data: url.endsWith("/sources/files") ? { id: "uploaded-1", project_id: "project-1", kind: "file" } : {} } }));
     mocks.delete.mockResolvedValue({ data: { data: { removed: true } } });
     useProjectStore.setState({
       currentProjectId: "project-1",
@@ -93,6 +93,22 @@ describe("project source lifecycle actions", () => {
     expect(mocks.post).not.toHaveBeenCalled();
   });
 
+  it("submits a workbook selection once and keeps preparation completion scoped to its original project", async () => {
+    let finish!: (value: unknown) => void;
+    mocks.post.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const selection = { sheet: "Cash & Sales", source_revision: "a".repeat(64), input_fingerprint: "b".repeat(64) };
+    const operation = useProjectStore.getState().profileSource("source-1", selection);
+    await expect(useProjectStore.getState().profileSource("source-1", selection)).rejects.toThrow();
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    expect(mocks.post).toHaveBeenCalledWith("/api/v1/projects/project-1/sources/source-1/preflight", selection, { timeout: 120000 });
+    const otherAction = { sourceId: "source-2", kind: "profile" as const };
+    useProjectStore.setState({ currentProjectId: "project-2", sourceAction: otherAction });
+    finish({ data: { data: {} } });
+    await operation;
+    expect(useProjectStore.getState().sourceAction).toBe(otherAction);
+    expect(mocks.get).not.toHaveBeenCalled();
+  });
+
   it("never starts preflight while adding a file or connection", async () => {
     await useProjectStore
       .getState()
@@ -105,8 +121,9 @@ describe("project source lifecycle actions", () => {
       "/api/v1/projects/project-1/sources/files",
       expect.any(FormData),
       {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { "Content-Type": undefined },
         timeout: 120000,
+        onUploadProgress: expect.any(Function),
       }
     );
     expect(mocks.post).toHaveBeenCalledWith(

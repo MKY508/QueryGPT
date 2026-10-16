@@ -10,6 +10,7 @@ import type {
 import { getErrorMessage } from "@/lib/types/api";
 import type { ChatMessage } from "@/lib/types/chat";
 import { runtimeMessage } from "@/i18n/runtime";
+import { appendAnalysisActivity } from "@/lib/analysis-activity";
 import { parseAnalysisState } from "@/lib/analysis-state";
 
 export type ChatStreamEventPayload = Exclude<SSEEventData, { type: "error" | "done" }>;
@@ -123,6 +124,49 @@ export function mapApiMessage(msg: APIMessage): ChatMessage {
   };
 }
 
+function confirmationIdentity(key: string, presentationCode?: string): string {
+  // Explicit aliases from business_decision_slots.py only. Do not infer a
+  // business decision from arbitrary question prose or answer similarity.
+  const normalized = key.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (presentationCode === "preflight.revenue_refund_policy" ||
+    ["revenue_refund_policy", "refund_policy", "refund_handling"].includes(normalized)) {
+    return "revenue_refund_policy";
+  }
+  return key.trim();
+}
+
+/** Rebuild receipts from ordered, typed server records, not the last answer
+ * anywhere in a run. A later question must remain unanswered until its receipt. */
+export function mapConversationMessages(messages: APIMessage[], projectId?: string | null): ChatMessage[] {
+  const mapped = messages.map(mapApiMessage);
+  const pending = new Map<string, number>();
+  const seenReceipts = new Set<string>();
+  messages.forEach((message, index) => {
+    const metadata = message.metadata;
+    const run = metadata?.analysis_run_id;
+    const project = metadata?.project_id || projectId;
+    if (typeof run !== "string" || !run || typeof project !== "string" || !project ||
+      (projectId && project !== projectId)) return;
+    const question = metadata?.report?.confirmation;
+    if (message.role === "assistant" && question && typeof question.key === "string" && question.key.trim()) {
+      pending.set(JSON.stringify([project, run, confirmationIdentity(question.key, question.presentation_code)]), index);
+      return;
+    }
+    if (message.role !== "user" || metadata?.kind !== "business_confirmation" ||
+      typeof metadata.confirmation_key !== "string" || !metadata.confirmation_key.trim() ||
+      typeof metadata.selected_option !== "string" || seenReceipts.has(message.id)) return;
+    seenReceipts.add(message.id);
+    const identity = JSON.stringify([project, run, confirmationIdentity(metadata.confirmation_key)]);
+    const target = pending.get(identity);
+    if (target === undefined) return;
+    const options = mapped[target].report?.confirmation?.options;
+    if (!Array.isArray(options) || !options.includes(metadata.selected_option)) return;
+    mapped[target] = { ...mapped[target], confirmationResolved: metadata.selected_option };
+    pending.delete(identity);
+  });
+  return mapped;
+}
+
 export function buildPendingAssistantMessage(
   executionContext?: ExecutionContextSummary,
   streamId?: string,
@@ -204,6 +248,7 @@ export function applyStreamEvent(
       ...message,
       status: String(payload.data.message || ""),
       thinkingStage: progressStage || message.thinkingStage,
+      activitySteps: appendAnalysisActivity(message.activitySteps, progressStage),
       analysisRunId: payload.data.analysis_run_id || message.analysisRunId,
       projectId: payload.data.project_id || message.projectId,
       analysisState: parseAnalysisState(payload.data.analysis_state) ?? message.analysisState,

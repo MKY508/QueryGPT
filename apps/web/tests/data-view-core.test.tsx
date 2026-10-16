@@ -343,7 +343,7 @@ describe("data view", () => {
   });
 
   it("keeps multiline, false, missing and empty record-value conditions distinct and drops them on a new snapshot", () => {
-    const rows = [{ note: "  First\r\nSecond \n", active: false, blank: "", toString: null, object: { text: "hidden" } },
+    const rows: Record<string, unknown>[] = [{ note: "  First\r\nSecond \n", active: false, blank: "", toString: null, object: { text: "hidden" } },
       { note: "FirstSecond", active: true, blank: null, toString: "own", object: [] }, {}];
     const view = render(intl(<Viewer snapshot={{ title: "Review", rows }} />));
     fireEvent.click(screen.getByRole("button", { name: "查看第 1 条记录" }));

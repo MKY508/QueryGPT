@@ -543,11 +543,9 @@ class ProjectDependencyManager:
             "--prefer-binary",
             "--report",
             str(report_path),
+            "--only-binary=:all:",
+            *packages,
         ]
-        require_wheels = bool(getattr(sys, "frozen", False))
-        if require_wheels:
-            arguments.append("--only-binary=:all:")
-        arguments.extend(packages)
         try:
             await self._run_pip_checked(
                 arguments,
@@ -555,7 +553,7 @@ class ProjectDependencyManager:
                 extra_paths=(str(staging),),
             )
             resolved = self._read_resolution_report(report_path)
-            self._assert_safe_resolution(resolved, require_wheels=require_wheels)
+            self._assert_safe_resolution(resolved, require_wheels=True)
             return resolved
         finally:
             report_path.unlink(missing_ok=True)
@@ -578,10 +576,9 @@ class ProjectDependencyManager:
             "--no-deps",
             "--target",
             str(staging),
+            "--only-binary=:all:",
+            *(item.install_argument for item in resolved),
         ]
-        if getattr(sys, "frozen", False):
-            arguments.append("--only-binary=:all:")
-        arguments.extend(item.install_argument for item in resolved)
         await self._run_pip_checked(arguments, deadline=deadline)
 
     def _prepare_staging(self) -> Path:

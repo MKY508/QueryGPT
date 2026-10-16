@@ -32,12 +32,18 @@ async def test_sqlite_enables_foreign_keys_and_cascades_sanitation_history(
     try:
         async with engine.begin() as connection:
             assert (await connection.execute(text("PRAGMA foreign_keys"))).scalar_one() == 1
+            assert (
+                str((await connection.execute(text("PRAGMA journal_mode"))).scalar_one()).lower()
+                == "wal"
+            )
+            assert (await connection.execute(text("PRAGMA busy_timeout"))).scalar_one() == 5000
             await connection.run_sync(Base.metadata.create_all)
 
         # Force a fresh pooled DB-API connection and verify the per-connection hook.
         await engine.dispose()
         async with engine.connect() as connection:
             assert (await connection.execute(text("PRAGMA foreign_keys"))).scalar_one() == 1
+            assert (await connection.execute(text("PRAGMA busy_timeout"))).scalar_one() == 5000
 
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
         async with session_factory() as session:

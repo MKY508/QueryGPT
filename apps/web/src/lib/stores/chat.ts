@@ -7,6 +7,7 @@ import type {
   Conversation,
   SSEEventData,
 } from "@/lib/types/api";
+import { UserFacingError } from "@/lib/types/api";
 import {
   applyClientError,
   applyStreamErrorEvent,
@@ -14,11 +15,15 @@ import {
   buildPendingAssistantMessage,
   finalizeStreamMessage,
   getInvestigationErrorRecovery,
-  mapApiMessage,
+  mapConversationMessages,
   markStoppedMessage,
 } from "@/lib/stores/chat-helpers";
 import type { ChatMessage } from "@/lib/types/chat";
 import { runtimeMessage } from "@/i18n/runtime";
+
+// Confirmation changes business definitions. Share the pending boundary across
+// message cards; never queue a second decision behind the first one.
+const confirmingConversations = new Set<string>();
 
 export interface AnalysisSettlement {
   id: string;
@@ -34,6 +39,7 @@ export interface SemanticValidationSelection {
 
 export const CONVERSATION_CONTINUITY_STORAGE_KEY =
   "receiptbi-current-conversations";
+const CONVERSATION_CONTINUITY_CHANGED = "receiptbi-conversation-continuity-changed";
 
 type ConversationContinuityStorage = Pick<
   Storage,
@@ -59,7 +65,25 @@ function continuityStorage(
 ): ConversationContinuityStorage | null {
   if (storage) return storage;
   if (typeof window === "undefined") return null;
-  return window.localStorage;
+  try {
+    return window.localStorage;
+  } catch {
+    // Some embedded/private browser contexts deny access to the getter itself.
+    return null;
+  }
+}
+
+export function subscribeToConversationContinuity(onChange: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if ((event.key === CONVERSATION_CONTINUITY_STORAGE_KEY || event.key === null)
+      && (!event.storageArea || event.storageArea === continuityStorage())) onChange();
+  };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(CONVERSATION_CONTINUITY_CHANGED, onChange);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(CONVERSATION_CONTINUITY_CHANGED, onChange);
+  };
 }
 
 function readConversationContinuity(
@@ -117,6 +141,7 @@ export function rememberConversationForProject(
   continuity.conversations[safeProjectId] = safeConversationId;
   try {
     target.setItem(CONVERSATION_CONTINUITY_STORAGE_KEY, JSON.stringify(continuity));
+    if (!storage) window.dispatchEvent(new Event(CONVERSATION_CONTINUITY_CHANGED));
   } catch {
     // Continuity is a convenience. Blocked storage must not block an investigation.
   }
@@ -140,6 +165,7 @@ export function forgetConversationForProject(
     } else {
       target.removeItem(CONVERSATION_CONTINUITY_STORAGE_KEY);
     }
+    if (!storage) window.dispatchEvent(new Event(CONVERSATION_CONTINUITY_CHANGED));
   } catch {
     // A failed cleanup is safer than preventing the user from starting over.
   }
@@ -448,52 +474,70 @@ export const useChatStore = create<ChatState>((set, get) => ({
   ) => {
     const origin = get();
     const originConversationId = origin.currentConversationId;
-    const originProjectId =
-      origin.messages.find((message) => message.analysisRunId === analysisRunId)?.projectId ||
-      origin.lastProjectId;
-    const response = await api.post("/api/v1/chat/confirm", {
-      analysis_run_id: analysisRunId,
-      key,
-      selected_option: selectedOption,
-    });
-    const confirmation = response.data.data as BusinessConfirmationResponse;
-    const live = get();
-    if (
-      !originConversationId ||
-      live.currentConversationId !== originConversationId ||
-      (originProjectId && live.lastProjectId && live.lastProjectId !== originProjectId)
-    ) {
-      throw new Error(runtimeMessage("confirmationSavedElsewhere"));
+    const originMessage = [...origin.messages].reverse().find((message) =>
+      message.role === "assistant" && message.analysisRunId === analysisRunId &&
+      message.report?.confirmation?.key === key);
+    const originProjectId = originMessage?.projectId || origin.lastProjectId;
+    if (origin.isLoading || origin.activeStreamId) {
+      throw new UserFacingError(runtimeMessage("analysisAlreadyRunning"));
     }
-    const state = get();
-    const originalQuery = state.messages.find(
-      (message) => message.analysisRunId === analysisRunId
-    )?.originalQuery;
-    set((current) => ({
-      messages: current.messages.map((message) =>
-        message.analysisRunId === analysisRunId
-          ? { ...message, confirmationResolved: selectedOption }
-          : message
-      ),
-    }));
-
-    if (state.currentConversationId !== confirmation.conversation_id) {
-      set({ currentConversationId: confirmation.conversation_id });
+    if (!originConversationId || !originMessage || !originProjectId || origin.isConversationLoading ||
+      (origin.lastProjectId && origin.lastProjectId !== originProjectId) ||
+      originMessage.confirmationResolved !== undefined ||
+      (originMessage.report?.confirmation && !originMessage.report.confirmation.options.includes(selectedOption))) {
+      throw new UserFacingError(runtimeMessage("confirmationCannotContinue"));
     }
-    rememberConversationForProject(
-      confirmation.project_id,
-      confirmation.conversation_id
-    );
-    await get().sendMessage(
-      selectedOption,
-      state.lastConnectionId,
-      state.lastModelId,
-      state.lastContextRounds,
-      language,
-      confirmation.project_id,
-      confirmation.resume_run_id,
-      originalQuery
-    );
+    if (confirmingConversations.has(originConversationId)) {
+      throw new UserFacingError(runtimeMessage("confirmationInProgress"));
+    }
+    confirmingConversations.add(originConversationId);
+    try {
+      const response = await api.post("/api/v1/chat/confirm", {
+        analysis_run_id: analysisRunId,
+        key,
+        selected_option: selectedOption,
+      });
+      const confirmation = response?.data?.data as BusinessConfirmationResponse | undefined;
+      // The server confirms and resumes the same run. Its key may be
+      // canonicalized, so compare the answer and authoritative identities.
+      if (!confirmation || confirmation.analysis_run_id !== analysisRunId ||
+        confirmation.resume_run_id !== analysisRunId ||
+        confirmation.conversation_id !== originConversationId ||
+        confirmation.project_id !== originProjectId ||
+        confirmation.selected_option !== selectedOption ||
+        confirmation.ready_to_continue !== true) {
+        throw new UserFacingError(runtimeMessage("confirmationCannotContinue"));
+      }
+      const live = get();
+      if (live.currentConversationId !== originConversationId || live.isConversationLoading ||
+        !live.messages.includes(originMessage) ||
+        (live.lastProjectId && live.lastProjectId !== originProjectId)) {
+        throw new UserFacingError(runtimeMessage("confirmationSavedElsewhere"));
+      }
+      if (live.isLoading || live.activeStreamId) {
+        throw new UserFacingError(runtimeMessage("confirmationWaitingForRun"));
+      }
+      set((current) => ({
+        messages: current.messages.map((message) =>
+          message === originMessage
+            ? { ...message, confirmationResolved: selectedOption }
+            : message
+        ),
+      }));
+      rememberConversationForProject(originProjectId, originConversationId);
+      await get().sendMessage(
+        selectedOption,
+        origin.lastConnectionId,
+        origin.lastModelId,
+        origin.lastContextRounds,
+        language,
+        originProjectId,
+        analysisRunId,
+        originMessage.originalQuery,
+      );
+    } finally {
+      confirmingConversations.delete(originConversationId);
+    }
   },
 
   stopGeneration: () => {
@@ -641,25 +685,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         });
         return;
       }
-      const confirmationSelections = new Map(
-        conversation.messages
-          .filter(
-            (message) =>
-              message.metadata?.kind === "business_confirmation" &&
-              message.metadata.analysis_run_id &&
-              message.metadata.selected_option
-          )
-          .map((message) => [
-            message.metadata!.analysis_run_id!,
-            message.metadata!.selected_option!,
-          ])
+      const restoredMessages = mapConversationMessages(
+        conversation.messages, conversation.project_id || expectedProjectId,
       );
-      const restoredMessages = conversation.messages.map(mapApiMessage).map((message) => ({
-        ...message,
-        confirmationResolved: message.analysisRunId
-          ? confirmationSelections.get(message.analysisRunId)
-          : undefined,
-      }));
 
       set({
         messages: restoredMessages,

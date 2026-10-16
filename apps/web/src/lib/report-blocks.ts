@@ -1,7 +1,9 @@
 /** Report block models and transformations; no component or React dependencies. */
-import type { AnalysisArtifact, AnalysisRunSummary } from "@/lib/types/api";
+import type { AnalysisArtifact, AnalysisHistoryItem } from "@/lib/types/api";
 import { normalizeChartSpec } from "@/lib/charts";
+import { compareNumericValues, numericValue } from "@/lib/numeric-values";
 import { reportContentRows as contentRows } from "@/lib/report-rows";
+import { metricColumnContent, metricResultColumns } from "@/lib/report-metrics";
 import type {
   ReportBlock,
   ReportBlockLayout,
@@ -149,10 +151,11 @@ export type ReportFilterOperator =
   | "less_or_equal";
 
 export interface ActiveReportFilter {
-  blockId?: string;
   field: string;
   operator: ReportFilterOperator;
   value: string;
+  /** Resolved runtime target, never persisted as a configuration reference. */
+  blockId?: string;
 }
 
 export function blockTypeLabel(type: ReportBlockType, copy: ReportBlocksCopy): string {
@@ -234,6 +237,14 @@ export function applyReportBlockUpdates(
     source_ref: block.source_ref,
     source_available: block.source_available,
   };
+  if (updates.block_type === "metric" && block.block_type === "table") {
+    const columns = metricResultColumns(block);
+    // Choosing the metric visualization is enough only when the value is unique.
+    // Multi-value results retain their rows and ask for an explicit field.
+    const column = columns.length === 1 ? columns[0] : "";
+    next.content = metricColumnContent(block, column);
+    next.config = { ...next.config, metric_column: column };
+  }
   const isManualEdit = ["block_type", "title", "content", "config"].some((key) =>
     Object.prototype.hasOwnProperty.call(updates, key)
   );
@@ -326,14 +337,12 @@ function matchesFilter(
   if (filter.operator === "equals") return actualText === expectedText;
   if (filter.operator === "not_equals") return actualText !== expectedText;
 
-  const actualNumber =
-    typeof candidate === "number" ? candidate : Number(String(candidate ?? "").trim());
-  const expectedNumber = Number(expected);
-  if (!Number.isFinite(actualNumber) || !Number.isFinite(expectedNumber)) return false;
-  if (filter.operator === "greater_than") return actualNumber > expectedNumber;
-  if (filter.operator === "greater_or_equal") return actualNumber >= expectedNumber;
-  if (filter.operator === "less_than") return actualNumber < expectedNumber;
-  if (filter.operator === "less_or_equal") return actualNumber <= expectedNumber;
+  const comparison = compareNumericValues(candidate, expected);
+  if (comparison === null) return false;
+  if (filter.operator === "greater_than") return comparison > 0;
+  if (filter.operator === "greater_or_equal") return comparison >= 0;
+  if (filter.operator === "less_than") return comparison < 0;
+  if (filter.operator === "less_or_equal") return comparison <= 0;
   return true;
 }
 
@@ -362,7 +371,7 @@ export function applyStaticReportFilters(
       filter.operator !== "contains" &&
       filter.operator !== "equals" &&
       filter.operator !== "not_equals" &&
-      !Number.isFinite(Number(filter.value.trim()))
+      numericValue(filter.value.trim()) === null
     ) {
       continue;
     }
@@ -736,7 +745,7 @@ export function artifactToReportBlock(
 }
 
 export function analysisSummaryToReportBlock(
-  run: AnalysisRunSummary,
+  run: AnalysisHistoryItem,
   copy: ReportBlocksCopy
 ): ReportBlock {
   return {

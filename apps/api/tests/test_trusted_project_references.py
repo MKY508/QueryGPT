@@ -259,7 +259,9 @@ async def test_historical_numbers_require_a_fresh_query_and_final_validation(
     assert public_reference["historical"] is True
     assert public_reference["requires_current_revalidation"] is True
 
-    monkeypatch.setattr(analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel()))
+    monkeypatch.setattr(
+        analyst_runtime, "model_session", lambda _config, **_kwargs: nullcontext(TestModel())
+    )
     runtime = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
     report = AnalysisReport(
         status="completed",

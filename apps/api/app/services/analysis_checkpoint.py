@@ -18,7 +18,8 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from app.models.analysis_state import AnalysisState
 from app.services.checkpoint_contract import (
@@ -243,7 +244,20 @@ def _write_checkpoint_sync(
                 continue
             path = temp_dir / f"{index:03d}-{safe_name}.parquet"
             try:
-                pd.DataFrame(rows).to_parquet(path, index=False)
+                # A result can legitimately mix safe integers, exact numeric
+                # strings and nulls in one column, or contain sparse rows.
+                # Persist row JSON in compressed batches instead of inferring a
+                # dataframe schema that coerces integers/nulls into floats.
+                schema = pa.schema([("row_json", pa.string())])
+                with pq.ParquetWriter(path, schema, compression="zstd") as writer:
+                    for offset in range(0, len(rows), 2048):
+                        payloads = [
+                            json.dumps(row, ensure_ascii=False, default=str, allow_nan=False)
+                            for row in rows[offset : offset + 2048]
+                        ]
+                        writer.write_batch(
+                            pa.RecordBatch.from_arrays([pa.array(payloads)], schema=schema)
+                        )
             except Exception as exc:
                 resumable = False
                 reason = reason or "checkpoint_dataset_not_serializable"
@@ -257,6 +271,7 @@ def _write_checkpoint_sync(
                 descriptor.update(
                     {
                         "storage": "parquet",
+                        "encoding": "json_rows_v1",
                         "path": path.name,
                         "sha256": _sha256_file(path),
                     }
@@ -408,7 +423,23 @@ def _load_checkpoint_sync(
             raise CheckpointError(f"中间结果 {name} 文件已丢失")
         if _sha256_file(data_path) != descriptor.get("sha256"):
             raise CheckpointError(f"中间结果 {name} 校验失败")
-        rows = pd.read_parquet(data_path).to_dict(orient="records")
+        try:
+            if descriptor.get("encoding") == "json_rows_v1":
+                rows = []
+                with pq.ParquetFile(data_path) as stored:
+                    for batch in stored.iter_batches(batch_size=2048, columns=["row_json"]):
+                        rows.extend(json.loads(value) for value in batch.column(0).to_pylist())
+                if any(not isinstance(row, dict) for row in rows):
+                    raise ValueError("Invalid result row")
+            elif descriptor.get("encoding") is None:
+                # Existing v1 checkpoints retain their hashes and native schema.
+                rows = pq.read_table(data_path).to_pylist()
+            else:
+                raise ValueError("Unsupported result encoding")
+        except (pa.ArrowException, ValueError, TypeError, IndexError) as exc:
+            raise CheckpointError(f"中间结果 {name} 无法读取") from exc
+        if len(rows) != descriptor.get("rows"):
+            raise CheckpointError(f"中间结果 {name} 行数发生了变化")
         if stable_payload_hash(rows) != descriptor.get("result_hash"):
             raise CheckpointError(f"中间结果 {name} 内容发生了变化")
         dataframes[str(name)] = rows

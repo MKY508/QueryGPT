@@ -22,6 +22,7 @@ from app.services.database_adapters import (
     build_database_adapter,
     is_valid_sqlite_identifier,
 )
+from app.services.result_values import json_result_value
 from app.services.sqlite_trusted_executor import configured_sidecar_path
 
 logger = structlog.get_logger()
@@ -149,6 +150,11 @@ class QueryResult:
     execution_backend: str = "python"
     execution_metadata: dict[str, Any] | None = None
 
+    def __post_init__(self) -> None:
+        # One boundary for raw queries, structured queries, samples and replay.
+        # Do not let FastAPI/pandas turn Decimal or BIGINT into rounded numbers.
+        self.data = json_result_value(self.data)
+
 
 class DatabaseManager:
     """数据库连接管理器"""
@@ -233,7 +239,7 @@ class DatabaseManager:
         if cancellation_event is not None and cancellation_event.is_set():
             raise DatabaseQueryCancelledError("Database query was cancelled before execution")
         if read_only:
-            self._validate_read_only(sql)
+            self.validate_read_only(sql)
 
         with self.connect() as conn:
             fetch_limit = max_rows + 1 if max_rows is not None else None
@@ -325,13 +331,14 @@ class DatabaseManager:
                 execution_metadata=adapter_result.metadata or None,
             )
 
-    def _validate_read_only(self, sql: str) -> None:
+    def validate_read_only(self, sql: str) -> None:
         sql_clean = sql.strip()
         sql_without_trailing_semicolon = sql_clean.rstrip(";")
-        if ";" in sql_without_trailing_semicolon:
+        sql_without_strings = re.sub(r"'[^']*'|\"[^\"]*\"", "", sql_without_trailing_semicolon)
+        if ";" in sql_without_strings:
             raise ValueError("禁止执行多语句查询")
 
-        if re.search(r"--|/\*|\*/", sql_clean):
+        if re.search(r"--|/\*|\*/", sql_without_strings):
             raise ValueError("禁止在查询中使用 SQL 注释")
 
         dangerous_keywords = [
@@ -350,12 +357,16 @@ class DatabaseManager:
             "ROLLBACK",
             "EXEC",
             "EXECUTE",
+            "ATTACH",
+            "COPY",
+            "INSTALL",
+            "LOAD",
+            "PRAGMA",
             "INTO",
             "OUTFILE",
             "DUMPFILE",
         ]
 
-        sql_without_strings = re.sub(r"'[^']*'|\"[^\"]*\"", "", sql_clean)
         words = re.findall(r"\b[A-Z_]+\b", sql_without_strings.upper())
         for word in words:
             if word in dangerous_keywords:

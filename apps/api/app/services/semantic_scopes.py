@@ -28,6 +28,7 @@ from app.models.workspace import (
 from app.services.semantic_revisions import (
     append_semantic_revision,
 )
+from app.services.source_activation import is_current_source
 
 SemanticResolvedScopeKind = Literal["project", "source", "table"]
 
@@ -50,28 +51,6 @@ def _normalized(value: str) -> str:
 
 def _source_profile(source: ProjectDataSource) -> dict[str, Any]:
     return source.profile_data if isinstance(source.profile_data, dict) else {}
-
-
-def _is_pending_file_replacement(source: ProjectDataSource) -> bool:
-    """Match the runtime gate for an unconfirmed file replacement.
-
-    Older source snapshots may not carry the newer ``is_current`` or
-    ``activation_state`` flags.  The blocking drift issue remains durable
-    evidence that the replacement is pending, so it must not compete with the
-    last known-good source while constructing semantic scopes.
-    """
-
-    if source.kind != "file":
-        return False
-    profile = _source_profile(source)
-    if str(profile.get("activation_state") or "") == "pending_confirmation":
-        return True
-    issues = profile.get("issues")
-    return isinstance(issues, list) and any(
-        isinstance(item, Mapping)
-        and str(item.get("code") or "") in {"recipe_replay_drift", "recipe_input_changed"}
-        for item in issues
-    )
 
 
 def source_logical_name(source: ProjectDataSource) -> str:
@@ -419,12 +398,7 @@ async def _current_sources(
         )
         .order_by(ProjectDataSource.created_at, ProjectDataSource.id)
     )
-    return [
-        source
-        for source in result.scalars()
-        if _source_profile(source).get("is_current") is not False
-        and not _is_pending_file_replacement(source)
-    ]
+    return [source for source in result.scalars() if is_current_source(source)]
 
 
 async def ensure_project_scope(

@@ -38,6 +38,7 @@ import { getInvestigationErrorRecovery } from "@/lib/stores/chat-helpers";
 import { ChartDisplay } from "./ChartDisplay";
 import { DataTable } from "./DataTable";
 import { SavedAnalysisArtifacts } from "./SavedAnalysisArtifacts";
+import { BusinessConfirmation } from "./BusinessConfirmation";
 
 interface AssistantMessageCardProps {
   message: ChatMessage;
@@ -296,14 +297,11 @@ function AssistantMessageSession({
   onManageAnalysisServices,
 }: AssistantMessageCardProps) {
   const t = useTranslations("assistantMessage");
+  const tConfirmation = useTranslations("businessConfirmation");
   const locale = useLocale();
   const queryClient = useQueryClient();
   const refreshProject = useProjectStore((state) => state.refreshCurrent);
   const projectKnowledge = useProjectStore((state) => state.knowledge);
-  const [confirmingOption, setConfirmingOption] = useState<string | null>(null);
-  const [confirmationError, setConfirmationError] = useState<string | null>(
-    null,
-  );
   const [playbookState, setPlaybookState] = useState<
     "idle" | "saving" | "saved"
   >("idle");
@@ -440,6 +438,7 @@ function AssistantMessageSession({
       : t("processingError");
   })();
   const needsData = report?.status === "needs_data";
+  const needsDecision = Boolean(report?.confirmation && !message.confirmationResolved);
   const wasStopped =
     message.analysisState === "needs_attention" &&
     !message.hasError &&
@@ -630,6 +629,8 @@ function AssistantMessageSession({
     (message.content && message.content !== message.errorMessage
       ? message.content
       : "");
+  const summaryDuplicatesConfirmation = Boolean(report?.confirmation &&
+    partialSummary === (localizedPreflightConfirmation?.reason || report.confirmation.reason));
   const runPrompt = onRunPrompt || onUsePrompt;
   const correctionKinds = buildCorrectionKinds(t);
 
@@ -658,22 +659,6 @@ function AssistantMessageSession({
     }
 
     onRerun(index);
-  };
-
-  const handleConfirmation = async (key: string, option: string) => {
-    if (!message.analysisRunId) {
-      setConfirmationError(t("resumeMissing"));
-      return;
-    }
-    setConfirmingOption(option);
-    setConfirmationError(null);
-    try {
-      await onConfirm(message.analysisRunId, key, option);
-    } catch (error) {
-      setConfirmationError(getErrorMessage(error));
-    } finally {
-      setConfirmingOption(null);
-    }
   };
 
   const handleSavePlaybook = async () => {
@@ -962,49 +947,32 @@ function AssistantMessageSession({
             <div className="min-w-0">
               <div
                 className={`flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.15em] ${
-                  needsData ? "text-warning" : "text-success"
+                  needsData ? "text-warning" : needsDecision ? "text-primary" : "text-success"
                 }`}
               >
                 {needsData ? (
                   <FilePlus2 size={14} />
+                ) : needsDecision ? (
+                  <CircleDot size={14} />
                 ) : (
                   <CheckCircle2 size={14} />
                 )}
                 {needsData
                   ? t("phaseWaitingData")
+                  : report?.confirmation && message.confirmationResolved
+                    ? tConfirmation("confirmed")
                   : message.analysisState === "waiting_confirmation"
                     ? t("phaseWaitingInput")
                     : wasStopped
                       ? t("phaseStopped")
                       : t("reportTitleFallback")}
               </div>
-              <h2 className="mt-2 max-w-2xl text-[26px] font-semibold leading-tight tracking-[-0.035em] text-foreground">
-                {localizedPreflightConfirmation?.title ||
+              <h2 className="analysis-report-title mt-2 max-w-2xl text-[26px] font-semibold leading-tight tracking-[-0.035em] text-foreground">
+                {(report?.confirmation && message.confirmationResolved ? tConfirmation("recordTitle") : localizedPreflightConfirmation?.title) ||
                   report?.title ||
                   (wasStopped ? t("reportTitleStopped") : t("reportTitleDefault"))}
               </h2>
             </div>
-            {!needsData && (
-              <div className="flex shrink-0 items-center gap-1">
-                {message.projectId && message.analysisRunId && canCorrectReport && (
-                  <Link
-                    href={`/projects/${message.projectId}/reports?fromRun=${message.analysisRunId}`}
-                    className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                  >
-                    <LayoutDashboard size={13} />
-                    {t("addToReport")}
-                  </Link>
-                )}
-                <Button
-                  onClick={handleLatestDataRerun}
-                  disabled={Boolean(message.projectId && correctionsPending)}
-                  variant="ghost"
-                >
-                  <RefreshCw size={13} />
-                  {canResume ? t("continueLast") : t("rerunLatest")}
-                </Button>
-              </div>
-            )}
           </div>
         )}
 
@@ -1014,11 +982,11 @@ function AssistantMessageSession({
           />
         )}
 
-        {!hasError && partialSummary ? (
+        {!hasError && partialSummary && !summaryDuplicatesConfirmation ? (
           <ReactMarkdown className="prose prose-sm mt-5 max-w-none dark:prose-invert">
             {partialSummary}
           </ReactMarkdown>
-        ) : !hasError ? (
+        ) : !hasError && !report?.confirmation ? (
           <p className="mt-5 text-sm text-muted-foreground">{t("noConclusionYet")}</p>
         ) : null}
 
@@ -1068,57 +1036,16 @@ function AssistantMessageSession({
         <AnalysisMetrics metrics={report?.metrics} />
 
         {report?.confirmation && (
-          <section className="mt-7 rounded-xl border border-warning/40 bg-warning/[0.06] px-5 py-5">
-            <div className="flex items-start gap-3">
-              <CircleDot size={18} className="mt-0.5 shrink-0 text-warning" />
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-warning">
-                  {message.confirmationResolved
-                    ? t("appliedDefinition")
-                    : t("willChangeConclusion")}
-                </div>
-                <h3 className="mt-2 text-base font-semibold text-foreground">
-                  {localizedPreflightConfirmation?.question || report.confirmation.question}
-                </h3>
-                <p className="mt-1 text-xs leading-5 text-warning/80">
-                  {localizedPreflightConfirmation?.reason || report.confirmation.reason}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {report.confirmation.options.map((option) => (
-                    <Button
-                      key={option}
-                      type="button"
-                      onClick={() =>
-                        void handleConfirmation(
-                          report.confirmation!.key,
-                          option,
-                        )
-                      }
-                      disabled={
-                        confirmingOption !== null ||
-                        Boolean(message.confirmationResolved)
-                      }
-                      variant="outline"
-                    >
-                      {(() => {
-                        const label = localizedPreflightConfirmation?.optionLabel(option) || option;
-                        return confirmingOption === option
-                          ? t("applyingDefinition")
-                          : message.confirmationResolved === option
-                            ? t("definitionSelected", { option: label })
-                            : label;
-                      })()}
-                    </Button>
-                  ))}
-                </div>
-                {confirmationError && (
-                  <p className="mt-3 text-xs leading-5 text-destructive">
-                    {confirmationError}
-                  </p>
-                )}
-              </div>
-            </div>
-          </section>
+          <BusinessConfirmation
+            request={report.confirmation}
+            projectId={message.projectId}
+            analysisRunId={message.analysisRunId}
+            resolvedOption={message.confirmationResolved}
+            question={localizedPreflightConfirmation?.question || report.confirmation.question}
+            reason={localizedPreflightConfirmation?.reason || report.confirmation.reason}
+            optionLabel={localizedPreflightConfirmation?.optionLabel || ((option) => option)}
+            onConfirm={onConfirm}
+          />
         )}
 
         <AnalysisFindings findings={report?.findings} />
@@ -1146,9 +1073,12 @@ function AssistantMessageSession({
         )}
 
         {!hasError && message.data?.length ? (
-          <section className="mt-7" aria-label={t("resultDetailsAria")}>
+          <details className="mt-7" open={!structuredVisualization && pythonImages.length === 0}>
+            <summary className="w-fit cursor-pointer rounded-md border border-border px-3 py-2 text-xs font-medium text-primary hover:bg-muted">{t("resultTable")}</summary>
+            <section className="mt-3" aria-label={t("resultDetailsAria")}>
             <DataTable data={message.data} title={t("resultTable")} />
-          </section>
+            </section>
+          </details>
         ) : null}
 
         {!needsData && artifactsFailed && (
@@ -1269,6 +1199,20 @@ function AssistantMessageSession({
         )}
 
         <AnalysisSuggestions actions={nextActions} questions={report?.follow_ups} onUsePrompt={onUsePrompt} />
+
+        {!hasError && !needsData && !needsDecision && (
+          <div className="analysis-report-actions mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+            <Button onClick={handleLatestDataRerun} disabled={Boolean(message.projectId && correctionsPending)}
+              variant="ghost">
+              <RefreshCw size={14} />{canResume ? t("continueLast") : t("rerunLatest")}
+            </Button>
+            {message.projectId && message.analysisRunId && canCorrectReport && <Link
+              href={`/projects/${message.projectId}/reports?fromRun=${message.analysisRunId}`}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+              <LayoutDashboard size={15} />{t("addToReport")}
+            </Link>}
+          </div>
+        )}
 
         {canCorrectReport && (
           <section className="mt-7 border-t border-border pt-5">

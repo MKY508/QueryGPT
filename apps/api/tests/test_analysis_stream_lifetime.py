@@ -33,7 +33,9 @@ class AnalysisStreamLifetimeTests(unittest.IsolatedAsyncioTestCase):
         workspace = patch.object(settings, "WORKSPACE_ROOT", Path(directory.name) / "中文项目")
         workspace.start()
         self.addCleanup(workspace.stop)
-        self.enterContext(patch.object(ConversationTurnState, "claim", AsyncMock(return_value=True)))
+        self.enterContext(
+            patch.object(ConversationTurnState, "claim", AsyncMock(return_value=True))
+        )
 
         async def apply(state, db, mutation):
             conversation = await db.get(Conversation, state.conversation_id)
@@ -164,7 +166,9 @@ class AnalysisStreamLifetimeTests(unittest.IsolatedAsyncioTestCase):
                 result.scalars.return_value.first.return_value = run
                 db = AsyncMock()
                 db.execute.return_value = result
-                db.get.side_effect = lambda table, _id: run if table is AnalysisRun else conversation
+                db.get.side_effect = lambda table, _id: (
+                    run if table is AnalysisRun else conversation
+                )
 
                 async def persist_recovery(*_args, **_kwargs):
                     # Cancellation must not interrupt awaited finalization work.

@@ -1911,12 +1911,13 @@ describe("AssistantMessageCard", () => {
         name: "Should refunded orders be deducted when calculating revenue?",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByText(/The data contains both amount and refund fields/).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText(/The data contains both amount and refund fields/)).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: enMessages.assistantMessage.rerunLatest })).not.toBeInTheDocument();
     expect(screen.queryByText("计算收入时，退款订单需要扣除吗？")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Deduct refunded orders" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Deduct refunded orders" }));
+    expect(onConfirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm and continue" }));
     await waitFor(() =>
       expect(onConfirm).toHaveBeenCalledWith(
         "run-preflight-en",
@@ -1924,5 +1925,16 @@ describe("AssistantMessageCard", () => {
         "扣除退款",
       ),
     );
+  });
+
+  it("shows a confirmed choice record without asking for the same decision again", () => {
+    renderCard({ role: "assistant", content: "需要确认", analysisState: "waiting_confirmation", analysisRunId: "run-confirmed", confirmationResolved: "扣除退款",
+      report: { status: "waiting_confirmation", title: "需要确认", summary: "需要确认", metrics: [], findings: [], evidence: [], follow_ups: [],
+        confirmation: { key: "revenue_refund_policy", question: "如何计算收入？", reason: "影响结果", options: ["扣除退款", "保留退款订单"] } },
+    });
+    expect(screen.getByRole("heading", { level: 2, name: "本次选择" })).toBeInTheDocument();
+    expect(screen.queryByText("等待你的判断")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.getByText("扣除退款")).toBeInTheDocument();
   });
 });

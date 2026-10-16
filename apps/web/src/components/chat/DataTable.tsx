@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useTranslations } from "next-intl";
-import { ChevronUp, ChevronDown, Download } from "lucide-react";
+import { useState, useMemo, useId } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { ChevronUp, ChevronDown, Download, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { dataColumns, downloadCsv } from "@/lib/csv";
+import { compareNumericValues, isNumericCell } from "@/lib/numeric-values";
+import { dataCellText, dataCellValue, sortTableRows } from "@/lib/tabular-data";
+import { DataViewDialog, type DataViewSnapshot } from "@/components/data/DataViewDialog";
 
 import type { DataRow } from "@/lib/types/api";
 
@@ -18,51 +22,39 @@ type SortDirection = "asc" | "desc" | null;
 export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
   const t = useTranslations("assistant");
   const tChart = useTranslations("chartDisplay");
+  const tData = useTranslations("dataView");
+  const locale = useLocale();
+  const titleId = useId();
+  const tableId = useId();
+  const [dataView, setDataView] = useState<DataViewSnapshot | null>(null);
+  const [exportError, setExportError] = useState(false);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   // 获取列名
-  const columns = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    return Object.keys(data[0]);
-  }, [data]);
+  const columns = useMemo(() => dataColumns(data ?? []), [data]);
 
   // 排序数据
   const sortedData = useMemo(() => {
-    const truncated = data?.slice(0, maxRows) ?? data;
-    if (!truncated || !sortColumn || !sortDirection) return truncated;
+    return sortTableRows(data ?? [], sortColumn && sortDirection ? { column: sortColumn, direction: sortDirection } : null, locale);
+  }, [data, sortColumn, sortDirection, locale]);
 
-    return [...truncated].sort((a, b) => {
-      const aVal = a[sortColumn];
-      const bVal = b[sortColumn];
-
-      if (aVal === null || aVal === undefined) return 1;
-      if (bVal === null || bVal === undefined) return -1;
-
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
-      }
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-      return sortDirection === "asc"
-        ? aStr.localeCompare(bStr)
-        : bStr.localeCompare(aStr);
-    });
-  }, [data, maxRows, sortColumn, sortDirection]);
+  const previewLimit = Number.isNaN(maxRows) ? 100 : Math.max(0, Math.floor(maxRows));
+  const visibleRows = Math.min(sortedData?.length || 0, previewLimit);
+  const totalPages = Math.ceil(visibleRows / pageSize);
+  const page = Math.min(currentPage, Math.max(1, totalPages));
 
   // 分页数据
   const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return sortedData?.slice(start, start + pageSize) || [];
-  }, [sortedData, currentPage]);
-
-  const totalPages = Math.ceil((sortedData?.length || 0) / pageSize);
+    const start = (page - 1) * pageSize;
+    return sortedData?.slice(start, Math.min(start + pageSize, visibleRows)) || [];
+  }, [sortedData, page, visibleRows]);
 
   // 处理排序
   const handleSort = (column: string) => {
+    setCurrentPage(1);
     if (sortColumn === column) {
       if (sortDirection === "asc") {
         setSortDirection("desc");
@@ -80,28 +72,9 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
   const exportCSV = () => {
     if (!data || data.length === 0) return;
 
-    const headers = columns.join(",");
-    const rows = data.map((row) =>
-      columns
-        .map((col) => {
-          const val = row[col];
-          if (val === null || val === undefined) return "";
-          if (typeof val === "string" && val.includes(",")) {
-            return `"${val.replace(/"/g, '""')}"`;
-          }
-          return String(val);
-        })
-        .join(",")
-    );
-
-    const csv = [headers, ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `query_result_${Date.now()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    setExportError(false);
+    try { downloadCsv(sortedData, `query_result_${Date.now()}.csv`, columns); }
+    catch { setExportError(true); }
   };
 
   if (!data || data.length === 0) {
@@ -111,28 +84,40 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
   return (
     <div className="mt-4 bg-card rounded-lg border border-border overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-secondary border-b border-border">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-secondary border-b border-border">
         <div className="text-sm text-foreground">
-          {title || t("queryResult")}
+          <span id={titleId}>{title || t("queryResult")}</span>
           <span className="text-muted-foreground ml-2">({t("rows", { count: data.length })})</span>
+          {visibleRows < data.length && <span className="ml-2 text-xs text-muted-foreground">{tData("previewRows", { count: visibleRows, total: data.length })}</span>}
         </div>
+        <div className="flex shrink-0 items-center gap-1">
+        <button type="button" aria-label={tData("openFor", { title: title || t("queryResult") })}
+          onClick={() => setDataView({ title: title || t("queryResult"), rows: structuredClone(data),
+            sort: sortColumn && sortDirection ? { column: sortColumn, direction: sortDirection } : null })}
+          className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"><Table2 size={14} />{tData("open")}</button>
         <button
+          type="button"
           onClick={exportCSV}
           className="flex items-center gap-1 px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors"
         >
           <Download size={14} />
           {t("exportCsv")}
         </button>
+        </div>
       </div>
 
+      {exportError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{tData("exportError")}</p>}
+
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+      <div role="region" aria-labelledby={titleId} tabIndex={0}
+        className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40">
+        <table id={tableId} aria-labelledby={titleId} className="w-full text-sm">
           <thead>
             <tr className="bg-secondary border-b border-border">
               {columns.map((col) => (
                 <th
                   key={col}
+                  scope="col"
                   aria-sort={
                     sortColumn === col && sortDirection
                       ? sortDirection === "asc"
@@ -170,9 +155,9 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
                 )}
               >
                 {columns.map((col) => {
-                  const value = row[col];
-                  const isNumber = typeof value === "number";
-                  const negative = isNumber && value < 0;
+                  const value = dataCellValue(row, col);
+                  const isNumber = isNumericCell(value);
+                  const negative = isNumber && compareNumericValues(value, 0) === -1;
                   return (
                     <td
                       key={col}
@@ -183,12 +168,12 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
                           ? "font-medium text-destructive"
                           : "text-muted-foreground"
                       )}
-                      title={String(value ?? "")}
+                      title={dataCellText(value)}
                     >
                       {value === null || value === undefined ? (
-                        <span className="text-muted-foreground/50 italic">{tChart("nullValue")}</span>
+                        <span className="text-muted-foreground/50" aria-label={tChart("nullValue")}>—</span>
                       ) : (
-                        String(value)
+                        dataCellText(value)
                       )}
                     </td>
                   );
@@ -201,28 +186,33 @@ export function DataTable({ data, title, maxRows = 100 }: DataTableProps) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 bg-secondary border-t border-border">
-          <div className="text-sm text-muted-foreground">
-            {t("page", { current: currentPage, total: totalPages })}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-secondary border-t border-border">
+          <div role="status" aria-atomic="true" className="text-sm text-muted-foreground">
+            {t("page", { current: page, total: totalPages })}
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 text-sm border border-border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              type="button"
+              aria-controls={tableId}
+              onClick={() => setCurrentPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="min-h-11 px-3 py-1 text-sm border border-border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {t("prevPage")}
             </button>
             <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 text-sm border border-border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              type="button"
+              aria-controls={tableId}
+              onClick={() => setCurrentPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="min-h-11 px-3 py-1 text-sm border border-border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {t("nextPage")}
             </button>
           </div>
         </div>
       )}
+      {dataView && <DataViewDialog snapshot={dataView} onClose={() => setDataView(null)} />}
     </div>
   );
 }

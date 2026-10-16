@@ -12,8 +12,7 @@ build/
 node_modules/
 .pnpm-store/
 .next/
-.next-dev/
-.next-desktop/
+.next-*/
 *.tsbuildinfo
 out/
 playwright-report/
@@ -45,6 +44,8 @@ Thumbs.db
 *.db
 *.sqlite
 data/
+# UI components are source, not local database content.
+!apps/web/src/components/data/
 
 # Logs
 *.log

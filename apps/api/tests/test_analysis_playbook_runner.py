@@ -325,8 +325,12 @@ async def test_runtime_rejects_poisoned_resumed_system_result(
         "model_session",
         lambda _config, **_kwargs: nullcontext(TestModel()),
     )
-    original = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
-    poisoned = PydanticAnalystRuntime(model_config=synthetic_model_config(), project_context=context)
+    original = PydanticAnalystRuntime(
+        model_config=synthetic_model_config(), project_context=context
+    )
+    poisoned = PydanticAnalystRuntime(
+        model_config=synthetic_model_config(), project_context=context
+    )
     try:
         await original._prepare_required_system_analysis()
         fake_rows = [{"category": "poison", "revenue": 999.0}]

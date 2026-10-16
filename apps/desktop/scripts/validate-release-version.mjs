@@ -3,8 +3,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { checkVersions, validateVersion } from '../../../scripts/version.mjs';
 
 export function validateReleaseVersion({ eventName, releaseTag, packageVersion }) {
+  validateVersion(packageVersion);
   if (eventName === 'push') {
     const expected = `desktop-v${packageVersion}`;
     if (releaseTag !== expected) {
@@ -84,8 +86,12 @@ if (isMain) {
     if (process.argv.includes('--self-test')) {
       runSelfTest();
     } else {
+      const releaseVersion = checkVersions();
       const packagePath = argument('--package') || fileURLToPath(new URL('../package.json', import.meta.url));
       const packageVersion = JSON.parse(readFileSync(packagePath, 'utf-8')).version;
+      if (packageVersion !== releaseVersion) {
+        throw new Error(`Desktop package version ${packageVersion} differs from release authority ${releaseVersion}`);
+      }
       const message = validateReleaseVersion({
         eventName: argument('--event'),
         releaseTag: argument('--tag'),

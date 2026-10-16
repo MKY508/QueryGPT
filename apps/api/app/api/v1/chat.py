@@ -307,16 +307,14 @@ async def _chat_stream_response(
                     if (event.type.value == "result" or event.is_terminal_progress) and not (
                         completion.committed
                     ):
-                        raise RuntimeError("Execution published a result before its completion commit")
+                        raise RuntimeError(
+                            "Execution published a result before its completion commit"
+                        )
                     accumulator.consume(event)
                     if accumulator.has_error:
                         terminal_events = [event]
                         break
-                    elif (
-                        terminal_events
-                        or accumulator.has_result
-                        or event.is_terminal_progress
-                    ):
+                    elif terminal_events or accumulator.has_result or event.is_terminal_progress:
                         terminal_events.append(event)
                     else:
                         yield event.to_sse()
@@ -354,7 +352,9 @@ async def _chat_stream_response(
                 await turn_state.apply(
                     db, partial(mark_conversation_exception, message=t("error.cancelled", language))
                 )
-                run_id = execution_service.analysis_run_id if execution_service is not None else None
+                run_id = (
+                    execution_service.analysis_run_id if execution_service is not None else None
+                )
                 interrupted_run = await db.get(AnalysisRun, run_id) if run_id is not None else None
                 if interrupted_run is not None:
                     await ensure_recovery_message(

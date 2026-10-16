@@ -129,7 +129,9 @@ async def test_planner_builds_dynamic_sections_and_filters_artifact_ids(monkeypa
     monkeypatch.setattr(report_draft, "_require_run", fake_require_run)
     monkeypatch.setattr(report_draft, "_load_artifacts", fake_load_artifacts)
     monkeypatch.setattr(report_draft, "_resolve_model", fake_resolve_model)
-    monkeypatch.setattr(report_draft, "model_session", lambda _config, **_kwargs: nullcontext(object()))
+    monkeypatch.setattr(
+        report_draft, "model_session", lambda _config, **_kwargs: nullcontext(object())
+    )
     monkeypatch.setattr(report_draft, "Agent", FakeAgent)
 
     current_report = ReportDraftCurrentReportContext(
@@ -231,7 +233,9 @@ async def test_planner_supports_summary_only_runs_and_repairs_blank_section_copy
     monkeypatch.setattr(report_draft, "_require_run", fake_require_run)
     monkeypatch.setattr(report_draft, "_load_artifacts", fake_load_artifacts)
     monkeypatch.setattr(report_draft, "_resolve_model", fake_resolve_model)
-    monkeypatch.setattr(report_draft, "model_session", lambda _config, **_kwargs: nullcontext(object()))
+    monkeypatch.setattr(
+        report_draft, "model_session", lambda _config, **_kwargs: nullcontext(object())
+    )
     monkeypatch.setattr(report_draft, "Agent", FakeAgent)
 
     plan = await report_draft.generate_report_draft_plan(

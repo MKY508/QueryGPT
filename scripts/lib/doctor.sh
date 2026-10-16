@@ -84,6 +84,11 @@ show_doctor() {
 
   echo "系统: $OS"
   echo "系统 Python: $PYTHON_CMD ($(selected_python_version))"
+  if check_command uv; then
+    echo "Python 依赖安装: $(uv --version) / uv.lock"
+  else
+    echo "Python 依赖安装: 缺少 uv（见 docs/DEVELOPMENT.md）"
+  fi
   if [ -x "$(venv_python)" ]; then
     echo "后端运行 Python: $(venv_python) ($(venv_python_version))"
   else
