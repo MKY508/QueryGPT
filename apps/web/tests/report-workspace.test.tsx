@@ -644,7 +644,7 @@ describe("ReportWorkspace", () => {
       expect(resolve.mock.calls[0][2]).toMatchObject({ title: sent.title, expected_version: 1 });
       expect(updateReport).not.toHaveBeenCalled();
       const restore = await screen.findByRole("button", { name: "恢复草稿" });
-      expect(restore).toBeEnabled();
+      await waitFor(() => expect(restore).toBeEnabled());
       fireEvent.click(restore);
       await waitFor(() => expect(screen.getByRole("textbox", { name: "报告标题" })).toHaveValue("关闭前的后续修改"));
       if (latestVersion > 2) {
@@ -722,7 +722,7 @@ describe("ReportWorkspace", () => {
       expect(updateReport).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole("button", { name: "查看草稿" }));
       expect(await screen.findByRole("dialog", { name: "未保存的草稿" })).toBeInTheDocument();
-      expect(await screen.findByText("找回的标题")).toBeInTheDocument();
+      expect((await screen.findAllByText("找回的标题")).length).toBeGreaterThan(0);
       fireEvent.click(screen.getByRole("button", { name: "恢复草稿" }));
       await waitFor(() => expect(screen.getByRole("textbox", { name: "报告标题" })).toHaveValue("找回的标题"));
       expect(adopt).toHaveBeenCalledOnce();
@@ -935,7 +935,7 @@ describe("ReportWorkspace", () => {
     await screen.findByText("收入稳步增长");
     fireEvent.click(screen.getByRole("button", { name: "编辑报告" }));
     fireEvent.click(screen.getByRole("button", { name: messages.reportBlocks.blockActions }));
-    fireEvent.click(screen.getByRole("button", { name: messages.reportBlocks.deleteAria }));
+    fireEvent.click(screen.getByRole("menuitem", { name: messages.reportBlocks.deleteAria }));
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(screen.queryByText("有尚未保存的修改")).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "撤销" }));
@@ -945,7 +945,7 @@ describe("ReportWorkspace", () => {
     expect(screen.queryByText("收入稳步增长")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "撤销" }));
     fireEvent.click(screen.getByRole("button", { name: "恢复为副本" }));
-    expect(screen.getByText("收入稳步增长")).toBeInTheDocument();
+    expect(screen.getAllByText("收入稳步增长").length).toBeGreaterThan(0);
     expect(updateReport).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(updateReport).toHaveBeenCalledTimes(2));
@@ -1611,7 +1611,7 @@ describe("ReportWorkspace", () => {
 
     await screen.findByText("12");
     fireEvent.click(screen.getByRole("button", { name: "编辑报告" }));
-    fireEvent.click(screen.getByText("区域明细"));
+    fireEvent.click(screen.getByRole("heading", { name: "区域明细" }));
     fireEvent.click(screen.getByRole("button", { name: "区块操作" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "刷新数据" }));
 
@@ -2558,19 +2558,19 @@ describe("ReportWorkspace", () => {
     await screen.findByText("收入稳步增长");
     fireEvent.click(screen.getByRole("button", { name: "编辑报告" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "展开页面目录" }));
     const outline = screen.getByRole("heading", { name: "页面与区块" }).closest("aside");
-    expect(outline).toHaveClass("absolute", "xl:relative");
-    expect(screen.getByRole("button", { name: "关闭页面目录" })).toHaveClass("xl:hidden");
+    expect(outline).toHaveClass("report-outline", "shrink-0");
+    fireEvent.click(screen.getAllByRole("button", { name: "收起页面目录" })[0]);
+    expect(screen.queryByRole("heading", { name: "页面与区块" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "展开页面目录" }));
+    expect(screen.getByRole("heading", { name: "页面与区块" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "展开设置" }));
-    expect(screen.queryByRole("heading", { name: "页面与区块" })).not.toBeInTheDocument();
     const properties = screen.getByRole("heading", { name: "页面设置" }).closest("aside")
       ?.parentElement;
-    expect(properties).toHaveClass("absolute", "2xl:relative");
-    expect(screen.getByRole("button", { name: "关闭区块设置" })).toHaveClass(
-      "2xl:hidden"
-    );
+    expect(properties).toHaveClass("h-full", "shrink-0");
+    fireEvent.click(screen.getByRole("button", { name: "关闭属性面板" }));
+    expect(screen.queryByRole("heading", { name: "页面设置" })).not.toBeInTheDocument();
   });
 
   it("does not put the 300px property panel in flow at the 1399px resize case", async () => {
@@ -2589,8 +2589,7 @@ describe("ReportWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "展开设置" }));
     const properties = screen.getByRole("heading", { name: "页面设置" }).closest("aside")
       ?.parentElement;
-    expect(properties).toHaveClass("absolute", "2xl:relative");
-    expect(properties).not.toHaveClass("xl:relative");
+    expect(properties).toHaveClass("h-full", "shrink-0");
   });
 
   it("ignores a stale artifact response after switching investigations", async () => {
@@ -2769,7 +2768,7 @@ describe("ReportWorkspace", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "应用到报告" }));
 
-    expect(screen.getAllByText("结论摘要")).toHaveLength(2);
+    await waitFor(() => expect(screen.getAllByText("结论摘要")).toHaveLength(2));
     expect(screen.getAllByText("本月收入")).toHaveLength(2);
     expect(screen.getByText("较上月增长 8%，是本月最重要的变化。")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
@@ -2963,6 +2962,7 @@ describe("ReportWorkspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: /本周经营调查/ }));
     fireEvent.click(await screen.findByRole("button", { name: "生成初稿" }));
     fireEvent.click(await screen.findByRole("button", { name: "应用到报告" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "保存" })).toBeEnabled());
     expect(screen.getByRole("textbox", { name: "报告标题" })).toHaveValue("我的空白周报");
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }));

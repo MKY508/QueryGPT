@@ -3084,9 +3084,29 @@ function ProjectUnderstandingSession({ projectId }: { projectId: string }) {
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">{t("header.description")}</p>
             </div>
-            <div className="grid min-w-0 flex-1 grid-cols-[minmax(220px,1fr)_auto_auto_auto] gap-2">
+            <div className="grid min-w-0 flex-1 grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto] gap-2">
               <SearchField value={search} onChange={setSearch} inputRef={detailSearchRef}
                 label={t("search.label")} clearLabel={t("search.clear")} />
+              <select
+                aria-label={t("filters.source")}
+                value={selectedScope?.key || ""}
+                onChange={(event) => {
+                  if (!event.target.value) {
+                    setSelectedScopeKey(null);
+                    return;
+                  }
+                  const scope = browserScopes.find((item) => item.key === event.target.value);
+                  if (scope) chooseScope(scope);
+                }}
+                className="h-9 min-w-0 max-w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+              >
+                <option value="">{t("header.allDefinitions")}</option>
+                {browserScopes.map((scope) => (
+                  <option key={scope.key} value={scope.key}>
+                    {`${"— ".repeat(Math.max(0, scope.depth))}${scope.businessName}`}
+                  </option>
+                ))}
+              </select>
               <select
                 aria-label={t("filters.contentType")}
                 value={entryType}

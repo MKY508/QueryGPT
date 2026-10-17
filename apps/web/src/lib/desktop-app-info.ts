@@ -140,13 +140,16 @@ export function subscribeToDesktopClose(): (() => void) | undefined {
   const unsubscribe = (window as WindowWithDesktopBridge).electronAPI?.onPrepareClose?.(async (command) => {
     if (!active) return "unavailable";
     if (command !== "inspect" && command !== "save" && command !== "discard" && command !== "cancel") return "unavailable";
-    const operation = ++operationRevision;
     if (command === "inspect") {
+      const current = inspect();
+      if (current === "busy") return current;
+      operationRevision += 1;
       cancelPreparations();
       try { for (const guard of settingsCloseGuards) guard.prepare(); }
       catch { cancelPreparations(); return "unavailable"; }
       return inspect();
     }
+    const operation = ++operationRevision;
     cancelPreparations(command === "cancel");
     if (command === "cancel") return "unavailable";
     const state = inspect();

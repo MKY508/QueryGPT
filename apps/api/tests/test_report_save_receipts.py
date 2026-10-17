@@ -81,7 +81,7 @@ async def test_resolving_save_receipt_is_read_only_and_requires_exact_parameters
         endpoint.replace(document["project_id"], str(uuid4())), json=payload
     )
     assert wrong_project.status_code == 404
-    await client.delete(url)
+    await client.delete(url, params={"expected_version": 3})
     assert (await client.post(endpoint, json=payload)).status_code == 404
 
 
@@ -194,6 +194,8 @@ async def test_report_delete_removes_receipts_and_replay_cannot_resurrect_it(cli
     url, document = await create_report(client, db_session)
     payload = save_payload(document)
     assert (await client.patch(url, json=payload)).status_code == 200
-    assert (await client.delete(url)).status_code == 200
+    assert (await client.delete(url, params={"expected_version": 2})).status_code == 200
+    trash_url = url.replace("/reports/", "/report-trash/")
+    assert (await client.delete(trash_url, params={"expected_version": 3})).status_code == 200
     assert await db_session.scalar(select(func.count()).select_from(ReportSaveReceipt)) == 0
     assert (await client.patch(url, json={**payload, "retry_save": True})).status_code == 404

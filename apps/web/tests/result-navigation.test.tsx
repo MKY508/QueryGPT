@@ -26,7 +26,7 @@ function Harness({ items = messages, scope = "conversation-one", focus, loading 
       renderResult={(message) => <><h1>{message.content}</h1><input aria-label={`note-${message.id}`} /></>} />
   </NextIntlClientProvider>;
 }
-const button = (name: string) => screen.getByRole("button", { name });
+const button = (name: string) => screen.getAllByRole("button", { name })[0];
 const back = () => button("上一个查看的结果"), forward = () => button("下一个查看的结果");
 const choose = (letter: string) => fireEvent.click(screen.getByRole("button", { name: new RegExp(`Question ${letter}`) }));
 const title = (value: string) => {
@@ -108,9 +108,9 @@ describe("result reading navigation", () => {
     choose("A"); fireEvent.click(back()); title("Third");
     const fourth: ChatMessage = { id: "d", role: "assistant", content: "Progress", originalQuery: "Question D", analysisRunId: "run-d", isLoading: true };
     view.rerender(<Harness items={[...messages, fourth]} />); title("Third");
-    fireEvent.click(button("专注阅读"));
+    fireEvent.click(button("收起工作区导航"));
     fireEvent.click(button("最新结果")); title("Progress");
-    expect(button("退出专注阅读")).toHaveAttribute("aria-pressed", "true");
+    expect(button("打开工作区导航")).toHaveAttribute("aria-expanded", "false");
     view.rerender(<Harness items={[...messages, { ...fourth, content: "Complete", isLoading: false }]} />); title("Complete");
     fireEvent.click(back()); title("Third");
     fireEvent.click(forward()); title("Complete");
@@ -126,6 +126,7 @@ describe("result reading navigation", () => {
     // Removing a visited result cannot make its old identity an action target.
     view.rerender(<Harness items={messages} />);
     fireEvent.click(back()); title("Third");
+    fireEvent.click(button("打开工作区导航"));
     choose("C"); // Explicitly resume following before leaving the result tab.
     fireEvent.click(screen.getByRole("tab", { name: "数据" }));
     view.rerender(<Harness items={[...messages, fourth]} />);

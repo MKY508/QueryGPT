@@ -71,7 +71,7 @@ describe("investigation activity", () => {
       { role: "user", content: "八月" }, { role: "assistant", id: "active", streamId: "stream-a", content: "当前进展", isLoading: true }];
     function Harness({ stopping = false, stream = "stream-a", messages = items }: { stopping?: boolean; stream?: string; messages?: ChatMessage[] }) {
       const [view, setView] = useState<WorkbenchView>("result");
-      return <NextIntlClientProvider locale="zh" messages={zh}><AnalysisWorkbench messages={messages} composer={<textarea defaultValue="下一条问题" />}
+      return <NextIntlClientProvider locale="zh" messages={zh}><AnalysisWorkbench header={<div>分析工作台</div>} messages={messages} composer={<textarea defaultValue="下一条问题" />}
         emptyContent={null} dataContent={null} renderResult={message => <h1>{message.content}</h1>} view={view} onViewChange={setView}
         onNewAnalysis={vi.fn()} onOpenHistory={vi.fn()} activeStreamId={stream} stopping={stopping} onStopStream={stop} /></NextIntlClientProvider>;
     }

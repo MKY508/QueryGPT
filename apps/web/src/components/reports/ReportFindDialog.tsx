@@ -54,7 +54,7 @@ export function ReportFindDialog({ report, query, onQuery, onSelect, onClose }: 
   const changeQuery = (value: string) => { onQuery(value); };
   const clear = () => { changeQuery(""); input.current?.focus(); };
 
-  return <TaskDialog dialogRef={dialog} writingRef={writing} activeRef={active} busy={false} size="compact" title={t("title")} closeLabel={t("close")} onClose={onClose} onEscape={() => { if (query) clear(); else onClose(); }}>
+  return <TaskDialog dialogRef={dialog} writingRef={writing} activeRef={active} busy={false} autoFocusClose={false} size="compact" title={t("title")} closeLabel={t("close")} onClose={onClose} onEscape={() => { if (query) clear(); else onClose(); }}>
     <div className="flex min-h-0 flex-col">
       <SearchField inputRef={input} value={query} maxLength={200} label={t("placeholder")} clearLabel={t("clear")} className="mx-5 my-4 shrink-0"
           onChange={changeQuery}

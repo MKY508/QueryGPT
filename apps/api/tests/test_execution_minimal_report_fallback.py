@@ -101,17 +101,17 @@ async def _stream_with_engine(
     conversation = Conversation(title="调查门店订单", status="active")
     db_session.add_all([project, conversation])
     await db_session.flush()
+    service = ExecutionService(db_session, project_id=project.id, language=language)
     run = AnalysisRun(
         project_id=project.id,
         conversation_id=conversation.id,
         query="汇总各门店订单",
         state="understanding",
         stage="understanding",
-        checkpoint=checkpoint or {},
+        checkpoint={**(checkpoint or {}), "stream_attempt_id": service.stream_attempt_id},
     )
     db_session.add(run)
     await db_session.commit()
-    service = ExecutionService(db_session, project_id=project.id, language=language)
 
     async def fake_load_inputs(**_kwargs):
         return SimpleNamespace(model_config=synthetic_model_config(model="test"), history=[])

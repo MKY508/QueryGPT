@@ -45,7 +45,6 @@ describe("business definition draft exit", () => {
     const field = input(), baseline = (field as HTMLTextAreaElement).value;
     fireEvent.change(field, { target: { value: `${baseline} ` } }); expect(unload()).toBe(true);
     fireEvent.change(field, { target: { value: baseline } }); expect(unload()).toBe(false); close();
-    fireEvent.click(screen.getByRole("button", { name: copy.details.close }));
     fireEvent.click(screen.getByRole("button", { name: copy.actions.addDefinition }));
     fireEvent.change(screen.getByRole("textbox", { name: copy.editor.name }), { target: { value: "待完善的定义" } });
     fireEvent.click(screen.getByRole("button", { name: copy.actions.cancel }));

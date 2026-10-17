@@ -21,6 +21,10 @@ async def test_previous_report_schema_upgrades_without_backfilling_fake_versions
             await db.commit()
             report_id = report.id
         async with engine.begin() as connection:
+            await connection.execute(text("DROP INDEX ix_analysis_history_updated"))
+            await connection.execute(
+                text("ALTER TABLE analysis_runs DROP COLUMN history_search_text")
+            )
             await connection.execute(text("DROP TABLE file_upload_receipts"))
             await connection.execute(text("DROP TABLE report_copy_receipts"))
             await connection.execute(text("DROP INDEX ix_report_trash"))

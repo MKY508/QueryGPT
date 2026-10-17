@@ -160,11 +160,13 @@ async def test_system_owned_confirmation_and_progress_follow_english_language(
     result = next(event for event in events if event.type == SSEEventType.RESULT)
     assert model.calls == 0
     assert progress[0] == {
+        "analysis_state": "understanding",
         "stage": "understanding",
         "step": "understand_data",
         "message": "Understanding the data and business definitions",
     }
     assert progress[-1] == {
+        "analysis_state": "waiting_confirmation",
         "stage": "waiting_confirmation",
         "step": "confirmation_required",
         "message": "A business definition that affects the conclusion needs confirmation",
@@ -211,7 +213,7 @@ def test_queued_product_milestones_use_stable_steps_and_runtime_language(
 ) -> None:
     runtime, _ = _runtime(monkeypatch, language="en")
 
-    runtime._queue_product_progress("read_files")
+    runtime.deps.queue_progress("read_files")
 
     assert runtime.deps.progress_queue.get_nowait() == {
         "stage": "investigating",

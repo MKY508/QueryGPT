@@ -21,6 +21,10 @@ async def test_prior_schema_adds_copy_receipts_without_copying_or_changing_repor
             await db.commit()
             identity = report.id
         async with engine.begin() as connection:
+            await connection.execute(text("DROP INDEX ix_analysis_history_updated"))
+            await connection.execute(
+                text("ALTER TABLE analysis_runs DROP COLUMN history_search_text")
+            )
             await connection.execute(text("DROP TABLE file_upload_receipts"))
             await connection.execute(text("DROP TABLE report_copy_receipts"))
             await connection.execute(

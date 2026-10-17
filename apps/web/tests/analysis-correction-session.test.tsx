@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -29,14 +29,14 @@ describe('correction draft ownership',()=>{
   await act(async()=>{client.setQueryData(['analysis-corrections','project'],[{...saved,text:'已更新的收入定义',updated_at:'2026-09-02'}]);});
   expect(input).toHaveValue('正在编辑：扣除退款再计算');
   fireEvent.click(screen.getByRole('button',{name:'取消'}));
-  expect(screen.getByText('已更新的收入定义')).toBeInTheDocument();
+  await waitFor(()=>expect(screen.getByText('已更新的收入定义')).toBeInTheDocument());
   fireEvent.click(screen.getByRole('button',{name:'修改'}));
   expect(screen.getByLabelText('正确的理解是什么？')).toHaveValue('已更新的收入定义');
  });
  it('stops showing a saved correction when it disappears from the authoritative query',async()=>{
   const {client}=mount();await screen.findByRole('button',{name:'撤销记录'});
   await act(async()=>{client.setQueryData(['analysis-corrections','project'],[]);});
-  expect(screen.queryByRole('button',{name:'撤销记录'})).not.toBeInTheDocument();
+  await waitFor(()=>expect(screen.queryByRole('button',{name:'撤销记录'})).not.toBeInTheDocument());
   expect(screen.getByRole('button',{name:'结论有偏差或口径不对？纠正这次理解'})).toBeInTheDocument();
  });
 });

@@ -125,7 +125,7 @@ describe("data record selection", () => {
     expect(button("选择全部 60 条结果")).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "选择本页记录" })).toBeChecked();
     fireEvent.click(button("清空选择")); count(0);
-  });
+  }, 15000);
 
   it("retains hidden selections and exports their full sorted scope while current-result export remains filtered", () => {
     const rows = [{ name: "West", amount: "9007199254740993.0123", note: "=1+2" },

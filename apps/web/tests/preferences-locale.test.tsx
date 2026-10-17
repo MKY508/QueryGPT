@@ -76,7 +76,7 @@ describe("PreferencesSettings locale switch", () => {
     fireEvent.click(screen.getByRole("button", { name: "中文" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(enMessages.preferences.languageChangeFailed);
     expect(mocks.refresh).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "中文" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "中文" })).toBeEnabled());
   });
 
   it("retains other sections' choices when saving only the visible section", async () => {

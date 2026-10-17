@@ -747,6 +747,7 @@ describe("DataWorkspacePanel project understanding", () => {
       expect(screen.queryByText("d".repeat(64))).not.toBeInTheDocument();
       expect(screen.queryByText(/operations|fingerprint|python|sql/i)).not.toBeInTheDocument();
 
+      fireEvent.click(screen.getByRole("button", { name: "返回修改" }));
       fireEvent.click(screen.getByRole("button", { name: /统一金额/ }));
       expect(clearSourceCleaningPreview).toHaveBeenLastCalledWith(source.id);
       expect(

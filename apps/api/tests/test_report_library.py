@@ -183,6 +183,8 @@ async def test_library_bootstrap_upgrades_populated_previous_schema_and_rejects_
             identity, updated = report.id, report.updated_at
         async with engine.begin() as connection:
             for statement in (
+                "DROP INDEX ix_analysis_history_updated",
+                "ALTER TABLE analysis_runs DROP COLUMN history_search_text",
                 "DROP TABLE file_upload_receipts",
                 "DROP TABLE report_copy_receipts",
                 "DROP INDEX ix_report_trash",

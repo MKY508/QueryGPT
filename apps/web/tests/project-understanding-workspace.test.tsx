@@ -227,7 +227,7 @@ describe("ProjectUnderstandingWorkspace", () => {
     expect(screen.getByLabelText("Next page")).toBeInTheDocument();
     expect(screen.getAllByText("财务分析").length).toBeGreaterThan(0);
     expect(screen.queryByText(/relationship_candidate/)).not.toBeInTheDocument();
-    expect(screen.getByTestId("semantic-scope-tree")).toHaveClass("md:flex");
+    expect(screen.getByTestId("semantic-scope-tree")).toHaveClass("flex");
   });
 
   it("localizes an API failure in English without exposing Chinese detail", async () => {
@@ -714,7 +714,7 @@ describe("ProjectUnderstandingWorkspace", () => {
       .find((element) => element.closest("tr"));
     expect(adoptedSummary).toBeDefined();
     fireEvent.click(adoptedSummary?.closest("tr") as HTMLElement);
-    const details = screen.getByRole("complementary", { name: "项目理解详情" });
+    const details = screen.getByTestId("semantic-detail-panel");
     expect(
       within(details).getByText("名称和业务含义尚未补充。")
     ).toBeInTheDocument();
@@ -769,7 +769,7 @@ describe("ProjectUnderstandingWorkspace", () => {
     render(<ProjectUnderstandingWorkspace projectId="project-1" />);
 
     expect((await screen.findAllByText("财务分析")).length).toBeGreaterThan(0);
-    const details = screen.getByRole("complementary", { name: "项目理解详情" });
+    const details = screen.getByTestId("semantic-detail-panel");
     expect(within(details).getByText("全部定义")).toBeInTheDocument();
     expect(within(details).queryByText(/remote-db/)).not.toBeInTheDocument();
     expect(within(details).queryByText("添加方式")).not.toBeInTheDocument();
@@ -1483,7 +1483,7 @@ describe("ProjectUnderstandingWorkspace", () => {
     );
     expect(screen.getByRole("button", { name: "验证" })).toBeDisabled();
     const details = within(
-      screen.getByRole("complementary", { name: "项目理解详情" })
+      screen.getByTestId("semantic-detail-panel")
     );
     expect(details.getByRole("button", { name: "验证" })).toBeDisabled();
     expect(details.getByRole("button", { name: "编辑" })).toBeDisabled();

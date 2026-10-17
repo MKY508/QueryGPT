@@ -177,6 +177,10 @@ async def test_previous_schema_adds_upload_receipts_without_changing_sources(tmp
             await db.commit()
             identity = source.id
         async with engine.begin() as connection:
+            await connection.execute(text("DROP INDEX ix_analysis_history_updated"))
+            await connection.execute(
+                text("ALTER TABLE analysis_runs DROP COLUMN history_search_text")
+            )
             await connection.execute(text("DROP TABLE file_upload_receipts"))
             await connection.execute(
                 text("UPDATE alembic_version SET version_num = '0028_report_copy_receipts'")

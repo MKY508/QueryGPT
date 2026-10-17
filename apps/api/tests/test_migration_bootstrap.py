@@ -62,6 +62,8 @@ def _create_pre_retirement_schema(sync_connection) -> None:
     sync_connection.exec_driver_sql(
         "ALTER TABLE semantic_entries DROP COLUMN recommendation_batch_id"
     )
+    sync_connection.exec_driver_sql("DROP INDEX ix_analysis_history_updated")
+    sync_connection.exec_driver_sql("ALTER TABLE analysis_runs DROP COLUMN history_search_text")
     sync_connection.exec_driver_sql("DROP TABLE file_upload_receipts")
     sync_connection.exec_driver_sql("DROP TABLE report_copy_receipts")
     sync_connection.exec_driver_sql("DROP TABLE report_revisions")

@@ -84,18 +84,32 @@ async def _old_database(tmp_path: Path):
                 business_name="Context",
             )
         )
-        report = ReportDocument(
-            id=REPORT_ID,
-            project_id=project.id,
-            title="Report 10",
-            description="Retained",
-            version=7,
-            updated_at=datetime(2026, 9, 1, tzinfo=UTC),
-            extra_data={"keep": [1, 2]},
-        )
-        session.add(report)
         await session.flush()
-        page = ReportPage(id=PAGE_ID, report_id=report.id, title="Page", version=3)
+        await session.execute(
+            sa.text(
+                "INSERT INTO report_documents ("
+                "id, project_id, title, description, search_text, name_key, "
+                "status, version, extra_data, created_at, updated_at"
+                ") VALUES ("
+                ":id, :project_id, :title, :description, :search_text, :name_key, "
+                ":status, :version, :extra_data, :created_at, :updated_at"
+                ")"
+            ),
+            {
+                "id": REPORT_ID.hex,
+                "project_id": project.id.hex,
+                "title": "Report 10",
+                "description": "Retained",
+                "search_text": "report 10\nretained",
+                "name_key": "report 00000000000000000010",
+                "status": "draft",
+                "version": 7,
+                "extra_data": '{"keep": [1, 2]}',
+                "created_at": "2026-09-01 00:00:00+00:00",
+                "updated_at": "2026-09-01 00:00:00+00:00",
+            },
+        )
+        page = ReportPage(id=PAGE_ID, report_id=REPORT_ID, title="Page", version=3)
         session.add(page)
         await session.flush()
         session.add(
@@ -118,7 +132,18 @@ def test_runtime_uuid_types_cover_migration_and_keep_postgresql_native():
         for name, table in Base.metadata.tables.items()
     }
     actual = {name: columns for name, columns in actual.items() if columns}
-    assert actual == {**_migration().UUID_COLUMNS, "report_save_receipts": ("report_id",)}
+    assert actual == {
+        **_migration().UUID_COLUMNS,
+        "report_save_receipts": ("report_id",),
+        "report_revisions": ("report_id",),
+        "report_copy_receipts": (
+            "project_id",
+            "request_id",
+            "source_report_id",
+            "target_report_id",
+        ),
+        "file_upload_receipts": ("project_id", "request_id", "source_id"),
+    }
     for table, names in actual.items():
         for name in names:
             type_ = Base.metadata.tables[table].c[name].type

@@ -1445,8 +1445,8 @@ async def test_confirmed_year_department_and_sales_semantics_execute_together(
     _ = [event async for event in runtime.execute(query="看 2023 年哪个部门的销量")]
 
     assert runtime.deps.dataframes["department_sales_2023"] == [
-        {"部门": "华东部", metric_alias: 5.0},
-        {"部门": "华北部", metric_alias: 8.0},
+        {"部门": "华东部", metric_alias: "5"},
+        {"部门": "华北部", metric_alias: "8"},
     ]
     metadata = runtime.deps.result_metadata["department_sales_2023"]
     assert [item["dimension_key"] for item in metadata["semantic_dimensions"]] == [department_key]
@@ -1644,8 +1644,8 @@ async def test_confirmed_derived_metric_uses_governed_formula_with_year_and_depa
     _ = [event async for event in runtime.execute(query="看 2023 年哪个部门的毛利")]
 
     assert runtime.deps.dataframes["department_profit_2023"] == [
-        {"部门": "华东部", metric_alias: 40.0},
-        {"部门": "华北部", metric_alias: 30.0},
+        {"部门": "华东部", metric_alias: "40"},
+        {"部门": "华北部", metric_alias: "30"},
     ]
     metadata = runtime.deps.result_metadata["department_profit_2023"]
     assert metadata["semantic_metric"]["kind"] == "semantic_derived_metric_binding"

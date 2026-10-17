@@ -53,7 +53,7 @@ export function DataRecordDetails({ record, position, total, columns, kinds, fil
     <div className="shrink-0 border-b border-border px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0"><h3 className="text-sm font-semibold">{t("recordDetails")}</h3>
-          <p id={fieldStatusId} role="status" aria-atomic="true" className={fieldQuery.trim() ? "mt-1 text-[11px] tabular-nums text-muted-foreground" : "sr-only"}>
+          <p id={fieldStatusId} role={fieldQuery.trim() ? "status" : undefined} aria-live="polite" aria-atomic="true" className={fieldQuery.trim() ? "mt-1 text-[11px] tabular-nums text-muted-foreground" : "sr-only"}>
             {t("fieldMatches", { count: fields.length, total: columns.length })}
           </p>
         </div>

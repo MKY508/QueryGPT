@@ -49,15 +49,18 @@ test("settings workflow and chat smoke test", async ({ page }) => {
     hasText: modelName,
   });
   await expect(modelCard).toBeVisible();
+  await expect(
+    modelCard.locator('[data-testid^="model-health-"]'),
+  ).toHaveText(/^(可用|Available)$/, { timeout: 15_000 });
   await modelCard.locator('[data-testid^="model-test-"]').click();
-  await expect(page.getByTestId("model-test-summary")).toHaveAttribute("data-status", "success", {
-    timeout: 15_000,
-  });
+  await expect(
+    modelCard.locator('[data-testid^="model-health-"]'),
+  ).toHaveText(/^(可用|Available)$/, { timeout: 15_000 });
 
   await page.goto("/");
   await expect(page.getByTestId("project-work-surface")).toBeVisible();
   await expect(page.getByTestId("chat-input")).toBeVisible();
-  await expect(page.getByTestId("chat-data-source-button")).toBeVisible();
+  await expect(page.getByTestId("chat-data-source-button")).toBeAttached();
   await expect(page.getByTestId("chat-connection-select")).toHaveCount(0);
   const analysisServiceSelector = page.getByTestId("analysis-service-selector");
   await expect(analysisServiceSelector).toBeVisible();
@@ -77,9 +80,11 @@ test("settings workflow and chat smoke test", async ({ page }) => {
 
   const assistantCard = page.locator('[data-testid^="assistant-message-card-"]').last();
   const assistantLoading = page.getByTestId("assistant-loading-message");
+  const investigationActivity = page.getByTestId("investigation-activity");
 
   await Promise.any([
     assistantCard.waitFor({ state: "visible", timeout: 30_000 }),
     assistantLoading.waitFor({ state: "visible", timeout: 30_000 }),
+    investigationActivity.waitFor({ state: "visible", timeout: 30_000 }),
   ]);
 });

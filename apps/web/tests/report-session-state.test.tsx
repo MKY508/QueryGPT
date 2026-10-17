@@ -116,7 +116,7 @@ describe("report session state", () => {
     rerender(view(true, "block-2"));
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle());
-    fireEvent.click(screen.getByRole("button", { name: messages.reportBlocks.moveUpAria }));
+    fireEvent.click(screen.getByRole("menuitem", { name: messages.reportBlocks.moveUpAria }));
     expect(move).toHaveBeenCalledExactlyOnceWith(-1);
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
   });

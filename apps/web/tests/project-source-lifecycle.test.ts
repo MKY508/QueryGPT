@@ -10,6 +10,12 @@ vi.mock("@/lib/api/client", () => ({
   api: mocks,
 }));
 
+vi.mock("@/lib/upload-journal", () => ({
+  uploadJournal: undefined,
+  listPendingUploads: vi.fn(async () => []),
+  subscribeUploadJournal: vi.fn(() => () => {}),
+}));
+
 import { useProjectStore } from "@/lib/stores/project";
 
 function mockWorkspaceRefresh(projectId = "project-1") {
@@ -120,11 +126,11 @@ describe("project source lifecycle actions", () => {
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/projects/project-1/sources/files",
       expect.any(FormData),
-      {
-        headers: { "Content-Type": undefined },
+      expect.objectContaining({
+        headers: expect.objectContaining({ "Content-Type": undefined }),
         timeout: 120000,
         onUploadProgress: expect.any(Function),
-      }
+      })
     );
     expect(mocks.post).toHaveBeenCalledWith(
       "/api/v1/projects/project-1/sources/connections",

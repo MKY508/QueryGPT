@@ -756,6 +756,8 @@ describe("data view", () => {
       fireEvent.keyDown(search, { key: "z", metaKey: true });
       expect(keydown).not.toHaveBeenCalled();
       fireEvent.keyDown(search, { key: "Escape" });
+      expect(search).toHaveValue("");
+      fireEvent.keyDown(search, { key: "Escape" });
       expect(chooser.open).toBe(false);
       expect(dialog).toHaveAttribute("open");
       fireEvent.click(screen.getByRole("button", { name: "关闭数据窗口" }));

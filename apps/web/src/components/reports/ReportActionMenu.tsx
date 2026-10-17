@@ -52,10 +52,19 @@ export function ReportActionMenu({ label, text, disabled = false, align = "start
     const dismiss = (event: PointerEvent) => {
       if (event.target instanceof Node && !anchor.contains(event.target)) onOpenChange(false);
     };
+    const keydown = (event: KeyboardEvent) => {
+      if (!event.defaultPrevented && !event.isComposing && event.keyCode !== 229 && event.key === "Escape") {
+        event.preventDefault();
+        onOpenChange(false);
+        trigger.current?.focus();
+      }
+    };
     document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", keydown);
     window.addEventListener("resize", position);
     return () => {
       document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", keydown);
       window.removeEventListener("resize", position);
     };
   }, [open, onOpenChange, align]);

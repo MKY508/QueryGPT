@@ -2961,7 +2961,7 @@ async def test_prepared_standing_run_starts_once_and_survives_restart_discovery(
     assert run.checkpoint["standing_analysis"]["input_token"] == "a" * 64
     assert run.checkpoint["standing_analysis"]["started_at"]
 
-    with pytest.raises(CheckpointError, match="没有可恢复"):
+    with pytest.raises(CheckpointError, match="已在运行或已经完成"):
         await service._prepare_analysis_run(
             query=run.query,
             conversation_id=conversation.id,

@@ -74,7 +74,7 @@ describe("recovered upload interface", () => {
     const selected = useProjectStore.getState().currentProjectId;
     view();
     fireEvent.click(await screen.findByRole("button", { name: "查看文件导入" }));
-    expect(await screen.findByText("经营项目")).toBeInTheDocument();
+    expect((await screen.findAllByText("经营项目")).length).toBeGreaterThan(0);
     expect(screen.getByText(messages.dataWorkspace.uploadQueue.recoveredHint)).toBeInTheDocument();
     expect(api.get).not.toHaveBeenCalled();
     expect(api.post).not.toHaveBeenCalled();

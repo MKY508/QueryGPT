@@ -409,6 +409,7 @@ async def test_create_list_and_get_report_with_manual_and_artifact_blocks(
             "version": 1,
             "page_count": 1,
             "block_count": 2,
+            "deleted_at": None,
             "created_at": document["created_at"],
             "updated_at": document["updated_at"],
         }
@@ -432,8 +433,9 @@ async def test_full_document_update_upserts_pages_and_blocks_with_version_guard(
     project = Project(name="可编辑报表")
     db_session.add(project)
     await db_session.commit()
+    project_id = str(project.id)
     created = await client.post(
-        f"/api/v1/projects/{project.id}/reports",
+        f"/api/v1/projects/{project_id}/reports",
         json={
             "title": "初稿",
             "pages": [
@@ -456,7 +458,7 @@ async def test_full_document_update_upserts_pages_and_blocks_with_version_guard(
     block = page["blocks"][0]
 
     updated = await client.patch(
-        f"/api/v1/projects/{project.id}/reports/{initial['id']}",
+        f"/api/v1/projects/{project_id}/reports/{initial['id']}",
         json={
             "expected_version": 1,
             "title": "正式经营报告",
@@ -510,11 +512,11 @@ async def test_full_document_update_upserts_pages_and_blocks_with_version_guard(
     # second writer that presents the same expected version.
     monkeypatch.setattr(reports_api, "_assert_expected_version", lambda *_args: None)
     stale = await client.patch(
-        f"/api/v1/projects/{project.id}/reports/{initial['id']}",
+        f"/api/v1/projects/{project_id}/reports/{initial['id']}",
         json={"expected_version": 1, "title": "过期覆盖"},
     )
     assert stale.status_code == 409
-    detail = await client.get(f"/api/v1/projects/{project.id}/reports/{initial['id']}")
+    detail = await client.get(f"/api/v1/projects/{project_id}/reports/{initial['id']}")
     assert detail.json()["data"]["title"] == "正式经营报告"
 
 

@@ -1658,7 +1658,7 @@ async def _report_refresh_targets(
         targets.append(
             _RefreshTarget(
                 block.id,
-                block.version,
+                block.version if block_id is None else expected_version,
                 ReportBlock(
                     block_type=block.block_type,
                     title=block.title,
