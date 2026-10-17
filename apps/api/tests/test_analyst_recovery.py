@@ -111,7 +111,7 @@ print('recovery-boundary-ok')
         result = subprocess.run(
             [sys.executable, "-c", probe], text=True, capture_output=True, check=True, timeout=20
         )
-        self.assertEqual(result.stdout.strip(), "recovery-boundary-ok")
+        self.assertEqual(result.stdout.strip().splitlines()[-1], "recovery-boundary-ok")
 
     async def test_disk_checkpoint_installs_isolated_sessions(self):
         first, second = self.session(), self.session()

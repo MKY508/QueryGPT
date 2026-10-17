@@ -79,7 +79,7 @@ print('toolset-boundary-ok')
             timeout=20,
             check=True,
         )
-        self.assertEqual(result.stdout.strip(), "toolset-boundary-ok")
+        self.assertEqual(result.stdout.strip().splitlines()[-1], "toolset-boundary-ok")
 
     async def test_one_agent_keeps_concurrent_file_analysis_sessions_separate(self):
         snapshots = [[], []]

@@ -15,6 +15,7 @@ const nextDistDir =
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
 
   output: 'standalone',
   distDir: nextDistDir,
